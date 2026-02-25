@@ -10,6 +10,7 @@ import '../../core/services/test_data_generator.dart';
 import '../../features/targets/data/models/target_model.dart';
 import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
+import '../../features/profile/data/models/user_profile.dart';
 
 // ==================== Service Providers ====================
 
@@ -533,4 +534,38 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
   }
 
   String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
+// ==================== Profile Providers ====================
+
+/// Current user profile
+final userProfileProvider = StateNotifierProvider<UserProfileNotifier, UserProfile?>((ref) {
+  return UserProfileNotifier();
+});
+
+/// Is profile loading
+final isProfileLoadingProvider = Provider<bool>((ref) {
+  return ref.watch(userProfileProvider) == null;
+});
+
+/// Profile Notifier
+class UserProfileNotifier extends StateNotifier<UserProfile?> {
+  UserProfileNotifier() : super(null) {
+    _loadProfile();
+  }
+
+  void _loadProfile() {
+    // TODO: Load from Hive or API
+    // For now, use mock data
+    state = UserProfile.mock();
+  }
+
+  Future<void> updateProfile(UserProfile profile) async {
+    // TODO: Save to Hive and sync to API
+    state = profile.copyWith(updatedAt: DateTime.now());
+  }
+
+  Future<void> logout() async {
+    state = null;
+  }
 }
