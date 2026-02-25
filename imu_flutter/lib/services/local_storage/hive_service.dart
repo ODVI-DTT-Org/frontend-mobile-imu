@@ -13,6 +13,7 @@ class HiveService {
   static const String _settingsBox = 'settings';
   static const String _pendingSyncBox = 'pending_sync';
   static const String _cacheBox = 'cache';
+  static const String _attendanceBox = 'attendance';
 
   bool _isInitialized = false;
 
@@ -29,6 +30,7 @@ class HiveService {
       Hive.openBox<String>(_settingsBox),
       Hive.openBox<String>(_pendingSyncBox),
       Hive.openBox<String>(_cacheBox),
+      Hive.openBox<String>(_attendanceBox),
     ]);
 
     _isInitialized = true;

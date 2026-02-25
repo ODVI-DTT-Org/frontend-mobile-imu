@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/local_storage/hive_service.dart';
 import '../../services/sync/sync_service.dart';
@@ -7,6 +9,7 @@ import '../../core/services/location_service.dart';
 import '../../core/services/test_data_generator.dart';
 import '../../features/targets/data/models/target_model.dart';
 import '../../features/visits/data/models/missed_visit_model.dart';
+import '../../features/attendance/data/models/attendance_record.dart';
 
 // ==================== Service Providers ====================
 
@@ -402,3 +405,132 @@ final missedVisitsCountProvider = Provider<Map<MissedVisitPriority, int>>((ref) 
     MissedVisitPriority.low: missedVisits.where((v) => v.priority == MissedVisitPriority.low).length,
   };
 });
+
+// ==================== Attendance Providers ====================
+
+/// Attendance records box name
+const _attendanceBox = 'attendance';
+
+/// Today's attendance record
+final todayAttendanceProvider = StateNotifierProvider<TodayAttendanceNotifier, AttendanceRecord?>((ref) {
+  return TodayAttendanceNotifier(ref.watch(hiveServiceProvider));
+});
+
+/// Is user currently checked in
+final isCheckedInProvider = Provider<bool>((ref) {
+  final today = ref.watch(todayAttendanceProvider);
+  return today?.status == AttendanceStatus.checkedIn;
+});
+
+/// Attendance history (last 14 days)
+final attendanceHistoryProvider = FutureProvider<List<AttendanceRecord>>((ref) async {
+  final hiveService = ref.watch(hiveServiceProvider);
+  if (!hiveService.isInitialized) await hiveService.init();
+
+  final records = <AttendanceRecord>[];
+  final box = Hive.box<String>(_attendanceBox);
+
+  final twoWeeksAgo = DateTime.now().subtract(const Duration(days: 14));
+
+  for (final key in box.keys) {
+    final data = box.get(key);
+    if (data != null) {
+      final record = AttendanceRecord.fromJson(
+        Map<String, dynamic>.from(const JsonDecoder().convert(data)),
+      );
+      if (record.date.isAfter(twoWeeksAgo)) {
+        records.add(record);
+      }
+    }
+  }
+
+  records.sort((a, b) => b.date.compareTo(a.date));
+  return records;
+});
+
+/// Attendance stats for current month
+final attendanceStatsProvider = Provider<Map<String, dynamic>>((ref) {
+  final historyAsync = ref.watch(attendanceHistoryProvider);
+  final now = DateTime.now();
+
+  return historyAsync.when(
+    data: (records) {
+      final monthRecords = records.where((r) =>
+        r.date.month == now.month && r.date.year == now.year
+      ).toList();
+
+      final completeDays = monthRecords.where((r) => r.status == AttendanceStatus.checkedOut).length;
+      final totalHours = monthRecords.fold<double>(0, (sum, r) => sum + (r.totalHours ?? 0));
+
+      return {
+        'daysWorked': completeDays,
+        'totalHours': totalHours.toStringAsFixed(1),
+        'averageHours': completeDays > 0 ? (totalHours / completeDays).toStringAsFixed(1) : '0',
+      };
+    },
+    loading: () => {'daysWorked': 0, 'totalHours': '0', 'averageHours': '0'},
+    error: (_, __) => {'daysWorked': 0, 'totalHours': '0', 'averageHours': '0'},
+  );
+});
+
+/// Today's Attendance Notifier
+class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
+  final HiveService _hiveService;
+
+  TodayAttendanceNotifier(this._hiveService) : super(null) {
+    _loadToday();
+  }
+
+  Future<void> _loadToday() async {
+    if (!_hiveService.isInitialized) await _hiveService.init();
+    final today = _formatDate(DateTime.now());
+    final box = Hive.box<String>(_attendanceBox);
+    final data = box.get(today);
+
+    if (data != null) {
+      state = AttendanceRecord.fromJson(
+        Map<String, dynamic>.from(const JsonDecoder().convert(data)),
+      );
+    } else {
+      state = null;
+    }
+  }
+
+  Future<void> checkIn(AttendanceLocation location) async {
+    final now = DateTime.now();
+    final userId = 'user-1'; // TODO: Get from auth provider
+
+    final record = AttendanceRecord(
+      id: _formatDate(now),
+      userId: userId,
+      date: DateTime(now.year, now.month, now.day),
+      checkInTime: now,
+      checkInLocation: location,
+      status: AttendanceStatus.checkedIn,
+    );
+
+    await _saveRecord(record);
+    state = record;
+  }
+
+  Future<void> checkOut(AttendanceLocation location) async {
+    if (state == null) return;
+
+    final now = DateTime.now();
+    final record = state!.copyWith(
+      checkOutTime: now,
+      checkOutLocation: location,
+      status: AttendanceStatus.checkedOut,
+    );
+
+    await _saveRecord(record);
+    state = record;
+  }
+
+  Future<void> _saveRecord(AttendanceRecord record) async {
+    final box = Hive.box<String>(_attendanceBox);
+    await box.put(record.id, const JsonEncoder().convert(record.toJson()));
+  }
+
+  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
