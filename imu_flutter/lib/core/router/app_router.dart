@@ -17,6 +17,7 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/debug/presentation/pages/debug_dashboard_page.dart';
 import '../../features/targets/presentation/pages/targets_page.dart';
 import '../../features/visits/presentation/pages/missed_visits_page.dart';
+import '../../features/calculator/presentation/pages/loan_calculator_page.dart';
 import '../../shared/widgets/main_shell.dart';
 
 // Auth state provider
@@ -123,6 +124,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/targets',
         builder: (context, state) => const TargetsPage(),
+      ),
+
+      // Calculator route
+      GoRoute(
+        path: '/calculator',
+        builder: (context, state) => const LoanCalculatorPage(),
       ),
 
       // Debug route (development only)
