@@ -232,6 +232,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       case 'calculator':
         context.push('/calculator');
         break;
+      case 'attendance':
+        context.push('/attendance');
+        break;
       case 'debug':
         context.push('/debug');
         break;

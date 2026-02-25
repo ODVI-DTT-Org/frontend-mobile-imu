@@ -18,6 +18,7 @@ import '../../features/debug/presentation/pages/debug_dashboard_page.dart';
 import '../../features/targets/presentation/pages/targets_page.dart';
 import '../../features/visits/presentation/pages/missed_visits_page.dart';
 import '../../features/calculator/presentation/pages/loan_calculator_page.dart';
+import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../shared/widgets/main_shell.dart';
 
 // Auth state provider
@@ -130,6 +131,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/calculator',
         builder: (context, state) => const LoanCalculatorPage(),
+      ),
+
+      // Attendance route
+      GoRoute(
+        path: '/attendance',
+        builder: (context, state) => const AttendancePage(),
       ),
 
       // Debug route (development only)
