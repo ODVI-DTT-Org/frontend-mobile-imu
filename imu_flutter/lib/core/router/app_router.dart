@@ -16,6 +16,7 @@ import '../../features/my_day/presentation/pages/my_day_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/debug/presentation/pages/debug_dashboard_page.dart';
 import '../../features/targets/presentation/pages/targets_page.dart';
+import '../../features/visits/presentation/pages/missed_visits_page.dart';
 import '../../shared/widgets/main_shell.dart';
 
 // Auth state provider
@@ -110,6 +111,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsPage(),
+      ),
+
+      // Missed visits route
+      GoRoute(
+        path: '/visits',
+        builder: (context, state) => const MissedVisitsPage(),
       ),
 
       // Targets route
