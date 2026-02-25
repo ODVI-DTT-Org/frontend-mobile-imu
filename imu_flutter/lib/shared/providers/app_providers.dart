@@ -6,6 +6,7 @@ import '../../services/location/geolocation_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/test_data_generator.dart';
 import '../../features/targets/data/models/target_model.dart';
+import '../../features/visits/data/models/missed_visit_model.dart';
 
 // ==================== Service Providers ====================
 
@@ -309,3 +310,95 @@ List<Target> _getMockTargets() {
     ),
   ];
 }
+
+// ==================== Missed Visits Providers ====================
+
+/// Missed visits filter
+final missedVisitsFilterProvider = StateProvider<MissedVisitPriority?>((ref) {
+  return null; // null means show all
+});
+
+/// Compute missed visits from clients and touchpoints
+final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
+  final clientsAsync = ref.watch(clientsProvider);
+
+  return clientsAsync.when(
+    data: (clients) {
+      final missedVisits = <MissedVisit>[];
+
+      for (final client in clients) {
+        // Get the next expected touchpoint
+        final nextTouchpointNum = client.completedTouchpoints + 1;
+        if (nextTouchpointNum > 7) continue; // All touchpoints completed
+
+        final nextType = client.nextTouchpointType;
+        if (nextType == null) continue;
+
+        // Determine scheduled date based on last touchpoint or client creation
+        DateTime scheduledDate;
+        if (client.touchpoints.isNotEmpty) {
+          final lastTouchpoint = client.touchpoints.last;
+          // Schedule next touchpoint 3 days after last one
+          scheduledDate = lastTouchpoint.date.add(const Duration(days: 3));
+        } else {
+          // If no touchpoints, check if client was created more than 3 days ago
+          scheduledDate = client.createdAt.add(const Duration(days: 3));
+        }
+
+        // Check if overdue
+        if (DateTime.now().isAfter(scheduledDate)) {
+          final primaryPhone = client.phoneNumbers.isNotEmpty
+              ? client.phoneNumbers.first.number
+              : null;
+          final primaryAddress = client.addresses.isNotEmpty
+              ? client.addresses.first.fullAddress
+              : null;
+
+          missedVisits.add(MissedVisit(
+            id: '${client.id}_$nextTouchpointNum',
+            clientId: client.id,
+            clientName: client.fullName,
+            touchpointNumber: nextTouchpointNum,
+            touchpointType: nextType,
+            scheduledDate: scheduledDate,
+            createdAt: DateTime.now(),
+            primaryPhone: primaryPhone,
+            primaryAddress: primaryAddress,
+          ));
+        }
+      }
+
+      // Sort by priority (high first) then by days overdue
+      missedVisits.sort((a, b) {
+        final priorityCompare = b.priority.index.compareTo(a.priority.index);
+        if (priorityCompare != 0) return priorityCompare;
+        return b.daysOverdue.compareTo(a.daysOverdue);
+      });
+
+      return missedVisits;
+    },
+    loading: () => [],
+    error: (_, __) => [],
+  );
+});
+
+/// Filtered missed visits by priority
+final filteredMissedVisitsProvider = Provider<List<MissedVisit>>((ref) {
+  final missedVisits = ref.watch(missedVisitsProvider);
+  final filter = ref.watch(missedVisitsFilterProvider);
+
+  if (filter == null) return missedVisits;
+
+  return missedVisits.where((v) => v.priority == filter).toList();
+});
+
+/// Missed visits count by priority
+final missedVisitsCountProvider = Provider<Map<MissedVisitPriority, int>>((ref) {
+  final missedVisits = ref.watch(missedVisitsProvider);
+
+  return {
+    MissedVisitPriority.high: missedVisits.where((v) => v.priority == MissedVisitPriority.high).length,
+    MissedVisitPriority.medium: missedVisits.where((v) => v.priority == MissedVisitPriority.medium).length,
+    MissedVisitPriority.low: missedVisits.where((v) => v.priority == MissedVisitPriority.low).length,
+  };
+});
