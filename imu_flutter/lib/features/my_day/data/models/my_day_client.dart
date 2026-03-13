@@ -79,7 +79,15 @@ class MyDayClient {
           other.isTimeIn == isTimeIn;
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => Object.hash(
+        id,
+        fullName,
+        agencyName,
+        location,
+        touchpointNumber,
+        touchpointType,
+        isTimeIn,
+      );
 
   @override
   String toString() =>
