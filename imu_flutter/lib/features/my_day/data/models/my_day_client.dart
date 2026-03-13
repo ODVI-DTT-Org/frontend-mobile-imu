@@ -19,7 +19,7 @@ class MyDayClient {
   });
 
   String get touchpointOrdinal {
-    if (touchpointNumber == 0) return '';
+    if (touchpointNumber < 1 || touchpointNumber > 7) return '';
     const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
     return ordinals[touchpointNumber - 1];
   }
@@ -65,4 +65,23 @@ class MyDayClient {
       isTimeIn: isTimeIn ?? this.isTimeIn,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MyDayClient &&
+          other.id == id &&
+          other.fullName == fullName &&
+          other.agencyName == agencyName &&
+          other.location == location &&
+          other.touchpointNumber == touchpointNumber &&
+          other.touchpointType == touchpointType &&
+          other.isTimeIn == isTimeIn;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() =>
+      'MyDayClient(id: $id, fullName: $fullName, touchpoint: $touchpointOrdinal)';
 }
