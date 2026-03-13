@@ -42,8 +42,8 @@ class HeaderButtons extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(3, (index) =>
-        Padding(
-          padding: EdgeInsets.only(left: index == 0 ? 0 : -8),
+        Transform.translate(
+          offset: Offset(index == 0 ? 0 : -8.0, 0),
           child: const Icon(
             LucideIcons.hand,
             size: 14,
