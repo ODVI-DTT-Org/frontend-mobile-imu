@@ -327,7 +327,8 @@ class SyncService extends ChangeNotifier {
           final localUpdated = existingClient['updatedAt'] as String?;
           final serverUpdated = record.updated;
 
-          if (serverUpdated != null && localUpdated != null) {
+          // serverUpdated is never null from PocketBase, but check localUpdated
+          if (localUpdated != null) {
             final serverTime = DateTime.parse(serverUpdated);
             final localTime = DateTime.parse(localUpdated);
 
