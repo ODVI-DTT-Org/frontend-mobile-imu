@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Inter">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/imu_flutter/assets/fonts/Inter.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

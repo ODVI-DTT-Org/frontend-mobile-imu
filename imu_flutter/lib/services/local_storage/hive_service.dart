@@ -48,6 +48,12 @@ class HiveService {
     await box.put(id, jsonEncode(client));
   }
 
+  /// Add a client (alias for saveClient with auto-ID extraction)
+  Future<void> addClient(Map<String, dynamic> client) async {
+    final id = client['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+    await saveClient(id, client);
+  }
+
   /// Get a client by ID
   Map<String, dynamic>? getClient(String id) {
     final box = Hive.box<String>(_clientsBox);
@@ -64,6 +70,13 @@ class HiveService {
     return box.values
         .map((data) => jsonDecode(data) as Map<String, dynamic>)
         .toList();
+  }
+
+  /// Update a client (alias for saveClient)
+  Future<void> updateClient(Map<String, dynamic> client) async {
+    final id = client['id'] as String?;
+    if (id == null) throw ArgumentError('Client ID is required');
+    await saveClient(id, client);
   }
 
   /// Delete a client
@@ -96,6 +109,19 @@ class HiveService {
   Future<void> saveTouchpoint(String id, Map<String, dynamic> touchpoint) async {
     final box = Hive.box<String>(_touchpointsBox);
     await box.put(id, jsonEncode(touchpoint));
+  }
+
+  /// Add a touchpoint (alias for saveTouchpoint with auto-ID extraction)
+  Future<void> addTouchpoint(Map<String, dynamic> touchpoint) async {
+    final id = touchpoint['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+    await saveTouchpoint(id, touchpoint);
+  }
+
+  /// Update a touchpoint (alias for saveTouchpoint)
+  Future<void> updateTouchpoint(Map<String, dynamic> touchpoint) async {
+    final id = touchpoint['id'] as String?;
+    if (id == null) throw ArgumentError('Touchpoint ID is required');
+    await saveTouchpoint(id, touchpoint);
   }
 
   /// Get touchpoints for a client

@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../services/auth/secure_storage_service.dart';
+import '../../../../shared/providers/app_providers.dart';
 
-class PinSetupPage extends StatefulWidget {
+class PinSetupPage extends ConsumerStatefulWidget {
   const PinSetupPage({super.key});
 
   @override
-  State<PinSetupPage> createState() => _PinSetupPageState();
+  ConsumerState<PinSetupPage> createState() => _PinSetupPageState();
 }
 
-class _PinSetupPageState extends State<PinSetupPage> {
+class _PinSetupPageState extends ConsumerState<PinSetupPage> {
+  final _secureStorage = SecureStorageService();
   String _pin = '';
   String _confirmPin = '';
   bool _isConfirmStep = false;
   bool _hasError = false;
+  bool _isSaving = false;
 
   void _onPinEntered(String digit) {
     HapticFeedback.lightImpact();
@@ -57,17 +62,39 @@ class _PinSetupPageState extends State<PinSetupPage> {
     }
   }
 
-  void _verifyPin() {
+  Future<void> _verifyPin() async {
     if (_pin == _confirmPin) {
       HapticFeedback.mediumImpact();
-      // PIN matches - save and navigate to home
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PIN set successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      context.go('/home');
+
+      setState(() => _isSaving = true);
+
+      try {
+        // Get current user ID
+        final userId = ref.read(currentUserIdProvider);
+
+        // Save PIN securely (hashed)
+        await _secureStorage.savePin(_pin, userId: userId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('PIN set successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          context.go('/home');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save PIN: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isSaving = false);
+        }
+      }
     } else {
       HapticFeedback.heavyImpact();
       setState(() {

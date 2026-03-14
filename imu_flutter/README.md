@@ -1,3 +1,4 @@
+xg!EhML376z
 # IMU Flutter App
 
 IMU (Itinerary Manager Uniformed) - Mobile app for field agents (Caravan role) to manage client visits, itineraries, and touchpoints.

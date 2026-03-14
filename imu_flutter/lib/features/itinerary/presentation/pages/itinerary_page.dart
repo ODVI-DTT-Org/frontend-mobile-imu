@@ -1,84 +1,65 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/swipeable_list_tile.dart';
 import '../../../../core/utils/haptic_utils.dart';
-import '../../../../services/sync/sync_service.dart';
+import '../../../../services/api/itinerary_api_service.dart';
+import '../../../../services/connectivity_service.dart';
 
-class ItineraryPage extends StatefulWidget {
+class ItineraryPage extends ConsumerStatefulWidget {
   const ItineraryPage({super.key});
 
   @override
-  State<ItineraryPage> createState() => _ItineraryPageState();
+  ConsumerState<ItineraryPage> createState() => _ItineraryPageState();
 }
 
-class _ItineraryPageState extends State<ItineraryPage> {
-  String _selectedFilter = 'tomorrow';
-  DateTime? _selectedDate;
-  bool _isCalendarMode = false;
-  Map<String, dynamic>? _recentlyDeletedVisit;
+class _ItineraryPageState extends ConsumerState<ItineraryPage> {
+  String _selectedTab = 'Today'; // 'Tomorrow', 'Today', 'Yesterday'
+  DateTime? _selectedCalendarDate;
+  ItineraryItem? _recentlyDeletedVisit;
   int? _recentlyDeletedIndex;
 
-  // Mock data
-  final List<Map<String, dynamic>> _visits = [
-    {
-      'id': '1',
-      'clientName': 'Maria Santos',
-      'address': '123 Main Street, Makati City',
-      'productType': 'SSS Pensioner',
-      'pensionType': 'SSS',
-      'touchpoint': 2,
-      'reason': 'INTERESTED',
-      'date': '2025-02-20',
-      'timeArrival': '09:00',
-      'timeDeparture': '09:45',
-      'dayStatus': 'tomorrow',
-    },
-    {
-      'id': '2',
-      'clientName': 'Juan Dela Cruz',
-      'address': '456 Oak Avenue, Quezon City',
-      'productType': 'GSIS Pensioner',
-      'pensionType': 'GSIS',
-      'touchpoint': 4,
-      'reason': 'FOR UPDATE',
-      'date': '2025-02-20',
-      'timeArrival': '14:30',
-      'timeDeparture': '15:15',
-      'dayStatus': 'tomorrow',
-    },
-    {
-      'id': '3',
-      'clientName': 'Ana Reyes',
-      'address': '789 Pine Road, Pasig City',
-      'productType': 'SSS Pensioner',
-      'pensionType': 'SSS',
-      'touchpoint': 1,
-      'reason': 'LOAN INQUIRY',
-      'date': '2025-02-19',
-      'timeArrival': '10:00',
-      'timeDeparture': '10:30',
-      'dayStatus': 'today',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+  }
 
-  List<Map<String, dynamic>> get _filteredVisits {
-    if (_isCalendarMode && _selectedDate != null) {
-      // For calendar mode, return visits for selected date
-      return _visits; // In production, filter by selected date
+  DateTime get _selectedDate {
+    switch (_selectedTab) {
+      case 'Tomorrow':
+        return DateTime.now().add(const Duration(days: 1));
+      case 'Yesterday':
+        return DateTime.now().subtract(const Duration(days: 1));
+      default: // Today
+        return DateTime.now();
     }
-    return _visits.where((visit) {
-      return visit['dayStatus'] == _selectedFilter;
-    }).toList();
+  }
+
+  List<ItineraryItem> get _filteredVisits {
+    final itineraryAsync = ref.watch(todayItineraryProvider);
+    final targetDate = _selectedCalendarDate ?? _selectedDate;
+
+    return itineraryAsync.when(
+      data: (items) {
+        return items.where((item) {
+          final itemDate = item.scheduledDate;
+          return itemDate.year == targetDate.year &&
+                 itemDate.month == targetDate.month &&
+                 itemDate.day == targetDate.day;
+        }).toList();
+      },
+      loading: () => [],
+      error: (_, __) => [],
+    );
   }
 
   Future<void> _handleRefresh() async {
     HapticUtils.pullToRefresh();
-    // Simulate data refresh
-    await Future.delayed(const Duration(seconds: 1));
-    // In production, this would fetch from API/local DB
-    setState(() {});
+    ref.invalidate(todayItineraryProvider);
+    await Future.delayed(const Duration(milliseconds: 500));
   }
 
   void _addVisit() {
@@ -88,17 +69,19 @@ class _ItineraryPageState extends State<ItineraryPage> {
 
   void _editVisit(String visitId) {
     HapticUtils.lightImpact();
-    final visit = _visits.firstWhere((v) => v['id'] == visitId);
-    _showVisitForm(existingVisit: visit);
+    final visit = _filteredVisits.firstWhere((v) => v.id == visitId, orElse: null);
+    if (visit != null) {
+      _showVisitForm(existingVisit: visit);
+    }
   }
 
   void _deleteVisit(String visitId) {
-    final index = _visits.indexWhere((v) => v['id'] == visitId);
+    final visits = _filteredVisits;
+    final index = visits.indexWhere((v) => v.id == visitId);
     if (index != -1) {
       setState(() {
-        _recentlyDeletedVisit = Map.from(_visits[index]);
+        _recentlyDeletedVisit = visits[index];
         _recentlyDeletedIndex = index;
-        _visits.removeAt(index);
       });
 
       HapticUtils.delete();
@@ -120,7 +103,6 @@ class _ItineraryPageState extends State<ItineraryPage> {
   void _undoDelete() {
     if (_recentlyDeletedVisit != null && _recentlyDeletedIndex != null) {
       setState(() {
-        _visits.insert(_recentlyDeletedIndex!, _recentlyDeletedVisit!);
         _recentlyDeletedVisit = null;
         _recentlyDeletedIndex = null;
       });
@@ -129,31 +111,21 @@ class _ItineraryPageState extends State<ItineraryPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Visit restored')),
       );
+      ref.invalidate(todayItineraryProvider);
     }
   }
 
-  void _showVisitForm({Map<String, dynamic>? existingVisit}) {
+  void _showVisitForm({ItineraryItem? existingVisit}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _VisitFormModal(
-        existingVisit: existingVisit,
+        existingVisit: existingVisit?.toJson(),
+        selectedDate: _selectedDate,
         onSave: (visitData) {
           HapticUtils.success();
-          setState(() {
-            if (existingVisit != null) {
-              final index = _visits.indexWhere((v) => v['id'] == existingVisit['id']);
-              if (index != -1) {
-                _visits[index] = {...existingVisit, ...visitData};
-              }
-            } else {
-              _visits.add({
-                'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                ...visitData,
-              });
-            }
-          });
+          ref.invalidate(todayItineraryProvider);
         },
       ),
     );
@@ -175,222 +147,237 @@ class _ItineraryPageState extends State<ItineraryPage> {
     // In production, use url_launcher
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Itinerary'),
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.plus),
-            onPressed: _addVisit,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Filter tabs
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[200]!),
-              ),
-            ),
-            child: Row(
-              children: [
-                if (_isCalendarMode) ...[
-                  IconButton(
-                    icon: const Icon(LucideIcons.x),
-                    onPressed: () {
-                      HapticUtils.lightImpact();
-                      setState(() {
-                        _isCalendarMode = false;
-                        _selectedDate = null;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatSelectedDate(_selectedDate!),
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ] else ...[
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          _FilterTab(
-                            label: 'Tomorrow',
-                            isSelected: _selectedFilter == 'tomorrow',
-                            onTap: () {
-                              HapticUtils.selectionClick();
-                              setState(() => _selectedFilter = 'tomorrow');
-                            },
-                          ),
-                          _FilterTab(
-                            label: 'Today',
-                            isSelected: _selectedFilter == 'today',
-                            onTap: () {
-                              HapticUtils.selectionClick();
-                              setState(() => _selectedFilter = 'today');
-                            },
-                          ),
-                          _FilterTab(
-                            label: 'Yesterday',
-                            isSelected: _selectedFilter == 'yesterday',
-                            onTap: () {
-                              HapticUtils.selectionClick();
-                              setState(() => _selectedFilter = 'yesterday');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(LucideIcons.calendar),
-                  onPressed: () => _showCalendarPicker(),
-                ),
-              ],
-            ),
-          ),
-          // Visits list with pull-to-refresh
-          Expanded(
-            child: _filteredVisits.isEmpty
-                ? PullToRefresh(
-                    onRefresh: _handleRefresh,
-                    child: ListView(
-                      children: [
-                        SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.5,
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  LucideIcons.calendar,
-                                  size: 48,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'No scheduled visits',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Pull down to refresh or tap + to add',
-                                  style: TextStyle(color: Colors.grey[500]),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : PullToRefresh(
-                    onRefresh: _handleRefresh,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredVisits.length,
-                      itemBuilder: (context, index) {
-                        final visit = _filteredVisits[index];
-                        return SwipeableListTile(
-                          leftActions: [
-                            SwipeAction.call(() => _callClient('+63 912 345 6789')), // Mock phone
-                            SwipeAction.navigate(() => _navigateToVisit(visit['address'])),
-                          ],
-                          rightActions: [
-                            SwipeAction.edit(() => _editVisit(visit['id'])),
-                            SwipeAction.delete(() => _deleteVisit(visit['id'])),
-                          ],
-                          onTap: () {
-                            HapticUtils.lightImpact();
-                            context.push('/clients/${visit['id']}');
-                          },
-                          child: _VisitCard(visit: visit),
-                        );
-                      },
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showCalendarPicker() {
     HapticUtils.lightImpact();
     showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _selectedCalendarDate ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     ).then((date) {
       if (date != null) {
         setState(() {
-          _selectedDate = date;
-          _isCalendarMode = true;
+          _selectedCalendarDate = date;
+          _selectedTab = '';
         });
       }
     });
   }
 
-  String _formatSelectedDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
-  }
-}
-
-class _FilterTab extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _FilterTab({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addVisit,
+        backgroundColor: const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
+        icon: const Icon(LucideIcons.plus, size: 20),
+        label: const Text(
+          'Add New Visit',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header - centered title (per Figma)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 16),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  const Text(
+                    'Itinerary',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
                     ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                  ),
+                  const Spacer(),
+                ],
+              ),
             ),
+
+            // Tab filter (Tomorrow / Today / Yesterday) with calendar button (per Figma)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 17),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9), // gray-100
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTabPill('Tomorrow', 'Tomorrow'),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _buildTabPill('Today', 'Today'),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _buildTabPill('Yesterday', 'Yesterday'),
+                  ),
+                  const SizedBox(width: 8),
+                  // Calendar button
+                  GestureDetector(
+                    onTap: _showCalendarPicker,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _selectedCalendarDate != null
+                            ? const Color(0xFF0F172A)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        LucideIcons.calendar,
+                        size: 20,
+                        color: _selectedCalendarDate != null
+                            ? Colors.white
+                            : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Selected date indicator (when using calendar)
+            if (_selectedCalendarDate != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, MMMM d, yyyy').format(_selectedCalendarDate!),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedCalendarDate = null;
+                          _selectedTab = 'Today';
+                        });
+                      },
+                      child: Icon(
+                        LucideIcons.x,
+                        size: 16,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 12),
+
+            // Visits list
+            Expanded(
+              child: _filteredVisits.isEmpty
+                  ? PullToRefresh(
+                      onRefresh: _handleRefresh,
+                      child: ListView(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.4,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    LucideIcons.calendar,
+                                    size: 48,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No scheduled visits',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Pull down to refresh',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : PullToRefresh(
+                      onRefresh: _handleRefresh,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _filteredVisits.length,
+                        itemBuilder: (context, index) {
+                          final visit = _filteredVisits[index];
+                          return SwipeableListTile(
+                            leftActions: [
+                              SwipeAction.call(() => _callClient('+63 912 345 6789')),
+                              SwipeAction.navigate(() => _navigateToVisit(visit.address ?? '')),
+                            ],
+                            rightActions: [
+                              SwipeAction.edit(() => _editVisit(visit.id)),
+                              SwipeAction.delete(() => _deleteVisit(visit.id)),
+                            ],
+                            onTap: () {
+                              HapticUtils.lightImpact();
+                              context.push('/clients/${visit.clientId}');
+                            },
+                            child: _VisitCard(visit: visit),
+                          );
+                        },
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabPill(String tabValue, String label) {
+    final isSelected = _selectedTab == tabValue && _selectedCalendarDate == null;
+    return GestureDetector(
+      onTap: () {
+        HapticUtils.lightImpact();
+        setState(() {
+          _selectedTab = tabValue;
+          _selectedCalendarDate = null;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? const Color(0xFF0F172A) : Colors.grey.shade600,
           ),
         ),
       ),
@@ -399,252 +386,169 @@ class _FilterTab extends StatelessWidget {
 }
 
 class _VisitCard extends StatelessWidget {
-  final Map<String, dynamic> visit;
+  final ItineraryItem visit;
 
   const _VisitCard({required this.visit});
+
+  String _getOrdinal(int number) {
+    if (number >= 11 && number <= 13) return '${number}th';
+    switch (number % 10) {
+      case 1: return '${number}st';
+      case 2: return '${number}nd';
+      case 3: return '${number}rd';
+      default: return '${number}th';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'INTERESTED':
+        return const Color(0xFF10B981); // Green
+      case 'NOT INTERESTED':
+        return const Color(0xFFEF4444); // Red
+      case 'UNDECIDED':
+        return const Color(0xFFF59E0B); // Yellow/Orange
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 17, vertical: 6),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+        ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(LucideIcons.calendar, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatDate(visit['date']),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildStatusBadge(visit['dayStatus']),
-                ],
-              ),
-              Row(
-                children: [
-                  Text(
-                    '${_getOrdinal(visit['touchpoint'])} ',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const Icon(LucideIcons.mapPin, size: 16, color: Colors.grey),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Client info
-          Row(
-            children: [
-              const Icon(LucideIcons.user, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
-              Text(
-                visit['clientName'],
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(LucideIcons.mapPin, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  visit['address'],
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+          // Left side: Touchpoint + Client info
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Touchpoint icon and number
+                SizedBox(
+                  width: 30,
+                  child: Column(
+                    children: [
+                      Icon(
+                        LucideIcons.mapPin,
+                        size: 20,
+                        color: const Color(0xFF0F172A),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getOrdinal(visit.touchpointNumber),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                // Client name and agency
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        visit.clientName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        visit.address ?? '',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                visit['productType'],
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                visit['pensionType'],
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          // Footer
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildReasonBadge(visit['reason']),
-              Row(
-                children: [
-                  const Icon(LucideIcons.clock, size: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${visit['timeArrival']} - ${visit['timeDeparture']}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
+          const SizedBox(width: 12),
+          // Right side: Status and notes
+          SizedBox(
+            width: 133,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(visit.status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _formatStatus(visit.status),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: _getStatusColor(visit.status),
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                if (visit.notes != null && visit.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    visit.notes!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color bgColor;
-    String label;
-
-    switch (status) {
-      case 'today':
-        bgColor = Colors.blue[100]!;
-        label = 'Today';
-        break;
-      case 'tomorrow':
-        bgColor = Colors.green[100]!;
-        label = 'Scheduled';
-        break;
-      case 'yesterday':
-        bgColor = Colors.grey[100]!;
-        label = 'Completed';
-        break;
-      default:
-        bgColor = Colors.grey[100]!;
-        label = status;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
-
-  Widget _buildReasonBadge(String reason) {
-    Color bgColor;
-    Color textColor;
-
-    switch (reason) {
-      case 'INTERESTED':
-        bgColor = Colors.green[100]!;
-        textColor = Colors.green[800]!;
-        break;
-      case 'NOT INTERESTED':
-        bgColor = Colors.red[100]!;
-        textColor = Colors.red[800]!;
-        break;
-      case 'UNDECIDED':
-        bgColor = Colors.yellow[100]!;
-        textColor = Colors.yellow[800]!;
-        break;
-      default:
-        bgColor = Colors.grey[100]!;
-        textColor = Colors.grey[800]!;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        _formatReason(reason),
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(String dateStr) {
-    final date = DateTime.parse(dateStr);
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
-  String _formatReason(String reason) {
-    return reason
+  String _formatStatus(String status) {
+    return status
         .split('_')
         .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
         .join(' ');
-  }
-
-  String _getOrdinal(int num) {
-    const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
-    return ordinals[num - 1] ?? '${num}th';
   }
 }
 
 /// Visit form modal for adding/editing visits
 class _VisitFormModal extends StatefulWidget {
   final Map<String, dynamic>? existingVisit;
+  final DateTime? selectedDate;
   final Function(Map<String, dynamic>) onSave;
 
   const _VisitFormModal({
     this.existingVisit,
+    this.selectedDate,
     required this.onSave,
   });
 
@@ -656,6 +560,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
   final _formKey = GlobalKey<FormState>();
   final _clientNameController = TextEditingController();
   final _addressController = TextEditingController();
+  final _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _timeArrival = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _timeDeparture = const TimeOfDay(hour: 9, minute: 30);
@@ -680,9 +585,13 @@ class _VisitFormModalState extends State<_VisitFormModal> {
   @override
   void initState() {
     super.initState();
+    if (widget.selectedDate != null) {
+      _selectedDate = widget.selectedDate!;
+    }
     if (widget.existingVisit != null) {
       _clientNameController.text = widget.existingVisit!['clientName'] ?? '';
       _addressController.text = widget.existingVisit!['address'] ?? '';
+      _notesController.text = widget.existingVisit!['notes'] ?? '';
       _productType = widget.existingVisit!['productType'] ?? _productType;
       _reason = widget.existingVisit!['reason'] ?? _reason;
       _touchpoint = widget.existingVisit!['touchpoint'] ?? _touchpoint;
@@ -697,6 +606,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
   void dispose() {
     _clientNameController.dispose();
     _addressController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -910,7 +820,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
                                 margin: const EdgeInsets.symmetric(horizontal: 2),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? Colors.blue : Colors.grey[100],
+                                  color: isSelected ? const Color(0xFF0F172A) : Colors.grey[100],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -948,6 +858,21 @@ class _VisitFormModalState extends State<_VisitFormModal> {
                           }
                         },
                       ),
+                      const SizedBox(height: 16),
+
+                      // Notes
+                      const Text(
+                        'Notes',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _notesController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter notes (optional)',
+                        ),
+                        maxLines: 3,
+                      ),
                       const SizedBox(height: 32),
 
                       // Save button
@@ -955,6 +880,13 @@ class _VisitFormModalState extends State<_VisitFormModal> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                           onPressed: _handleSave,
                           child: Text(
                             widget.existingVisit != null
@@ -980,7 +912,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
     final date = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (date != null) {
@@ -1012,6 +944,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
       widget.onSave({
         'clientName': _clientNameController.text,
         'address': _addressController.text,
+        'notes': _notesController.text,
         'date': _selectedDate.toIso8601String().split('T')[0],
         'timeArrival': _formatTime(_timeArrival),
         'timeDeparture': _formatTime(_timeDeparture),
@@ -1019,22 +952,10 @@ class _VisitFormModalState extends State<_VisitFormModal> {
         'pensionType': _productType.contains('SSS') ? 'SSS' : 'GSIS',
         'touchpoint': _touchpoint,
         'reason': _reason,
-        'dayStatus': _getDayStatus(_selectedDate),
       });
 
       Navigator.pop(context);
     }
-  }
-
-  String _getDayStatus(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final visitDate = DateTime(date.year, date.month, date.day);
-
-    if (visitDate == today) return 'today';
-    if (visitDate == today.add(const Duration(days: 1))) return 'tomorrow';
-    if (visitDate == today.subtract(const Duration(days: 1))) return 'yesterday';
-    return visitDate.isAfter(today) ? 'upcoming' : 'past';
   }
 
   String _formatDate(DateTime date) {
@@ -1059,4 +980,3 @@ class _VisitFormModalState extends State<_VisitFormModal> {
         .join(' ');
   }
 }
-

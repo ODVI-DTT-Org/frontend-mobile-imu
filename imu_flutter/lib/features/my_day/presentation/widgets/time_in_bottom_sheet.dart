@@ -87,15 +87,21 @@ class _TimeInBottomSheetState extends State<TimeInBottomSheet> {
     });
 
     try {
-      // Get current position
-      final position = await _geoService.getCurrentPosition();
+      // Get current position with detailed error handling
+      final (position, result, errorMessage) = await _geoService.getCurrentPositionWithResult();
 
       if (position == null) {
         setState(() {
           _isLoadingTimeIn = false;
-          _timeInError = 'Unable to get location. Please check GPS settings.';
+          _timeInError = errorMessage ?? 'Unable to get location';
         });
         HapticUtils.error();
+
+        // Show action dialog for permission/service issues
+        if (result == LocationResult.permissionDeniedForever ||
+            result == LocationResult.serviceDisabled) {
+          _showLocationActionDialog(result);
+        }
         return;
       }
 
@@ -124,6 +130,37 @@ class _TimeInBottomSheetState extends State<TimeInBottomSheet> {
       });
       HapticUtils.error();
     }
+  }
+
+  void _showLocationActionDialog(LocationResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location Required'),
+        content: Text(
+          result == LocationResult.serviceDisabled
+              ? 'GPS is disabled. Please enable location services to capture your time-in location.'
+              : 'Location permission is required. Please enable it in app settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (result == LocationResult.serviceDisabled) {
+                _geoService.openLocationSettings();
+              } else {
+                _geoService.openAppSettings();
+              }
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleSelfie() async {

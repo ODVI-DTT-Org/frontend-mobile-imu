@@ -7,6 +7,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/missed_visit_model.dart';
 
+import '../../../../features/clients/data/models/client_model.dart';
 class MissedVisitsPage extends ConsumerStatefulWidget {
   const MissedVisitsPage({super.key});
 

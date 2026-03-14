@@ -2,9 +2,13 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:pocketbase/pocketbase.dart';
 import '../local_storage/hive_service.dart';
+import '../api/pocketbase_client.dart';
 
-/// Sync service for managing offline/online data synchronization
+// Note: SyncStatus and SyncResult are defined in hive_service.dart
+
+/// Sync service for managing offline/online data synchronization with PocketBase
 class SyncService extends ChangeNotifier {
   static final SyncService _instance = SyncService._internal();
   factory SyncService() => _instance;
@@ -12,23 +16,39 @@ class SyncService extends ChangeNotifier {
 
   final HiveService _hiveService = HiveService();
   final Connectivity _connectivity = Connectivity();
+  PocketBase? _pb;
 
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   SyncStatus _status = SyncStatus.idle;
   DateTime? _lastSyncTime;
   String? _lastSyncError;
   int _pendingCount = 0;
+  int _syncedCount = 0;
+  int _failedCount = 0;
 
   // Getters
-  SyncStatus get status => _status;
-  DateTime? get lastSyncTime => _lastSyncTime;
-  String? get lastSyncError => _lastSyncError;
-  int get pendingCount => _pendingCount;
-  bool get isOnline => _status != SyncStatus.offline;
-  bool get isSyncing => _status == SyncStatus.syncing;
+    SyncStatus get status => _status;
+    DateTime? get lastSyncTime => _lastSyncTime;
+    String? get lastSyncError => _lastSyncError;
+    int get pendingCount => _pendingCount;
+    int get syncedCount => _syncedCount;
+    int get failedCount => _failedCount;
+    bool get isOnline => _status != SyncStatus.offline;
+    bool get isSyncing => _status == SyncStatus.syncing;
 
-  /// Initialize sync service
-  Future<void> init() async {
+    /// Initialize sync service
+    Future<void> init() async {
+    // Get PocketBase instance
+    try {
+      final pbClient = PocketBaseClient();
+      if (!pbClient.isInitialized) {
+        await pbClient.initialize();
+      }
+      _pb = pbClient.instance;
+    } catch (e) {
+      debugPrint('SyncService: Failed to initialize PocketBase: $e');
+    }
+
     // Check initial connectivity
     final result = await _connectivity.checkConnectivity();
     _updateConnectivityStatus(result);
@@ -75,7 +95,7 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Trigger manual sync
+  /// Trigger full sync (pull + push)
   Future<SyncResult> syncNow() async {
     if (_status == SyncStatus.offline) {
       return SyncResult(
@@ -93,53 +113,34 @@ class SyncService extends ChangeNotifier {
 
     _status = SyncStatus.syncing;
     _lastSyncError = null;
+    _syncedCount = 0;
+    _failedCount = 0;
     notifyListeners();
 
     try {
-      final pendingItems = _hiveService.getPendingSyncItems();
+      // Step 1: Push pending changes to server
+      final pushResult = await _pushPendingChanges();
+      _syncedCount = pushResult['synced'] as int;
+      _failedCount = pushResult['failed'] as int;
 
-      if (pendingItems.isEmpty) {
-        _status = SyncStatus.success;
-        _lastSyncTime = DateTime.now();
-        notifyListeners();
-        return SyncResult(success: true);
-      }
-
-      int syncedCount = 0;
-      int failedCount = 0;
-
-      for (final item in pendingItems) {
-        try {
-          // Simulate API call with exponential backoff
-          await _syncWithBackoff(item);
-          syncedCount++;
-
-          // Remove from pending queue
-          await _hiveService.removeFromPendingSync(
-            item['entityType'] as String,
-            item['id'] as String,
-          );
-        } catch (e) {
-          debugPrint('Failed to sync item ${item['id']}: $e');
-          failedCount++;
-        }
-      }
+      // Step 2: Pull latest data from server
+      await _pullFromServer();
 
       await _updatePendingCount();
 
-      _status = failedCount > 0 ? SyncStatus.error : SyncStatus.success;
+      _status = _failedCount > 0 ? SyncStatus.error : SyncStatus.success;
       _lastSyncTime = DateTime.now();
 
-      if (failedCount > 0) {
-        _lastSyncError = 'Failed to sync $failedCount items';
+      if (_failedCount > 0) {
+        _lastSyncError = 'Failed to sync $_failedCount items';
       }
 
       notifyListeners();
 
       return SyncResult(
-        success: failedCount == 0,
-        syncedCount: syncedCount,
-        failedCount: failedCount,
+        success: _failedCount == 0,
+        syncedCount: _syncedCount,
+        failedCount: _failedCount,
       );
     } catch (e) {
       _status = SyncStatus.error;
@@ -153,34 +154,256 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  /// Sync with exponential backoff
+  /// Push pending changes to PocketBase
+  Future<Map<String, int>> _pushPendingChanges() async {
+    final pendingItems = _hiveService.getPendingSyncItems();
+
+    if (pendingItems.isEmpty) {
+      return {'synced': 0, 'failed': 0};
+    }
+
+    if (_pb == null) {
+      debugPrint('SyncService: PocketBase not initialized');
+      return {'synced': 0, 'failed': pendingItems.length};
+    }
+
+    int synced = 0;
+    int failed = 0;
+
+    for (final item in pendingItems) {
+      try {
+        await _syncWithBackoff(item);
+        synced++;
+
+        // Remove from pending queue after successful sync
+        await _hiveService.removeFromPendingSync(
+          item['entityType'] as String,
+          item['id'] as String,
+        );
+      } catch (e) {
+        debugPrint('Failed to sync item ${item['id']}: $e');
+        failed++;
+      }
+    }
+
+    return {'synced': synced, 'failed': failed};
+  }
+
+  /// Sync individual item with exponential backoff
   Future<void> _syncWithBackoff(
     Map<String, dynamic> item, {
     int maxRetries = 3,
   }) async {
     int attempt = 0;
+    final entityType = item['entityType'] as String;
+    final operation = item['operation'] as String;
+    final data = item['data'] as Map<String, dynamic>;
+    final id = item['id'] as String;
 
     while (attempt < maxRetries) {
       try {
-        // In production, this would be an actual API call
-        // For now, simulate network delay
-        await Future.delayed(Duration(milliseconds: 100 + Random().nextInt(200)));
-
-        // Simulate occasional failure for testing
-        if (Random().nextDouble() < 0.1) {
-          throw Exception('Network error');
+        // Map entity types to PocketBase collections
+        String collection;
+        switch (entityType) {
+          case 'client':
+            collection = 'clients';
+            break;
+          case 'touchpoint':
+            collection = 'touchpoints';
+            break;
+          default:
+            collection = entityType;
         }
 
+        switch (operation) {
+          case 'create':
+            await _pb!.collection(collection).create(body: _mapToPocketBase(entityType, data));
+            break;
+          case 'update':
+            await _pb!.collection(collection).update(id, body: _mapToPocketBase(entityType, data));
+            break;
+          case 'delete':
+            await _pb!.collection(collection).delete(id);
+            break;
+        }
+
+        debugPrint('Synced $operation on $entityType:$id');
         return; // Success
-      } catch (e) {
+      } on ClientException catch (e) {
         attempt++;
+        debugPrint('Sync attempt $attempt failed for $entityType:$id - ${e.response}');
+
+        // Don't retry on 404 (already deleted) or 403 (no permission)
+        if (e.statusCode == 404 || e.statusCode == 403) {
+          debugPrint('Not retrying due to status ${e.statusCode}');
+          rethrow;
+        }
+
         if (attempt >= maxRetries) rethrow;
 
         // Exponential backoff: 1s, 2s, 4s
         final delay = Duration(seconds: pow(2, attempt).toInt());
         await Future.delayed(delay);
+      } catch (e) {
+        attempt++;
+        if (attempt >= maxRetries) rethrow;
+
+        final delay = Duration(seconds: pow(2, attempt).toInt());
+        await Future.delayed(delay);
       }
     }
+  }
+
+  /// Map local data to PocketBase format
+  Map<String, dynamic> _mapToPocketBase(String entityType, Map<String, dynamic> data) {
+    switch (entityType) {
+      case 'client':
+        return {
+          'first_name': data['firstName'],
+          'last_name': data['lastName'],
+          'middle_name': data['middleName'],
+          'client_type': data['clientType'],
+          'product_type': data['productType'],
+          'market_type': data['marketType'],
+          'pension_type': data['pensionType'],
+          'email': data['email'],
+          'phone': data['phone'],
+          'is_starred': data['isStarred'] ?? false,
+        };
+      case 'touchpoint':
+        return {
+          'client_id': data['clientId'],
+          'touchpoint_number': data['touchpointNumber'],
+          'type': data['type'],
+          'reason': data['reason'],
+          'date': data['date'],
+          'notes': data['notes'],
+          'photo_path': data['photoPath'],
+          'audio_path': data['audioPath'],
+          'location_data': data['locationData'],
+        };
+      default:
+        return data;
+    }
+  }
+
+  /// Pull latest data from PocketBase
+  Future<void> _pullFromServer() async {
+    if (_pb == null || !_pb!.authStore.isValid) {
+      debugPrint('SyncService: Not authenticated, skipping pull');
+      return;
+    }
+
+    try {
+      // Pull clients
+      await _pullClients();
+
+      // Pull touchpoints
+      await _pullTouchpoints();
+
+      debugPrint('Pull from server completed');
+    } catch (e) {
+      debugPrint('Error pulling from server: $e');
+    }
+  }
+
+  /// Pull clients from PocketBase
+  Future<void> _pullClients() async {
+    try {
+      final result = await _pb!.collection('clients').getList(
+        page: 1,
+        perPage: 500,
+        sort: '-updated',
+      );
+
+      debugPrint('Pulled ${result.items.length} clients from server');
+
+      for (final record in result.items) {
+        final clientData = _mapFromPocketBaseClient(record);
+        final existingClient = _hiveService.getClient(record.id);
+
+        // Last-write-wins: compare updated timestamps
+        if (existingClient != null) {
+          final localUpdated = existingClient['updatedAt'] as String?;
+          final serverUpdated = record.updated;
+
+          if (serverUpdated != null && localUpdated != null) {
+            final serverTime = DateTime.parse(serverUpdated);
+            final localTime = DateTime.parse(localUpdated);
+
+            if (serverTime.isAfter(localTime)) {
+            await _hiveService.saveClient(record.id, clientData);
+          }
+        } else {
+          await _hiveService.saveClient(record.id, clientData);
+        }
+      }
+
+      // Cache last sync info
+      _hiveService.cacheData('clients_last_sync', {
+        'timestamp': DateTime.now().toIso8601String(),
+        'count': result.items.length,
+      });
+    } on ClientException catch (e) {
+      debugPrint('Error pulling clients: ${e.response}');
+    }
+  }
+
+  /// Map PocketBase record to local client format
+  Map<String, dynamic> _mapFromPocketBaseClient(RecordModel record) {
+    return {
+      'id': record.id,
+      'firstName': record.data['first_name'],
+      'lastName': record.data['last_name'],
+      'middleName': record.data['middle_name'],
+      'clientType': record.data['client_type'],
+      'productType': record.data['product_type'],
+      'marketType': record.data['market_type'],
+      'pensionType': record.data['pension_type'],
+      'email': record.data['email'],
+      'phone': record.data['phone'],
+      'isStarred': record.data['is_starred'] ?? false,
+      'created': record.created,
+      'updatedAt': record.updated,
+    };
+  }
+
+  /// Pull touchpoints from PocketBase
+  Future<void> _pullTouchpoints() async {
+    try {
+      final result = await _pb!.collection('touchpoints').getList(
+        page: 1,
+        perPage: 1000,
+        sort: '-updated',
+      );
+
+      debugPrint('Pulled ${result.items.length} touchpoints from server');
+
+      for (final record in result.items) {
+        final touchpointData = _mapFromPocketBaseTouchpoint(record);
+        await _hiveService.saveTouchpoint(record.id, touchpointData);
+      }
+    } on ClientException catch (e) {
+      debugPrint('Error pulling touchpoints: ${e.response}');
+    }
+  }
+
+  /// Map PocketBase record to local touchpoint format
+  Map<String, dynamic> _mapFromPocketBaseTouchpoint(RecordModel record) {
+    return {
+      'id': record.id,
+      'clientId': record.data['client_id'],
+      'touchpointNumber': record.data['touchpoint_number'],
+      'type': record.data['type'],
+      'reason': record.data['reason'],
+      'date': record.data['date'],
+      'notes': record.data['notes'],
+      'photoPath': record.data['photo_path'],
+      'audioPath': record.data['audio_path'],
+      'locationData': record.data['location_data'],
+      'created': record.created,
+      'updatedAt': record.updated,
+    };
   }
 
   /// Queue an item for sync
@@ -232,6 +455,19 @@ class SyncService extends ChangeNotifier {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
+  }
+
+  /// Check if backend is reachable
+  Future<bool> checkBackendConnection() async {
+    if (_pb == null) return false;
+
+    try {
+      await _pb!.health.check();
+      return true;
+    } catch (e) {
+      debugPrint('Backend connection check failed: $e');
+      return false;
+    }
   }
 }
 

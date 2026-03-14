@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
-import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/providers/app_providers.dart' show userProfileProvider, currentUserIdProvider, isAuthenticatedProvider, currentUserNameProvider;
+import '../../../../services/api/profile_api_service.dart' hide UserProfile, userProfileProvider;
 import '../../data/models/user_profile.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -70,10 +71,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         phone: _phoneController.text.trim(),
       );
 
-      await ref.read(userProfileProvider.notifier).updateProfile(updatedProfile);
+      // Try to update via API
+      final userId = ref.read(currentUserIdProvider);
+      if (userId != null) {
+        try {
+          final profileApi = ref.read(profileApiServiceProvider);
+          await profileApi.updateProfile(userId, {
+            'first_name': updatedProfile.firstName,
+            'last_name': updatedProfile.lastName,
+            'email': updatedProfile.email,
+            'phone': updatedProfile.phone,
+          });
+        } catch (e) {
+          debugPrint('Failed to update profile via API: $e');
+        }
+      }
 
-      // Update current user name provider
-      ref.read(currentUserNameProvider.notifier).state = updatedProfile.fullName;
+      // Update local state
+      await ref.read(userProfileProvider.notifier).updateProfile(updatedProfile);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -113,8 +128,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (confirmed == true && mounted) {
       HapticUtils.mediumImpact();
       await ref.read(userProfileProvider.notifier).logout();
-      ref.read(isAuthenticatedProvider.notifier).state = false;
-      ref.read(currentUserNameProvider.notifier).state = null;
       if (mounted) context.go('/login');
     }
   }

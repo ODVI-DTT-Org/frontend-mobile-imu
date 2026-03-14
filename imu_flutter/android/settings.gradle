@@ -1,0 +1,43 @@
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.1.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+}
+
+include ":app"
+
+// Expose Flutter SDK properties to subprojects for compatibility with plugins using old Gradle style
+gradle.beforeProject { project ->
+    if (project.name != "app") {
+        project.ext.flutter = [
+            compileSdkVersion: 35,
+            minSdkVersion: 21,
+            targetSdkVersion: 35,
+            ndkVersion: "27.0.12077973"
+        ]
+    }
+    // Also set android.compileSdkVersion for subprojects
+    project.afterEvaluate {
+        if (project.hasProperty("android")) {
+            project.android.compileSdkVersion 35
+        }
+    }
+}

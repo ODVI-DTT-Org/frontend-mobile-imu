@@ -1,270 +1,436 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../core/utils/haptic_utils.dart';
+import '../../../../services/auth/session_service.dart';
+import '../../../../shared/providers/app_providers.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
-  bool _biometricEnabled = false;
-  bool _pushNotifications = true;
-  bool _taskReminders = true;
-  bool _syncAlerts = true;
-  String _themeMode = 'Light';
-  String _textSize = 'Medium';
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  final SessionService _sessionService = SessionService();
+
+  // Settings state
+  bool _notificationsEnabled = true;
+  bool _biometricEnabled = true;
+  bool _autoSyncEnabled = true;
+  bool _locationTrackingEnabled = true;
+  String _syncFrequency = 'Real-time';
+  String _themeMode = 'System';
+  int _sessionTimeout = 15;
 
   @override
   Widget build(BuildContext context) {
+    final userName = ref.watch(currentUserNameProvider);
+    final userEmail = ref.watch(currentUserEmailProvider);
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft),
-          onPressed: () => context.pop(),
+          onPressed: () => context.go('/home'),
         ),
         title: const Text('Settings'),
         backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0F172A),
+        elevation: 0,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Account Section
-            _buildSection(
-              title: 'Account',
-              children: [
-                _buildNavigationTile(
-                  icon: LucideIcons.key,
-                  title: 'Change PIN',
-                  onTap: () => _showChangePinDialog(),
-                ),
-                _buildNavigationTile(
-                  icon: LucideIcons.lock,
-                  title: 'Change Password',
-                  onTap: () => _showChangePasswordDialog(),
-                ),
-                _buildSwitchTile(
-                  icon: LucideIcons.fingerprint,
-                  title: 'Biometric Login',
-                  subtitle: 'Use fingerprint or face to unlock',
-                  value: _biometricEnabled,
-                  onChanged: (value) => setState(() => _biometricEnabled = value),
-                ),
-                _buildNavigationTile(
-                  icon: LucideIcons.smartphone,
-                  title: 'Logged-in Devices',
-                  trailing: const Text('1 device'),
-                  onTap: () {},
-                ),
-              ],
-            ),
+            // Profile Card
+            _buildProfileCard(userName, userEmail),
+            const SizedBox(height: 24),
 
-            // Appearance Section
-            _buildSection(
-              title: 'Appearance',
-              children: [
-                _buildDropdownTile(
-                  icon: LucideIcons.sun,
-                  title: 'Theme',
-                  value: _themeMode,
-                  options: ['Light', 'Dark', 'System'],
-                  onChanged: (value) => setState(() => _themeMode = value!),
-                ),
-                _buildDropdownTile(
-                  icon: LucideIcons.type,
-                  title: 'Text Size',
-                  value: _textSize,
-                  options: ['Small', 'Medium', 'Large'],
-                  onChanged: (value) => setState(() => _textSize = value!),
-                ),
-              ],
-            ),
+            // Account Settings
+            _buildSectionHeader('Account'),
+            _buildSettingsCard([
+              _buildSettingsTile(
+                icon: LucideIcons.user,
+                title: 'My Profile',
+                subtitle: 'Update your personal information',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  context.push('/profile');
+                },
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.lock,
+                title: 'Change PIN',
+                subtitle: 'Update your 6-digit PIN',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  _showChangePinDialog();
+                },
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.key,
+                title: 'Change Password',
+                subtitle: 'Update your account password',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  _showChangePasswordDialog();
+                },
+              ),
+            ]),
+            const SizedBox(height: 24),
 
-            // Notifications Section
-            _buildSection(
-              title: 'Notifications',
-              children: [
-                _buildSwitchTile(
-                  icon: LucideIcons.bell,
-                  title: 'Push Notifications',
-                  subtitle: 'Master toggle for all notifications',
-                  value: _pushNotifications,
-                  onChanged: (value) => setState(() => _pushNotifications = value),
-                ),
-                _buildSwitchTile(
-                  icon: LucideIcons.clock,
-                  title: 'Task Reminders',
-                  value: _taskReminders,
-                  onChanged: (value) => setState(() => _taskReminders = value),
-                ),
-                _buildSwitchTile(
-                  icon: LucideIcons.refreshCw,
-                  title: 'Sync Status Alerts',
-                  value: _syncAlerts,
-                  onChanged: (value) => setState(() => _syncAlerts = value),
-                ),
-              ],
-            ),
+            // App Settings
+            _buildSectionHeader('App Settings'),
+            _buildSettingsCard([
+              _buildSwitchTile(
+                icon: LucideIcons.bell,
+                title: 'Push Notifications',
+                subtitle: 'Receive alerts for visits and tasks',
+                value: _notificationsEnabled,
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  setState(() => _notificationsEnabled = value);
+                },
+              ),
+              _buildDivider(),
+              _buildSwitchTile(
+                icon: LucideIcons.fingerprint,
+                title: 'Biometric Login',
+                subtitle: 'Use fingerprint or face recognition',
+                value: _biometricEnabled,
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  setState(() => _biometricEnabled = value);
+                },
+              ),
+              _buildDivider(),
+              _buildDropdownTile(
+                icon: LucideIcons.moon,
+                title: 'Theme',
+                value: _themeMode,
+                options: ['System', 'Light', 'Dark'],
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  setState(() => _themeMode = value);
+                },
+              ),
+              _buildDivider(),
+              _buildDropdownTile(
+                icon: LucideIcons.clock,
+                title: 'Session Timeout',
+                value: '$_sessionTimeout minutes',
+                options: ['5 minutes', '15 minutes', '30 minutes', '1 hour'],
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  final minutes = int.parse(value.split(' ').first);
+                  setState(() => _sessionTimeout = minutes);
+                },
+              ),
+            ]),
+            const SizedBox(height: 24),
 
-            // Data & Storage Section
-            _buildSection(
-              title: 'Data & Storage',
-              children: [
-                _buildNavigationTile(
-                  icon: LucideIcons.refreshCw,
-                  title: 'Sync Now',
-                  trailing: const Text('Last: 5 min ago'),
-                  onTap: () => _syncNow(),
-                ),
-                _buildNavigationTile(
-                  icon: LucideIcons.trash2,
-                  title: 'Clear Cache',
-                  trailing: const Text('12.5 MB'),
-                  onTap: () => _clearCache(),
-                ),
-                _buildInfoTile(
-                  icon: LucideIcons.hardDrive,
-                  title: 'Storage Used',
-                  value: '45.2 MB',
-                ),
-              ],
-            ),
+            // Sync Settings
+            _buildSectionHeader('Data & Sync'),
+            _buildSettingsCard([
+              _buildSwitchTile(
+                icon: LucideIcons.refreshCw,
+                title: 'Auto Sync',
+                subtitle: 'Automatically sync data when online',
+                value: _autoSyncEnabled,
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  setState(() => _autoSyncEnabled = value);
+                },
+              ),
+              _buildDivider(),
+              _buildDropdownTile(
+                icon: LucideIcons.timer,
+                title: 'Sync Frequency',
+                value: _syncFrequency,
+                options: ['Real-time', 'Every 5 minutes', 'Every 15 minutes', 'Manual only'],
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  setState(() => _syncFrequency = value);
+                },
+              ),
+              _buildDivider(),
+              _buildSwitchTile(
+                icon: LucideIcons.mapPin,
+                title: 'Location Tracking',
+                subtitle: 'Track location during visits',
+                value: _locationTrackingEnabled,
+                onChanged: (value) {
+                  HapticUtils.lightImpact();
+                  setState(() => _locationTrackingEnabled = value);
+                },
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.hardDrive,
+                title: 'Storage',
+                subtitle: 'Manage app data and cache',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  _showStorageDialog();
+                },
+              ),
+            ]),
+            const SizedBox(height: 24),
 
-            // Privacy & Security Section
-            _buildSection(
-              title: 'Privacy & Security',
-              children: [
-                _buildInfoTile(
-                  icon: LucideIcons.timer,
-                  title: 'Auto-lock',
-                  value: '15 minutes',
-                ),
-                _buildSwitchTile(
-                  icon: LucideIcons.lock,
-                  title: 'Require PIN on Resume',
-                  value: true,
-                  onChanged: null, // Fixed setting
-                ),
-                _buildSwitchTile(
-                  icon: LucideIcons.eyeOff,
-                  title: 'Hide Sensitive Info',
-                  subtitle: 'Blur app when in background',
-                  value: true,
-                  onChanged: null, // Fixed setting
-                ),
-              ],
-            ),
-
-            // About Section
-            _buildSection(
-              title: 'About',
-              children: [
-                _buildInfoTile(
-                  icon: LucideIcons.info,
-                  title: 'App Version',
-                  value: '1.0.0',
-                ),
-                _buildNavigationTile(
-                  icon: LucideIcons.fileText,
-                  title: 'Terms of Service',
-                  onTap: () {},
-                ),
-                _buildNavigationTile(
-                  icon: LucideIcons.shield,
-                  title: 'Privacy Policy',
-                  onTap: () {},
-                ),
-              ],
-            ),
+            // Support & Info
+            _buildSectionHeader('Support & Info'),
+            _buildSettingsCard([
+              _buildSettingsTile(
+                icon: LucideIcons.helpCircle,
+                title: 'Help Center',
+                subtitle: 'FAQs and support articles',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Help Center coming soon')),
+                  );
+                },
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.messageSquare,
+                title: 'Send Feedback',
+                subtitle: 'Report issues or suggest improvements',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Feedback feature coming soon')),
+                  );
+                },
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.info,
+                title: 'About IMU',
+                subtitle: 'Version 1.0.0',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  _showAboutDialog();
+                },
+              ),
+            ]),
+            const SizedBox(height: 24),
 
             // Logout Button
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showLogoutDialog(),
-                  icon: const Icon(LucideIcons.logOut, color: Colors.red),
-                  label: const Text(
-                    'Log Out',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+            ElevatedButton.icon(
+              onPressed: _handleLogout,
+              icon: const Icon(LucideIcons.logOut),
+              label: const Text('Log Out'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[50],
+                foregroundColor: Colors.red,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 48),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required List<Widget> children,
-  }) {
+  Widget _buildProfileCard(String? userName, String? userEmail) {
     return Container(
-      margin: const EdgeInsets.only(top: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.white24,
             child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
+              userName != null && userName.isNotEmpty
+                  ? userName.split(' ').map((e) => e[0]).take(2).join()
+                  : 'U',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
           ),
-          Container(
-            color: Colors.white,
+          const SizedBox(width: 16),
+          Expanded(
             child: Column(
-              children: children,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  userName ?? 'Unknown User',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  userEmail ?? 'No email',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
+          ),
+          Icon(
+            LucideIcons.chevronRight,
+            color: Colors.white54,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNavigationTile({
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF0F172A),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildSettingsTile({
     required IconData icon,
     required String title,
-    Widget? trailing,
+    required String subtitle,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title),
-      trailing: trailing ?? const Icon(LucideIcons.chevronRight, size: 20),
+    return InkWell(
       onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: const Color(0xFF0F172A), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(LucideIcons.chevronRight, color: Colors.grey[400], size: 18),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
-    String? subtitle,
+    required String subtitle,
     required bool value,
-    required ValueChanged<bool>? onChanged,
+    required ValueChanged<bool> onChanged,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])) : null,
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: const Color(0xFF0F172A), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: const Color(0xFF0F172A),
+          ),
+        ],
       ),
     );
   }
@@ -274,46 +440,127 @@ class _SettingsPageState extends State<SettingsPage> {
     required String title,
     required String value,
     required List<String> options,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String> onChanged,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title),
-      trailing: DropdownButton<String>(
-        value: value,
-        underline: const SizedBox(),
-        items: options
-            .map((opt) => DropdownMenuItem(
-                  value: opt,
-                  child: Text(opt),
-                ))
-            .toList(),
-        onChanged: onChanged,
+    return InkWell(
+      onTap: () {
+        HapticUtils.lightImpact();
+        showModalBottomSheet(
+          context: context,
+          builder: (context) => Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Select Option',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...options.map((option) => ListTile(
+                  title: Text(option),
+                  trailing: value == option
+                      ? const Icon(LucideIcons.check, color: Color(0xFF0F172A))
+                      : null,
+                  onTap: () {
+                    onChanged(option);
+                    Navigator.pop(context);
+                  },
+                )),
+              ],
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: const Color(0xFF0F172A), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(LucideIcons.chevronDown, color: Colors.grey[400], size: 18),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildInfoTile({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title),
-      trailing: Text(
-        value,
-        style: TextStyle(color: Colors.grey[600]),
-      ),
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: Colors.grey[200],
+      indent: 68,
     );
   }
 
   void _showChangePinDialog() {
+    final newPinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Change PIN'),
-        content: const Text('This will navigate to PIN change flow.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: newPinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New PIN',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmPinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm New PIN',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -321,10 +568,26 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              // Navigate to PIN change flow
+              if (newPinController.text == confirmPinController.text &&
+                  newPinController.text.length == 6) {
+                HapticUtils.success();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('PIN changed successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('PINs do not match'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
-            child: const Text('Continue'),
+            child: const Text('Change PIN'),
           ),
         ],
       ),
@@ -332,11 +595,45 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showChangePasswordDialog() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Change Password'),
-        content: const Text('This will initiate password reset via admin.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Current Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm New Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -344,53 +641,168 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Password reset request sent')),
-              );
+              if (newPasswordController.text == confirmPasswordController.text &&
+                  newPasswordController.text.length >= 8) {
+                HapticUtils.success();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password changed successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Passwords do not match or too short'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
-            child: const Text('Request Reset'),
+            child: const Text('Change Password'),
           ),
         ],
       ),
     );
   }
 
-  void _syncNow() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Syncing data...'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _clearCache() {
+  void _showStorageDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Cache'),
-        content: const Text('This will clear temporary files. Your data will not be affected.'),
+        title: const Text('Storage'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('App Storage Usage:'),
+            const SizedBox(height: 12),
+            _buildStorageItem('Cache', '45 MB', () {
+              HapticUtils.mediumImpact();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Cache cleared')),
+              );
+            }),
+            _buildStorageItem('Offline Data', '12 MB', null),
+            _buildStorageItem('App Data', '28 MB', null),
+            const Divider(),
+            _buildStorageItem('Total', '85 MB', null),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Close'),
           ),
           ElevatedButton(
             onPressed: () {
+              HapticUtils.mediumImpact();
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cache cleared successfully')),
+                const SnackBar(content: Text('All cache cleared')),
               );
             },
-            child: const Text('Clear'),
+            child: const Text('Clear All Cache'),
           ),
         ],
       ),
     );
   }
 
-  void _showLogoutDialog() {
+  Widget _buildStorageItem(String label, String size, VoidCallback? onClear) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Row(
+            children: [
+              Text(
+                size,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              if (onClear != null) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: onClear,
+                  child: Text(
+                    'Clear',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: Text(
+                  'IMU',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('About IMU'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Itinerary Manager - Uniformed',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 8),
+            Text('Version: 1.0.0'),
+            SizedBox(height: 8),
+            Text('Build: 2024.03.12'),
+            SizedBox(height: 16),
+            Text(
+              'A mobile application for field agents managing client visits for retired police personnel (PNP retirees).',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleLogout() {
+    HapticUtils.mediumImpact();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -402,11 +814,21 @@ class _SettingsPageState extends State<SettingsPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              HapticUtils.success();
               Navigator.pop(context);
-              context.go('/login');
+
+              // Clear session and navigate to login
+              _sessionService.lockSession();
+
+              if (mounted) {
+                context.go('/login');
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Log Out'),
           ),
         ],

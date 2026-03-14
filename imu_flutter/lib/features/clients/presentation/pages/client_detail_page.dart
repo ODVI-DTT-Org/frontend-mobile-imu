@@ -2,12 +2,70 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'dart:convert';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/sync_service.dart';
+import '../../../../services/api/client_api_service.dart';
+import '../../../../services/api/touchpoint_api_service.dart';
+import '../../../../services/connectivity_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+
+// Client detail provider
+final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
+  final clientApi = ref.watch(clientApiServiceProvider);
+  final isOnline = ref.watch(isOnlineProvider);
+
+  if (isOnline) {
+    try {
+      return await clientApi.fetchClient(clientId);
+    } catch (e) {
+      // Fall back to local cache
+      final hiveService = HiveService();
+      if (!hiveService.isInitialized) await hiveService.init();
+      final localClient = hiveService.getClient(clientId);
+      if (localClient != null) {
+        return Client.fromJson(localClient);
+      }
+      return null;
+    }
+  } else {
+    // Offline - use local cache
+    final hiveService = HiveService();
+    if (!hiveService.isInitialized) await hiveService.init();
+    final localClient = hiveService.getClient(clientId);
+    if (localClient != null) {
+      return Client.fromJson(localClient);
+    }
+    return null;
+  }
+});
+
+// Touchpoints for client provider
+final clientTouchpointsProvider = FutureProvider.family<List<Touchpoint>, String>((ref, clientId) async {
+  final touchpointApi = ref.watch(touchpointApiServiceProvider);
+  final isOnline = ref.watch(isOnlineProvider);
+
+  if (isOnline) {
+    try {
+      return await touchpointApi.fetchTouchpoints(clientId);
+    } catch (e) {
+      // Fall back to local cache
+      final hiveService = HiveService();
+      if (!hiveService.isInitialized) await hiveService.init();
+      final localTouchpoints = hiveService.getTouchpointsForClient(clientId);
+      return localTouchpoints.map((data) => Touchpoint.fromJson(data)).toList();
+    }
+  } else {
+    // Offline - use local cache
+    final hiveService = HiveService();
+    if (!hiveService.isInitialized) await hiveService.init();
+    final localTouchpoints = hiveService.getTouchpointsForClient(clientId);
+    return localTouchpoints.map((data) => Touchpoint.fromJson(data)).toList();
+  }
+});
 
 class ClientDetailPage extends ConsumerStatefulWidget {
   final String clientId;

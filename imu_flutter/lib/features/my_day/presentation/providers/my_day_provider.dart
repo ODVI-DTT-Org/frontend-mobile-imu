@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/models/my_day_client.dart';
+import '../../data/models/my_day_client.dart';
 import '../../../../services/api/my_day_api_service.dart';
 
 /// State for My Day page

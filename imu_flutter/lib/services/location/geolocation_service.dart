@@ -3,6 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
+/// Result enum for location operations
+enum LocationResult {
+  success,
+  serviceDisabled,
+  permissionDenied,
+  permissionDeniedForever,
+  timeout,
+  error,
+}
+
 /// Location service for GPS capture and geofencing
 class GeolocationService {
   static final GeolocationService _instance = GeolocationService._internal();
@@ -41,29 +51,56 @@ class GeolocationService {
     return permission;
   }
 
-  /// Get current position
-  Future<Position?> getCurrentPosition({
+  /// Get current position with detailed error handling
+  Future<(Position?, LocationResult, String?)> getCurrentPositionWithResult({
     LocationAccuracy accuracy = LocationAccuracy.high,
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    try {
-      final permission = await requestPermission();
-      if (permission != LocationPermission.always &&
-          permission != LocationPermission.whileInUse) {
-        return null;
-      }
+    // Check if location service is enabled
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return (null, LocationResult.serviceDisabled, 'GPS is disabled. Please enable location services in your device settings.');
+    }
 
+    // Check and request permission
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return (null, LocationResult.permissionDenied, 'Location permission denied. Please allow location access to capture your time-in location.');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return (null, LocationResult.permissionDeniedForever, 'Location permission permanently denied. Please enable it in app settings.');
+    }
+
+    try {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: accuracy,
         timeLimit: timeout,
       );
 
       _lastKnownPosition = position;
-      return position;
+      return (position, LocationResult.success, null);
+    } on TimeoutException {
+      return (null, LocationResult.timeout, 'Location request timed out. Please try again.');
     } catch (e) {
       debugPrint('Error getting current position: $e');
-      return _lastKnownPosition;
+      return (null, LocationResult.error, 'Failed to get location: ${e.toString()}');
     }
+  }
+
+  /// Get current position (backward compatible, returns null on any error)
+  Future<Position?> getCurrentPosition({
+    LocationAccuracy accuracy = LocationAccuracy.high,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final (position, _, _) = await getCurrentPositionWithResult(
+      accuracy: accuracy,
+      timeout: timeout,
+    );
+    return position;
   }
 
   /// Get address from coordinates (reverse geocoding)

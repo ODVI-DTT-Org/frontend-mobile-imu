@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/utils/haptic_utils.dart';
 
 class MainShell extends StatelessWidget {
   final Widget child;
@@ -24,26 +25,37 @@ class BottomNavBar extends StatelessWidget {
 
   int _getCurrentIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    if (location.startsWith('/home') || location.startsWith('/clients')) {
+    if (location == '/home') {
       return 0;
-    } else if (location.startsWith('/my-day')) {
+    } else if (location == '/agencies') {
       return 1;
-    } else if (location.startsWith('/itinerary')) {
+    } else if (location == '/my-day') {
       return 2;
+    } else if (location == '/itinerary') {
+      return 3;
+    } else if (location == '/call-log') {
+      return 4;
     }
     return 0;
   }
 
   void _onItemTapped(BuildContext context, int index) {
+    HapticUtils.lightImpact();
     switch (index) {
       case 0:
         context.go('/home');
         break;
       case 1:
-        context.go('/my-day');
+        context.go('/agencies');
         break;
       case 2:
+        context.go('/my-day');
+        break;
+      case 3:
         context.go('/itinerary');
+        break;
+      case 4:
+        context.go('/call-log');
         break;
     }
   }
@@ -54,18 +66,18 @@ class BottomNavBar extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: const Color(0xFF0F172A).withOpacity(0.2),
+            width: 1,
           ),
-        ],
+        ),
       ),
       child: SafeArea(
+        top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -76,16 +88,28 @@ class BottomNavBar extends StatelessWidget {
                 onTap: () => _onItemTapped(context, 0),
               ),
               _NavItem(
-                icon: LucideIcons.calendar,
-                label: 'My Day',
+                icon: LucideIcons.building2,
+                label: 'Agencies',
                 isSelected: currentIndex == 1,
                 onTap: () => _onItemTapped(context, 1),
               ),
               _NavItem(
-                icon: LucideIcons.mapPin,
-                label: 'Itinerary',
+                icon: LucideIcons.calendarDays,
+                label: 'My Day',
                 isSelected: currentIndex == 2,
                 onTap: () => _onItemTapped(context, 2),
+              ),
+              _NavItem(
+                icon: LucideIcons.mapPin,
+                label: 'Itinerary',
+                isSelected: currentIndex == 3,
+                onTap: () => _onItemTapped(context, 3),
+              ),
+              _NavItem(
+                icon: LucideIcons.phone,
+                label: 'Call',
+                isSelected: currentIndex == 4,
+                onTap: () => _onItemTapped(context, 4),
               ),
             ],
           ),
@@ -110,33 +134,44 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Per Figma design: primary color #0F172A
     final color = isSelected
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+        ? const Color(0xFF0F172A)
+        : const Color(0xFF0F172A).withOpacity(0.5);
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon - 21.4px per Figma (using 22 for crisp rendering)
+              SizedBox(
+                width: 44,
+                height: 22,
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 22,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 7),
+              // Label - 10px per Figma
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  height: 1.0,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

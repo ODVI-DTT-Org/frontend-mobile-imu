@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' show MultipartFile;
 import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/services/api/pocketbase_client.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
-import 'package:imu_flutter/services/api/itinerary_api_service.dart';
 import 'package:imu_flutter/features/my_day/data/models/my_day_client.dart';
 
 /// Task status for My Day
@@ -276,8 +276,66 @@ class MyDayApiService {
     }
 
     try {
-      // TODO: Replace with actual PocketBase query
-      // For now, return mock data
+      // Format date for filtering
+      final startOfDay = DateTime(date.year, date.month, date.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      // Query itineraries for the specified date
+      final itineraryResult = await _pb.collection('itineraries').getList(
+        page: 1,
+        perPage: 100,
+        filter: 'date >= "${startOfDay.toIso8601String()}" && date < "${endOfDay.toIso8601String()}"',
+        expand: 'client',
+      );
+
+      final List<MyDayClient> myDayClients = [];
+
+      for (final item in itineraryResult.items) {
+        final itineraryData = item.data;
+        final expandedList = item.expand['client'];
+
+        // expand returns a List<RecordModel>, get first if available
+        if (expandedList != null && expandedList.isNotEmpty) {
+          final expandedClient = expandedList.first;
+
+          // Get the latest touchpoint for this client
+          int touchpointNumber = 0;
+          String touchpointType = 'visit';
+
+          try {
+            final touchpointsResult = await _pb.collection('touchpoints').getList(
+              page: 1,
+              perPage: 1,
+              filter: 'client = "${expandedClient.id}"',
+              sort: '-touchpoint_number',
+            );
+
+            if (touchpointsResult.items.isNotEmpty) {
+              touchpointNumber = touchpointsResult.items.first.data['touchpoint_number'] ?? 0;
+              touchpointType = touchpointsResult.items.first.data['type'] ?? 'visit';
+            }
+          } catch (e) {
+            debugPrint('Error fetching touchpoints for client: $e');
+          }
+
+          myDayClients.add(MyDayClient(
+            id: expandedClient.id,
+            fullName: '${expandedClient.data['last_name'] ?? ''}, ${expandedClient.data['first_name'] ?? ''} ${expandedClient.data['middle_name'] ?? ''}'.trim(),
+            agencyName: expandedClient.data['agency_name'],
+            location: expandedClient.data['agency_name'] ?? expandedClient.data['address'],
+            touchpointNumber: touchpointNumber,
+            touchpointType: touchpointType,
+            isTimeIn: itineraryData['is_time_in'] ?? false,
+          ),);
+        }
+      }
+
+      return myDayClients.isEmpty ? _getMockMyDayClients() : myDayClients;
+    } on ClientException catch (e) {
+      debugPrint('Error fetching My Day clients: $e');
+      if (e.statusCode == 404) {
+        _useMockData = true;
+      }
       return _getMockMyDayClients();
     } catch (e) {
       debugPrint('Error fetching My Day clients: $e');
@@ -345,8 +403,15 @@ class MyDayApiService {
     }
 
     try {
-      // TODO: Replace with actual PocketBase update
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Update the client's time-in status in PocketBase
+      await _pb.collection('clients').update(clientId, body: {
+        'is_time_in': isTimeIn,
+        'time_in_at': isTimeIn ? DateTime.now().toIso8601String() : null,
+      });
+      debugPrint('Time-in status updated for client $clientId: $isTimeIn');
+    } on ClientException catch (e) {
+      debugPrint('Error setting time-in: $e');
+      throw ApiException.fromPocketBase(e);
     } catch (e) {
       debugPrint('Error setting time-in: $e');
       rethrow;
@@ -362,15 +427,30 @@ class MyDayApiService {
     }
 
     try {
-      // TODO: Replace with actual PocketBase create
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Create a visit record in PocketBase
+      final visitData = {
+        'client': clientId,
+        'transaction': formData['transaction'],
+        'status': formData['status'],
+        'remarks': formData['remarks'],
+        'release_amount': formData['releaseAmount'],
+        'other_remarks': formData['otherRemarks'],
+        'visit_date': DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      await _pb.collection('visits').create(body: visitData);
+      debugPrint('Visit form submitted for client $clientId');
+    } on ClientException catch (e) {
+      debugPrint('Error submitting visit form: $e');
+      throw ApiException.fromPocketBase(e);
     } catch (e) {
       debugPrint('Error submitting visit form: $e');
       rethrow;
     }
   }
 
-  /// Record selfie for a client visit
+  /// Upload selfie for a client visit
   Future<String?> uploadSelfie(String clientId, String photoPath) async {
     if (_useMockData) {
       // Mock: return a fake URL
@@ -379,9 +459,29 @@ class MyDayApiService {
     }
 
     try {
-      // TODO: Replace with actual file upload
-      await Future.delayed(const Duration(milliseconds: 500));
-      return 'https://mock-storage.selfie/$clientId.jpg';
+      // Create the multipart file
+      final multipartFile = await MultipartFile.fromPath('selfie', photoPath);
+
+      // Upload the selfie file to PocketBase
+      final response = await _pb.collection('client_selfies').create(
+        body: {
+          'client': clientId,
+          'uploaded_at': DateTime.now().toIso8601String(),
+        },
+        files: [multipartFile],
+      );
+
+      final selfieId = response.id;
+      final selfieFilename = response.data['selfie'] ?? 'selfie.jpg';
+
+      // Get the file URL using PocketBase files helper
+      final selfieUrl = _pb.files.getUrl(response, selfieFilename);
+
+      debugPrint('Selfie uploaded for client $clientId');
+      return selfieUrl.toString();
+    } on ClientException catch (e) {
+      debugPrint('Error uploading selfie: $e');
+      throw ApiException.fromPocketBase(e);
     } catch (e) {
       debugPrint('Error uploading selfie: $e');
       return null;

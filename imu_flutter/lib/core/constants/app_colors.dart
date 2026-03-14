@@ -4,8 +4,8 @@ class AppColors {
   // Private constructor to prevent instantiation
   AppColors._();
 
-  // Light theme colors
-  static const Color primary = Color(0xFF334155); // slate-700
+  // Light theme colors - Figma primary color #0F172A
+  static const Color primary = Color(0xFF0F172A); // slate-900
   static const Color secondary = Color(0xFF64748B); // slate-500
   static const Color surface = Color(0xFFFFFFFF);
   static const Color background = Color(0xFFFFFFFF);

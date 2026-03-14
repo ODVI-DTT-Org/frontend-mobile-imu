@@ -48,6 +48,7 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
   String? _capturedAddress;
   String? _capturedTimestamp;
   bool _locationCaptured = false;
+  String? _locationError;
 
   @override
   Widget build(BuildContext context) {
@@ -201,6 +202,49 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
   }
 
   Widget _buildLocationStatus() {
+    // Show error state if location capture failed
+    if (_locationError != null && !_locationCaptured) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFEF4444)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              LucideIcons.alertCircle,
+              size: 18,
+              color: Color(0xFFEF4444),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _locationError!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFFEF4444),
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: _captureLocation,
+              child: const Text(
+                'Retry',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3B82F6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_locationCaptured) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -262,17 +306,35 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: OutlinedButton.icon(
-        onPressed: _captureLocation,
-        icon: const Icon(LucideIcons.mapPin, size: 18),
-        label: const Text('Capture Location First'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF0F172A),
-          side: const BorderSide(color: Color(0xFFE2E8F0)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+      child: Column(
+        children: [
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _captureLocation,
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(LucideIcons.mapPin, size: 18),
+            label: Text(_isLoading ? 'Capturing...' : 'Capture Location First'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF0F172A),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            'Location is required before time-in',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -409,18 +471,36 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
 
   Future<void> _captureLocation() async {
     HapticUtils.lightImpact();
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _locationError = null;
+    });
 
     try {
-      final position = await _geoService.getCurrentPosition();
+      final (position, result, errorMessage) = await _geoService.getCurrentPositionWithResult();
 
       if (position == null) {
-        setState(() => _isLoading = false);
-        if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _locationError = errorMessage ?? 'Unable to get location';
+        });
+
+        // Show action for permission issues
+        if (mounted && (result == LocationResult.permissionDeniedForever ||
+            result == LocationResult.serviceDisabled)) {
+          _showLocationActionDialog(result);
+        } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Unable to get location. Please check GPS settings.'),
-              backgroundColor: Color(0xFFEF4444),
+            SnackBar(
+              content: Text(errorMessage ?? 'Unable to get location'),
+              backgroundColor: const Color(0xFFEF4444),
+              action: result == LocationResult.permissionDenied
+                  ? SnackBarAction(
+                      label: 'Settings',
+                      textColor: Colors.white,
+                      onPressed: () => _geoService.openAppSettings(),
+                    )
+                  : null,
             ),
           );
         }
@@ -439,11 +519,15 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
       setState(() {
         _isLoading = false;
         _locationCaptured = true;
+        _locationError = null;
         _capturedAddress = address ?? '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
         _capturedTimestamp = formattedTime;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _locationError = 'Error capturing location: $e';
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -453,6 +537,37 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
         );
       }
     }
+  }
+
+  void _showLocationActionDialog(LocationResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location Required'),
+        content: Text(
+          result == LocationResult.serviceDisabled
+              ? 'GPS is disabled. Please enable location services to capture your time-in location.'
+              : 'Location permission is required. Please enable it in app settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (result == LocationResult.serviceDisabled) {
+                _geoService.openLocationSettings();
+              } else {
+                _geoService.openAppSettings();
+              }
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleBulkTimeIn() {

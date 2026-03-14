@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../core/utils/haptic_utils.dart';
+import '../../../../shared/providers/app_providers.dart';
+import '../../../../services/api/client_api_service.dart';
+import '../../data/models/client_model.dart';
 
-class AddClientPage extends StatefulWidget {
+class AddClientPage extends ConsumerStatefulWidget {
   const AddClientPage({super.key});
 
   @override
-  State<AddClientPage> createState() => _AddClientPageState();
+  ConsumerState<AddClientPage> createState() => _AddClientPageState();
 }
 
-class _AddClientPageState extends State<AddClientPage> {
+class _AddClientPageState extends ConsumerState<AddClientPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -19,6 +24,7 @@ class _AddClientPageState extends State<AddClientPage> {
   String _selectedProductType = 'SSS Pensioner';
   String _selectedPensionType = 'SSS';
   String _selectedClientType = 'POTENTIAL';
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -29,16 +35,114 @@ class _AddClientPageState extends State<AddClientPage> {
     super.dispose();
   }
 
-  void _handleSave() {
-    if (_formKey.currentState!.validate()) {
-      // Save client logic would go here
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Client added successfully'),
-          backgroundColor: Colors.green,
-        ),
+  ProductType _parseProductType(String value) {
+    switch (value) {
+      case 'SSS Pensioner':
+        return ProductType.sssPensioner;
+      case 'GSIS Pensioner':
+        return ProductType.gsisPensioner;
+      case 'Private':
+        return ProductType.private;
+      default:
+        return ProductType.sssPensioner;
+    }
+  }
+
+  PensionType _parsePensionType(String value) {
+    switch (value) {
+      case 'SSS':
+        return PensionType.sss;
+      case 'GSIS':
+        return PensionType.gsis;
+      case 'Private':
+        return PensionType.private;
+      case 'None':
+        return PensionType.none;
+      default:
+        return PensionType.none;
+    }
+  }
+
+  MarketType _parseMarketType(String value) {
+    switch (value) {
+      case 'Residential':
+        return MarketType.residential;
+      case 'Commercial':
+        return MarketType.commercial;
+      case 'Industrial':
+        return MarketType.industrial;
+      default:
+        return MarketType.residential;
+    }
+  }
+
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    HapticUtils.success();
+    setState(() => _isLoading = true);
+
+    try {
+      final clientApi = ref.read(clientApiServiceProvider);
+
+      // Parse name into first and last
+      final nameParts = _nameController.text.trim().split(' ');
+      final firstName = nameParts.first;
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      final client = Client(
+        id: '', // Will be set by API
+        firstName: firstName,
+        lastName: lastName,
+        email: _emailController.text.trim(),
+        clientType: _selectedClientType == 'POTENTIAL' ? ClientType.potential : ClientType.existing,
+        productType: _parseProductType(_selectedProductType),
+        pensionType: _parsePensionType(_selectedPensionType),
+        marketType: _parseMarketType(_selectedMarketType),
+        addresses: [
+          Address(
+            id: '',
+            street: _addressController.text.trim(),
+            city: '',
+            zipCode: '',
+            province: '',
+          )
+        ],
+        phoneNumbers: [
+          PhoneNumber(
+            id: '',
+            number: _phoneController.text.trim(),
+            label: 'mobile',
+          )
+        ],
+        createdAt: DateTime.now(),
       );
-      context.pop();
+
+      await clientApi.createClient(client);
+
+      // Invalidate providers to refresh lists
+      ref.invalidate(clientsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$firstName added successfully'),
+            backgroundColor: const Color(0xFF22C55E),
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add client: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -54,8 +158,14 @@ class _AddClientPageState extends State<AddClientPage> {
         title: const Text('Add Client'),
         actions: [
           TextButton(
-            onPressed: _handleSave,
-            child: const Text('Save'),
+            onPressed: _isLoading ? null : _handleSave,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Saving...'),
           ),
         ],
       ),
@@ -69,7 +179,7 @@ class _AddClientPageState extends State<AddClientPage> {
               // Personal Information
               const Text(
                 'Personal Information',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -117,7 +227,7 @@ class _AddClientPageState extends State<AddClientPage> {
               // Address
               const Text(
                 'Address',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -142,7 +252,7 @@ class _AddClientPageState extends State<AddClientPage> {
               // Client Classification
               const Text(
                 'Client Classification',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -215,8 +325,29 @@ class _AddClientPageState extends State<AddClientPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _handleSave,
-                  child: const Text('ADD CLIENT'),
+                  onPressed: _isLoading ? null : _handleSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: _isLoading
+                      ? const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Adding Client...'),
+                          ],
+                        )
+                      : const Text('ADD CLIENT'),
                 ),
               ),
             ],

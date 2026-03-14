@@ -1,6 +1,12 @@
+// Re-export connectivity providers
+export '../../services/connectivity_service.dart' show isOnlineProvider, connectivityStatusProvider;
+
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pocketbase/pocketbase.dart';
+import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/local_storage/hive_service.dart';
 import '../../services/sync/sync_service.dart';
@@ -11,6 +17,16 @@ import '../../features/targets/data/models/target_model.dart';
 import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
 import '../../features/profile/data/models/user_profile.dart';
+import '../../services/auth/auth_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/api/client_api_service.dart';
+import '../../services/api/touchpoint_api_service.dart';
+import '../../services/api/itinerary_api_service.dart';
+import '../../services/api/targets_api_service.dart';
+import '../../services/api/attendance_api_service.dart' hide AttendanceRecord;
+import '../../services/api/profile_api_service.dart' hide UserProfile;
+import '../../services/api/my_day_api_service.dart';
+import '../../services/api/groups_api_service.dart';
 
 // ==================== Service Providers ====================
 
@@ -29,30 +45,77 @@ final geolocationServiceProvider = Provider<GeolocationService>((ref) {
   return GeolocationService();
 });
 
+// Note: connectivityServiceProvider, isOnlineProvider, and connectivityStatusProvider
+// are defined in connectivity_service.dart - use that import
+
 // ==================== Auth Providers ====================
+// Note: Primary auth state is managed by authNotifierProvider in auth_service.dart
 
-/// Authentication state
-final isAuthenticatedProvider = StateProvider<bool>((ref) => false);
+/// Authentication state - derived from authNotifierProvider
+final isAuthenticatedProvider = Provider<bool>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  return authState.isAuthenticated;
+});
 
-/// Current user ID
-final currentUserIdProvider = StateProvider<String?>((ref) => null);
+/// Current user record from PocketBase
+final currentUserRecordProvider = Provider<RecordModel?>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  return authState.user;
+});
 
-/// Current user name
-final currentUserNameProvider = StateProvider<String?>((ref) => null);
+/// Current user ID - derived from auth state
+final currentUserIdProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  return authState.user?.id;
+});
 
-/// Has PIN been set
-final hasPinProvider = StateProvider<bool>((ref) => false);
+/// Current user name - derived from auth state
+final currentUserNameProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  final user = authState.user;
+  if (user == null) return null;
+
+  final firstName = user.data['first_name'] as String? ?? '';
+  final lastName = user.data['last_name'] as String? ?? '';
+  final fullName = '$firstName $lastName'.trim();
+  return fullName.isNotEmpty ? fullName : user.data['email'] as String?;
+});
+
+/// Current user email - derived from auth state
+final currentUserEmailProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  return authState.user?.data['email'] as String?;
+});
 
 // ==================== Client Providers ====================
 
-/// All clients
+/// All clients - uses API when online, falls back to Hive when offline
 final clientsProvider = FutureProvider<List<Client>>((ref) async {
   final hiveService = ref.watch(hiveServiceProvider);
+  final isOnline = ref.watch(isOnlineProvider);
 
   if (!hiveService.isInitialized) {
     await hiveService.init();
   }
 
+  if (isOnline) {
+    try {
+      final clientApi = ref.watch(clientApiServiceProvider);
+      final clients = await clientApi.fetchClients();
+
+      // Cache clients to Hive for offline use
+      for (final client in clients) {
+        await hiveService.addClient(client.toJson());
+      }
+
+      return clients;
+    } catch (e) {
+      // Fall back to local cache on error
+      debugPrint('Failed to fetch clients from API: $e');
+    }
+  }
+
+  // Use local cache
   final clientsData = hiveService.getAllClients();
   return clientsData.map((data) => Client.fromJson(data)).toList();
 });
@@ -230,16 +293,21 @@ final targetPeriodProvider = StateProvider<TargetPeriod>((ref) {
   return TargetPeriod.weekly;
 });
 
-/// Current targets (mock data for now)
+/// Current targets - uses API when online
 final targetsProvider = FutureProvider<List<Target>>((ref) async {
-  final hiveService = ref.watch(hiveServiceProvider);
+  final isOnline = ref.watch(isOnlineProvider);
 
-  if (!hiveService.isInitialized) {
-    await hiveService.init();
+  if (isOnline) {
+    try {
+      final targetsApi = ref.watch(targetsApiServiceProvider);
+      final targets = await targetsApi.fetchTargets();
+      if (targets.isNotEmpty) return targets;
+    } catch (e) {
+      debugPrint('Failed to fetch targets from API: $e');
+    }
   }
 
-  // TODO: Replace with actual Hive storage
-  // For now, return mock data
+  // Fall back to mock data for now
   return _getMockTargets();
 });
 
@@ -538,9 +606,9 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
 
 // ==================== Profile Providers ====================
 
-/// Current user profile
+/// Current user profile - uses API when online
 final userProfileProvider = StateNotifierProvider<UserProfileNotifier, UserProfile?>((ref) {
-  return UserProfileNotifier();
+  return UserProfileNotifier(ref);
 });
 
 /// Is profile loading
@@ -550,18 +618,68 @@ final isProfileLoadingProvider = Provider<bool>((ref) {
 
 /// Profile Notifier
 class UserProfileNotifier extends StateNotifier<UserProfile?> {
-  UserProfileNotifier() : super(null) {
+  final Ref _ref;
+
+  UserProfileNotifier(this._ref) : super(null) {
     _loadProfile();
   }
 
-  void _loadProfile() {
-    // TODO: Load from Hive or API
-    // For now, use mock data
+  Future<void> _loadProfile() async {
+    final isOnline = _ref.read(isOnlineProvider);
+    final userId = _ref.read(currentUserIdProvider);
+
+    if (isOnline && userId != null) {
+      try {
+        final profileApi = _ref.read(profileApiServiceProvider);
+        final profile = await profileApi.fetchProfile(userId);
+        state = _convertToUserProfile(profile);
+        return;
+      } catch (e) {
+        debugPrint('Failed to fetch profile from API: $e');
+      }
+    }
+
+    // Fall back to mock data
     state = UserProfile.mock();
   }
 
+  UserProfile _convertToUserProfile(dynamic apiProfile) {
+    // Handle both UserProfile from API and mock data
+    if (apiProfile is UserProfile) {
+      return apiProfile;
+    }
+    // Fallback for raw data
+    return UserProfile(
+      id: apiProfile.id ?? '',
+      firstName: apiProfile.firstName ?? '',
+      lastName: apiProfile.lastName ?? '',
+      email: apiProfile.email ?? '',
+      phone: apiProfile.phone ?? '',
+      employeeId: apiProfile.employeeId ?? apiProfile.id?.toString().substring(0, 8).toUpperCase() ?? '',
+      role: apiProfile.role ?? 'Field Agent',
+      profilePhotoUrl: apiProfile.profilePhotoUrl,
+      createdAt: apiProfile.createdAt ?? DateTime.now(),
+      updatedAt: apiProfile.updatedAt,
+    );
+  }
+
   Future<void> updateProfile(UserProfile profile) async {
-    // TODO: Save to Hive and sync to API
+    final isOnline = _ref.read(isOnlineProvider);
+    final userId = _ref.read(currentUserIdProvider);
+
+    if (isOnline && userId != null) {
+      try {
+        final profileApi = _ref.read(profileApiServiceProvider);
+        await profileApi.updateProfile(userId, {
+          'first_name': profile.firstName,
+          'last_name': profile.lastName,
+          'phone': profile.phone,
+        });
+      } catch (e) {
+        debugPrint('Failed to update profile via API: $e');
+      }
+    }
+
     state = profile.copyWith(updatedAt: DateTime.now());
   }
 

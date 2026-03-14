@@ -25,6 +25,7 @@ class Client {
   final List<Touchpoint> touchpoints;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final bool isStarred;
 
   Client({
     required this.id,
@@ -52,6 +53,7 @@ class Client {
     this.touchpoints = const [],
     required this.createdAt,
     this.updatedAt,
+    this.isStarred = false,
   });
 
   String get fullName => '$firstName ${middleName != null ? '$middleName ' : ''}$lastName';
@@ -101,6 +103,7 @@ class Client {
     List<Touchpoint>? touchpoints,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isStarred,
   }) {
     return Client(
       id: id ?? this.id,
@@ -128,6 +131,7 @@ class Client {
       touchpoints: touchpoints ?? this.touchpoints,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isStarred: isStarred ?? this.isStarred,
     );
   }
 
@@ -158,6 +162,7 @@ class Client {
       'touchpoints': touchpoints.map((t) => t.toJson()).toList(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'isStarred': isStarred,
     };
   }
 
@@ -202,6 +207,7 @@ class Client {
       touchpoints: (json['touchpoints'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      isStarred: json['isStarred'] ?? false,
     );
   }
 }
