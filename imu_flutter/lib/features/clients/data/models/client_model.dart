@@ -11,7 +11,7 @@ class Client {
   final String? payrollDate;
   final int? tenure;
   final DateTime? birthDate;
-  final String? contactNumber;
+  final String? phone; // Changed from contactNumber to match PocketBase schema
   final String? remarks;
   final ClientType clientType;
   final MarketType? marketType;
@@ -39,7 +39,7 @@ class Client {
     this.payrollDate,
     this.tenure,
     this.birthDate,
-    this.contactNumber,
+    this.phone,
     this.remarks,
     required this.clientType,
     this.marketType,
@@ -89,7 +89,7 @@ class Client {
     String? payrollDate,
     int? tenure,
     DateTime? birthDate,
-    String? contactNumber,
+    String? phone,
     String? remarks,
     ClientType? clientType,
     MarketType? marketType,
@@ -117,7 +117,7 @@ class Client {
       payrollDate: payrollDate ?? this.payrollDate,
       tenure: tenure ?? this.tenure,
       birthDate: birthDate ?? this.birthDate,
-      contactNumber: contactNumber ?? this.contactNumber,
+      phone: phone ?? this.phone,
       remarks: remarks ?? this.remarks,
       clientType: clientType ?? this.clientType,
       marketType: marketType ?? this.marketType,
@@ -148,7 +148,7 @@ class Client {
       'payrollDate': payrollDate,
       'tenure': tenure,
       'birthDate': birthDate?.toIso8601String(),
-      'contactNumber': contactNumber,
+      'phone': phone,
       'remarks': remarks,
       'clientType': clientType.name,
       'marketType': marketType?.name,
@@ -179,7 +179,7 @@ class Client {
       payrollDate: json['payrollDate'],
       tenure: json['tenure'],
       birthDate: json['birthDate'] != null ? DateTime.parse(json['birthDate']) : null,
-      contactNumber: json['contactNumber'],
+      phone: json['phone'] ?? json['contactNumber'] ?? json['phone_number'],
       remarks: json['remarks'],
       clientType: ClientType.values.firstWhere(
         (e) => e.name == json['clientType'],
