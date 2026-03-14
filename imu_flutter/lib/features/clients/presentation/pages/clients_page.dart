@@ -183,11 +183,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
               child: Row(
                 children: [
-                _buildInterestedChip(),
-              ],
+                  _buildInterestedChip(),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
           // Touchpoint Selector (horizontal scroll)
           Container(
@@ -280,6 +280,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         ],
       ),
     ),
+    );
   }
 
   Widget _buildInterestedChip() {

@@ -6,6 +6,11 @@ import 'client_api_service.dart';
 import 'touchpoint_api_service.dart';
 import '../connectivity_service.dart';
 import '../local_storage/hive_service.dart';
+import '../../shared/providers/app_providers.dart';
+
+// Re-export needed providers
+export 'client_api_service.dart' show clientApiServiceProvider;
+export 'touchpoint_api_service.dart' show touchpointApiServiceProvider;
 
 /// Background sync service for automatic data synchronization
 class BackgroundSyncService extends ChangeNotifier {

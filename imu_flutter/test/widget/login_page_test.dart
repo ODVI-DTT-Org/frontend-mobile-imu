@@ -219,8 +219,8 @@ void main() {
       );
 
       // Find password field
-      final passwordField = find.widgetWithText(TextFormField, 'Password');
-      TextFormField textField = tester.widget(passwordField);
+      final passwordField = find.widgetWithText(TextField, 'Password');
+      TextField textField = tester.widget(passwordField);
       expect(textField.obscureText, isTrue);
 
       // Tap visibility toggle

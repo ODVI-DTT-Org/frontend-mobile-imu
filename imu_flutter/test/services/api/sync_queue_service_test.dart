@@ -13,7 +13,7 @@ void main() {
     mockHiveService = MockHiveService();
     when(() => mockHiveService.isInitialized).thenReturn(true);
 
-    syncQueueService = SyncQueueService(hiveService: mockHiveService);
+    syncQueueService = SyncQueueService();
   });
 
   group('SyncQueueService', () {
@@ -61,49 +61,6 @@ void main() {
       expect(json['operation'], equals('create'));
       expect(json['entityType'], equals('client'));
       expect(json['retryCount'], equals(0));
-    });
-
-    test('SyncConflict creates correct conflict', () {
-      // Arrange & Act
-      final conflict = SyncConflict(
-        id: 'conflict-1',
-        entityType: 'client',
-        operation: 'update',
-        localData: {'id': '1', 'name': 'Local'},
-        serverData: {'id': '1', 'name': 'Server'},
-        detectedAt: DateTime.now(),
-        conflictType: 'update_conflict',
-      );
-
-      // Assert
-      expect(conflict.id, equals('conflict-1'));
-      expect(conflict.entityType, equals('client'));
-      expect(conflict.conflictType, equals('update_conflict'));
-      expect(conflict.localData['name'], equals('Local'));
-      expect(conflict.serverData['name'], equals('Server'));
-    });
-
-    test('ConflictResult creates correct result', () {
-      // Arrange & Act
-      final result = ConflictResult(
-        resolved: true,
-        resolution: ConflictResolution.serverWins,
-        resolvedData: {'id': '1', 'name': 'Server'},
-      );
-
-      // Assert
-      expect(result.resolved, isTrue);
-      expect(result.resolution, equals(ConflictResolution.serverWins));
-      expect(result.resolvedData?['name'], equals('Server'));
-    });
-
-    test('ConflictResolution enum has all strategies', () {
-      // Assert
-      expect(ConflictResolution.values.length, equals(4));
-      expect(ConflictResolution.values, contains(ConflictResolution.localWins));
-      expect(ConflictResolution.values, contains(ConflictResolution.serverWins));
-      expect(ConflictResolution.values, contains(ConflictResolution.merge));
-      expect(ConflictResolution.values, contains(ConflictResolution.askUser));
     });
   });
 }

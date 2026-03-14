@@ -4,6 +4,11 @@ import 'client_api_service.dart';
 import 'touchpoint_api_service.dart';
 import '../local_storage/hive_service.dart';
 import '../../features/clients/data/models/client_model.dart';
+import '../../shared/providers/app_providers.dart';
+
+// Re-export needed providers
+export 'client_api_service.dart' show clientApiServiceProvider;
+export 'touchpoint_api_service.dart' show touchpointApiServiceProvider;
 
 /// Conflict resolution strategy
 enum ConflictResolution {

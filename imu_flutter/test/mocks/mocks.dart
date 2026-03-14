@@ -14,8 +14,8 @@ class MockRecordService extends Mock implements RecordService {}
 /// Mock RecordModel
 class MockRecordModel extends Mock implements RecordModel {}
 
-/// Mock ResultList
-class MockResultList<T> extends Mock implements ResultList<T> {}
+/// Mock ResultList for RecordModel (most common use case)
+class MockResultList extends Mock implements ResultList<RecordModel> {}
 
 /// Mock ClientApiService
 class MockClientApiService extends Mock implements ClientApiService {}
@@ -31,3 +31,6 @@ class MockBox<T> extends Mock implements Box<T> {}
 
 /// Mock AuthStore
 class MockAuthStore extends Mock implements AuthStore {}
+
+/// Mock Collection - for PocketBase collection operations
+class MockCollection extends Mock implements RecordService {}

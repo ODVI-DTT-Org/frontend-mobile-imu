@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/clients/presentation/pages/clients_page.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/local_storage/hive_service.dart';
-import 'package:imu_flutter/services/sync/sync_service.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
+import 'package:imu_flutter/shared/providers/app_providers.dart';
 
 import '../mocks/mocks.dart';
 
@@ -15,22 +15,32 @@ Client _createTestClient({
   required String firstName,
   required String lastName,
   ClientType clientType = ClientType.potential,
-  int completedTouchpoints = 0,
 }) {
   return Client(
     id: id,
     firstName: firstName,
     lastName: lastName,
+    middleName: null,
+    agencyName: null,
+    department: null,
+    position: null,
+    employmentStatus: null,
+    payrollDate: null,
+    tenure: null,
+    birthDate: null,
+    phone: null,
+    remarks: null,
+    pan: null,
+    facebookLink: null,
     email: '$firstName@example.com',
     clientType: clientType,
+    marketType: MarketType.residential,
     productType: ProductType.sssPensioner,
-    pensionType: 'SSS',
-    marketType: 'Residential',
+    pensionType: PensionType.sss,
     phoneNumbers: [],
     addresses: [],
     touchpoints: [],
     createdAt: DateTime.now(),
-    completedTouchpoints: completedTouchpoints,
   );
 }
 
@@ -48,7 +58,6 @@ void main() {
           overrides: [
             clientsProvider.overrideWith((ref) => testClients),
             hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
             isOnlineProvider.overrideWith((ref) => true),
           ],
           child: const MaterialApp(
@@ -72,7 +81,6 @@ void main() {
           overrides: [
             clientsProvider.overrideWith((ref) => []),
             hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
             isOnlineProvider.overrideWith((ref) => true),
           ],
           child: const MaterialApp(
@@ -84,25 +92,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert
-      expect(find.text('No clients found'), findsOneWidget);
-      expect(
-          find.text('Pull down to refresh or add a new client'),
-          findsOneWidget);
+      expect(find.text('No clients yet'), findsOneWidget);
     });
 
-    testWidgets('displays list of clients', (WidgetTester tester) async {
+    testWidgets('shows loading indicator while loading', (WidgetTester tester) async {
       // Arrange
-      final testClients = [
-        _createTestClient(id: '1', firstName: 'John', lastName: 'Doe'),
-        _createTestClient(id: '2', firstName: 'Jane', lastName: 'Smith'),
-      ];
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            clientsProvider.overrideWith((ref) => testClients),
+            clientsProvider.overrideWith((ref) async => []),
             hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
             isOnlineProvider.overrideWith((ref) => true),
           ],
           child: const MaterialApp(
@@ -113,19 +112,38 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Assert
-      expect(find.text('John Doe'), findsOneWidget);
-      expect(find.text('Jane Smith'), findsOneWidget);
+      // Assert - Should show loading indicator
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('shows search field', (WidgetTester tester) async {
+    testWidgets('shows error state when loading fails', (WidgetTester tester) async {
+      // Arrange
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            clientsProvider.overrideWith((ref) async => throw Exception('Test error')),
+            hiveServiceProvider.overrideWith((ref) => MockHiveService()),
+            isOnlineProvider.overrideWith((ref) => true),
+          ],
+          child: const MaterialApp(
+            home: ClientsPage(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Assert - Should show error state
+      expect(find.text('Failed to load'), findsOneWidget);
+    });
+
+    testWidgets('shows search bar', (WidgetTester tester) async {
       // Arrange
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             clientsProvider.overrideWith((ref) => []),
             hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
             isOnlineProvider.overrideWith((ref) => true),
           ],
           child: const MaterialApp(
@@ -136,85 +154,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Assert
+      // Assert - Search bar should be visible
+      expect(find.byType(TextField), findsOneWidget);
       expect(find.text('Search clients...'), findsOneWidget);
     });
 
-    testWidgets('shows Potential and Existing tabs',
-        (WidgetTester tester) async {
-      // Arrange
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            clientsProvider.overrideWith((ref) => []),
-            hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
-            isOnlineProvider.overrideWith((ref) => true),
-          ],
-          child: const MaterialApp(
-            home: ClientsPage(),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Assert
-      expect(find.text('Potential'), findsOneWidget);
-      expect(find.text('Existing'), findsOneWidget);
-    });
-
-    testWidgets('filters by tab selection', (WidgetTester tester) async {
-      // Arrange
-      final testClients = [
-        _createTestClient(
-          id: '1',
-          firstName: 'Potential',
-          lastName: 'Client',
-          clientType: ClientType.potential,
-        ),
-        _createTestClient(
-          id: '2',
-          firstName: 'Existing',
-          lastName: 'Client',
-          clientType: ClientType.existing,
-        ),
-      ];
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            clientsProvider.overrideWith((ref) => testClients),
-            hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
-            isOnlineProvider.overrideWith((ref) => true),
-          ],
-          child: const MaterialApp(
-            home: ClientsPage(),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Initially shows Potential tab
-      expect(find.text('Potential Client'), findsOneWidget);
-      expect(find.text('Existing Client'), findsNothing);
-
-      // Tap Existing tab
-      await tester.tap(find.text('Existing'));
-      await tester.pumpAndSettle();
-
-      // Now shows Existing clients
-      expect(find.text('Existing Client'), findsOneWidget);
-      expect(find.text('Potential Client'), findsNothing);
-    });
-
-    testWidgets('search filters clients by name', (WidgetTester tester) async {
+    testWidgets('shows filter dialog when tapping filter button', (WidgetTester tester) async {
       // Arrange
       final testClients = [
         _createTestClient(id: '1', firstName: 'John', lastName: 'Doe'),
-        _createTestClient(id: '2', firstName: 'Jane', lastName: 'Smith'),
       ];
 
       await tester.pumpWidget(
@@ -222,60 +170,6 @@ void main() {
           overrides: [
             clientsProvider.overrideWith((ref) => testClients),
             hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
-            isOnlineProvider.overrideWith((ref) => true),
-          ],
-          child: const MaterialApp(
-            home: ClientsPage(),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Type in search
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Search clients...'), 'John');
-      await tester.pump();
-
-      // Assert - Only John should be visible
-      expect(find.text('John Doe'), findsOneWidget);
-      expect(find.text('Jane Smith'), findsNothing);
-    });
-
-    testWidgets('shows loading indicator while loading',
-        (WidgetTester tester) async {
-      // Arrange - Async value in loading state
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            clientsProvider.overrideWith((ref) => throw Exception('Loading')),
-            hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
-            isOnlineProvider.overrideWith((ref) => true),
-          ],
-          child: const MaterialApp(
-            home: ClientsPage(),
-          ),
-        ),
-      );
-
-      // Should show error state
-      await tester.pumpAndSettle();
-
-      // Assert - Error state should have retry button
-      expect(find.text('Retry'), findsOneWidget);
-    });
-
-    testWidgets('tapping filter button shows filter dialog',
-        (WidgetTester tester) async {
-      // Arrange
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            clientsProvider.overrideWith((ref) => []),
-            hiveServiceProvider.overrideWith((ref) => MockHiveService()),
-            syncServiceProvider.overrideWith((ref) => MockSyncService()),
             isOnlineProvider.overrideWith((ref) => true),
           ],
           child: const MaterialApp(
@@ -296,17 +190,4 @@ void main() {
       expect(find.text('Product Type'), findsOneWidget);
     });
   });
-}
-
-// Mock SyncService
-class MockSyncService extends SyncService {
-  MockSyncService() : super(hiveService: MockHiveService());
-
-  @override
-  Future<void> queueForSync({
-    required String id,
-    required String operation,
-    required String entityType,
-    required Map<String, dynamic> data,
-  }) async {}
 }

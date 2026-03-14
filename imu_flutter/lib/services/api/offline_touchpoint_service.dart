@@ -7,6 +7,11 @@ import '../connectivity_service.dart';
 import '../local_storage/hive_service.dart';
 import 'sync_queue_service.dart';
 import '../../features/clients/data/models/client_model.dart';
+import '../../shared/providers/app_providers.dart';
+
+// Re-export needed providers from their source files
+export 'touchpoint_api_service.dart' show touchpointApiServiceProvider;
+export 'sync_queue_service.dart' show syncQueueServiceProvider;
 
 /// Offline touchpoint service for managing touchpoints without network
 class OfflineTouchpointService extends ChangeNotifier {
@@ -34,6 +39,7 @@ class OfflineTouchpointService extends ChangeNotifier {
 
     // Queue for offline sync
     await _syncQueue.queueOperation(
+      id: touchpoint.id,
       operation: 'create',
       entityType: 'touchpoint',
       data: touchpoint.toJson(),
@@ -53,6 +59,7 @@ class OfflineTouchpointService extends ChangeNotifier {
 
     // Queue for offline sync
     await _syncQueue.queueOperation(
+      id: touchpoint.id,
       operation: 'update',
       entityType: 'touchpoint',
       data: touchpoint.toJson(),
@@ -72,6 +79,7 @@ class OfflineTouchpointService extends ChangeNotifier {
 
     // Queue for offline sync
     await _syncQueue.queueOperation(
+      id: touchpointId,
       operation: 'delete',
       entityType: 'touchpoint',
       data: {'id': touchpointId},

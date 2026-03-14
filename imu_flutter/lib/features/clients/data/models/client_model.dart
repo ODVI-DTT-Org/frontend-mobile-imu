@@ -325,6 +325,7 @@ class PhoneNumber {
 class Touchpoint {
   final String id;
   final String clientId;
+  final String? agentId; // The agent/caravan who created this touchpoint
   final int touchpointNumber; // 1-7
   final TouchpointType type;
   final DateTime date;
@@ -344,6 +345,7 @@ class Touchpoint {
   Touchpoint({
     required this.id,
     required this.clientId,
+    this.agentId,
     required this.touchpointNumber,
     required this.type,
     required this.date,
@@ -366,26 +368,33 @@ class Touchpoint {
     return ordinals[touchpointNumber - 1];
   }
 
+  /// Convert to PocketBase format (snake_case)
   Map<String, dynamic> toJson() => {
     'id': id,
-    'clientId': clientId,
-    'touchpointNumber': touchpointNumber,
-    'type': type.name,
+    'client_id': clientId,
+    'agent_id': agentId,
+    'touchpoint_number': touchpointNumber,
+    'type': type.pocketBaseValue,
     'date': date.toIso8601String(),
     'address': address,
-    'timeArrival': timeArrival != null ? '${timeArrival!.hour}:${timeArrival!.minute}' : null,
-    'timeDeparture': timeDeparture != null ? '${timeDeparture!.hour}:${timeDeparture!.minute}' : null,
-    'odometerArrival': odometerArrival,
-    'odometerDeparture': odometerDeparture,
-    'reason': reason.name,
-    'nextVisitDate': nextVisitDate?.toIso8601String(),
-    'remarks': remarks,
-    'photoPath': photoPath,
+    'time_arrival': timeArrival != null
+        ? '${timeArrival!.hour.toString().padLeft(2, '0')}:${timeArrival!.minute.toString().padLeft(2, '0')}'
+        : null,
+    'time_departure': timeDeparture != null
+        ? '${timeDeparture!.hour.toString().padLeft(2, '0')}:${timeDeparture!.minute.toString().padLeft(2, '0')}'
+        : null,
+    'odometer_start': odometerArrival,
+    'odometer_end': odometerDeparture,
+    'reason': reason.pocketBaseValue,
+    'next_visit_date': nextVisitDate?.toIso8601String(),
+    'notes': remarks,
+    'photo_path': photoPath,
     'latitude': latitude,
     'longitude': longitude,
-    'createdAt': createdAt.toIso8601String(),
+    'created': createdAt.toIso8601String(),
   };
 
+  /// Parse from PocketBase format (snake_case) or local format (camelCase)
   factory Touchpoint.fromJson(Map<String, dynamic> json) {
     TimeOfDay? parseTime(String? time) {
       if (time == null) return null;
@@ -393,37 +402,54 @@ class Touchpoint {
       return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
     }
 
+    // Helper to get value from either snake_case or camelCase
+    T? getValue<T>(String snakeCase, String camelCase) {
+      return (json[snakeCase] ?? json[camelCase]) as T?;
+    }
+
     return Touchpoint(
       id: json['id'] ?? '',
-      clientId: json['clientId'] ?? '',
-      touchpointNumber: json['touchpointNumber'] ?? 1,
-      type: TouchpointType.values.firstWhere(
-        (e) => e.name == json['type'],
-        orElse: () => TouchpointType.visit,
-      ),
+      clientId: getValue<String>('client_id', 'clientId') ?? '',
+      agentId: getValue<String>('agent_id', 'agentId'),
+      touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? 1,
+      type: TouchpointType.fromPocketBase(getValue<String>('type', 'type') ?? 'VISIT'),
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
-      address: json['address'],
-      timeArrival: parseTime(json['timeArrival']),
-      timeDeparture: parseTime(json['timeDeparture']),
-      odometerArrival: json['odometerArrival'],
-      odometerDeparture: json['odometerDeparture'],
-      reason: TouchpointReason.values.firstWhere(
-        (e) => e.name == json['reason'],
-        orElse: () => TouchpointReason.interested,
-      ),
-      nextVisitDate: json['nextVisitDate'] != null ? DateTime.parse(json['nextVisitDate']) : null,
-      remarks: json['remarks'],
-      photoPath: json['photoPath'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
+      address: getValue<String>('address', 'address'),
+      timeArrival: parseTime(getValue<String>('time_arrival', 'timeArrival')),
+      timeDeparture: parseTime(getValue<String>('time_departure', 'timeDeparture')),
+      odometerArrival: getValue<String>('odometer_start', 'odometerArrival'),
+      odometerDeparture: getValue<String>('odometer_end', 'odometerDeparture'),
+      reason: TouchpointReason.fromPocketBase(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
+      nextVisitDate: getValue<String>('next_visit_date', 'nextVisitDate') != null
+          ? DateTime.parse(getValue<String>('next_visit_date', 'nextVisitDate')!)
+          : null,
+      remarks: getValue<String>('notes', 'remarks'),
+      photoPath: getValue<String>('photo_path', 'photoPath'),
+      latitude: getValue<double>('latitude', 'latitude'),
+      longitude: getValue<double>('longitude', 'longitude'),
+      createdAt: getValue<String>('created', 'createdAt') != null
+          ? DateTime.parse(getValue<String>('created', 'createdAt')!)
+          : DateTime.now(),
     );
   }
 }
 
+/// Touchpoint type enum with PocketBase-compatible values
 enum TouchpointType {
-  visit,
-  call,
+  visit('VISIT'),
+  call('CALL');
+
+  final String _pocketBaseValue;
+  const TouchpointType(this._pocketBaseValue);
+
+  String get pocketBaseValue => _pocketBaseValue;
+
+  static TouchpointType fromPocketBase(String value) {
+    return TouchpointType.values.firstWhere(
+      (e) => e._pocketBaseValue == value.toUpperCase(),
+      orElse: () => TouchpointType.visit,
+    );
+  }
 }
 
 /// Touchpoint pattern: Visit-Call-Call-Visit-Call-Call-Visit
@@ -443,34 +469,46 @@ class TouchpointPattern {
   }
 }
 
-/// Reason types for touchpoints
+/// Reason types for touchpoints with PocketBase-compatible values
 enum TouchpointReason {
-  abroad,
-  applyMembership,
-  backedOut,
-  ciBi,
-  deceased,
-  disapproved,
-  forAdaCompliance,
-  forProcessing,
-  forUpdate,
-  forVerification,
-  inaccessibleArea,
-  interested,
-  loanInquiry,
-  movedOut,
-  notAmenable,
-  notAround,
-  notInList,
-  notInterested,
-  overage,
-  poorHealth,
-  returnedAtm,
-  undecided,
-  unlocated,
-  withOtherLending,
-  interestedButDeclined,
-  telemarketing,
+  abroad('ABROAD'),
+  applyMembership('APPLY_MEMBERSHIP'),
+  backedOut('BACKED_OUT'),
+  ciBi('CI_BI'),
+  deceased('DECEASED'),
+  disapproved('DISAPPROVED'),
+  forAdaCompliance('FOR_ADA_COMPLIANCE'),
+  forProcessing('FOR_PROCESSING'),
+  forUpdate('FOR_UPDATE'),
+  forVerification('FOR_VERIFICATION'),
+  inaccessibleArea('INACCESSIBLE_AREA'),
+  interested('INTERESTED'),
+  loanInquiry('LOAN_INQUIRY'),
+  movedOut('MOVED_OUT'),
+  notAmenable('NOT_AMENABLE'),
+  notAround('NOT_AROUND'),
+  notInList('NOT_IN_LIST'),
+  notInterested('NOT_INTERESTED'),
+  overage('OVERAGE'),
+  poorHealth('POOR_HEALTH'),
+  returnedAtm('RETURNED_ATM'),
+  undecided('UNDECIDED'),
+  unlocated('UNLOCATED'),
+  withOtherLending('WITH_OTHER_LENDING'),
+  interestedButDeclined('INTERESTED_BUT_DECLINED'),
+  telemarketing('TELEMARKETING');
+
+  final String _pocketBaseValue;
+  const TouchpointReason(this._pocketBaseValue);
+
+  String get pocketBaseValue => _pocketBaseValue;
+
+  static TouchpointReason fromPocketBase(String value) {
+    return TouchpointReason.values.firstWhere(
+      (e) => e._pocketBaseValue == value.toUpperCase(),
+      orElse: () => TouchpointReason.interested,
+    );
+  }
 }
 
 /// TimeOfDay helper class (since Flutter's TimeOfDay doesn't serialize easily)

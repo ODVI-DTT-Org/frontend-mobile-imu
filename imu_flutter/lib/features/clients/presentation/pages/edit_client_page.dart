@@ -75,7 +75,9 @@ class _EditClientPageState extends State<EditClientPage> {
     _firstNameController.text = _client!.firstName;
     _middleNameController.text = _client!.middleName ?? '';
     _lastNameController.text = _client!.lastName;
-    _contactNumberController.text = _client!.contactNumber ?? '';
+    _contactNumberController.text = _client!.phoneNumbers.isNotEmpty
+        ? _client!.phoneNumbers.first.number
+        : '';
     _emailController.text = _client!.email ?? '';
     _facebookController.text = _client!.facebookLink ?? '';
     _remarksController.text = _client!.remarks ?? '';

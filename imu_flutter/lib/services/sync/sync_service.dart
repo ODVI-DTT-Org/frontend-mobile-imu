@@ -273,14 +273,21 @@ class SyncService extends ChangeNotifier {
       case 'touchpoint':
         return {
           'client_id': data['clientId'],
+          'agent_id': data['agentId'],
           'touchpoint_number': data['touchpointNumber'],
           'type': data['type'],
           'reason': data['reason'],
           'date': data['date'],
-          'notes': data['notes'],
+          'address': data['address'],
+          'time_arrival': data['timeArrival'],
+          'time_departure': data['timeDeparture'],
+          'odometer_start': data['odometerArrival'],
+          'odometer_end': data['odometerDeparture'],
+          'next_visit_date': data['nextVisitDate'],
+          'notes': data['remarks'],
           'photo_path': data['photoPath'],
-          'audio_path': data['audioPath'],
-          'location_data': data['locationData'],
+          'latitude': data['latitude'],
+          'longitude': data['longitude'],
         };
       default:
         return data;
@@ -395,15 +402,22 @@ class SyncService extends ChangeNotifier {
     return {
       'id': record.id,
       'clientId': record.data['client_id'],
+      'agentId': record.data['agent_id'],
       'touchpointNumber': record.data['touchpoint_number'],
       'type': record.data['type'],
       'reason': record.data['reason'],
       'date': record.data['date'],
-      'notes': record.data['notes'],
+      'address': record.data['address'],
+      'timeArrival': record.data['time_arrival'],
+      'timeDeparture': record.data['time_departure'],
+      'odometerArrival': record.data['odometer_start'],
+      'odometerDeparture': record.data['odometer_end'],
+      'nextVisitDate': record.data['next_visit_date'],
+      'remarks': record.data['notes'],
       'photoPath': record.data['photo_path'],
-      'audioPath': record.data['audio_path'],
-      'locationData': record.data['location_data'],
-      'created': record.created,
+      'latitude': record.data['latitude'],
+      'longitude': record.data['longitude'],
+      'createdAt': record.created,
       'updatedAt': record.updated,
     };
   }
