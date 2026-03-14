@@ -332,10 +332,11 @@ class SyncService extends ChangeNotifier {
             final localTime = DateTime.parse(localUpdated);
 
             if (serverTime.isAfter(localTime)) {
+              await _hiveService.saveClient(record.id, clientData);
+            }
+          } else {
             await _hiveService.saveClient(record.id, clientData);
           }
-        } else {
-          await _hiveService.saveClient(record.id, clientData);
         }
       }
 
