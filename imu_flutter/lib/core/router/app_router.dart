@@ -51,16 +51,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/forgot-password') ||
           state.matchedLocation.startsWith('/pin-setup') ||
-          state.matchedLocation.startsWith('/pin-entry');
+          state.matchedLocation.startsWith('/pin-entry') ||
+          state.matchedLocation.startsWith('/permissions');
 
       // Not authenticated and trying to access protected route -> go to login
       if (!isAuth && !isAuthRoute) {
         return '/login';
       }
 
-      // Authenticated but haven't set up PIN yet -> go to PIN setup
+      // Authenticated but haven't set up PIN yet -> go to PIN setup (unless on permissions page)
       if (isAuth && !hasPin.hasValue) {
         // Still loading, stay on current route
+        return null;
+      }
+
+      // Don't redirect away from permissions page - user needs to grant permissions first
+      if (isAuth && state.matchedLocation.startsWith('/permissions')) {
         return null;
       }
 

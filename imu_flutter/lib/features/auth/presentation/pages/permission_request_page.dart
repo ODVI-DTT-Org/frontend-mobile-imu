@@ -170,7 +170,8 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
 
   void _continueToApp() {
     HapticUtils.lightImpact();
-    context.go('/home');
+    // After permissions, go to PIN setup for first-time users
+    context.go('/pin-setup');
   }
 
   bool get _hasRequiredPermissions {
