@@ -1,6 +1,26 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+/// AWS S3 configuration loaded from environment variables
+class AwsConfig {
+  AwsConfig._();
+
+  static String get accessKeyId =>
+    const String.fromEnvironment('AWS_ACCESS_KEY_ID', defaultValue: '');
+
+  static String get secretAccessKey =>
+    const String.fromEnvironment('AWS_SECRET_ACCESS_KEY', defaultValue: '');
+
+  static String get region =>
+    const String.fromEnvironment('AWS_REGION', defaultValue: 'ap-southeast-1');
+
+  static String get bucket =>
+    const String.fromEnvironment('AWS_S3_BUCKET', defaultValue: '');
+
+  static bool get isConfigured =>
+    accessKeyId.isNotEmpty && secretAccessKey.isNotEmpty && bucket.isNotEmpty;
+}
+
 /// Application configuration loaded from environment files
 class AppConfig {
   AppConfig._();

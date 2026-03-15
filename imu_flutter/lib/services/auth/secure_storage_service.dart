@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
@@ -30,9 +31,9 @@ class SecureStorageService {
 
   /// Generate a random salt for PIN hashing
   String _generateSalt() {
-    final random = DateTime.now().microsecondsSinceEpoch.toString();
-    final bytes = utf8.encode(random);
-    return sha256.convert(bytes).toString().substring(0, 32);
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64.encode(bytes);
   }
 
   /// Hash PIN with salt using SHA-256
