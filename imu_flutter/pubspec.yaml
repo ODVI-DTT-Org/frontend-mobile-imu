@@ -57,6 +57,9 @@ dependencies:
   quick_actions: ^1.0.7
   uuid: ^4.5.3
 
+  # Permissions
+  permission_handler: ^11.0.1
+
   # Firebase (temporarily disabled for web compatibility)
   # firebase_core: ^2.24.2
   # firebase_crashlytics: ^3.4.8

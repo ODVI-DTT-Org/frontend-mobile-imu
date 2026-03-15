@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/notification_utils.dart';
@@ -36,6 +36,12 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
       _locationStatus = _mapLocationPermission(locationPermission);
     });
 
+    // Check camera permission
+    final cameraStatus = await ph.Permission.camera.status;
+    setState(() {
+      _cameraStatus = _mapPermissionStatus(cameraStatus);
+    });
+
     // Check notification permission
     final notificationService = NotificationService();
     final hasNotification = await notificationService.hasPermission();
@@ -60,12 +66,38 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
     }
   }
 
+  PermissionStatus _mapPermissionStatus(ph.PermissionStatus status) {
+    switch (status) {
+      case ph.PermissionStatus.granted:
+      case ph.PermissionStatus.limited:
+        return PermissionStatus.granted;
+      case ph.PermissionStatus.denied:
+        return PermissionStatus.denied;
+      case ph.PermissionStatus.permanentlyDenied:
+        return PermissionStatus.permanentlyDenied;
+      default:
+        return PermissionStatus.notRequested;
+    }
+  }
+
   Future<void> _requestLocationPermission() async {
     HapticUtils.lightImpact();
     setState(() => _isLoading = true);
 
     try {
-      final permission = await Geolocator.requestPermission();
+      // First try using geolocator
+      var permission = await Geolocator.requestPermission();
+
+      // If denied, try permission_handler as fallback
+      if (permission == LocationPermission.denied) {
+        final phStatus = await ph.Permission.locationWhenInUse.request();
+        if (phStatus.isGranted) {
+          permission = LocationPermission.whileInUse;
+        } else if (phStatus.isPermanentlyDenied) {
+          permission = LocationPermission.deniedForever;
+        }
+      }
+
       setState(() {
         _locationStatus = _mapLocationPermission(permission);
       });
@@ -85,15 +117,16 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
     setState(() => _isLoading = true);
 
     try {
-      final picker = ImagePicker();
-      // Try to pick an image to trigger permission request
-      await picker.pickImage(source: ImageSource.camera);
-      // If we got here, permission was granted
+      // Use permission_handler to request camera permission without opening camera
+      final status = await ph.Permission.camera.request();
       setState(() {
-        _cameraStatus = PermissionStatus.granted;
+        _cameraStatus = _mapPermissionStatus(status);
       });
+
+      if (status.isPermanentlyDenied) {
+        _showOpenSettingsDialog('Camera');
+      }
     } catch (e) {
-      // Permission was denied
       setState(() {
         _cameraStatus = PermissionStatus.denied;
       });
@@ -107,17 +140,30 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
     setState(() => _isLoading = true);
 
     try {
-      final notificationService = NotificationService();
-      final granted = await notificationService.requestPermission();
+      // Try permission_handler for notifications
+      final status = await ph.Permission.notification.request();
       setState(() {
-        _notificationStatus = granted
-            ? PermissionStatus.granted
-            : PermissionStatus.denied;
+        _notificationStatus = _mapPermissionStatus(status);
       });
+
+      if (status.isPermanentlyDenied) {
+        _showOpenSettingsDialog('Notification');
+      }
     } catch (e) {
-      setState(() {
-        _notificationStatus = PermissionStatus.denied;
-      });
+      // Fallback to notification service
+      try {
+        final notificationService = NotificationService();
+        final granted = await notificationService.requestPermission();
+        setState(() {
+          _notificationStatus = granted
+              ? PermissionStatus.granted
+              : PermissionStatus.denied;
+        });
+      } catch (e2) {
+        setState(() {
+          _notificationStatus = PermissionStatus.denied;
+        });
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -139,7 +185,7 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              Geolocator.openAppSettings();
+              ph.openAppSettings();
             },
             child: const Text('Open Settings'),
           ),
@@ -154,17 +200,64 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
 
     try {
       // Request location
-      await _requestLocationPermission();
+      await _requestLocationPermissionInternal();
 
       // Request camera
-      await _requestCameraPermission();
+      await _requestCameraPermissionInternal();
 
       // Request notifications
-      await _requestNotificationPermission();
+      await _requestNotificationPermissionInternal();
 
       HapticUtils.success();
     } finally {
       setState(() => _isRequestingAll = false);
+    }
+  }
+
+  Future<void> _requestLocationPermissionInternal() async {
+    try {
+      var permission = await Geolocator.requestPermission();
+
+      if (permission == LocationPermission.denied) {
+        final phStatus = await ph.Permission.locationWhenInUse.request();
+        if (phStatus.isGranted) {
+          permission = LocationPermission.whileInUse;
+        } else if (phStatus.isPermanentlyDenied) {
+          permission = LocationPermission.deniedForever;
+        }
+      }
+
+      setState(() {
+        _locationStatus = _mapLocationPermission(permission);
+      });
+    } catch (e) {
+      setState(() => _locationStatus = PermissionStatus.denied);
+    }
+  }
+
+  Future<void> _requestCameraPermissionInternal() async {
+    try {
+      final status = await ph.Permission.camera.request();
+      setState(() {
+        _cameraStatus = _mapPermissionStatus(status);
+      });
+    } catch (e) {
+      setState(() {
+        _cameraStatus = PermissionStatus.denied;
+      });
+    }
+  }
+
+  Future<void> _requestNotificationPermissionInternal() async {
+    try {
+      final status = await ph.Permission.notification.request();
+      setState(() {
+        _notificationStatus = _mapPermissionStatus(status);
+      });
+    } catch (e) {
+      setState(() {
+        _notificationStatus = PermissionStatus.denied;
+      });
     }
   }
 
