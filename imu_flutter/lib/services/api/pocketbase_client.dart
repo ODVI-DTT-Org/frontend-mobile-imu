@@ -54,7 +54,7 @@ class PocketBaseClient {
 
     _pb = PocketBase(baseUrl);
 
-    // Initialize token manager
+    // Initialize token manager (restores auth token from secure storage)
     await _tokenManager.initialize(_pb);
 
     _isInitialized = true;
@@ -82,6 +82,20 @@ class PocketBaseClient {
     debugPrint('Auth cleared');
   }
 
+  /// Persist current auth token to secure storage
+  /// Call this after successful login to ensure auth persists across app restarts
+  Future<void> persistAuth() async {
+    if (_pb.authStore.isValid) {
+      await _tokenManager.saveToken(
+        _pb.authStore.token,
+        _pb.authStore.model as RecordModel?,
+      );
+      debugPrint('✅ Auth token persisted to secure storage');
+    } else {
+      debugPrint('⚠️ Cannot persist auth: no valid auth token');
+    }
+  }
+
   /// Dispose resources
   void dispose() {
     _tokenManager.dispose();
@@ -90,18 +104,30 @@ class PocketBaseClient {
   }
 }
 
-/// Riverpod provider for PocketBase client
-final pocketBaseClientProvider = Provider<PocketBaseClient>((ref) {
-  final client = PocketBaseClient();
+/// Singleton instance initialized in main.dart
+PocketBaseClient? _pocketBaseClientInstance;
 
-  // Initialize synchronously
-  client._initializeSync();
+/// Initialize the global PocketBase client (called in main.dart)
+Future<void> initializePocketBaseClient() async {
+  _pocketBaseClientInstance = PocketBaseClient();
+  await _pocketBaseClientInstance!.initialize();
+}
+
+/// Riverpod provider for PocketBase client
+/// Uses the singleton instance initialized in main.dart
+final pocketBaseClientProvider = Provider<PocketBaseClient>((ref) {
+  if (_pocketBaseClientInstance == null) {
+    debugPrint('⚠️ PocketBaseClient not initialized! Call initializePocketBaseClient() in main.dart');
+    // Fallback: create and initialize synchronously (without token restoration)
+    _pocketBaseClientInstance = PocketBaseClient();
+    _pocketBaseClientInstance!._initializeSync();
+  }
 
   ref.onDispose(() {
-    client.dispose();
+    // Don't dispose the singleton here - it's managed globally
   });
 
-  return client;
+  return _pocketBaseClientInstance!;
 });
 
 /// Provider for PocketBase instance

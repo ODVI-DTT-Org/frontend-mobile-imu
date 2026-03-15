@@ -86,7 +86,8 @@ class _PinSetupPageState extends ConsumerState<PinSetupPage> {
               backgroundColor: Colors.green,
             ),
           );
-          context.go('/home');
+          // Navigate to PIN entry so user must verify the PIN they just set
+          context.go('/pin-entry');
         }
       } catch (e) {
         if (mounted) {

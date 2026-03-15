@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,10 @@ import 'package:imu_flutter/services/api/api_exception.dart';
 class AuthService {
   final PocketBase _pb;
   final FlutterSecureStorage _secureStorage;
+
+  // Token storage keys (must match TokenManager)
+  static const _tokenKey = 'pb_auth_token';
+  static const _recordKey = 'pb_auth_record';
 
   AuthService({
     required PocketBase pb,
@@ -34,6 +39,10 @@ class AuthService {
       );
 
       debugPrint('AuthService: Login successful for user ${authRecord.record?.id}');
+
+      // Persist auth token to secure storage for session restoration
+      await _persistAuthToken();
+
       return authRecord.record!;
     } on ClientException catch (e) {
       debugPrint('AuthService: Login failed - ${e.toString()}');
@@ -61,6 +70,10 @@ class AuthService {
       );
 
       debugPrint('AuthService: Superuser login successful');
+
+      // Persist auth token to secure storage for session restoration
+      await _persistAuthToken();
+
       return authRecord.record!;
     } on ClientException catch (e) {
       debugPrint('AuthService: Superuser login failed - ${e.toString()}');
@@ -74,11 +87,36 @@ class AuthService {
     }
   }
 
+  /// Persist auth token to secure storage for session restoration
+  Future<void> _persistAuthToken() async {
+    try {
+      if (_pb.authStore.isValid) {
+        final token = _pb.authStore.token;
+        final record = _pb.authStore.model as RecordModel?;
+
+        // Save token
+        await _secureStorage.write(key: _tokenKey, value: token);
+
+        // Save record data as JSON
+        if (record != null) {
+          final recordJson = jsonEncode(record.toJson());
+          await _secureStorage.write(key: _recordKey, value: recordJson);
+        }
+
+        debugPrint('✅ AuthService: Auth token persisted to secure storage');
+      }
+    } catch (e) {
+      debugPrint('❌ AuthService: Failed to persist auth token - $e');
+    }
+  }
+
   /// Logout current user
   Future<void> logout() async {
     try {
       _pb.authStore.clear();
-      await _secureStorage.delete(key: 'pb_auth');
+      // Clear the persisted auth tokens (matching TokenManager keys)
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _recordKey);
       debugPrint('AuthService: Logout successful');
     } catch (e) {
       debugPrint('AuthService: Logout error - $e');

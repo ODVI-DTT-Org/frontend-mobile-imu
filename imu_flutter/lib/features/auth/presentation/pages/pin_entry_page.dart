@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/auth/secure_storage_service.dart';
+import '../../../../services/auth/session_service.dart';
 
 class PinEntryPage extends StatefulWidget {
   const PinEntryPage({super.key});
@@ -13,6 +14,7 @@ class PinEntryPage extends StatefulWidget {
 
 class _PinEntryPageState extends State<PinEntryPage> {
   final _secureStorage = SecureStorageService();
+  final _sessionService = SessionService();
   String _pin = '';
   bool _hasError = false;
   int _attempts = 0;
@@ -49,6 +51,8 @@ class _PinEntryPageState extends State<PinEntryPage> {
 
       if (isValid) {
         HapticFeedback.mediumImpact();
+        // Start the session after successful PIN verification
+        _sessionService.startSession();
         if (mounted) {
           context.go('/home');
         }

@@ -8,7 +8,7 @@ import 'core/config/app_config.dart';
 import 'services/local_storage/hive_service.dart';
 import 'services/sync/sync_service.dart';
 import 'services/location/geolocation_service.dart';
-import 'services/api/pocketbase_client.dart';
+import 'services/api/pocketbase_client.dart' show initializePocketBaseClient;
 import 'services/connectivity_service.dart';
 import 'core/utils/notification_utils.dart';
 
@@ -43,9 +43,8 @@ Future<void> _initializeServices() async {
   final hiveService = HiveService();
   await hiveService.init();
 
-  // Initialize PocketBase client
-  final pbClient = PocketBaseClient();
-  await pbClient.initialize();
+  // Initialize PocketBase client (singleton with token restoration)
+  await initializePocketBaseClient();
 
   // Initialize connectivity service
   final connectivityService = ConnectivityService();
@@ -77,18 +76,6 @@ Future<void> _initializeServices() async {
     } catch (e) {
       debugPrint('Could not initialize geolocation service: $e');
     }
-  }
-
-  // Verify backend health
-  try {
-    final health = await pbClient.healthCheck();
-    if (health['healthy'] == true) {
-      debugPrint('✅ Backend health check: OK');
-    } else {
-      debugPrint('⚠️ Backend health check: FAILED - ${health['error']}');
-    }
-  } catch (e) {
-    debugPrint('❌ Backend health check error: $e');
   }
 
   debugPrint('All services initialized');

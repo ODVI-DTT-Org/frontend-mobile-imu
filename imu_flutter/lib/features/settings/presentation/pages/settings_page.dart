@@ -772,29 +772,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             const Text('About IMU'),
           ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Itinerary Manager - Uniformed',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 8),
-            Text('Version: 1.0.1'),
-            SizedBox(height: 8),
-            Text('Build: 2025.03.15'),
-            SizedBox(height: 16),
-            Text(
-              'A mobile application for field agents managing client visits for retired police personnel (PNP retirees).',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Itinerary Manager - Uniformed',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              const Text('Version: 1.1.0'),
+              const SizedBox(height: 4),
+              const Text('Build: 2026.03.15'),
+              const SizedBox(height: 16),
+              const Text(
+                'What\'s New in v1.1.0:',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              _buildUpdateItem('Session Persistence',
+                  'Auth sessions now persist across app restarts. Returning users go directly to PIN entry.'),
+              _buildUpdateItem('PIN Verification Fix',
+                  'PIN is now properly verified after setup before accessing the app.'),
+              _buildUpdateItem('Improved Security',
+                  'Session starts only after successful PIN verification.'),
+              const SizedBox(height: 16),
+              const Text(
+                'A mobile application for field agents managing client visits for retired police personnel (PNP retirees).',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUpdateItem(String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(LucideIcons.checkCircle, size: 16, color: Color(0xFF22C55E)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                ),
+                Text(
+                  description,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
           ),
         ],
       ),

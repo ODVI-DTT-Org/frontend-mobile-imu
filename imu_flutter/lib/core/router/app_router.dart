@@ -121,12 +121,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/pin-setup';
       }
 
-      // Authenticated and has PIN, but on PIN entry route -> go to home
-      if (isAuth && hasPin.hasValue && hasPin.value! && state.matchedLocation == '/pin-entry') {
-        return '/home';
-      }
-
       // Authenticated and on auth route (with PIN) -> go to PIN entry or home
+      // Note: We don't redirect away from /pin-entry - user needs to verify their PIN
       if (isAuth && isAuthRoute && !state.matchedLocation.startsWith('/pin')) {
         // If has PIN, go to PIN entry, otherwise home
         if (hasPin.hasValue && hasPin.value!) {
