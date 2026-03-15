@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/auth/secure_storage_service.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../core/router/app_router.dart';
 
 class PinSetupPage extends ConsumerStatefulWidget {
   const PinSetupPage({super.key});
@@ -74,6 +75,9 @@ class _PinSetupPageState extends ConsumerState<PinSetupPage> {
 
         // Save PIN securely (hashed)
         await _secureStorage.savePin(_pin, userId: userId);
+
+        // Update the PIN state so router knows we have a PIN now
+        ref.read(pinStateProvider.notifier).setHasPin(true);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

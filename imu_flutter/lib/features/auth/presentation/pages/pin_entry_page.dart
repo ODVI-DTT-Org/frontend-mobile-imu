@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../services/auth/secure_storage_service.dart';
 
 class PinEntryPage extends StatefulWidget {
   const PinEntryPage({super.key});
@@ -11,9 +12,11 @@ class PinEntryPage extends StatefulWidget {
 }
 
 class _PinEntryPageState extends State<PinEntryPage> {
+  final _secureStorage = SecureStorageService();
   String _pin = '';
   bool _hasError = false;
   int _attempts = 0;
+  bool _isVerifying = false;
 
   void _onPinEntered(String digit) {
     HapticFeedback.lightImpact();
@@ -38,22 +41,43 @@ class _PinEntryPageState extends State<PinEntryPage> {
     }
   }
 
-  void _verifyPin() {
-    // In production, this would verify against stored PIN
-    // For demo, accept any 6-digit PIN
-    if (_pin.length == 6) {
-      HapticFeedback.mediumImpact();
-      context.go('/home');
-    } else {
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _hasError = true;
-        _pin = '';
-        _attempts++;
-      });
+  Future<void> _verifyPin() async {
+    setState(() => _isVerifying = true);
 
-      if (_attempts >= 3) {
-        _showTooManyAttemptsDialog();
+    try {
+      final isValid = await _secureStorage.verifyPin(_pin);
+
+      if (isValid) {
+        HapticFeedback.mediumImpact();
+        if (mounted) {
+          context.go('/home');
+        }
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _hasError = true;
+          _pin = '';
+          _attempts++;
+          _isVerifying = false;
+        });
+
+        if (_attempts >= 3) {
+          _showTooManyAttemptsDialog();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _pin = '';
+          _isVerifying = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error verifying PIN: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

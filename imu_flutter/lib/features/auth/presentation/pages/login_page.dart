@@ -38,22 +38,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           _passwordController.text,
         );
 
-    if (success && mounted) {
-      // Check if PIN is already set
-      final hasPin = await _checkPinExists();
-
-      if (hasPin) {
-        context.go('/pin-entry');
-      } else {
-        // First time login - redirect to permission request page
-        context.go('/permissions');
-      }
-    }
-  }
-
-  Future<bool> _checkPinExists() async {
-    // TODO: Check secure storage for existing PIN
-    return false;
+    // Navigation is handled automatically by the router based on auth state
+    // No manual navigation needed here
   }
 
   @override

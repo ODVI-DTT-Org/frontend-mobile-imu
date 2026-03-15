@@ -33,10 +33,37 @@ final authStateProvider = Provider<bool>((ref) {
   return authState.isAuthenticated;
 });
 
-// Has PIN provider - check secure storage
-final hasPinProvider = FutureProvider<bool>((ref) async {
-  final secureStorage = SecureStorageService();
-  return await secureStorage.hasPin();
+// PIN state notifier
+class PinStateNotifier extends StateNotifier<AsyncValue<bool>> {
+  final SecureStorageService _secureStorage;
+
+  PinStateNotifier(this._secureStorage) : super(const AsyncValue.loading());
+
+  Future<void> checkPinStatus() async {
+    state = const AsyncValue.loading();
+    try {
+      final hasPin = await _secureStorage.hasPin();
+      state = AsyncValue.data(hasPin);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  void setHasPin(bool value) {
+    state = AsyncValue.data(value);
+  }
+}
+
+// Has PIN provider - uses StateNotifier for refreshable state
+final pinStateProvider = StateNotifierProvider<PinStateNotifier, AsyncValue<bool>>((ref) {
+  final notifier = PinStateNotifier(SecureStorageService());
+  notifier.checkPinStatus();
+  return notifier;
+});
+
+// Legacy provider for backwards compatibility
+final hasPinProvider = Provider<AsyncValue<bool>>((ref) {
+  return ref.watch(pinStateProvider);
 });
 
 // Router provider
