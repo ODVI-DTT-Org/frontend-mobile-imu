@@ -55,9 +55,16 @@ class PinStateNotifier extends StateNotifier<AsyncValue<bool>> {
 }
 
 // Has PIN provider - uses StateNotifier for refreshable state
+// Refreshes PIN status when auth state changes
 final pinStateProvider = StateNotifierProvider<PinStateNotifier, AsyncValue<bool>>((ref) {
+  final authState = ref.watch(authStateProvider);
   final notifier = PinStateNotifier(SecureStorageService());
-  notifier.checkPinStatus();
+
+  // Refresh PIN status when auth state changes
+  if (authState) {
+    notifier.checkPinStatus();
+  }
+
   return notifier;
 });
 

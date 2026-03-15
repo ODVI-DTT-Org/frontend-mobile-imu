@@ -372,5 +372,8 @@ class AuthState {
 /// Provider for AuthNotifier
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
-  return AuthNotifier(authService);
+  final notifier = AuthNotifier(authService);
+  // Check auth status on initialization to detect persisted PocketBase sessions
+  notifier.checkAuthStatus();
+  return notifier;
 });
