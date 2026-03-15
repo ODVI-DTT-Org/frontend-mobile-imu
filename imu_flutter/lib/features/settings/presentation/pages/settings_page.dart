@@ -214,7 +214,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               _buildSettingsTile(
                 icon: LucideIcons.info,
                 title: 'About IMU',
-                subtitle: 'Version 1.0.0',
+                subtitle: 'Version 1.0.1',
                 onTap: () {
                   HapticUtils.lightImpact();
                   _showAboutDialog();
@@ -781,9 +781,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 8),
-            Text('Version: 1.0.0'),
+            Text('Version: 1.0.1'),
             SizedBox(height: 8),
-            Text('Build: 2024.03.12'),
+            Text('Build: 2025.03.15'),
             SizedBox(height: 16),
             Text(
               'A mobile application for field agents managing client visits for retired police personnel (PNP retirees).',
