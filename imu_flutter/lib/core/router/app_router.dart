@@ -70,9 +70,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      if (isAuth && hasPin.hasValue && !hasPin.value! &&
-          !state.matchedLocation.startsWith('/pin-setup') &&
-          !state.matchedLocation.startsWith('/permissions')) {
+      // Authenticated user without PIN needs to go through setup flow
+      // But only redirect if they're on login page (just logged in) or trying to access protected routes
+      if (isAuth && hasPin.hasValue && !hasPin.value!) {
+        // User just logged in (on login page) and has no PIN -> go to permissions first
+        if (state.matchedLocation.startsWith('/login')) {
+          return '/permissions';
+        }
+        // User is on other auth routes, let them stay
+        if (state.matchedLocation.startsWith('/pin-setup') ||
+            state.matchedLocation.startsWith('/pin-entry') ||
+            state.matchedLocation.startsWith('/forgot-password')) {
+          return null;
+        }
+        // User trying to access protected route without PIN -> go to pin setup
         return '/pin-setup';
       }
 
@@ -81,7 +92,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/home';
       }
 
-      // Authenticated and on auth route -> go to PIN entry or home
+      // Authenticated and on auth route (with PIN) -> go to PIN entry or home
       if (isAuth && isAuthRoute && !state.matchedLocation.startsWith('/pin')) {
         // If has PIN, go to PIN entry, otherwise home
         if (hasPin.hasValue && hasPin.value!) {
