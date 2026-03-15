@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pocketbase/pocketbase.dart';
@@ -28,8 +29,8 @@ class TokenManager {
   Future<void> initialize(PocketBase pb) async {
     _pocketbase = pb;
 
-    // Load existing token
-    await _loadStoredToken();
+    // Load existing token and restore to PocketBase authStore
+    await _loadAndRestoreToken();
 
     // Setup auto-refresh timer
     _setupRefreshTimer();
@@ -37,16 +38,37 @@ class TokenManager {
     debugPrint('TokenManager initialized');
   }
 
-  /// Load stored token from secure storage
-  Future<void> _loadStoredToken() async {
+  /// Load stored token from secure storage and restore to PocketBase authStore
+  Future<void> _loadAndRestoreToken() async {
     try {
       final token = await _secureStorage.read(key: _tokenKey);
-      if (token != null && token.isNotEmpty) {
-        debugPrint('Found stored auth token');
-        // Token will be validated on first API call
+      final recordJson = await _secureStorage.read(key: _recordKey);
+
+      if (token != null && token.isNotEmpty && _pocketbase != null) {
+        debugPrint('Found stored auth token, restoring to PocketBase authStore');
+
+        // Restore the auth record to PocketBase
+        if (recordJson != null && recordJson.isNotEmpty) {
+          try {
+            final recordData = jsonDecode(recordJson) as Map<String, dynamic>;
+            // Create a fake auth store and load it
+            _pocketbase!.authStore.save(token, RecordModel(id: recordData['id'] ?? '', data: recordData));
+            debugPrint('✅ Auth token restored to PocketBase authStore');
+          } catch (e) {
+            debugPrint('⚠️ Could not parse stored record: $e');
+            // Just save the token without the record
+            _pocketbase!.authStore.save(token, null);
+          }
+        } else {
+          // Just save the token without the record
+          _pocketbase!.authStore.save(token, null);
+          debugPrint('✅ Auth token restored (without record data)');
+        }
+      } else {
+        debugPrint('No stored auth token found');
       }
     } catch (e) {
-      debugPrint('Error loading stored token: $e');
+      debugPrint('❌ Error loading stored token: $e');
     }
   }
 
@@ -133,7 +155,15 @@ class TokenManager {
   Future<void> saveToken(String token, RecordModel? record) async {
     try {
       await _secureStorage.write(key: _tokenKey, value: token);
-      debugPrint('✅ Auth token saved');
+
+      // Also save the record data as JSON for restoration
+      if (record != null) {
+        final recordJson = jsonEncode(record.toJson());
+        await _secureStorage.write(key: _recordKey, value: recordJson);
+        debugPrint('✅ Auth token and record saved');
+      } else {
+        debugPrint('✅ Auth token saved (no record data)');
+      }
 
       // Restart refresh timer
       _setupRefreshTimer();
