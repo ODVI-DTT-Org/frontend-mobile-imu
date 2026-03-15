@@ -70,7 +70,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      if (isAuth && hasPin.hasValue && !hasPin.value! && !state.matchedLocation.startsWith('/pin-setup')) {
+      if (isAuth && hasPin.hasValue && !hasPin.value! &&
+          !state.matchedLocation.startsWith('/pin-setup') &&
+          !state.matchedLocation.startsWith('/permissions')) {
         return '/pin-setup';
       }
 
