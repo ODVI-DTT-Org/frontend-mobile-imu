@@ -45,7 +45,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (hasPin) {
         context.go('/pin-entry');
       } else {
-        context.go('/pin-setup');
+        // First time login - redirect to permission request page
+        context.go('/permissions');
       }
     }
   }

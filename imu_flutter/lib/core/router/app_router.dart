@@ -5,6 +5,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/pin_setup_page.dart';
 import '../../features/auth/presentation/pages/pin_entry_page.dart';
+import '../../features/auth/presentation/pages/permission_request_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/clients/presentation/pages/clients_page.dart';
 import '../../features/clients/presentation/pages/client_detail_page.dart';
@@ -100,6 +101,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/pin-entry',
         builder: (context, state) => const PinEntryPage(),
+      ),
+      GoRoute(
+        path: '/permissions',
+        builder: (context, state) => const PermissionRequestPage(),
       ),
 
       // Main app shell with bottom navigation (5 tabs: Home, Agencies, My Day, Itinerary, Call)

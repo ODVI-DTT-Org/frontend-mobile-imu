@@ -19,6 +19,12 @@ class NotificationService {
     return true;
   }
 
+  /// Check if notification permission is granted
+  Future<bool> hasPermission() async {
+    // In production, check actual permission status
+    return true;
+  }
+
   /// Show local notification
   Future<void> showNotification({
     required String title,

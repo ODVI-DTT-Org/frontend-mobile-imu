@@ -60,14 +60,15 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       data: (clients) => clients.where((client) {
         final matchesSearch = query.isEmpty ||
             client.fullName.toLowerCase().contains(query) ||
-            (client.addresses.isNotEmpty && client.addresses.first.city.toLowerCase().contains(query));
+            (client.addresses.isNotEmpty &&
+             client.addresses.first.city.toLowerCase().contains(query));
 
         // Filter by Interested status
         final matchesInterested = !_showInterestedOnly || client.isStarred;
 
         // Filter by touchpoint
         final matchesTouchpoint = _selectedTouchpoint == 'all' ||
-            (_getLatestTouchpointNumber(client) ?? 0) == int.parse(_selectedTouchpoint);
+            _getLatestTouchpointNumber(client) == (int.tryParse(_selectedTouchpoint) ?? 0);
 
         // Filter by market/product/pension type
         final matchesMarketType = _selectedMarketType == null ||
@@ -475,7 +476,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    latestTouchpoint!.ordinal,
+                    latestTouchpoint.ordinal,
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -511,7 +512,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                           child: Text(
                             client.addresses.isNotEmpty
                               ? client.addresses.first.street
-                              : '',
+                              : 'No address',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
