@@ -1,6 +1,6 @@
 /// Client data model for IMU app
 class Client {
-  final String id;
+  final String? id;
   final String firstName;
   final String? middleName;
   final String lastName;
@@ -20,10 +20,12 @@ class Client {
   final String? pan;
   final String? email;
   final String? facebookLink;
+  final String? agencyId;
+  final String? caravanId;
   final List<Address> addresses;
   final List<PhoneNumber> phoneNumbers;
   final List<Touchpoint> touchpoints;
-  final DateTime createdAt;
+  final DateTime? createdAt;
   final DateTime? updatedAt;
   final bool isStarred;
 
@@ -208,6 +210,57 @@ class Client {
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
       isStarred: json['isStarred'] ?? false,
+    );
+  }
+
+  /// Create Client from PowerSync row (snake_case column names)
+  factory Client.fromRow(Map<String, dynamic> row) {
+    return Client(
+      id: row['id'] as String,
+      firstName: row['first_name'] as String,
+      lastName: row['last_name'] as String,
+      middleName: row['middle_name'] as String?,
+      birthDate: row['birth_date'] != null ? DateTime.parse(row['birth_date'] as String) : null,
+      email: row['email'] as String?,
+      phone: row['phone'] as String?,
+      agencyName: row['agency_name'] as String?,
+      department: row['department'] as String?,
+      position: row['position'] as String?,
+      employmentStatus: row['employment_status'] as String?,
+      payrollDate: row['payroll_date'] as String?,
+      tenure: row['tenure'] as int?,
+      clientType: ClientType.values.firstWhere(
+        (e) => e.name.toUpperCase() == (row['client_type'] as String?)?.toUpperCase(),
+        orElse: () => ClientType.potential,
+      ),
+      productType: ProductType.values.firstWhere(
+        (e) => e.name.toUpperCase() == (row['product_type'] as String?)?.toUpperCase(),
+        orElse: () => ProductType.sssPensioner,
+      ),
+      marketType: row['market_type'] != null
+          ? MarketType.values.firstWhere(
+              (e) => e.name.toUpperCase() == (row['market_type'] as String).toUpperCase(),
+              orElse: () => MarketType.residential,
+            )
+          : null,
+      pensionType: row['pension_type'] != null
+          ? PensionType.values.firstWhere(
+              (e) => e.name.toUpperCase() == (row['pension_type'] as String).toUpperCase(),
+              orElse: () => PensionType.none,
+            )
+          : PensionType.none,
+      pan: row['pan'] as String?,
+      facebookLink: row['facebook_link'] as String?,
+      remarks: row['remarks'] as String?,
+      agencyId: row['agency_id'] as String?,
+      caravanId: row['caravan_id'] as String?,
+      isStarred: (row['is_starred'] as int?) == 1,
+      createdAt: row['created_at'] != null
+          ? DateTime.parse(row['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: row['updated_at'] != null
+          ? DateTime.parse(row['updated_at'] as String)
+          : null,
     );
   }
 }
