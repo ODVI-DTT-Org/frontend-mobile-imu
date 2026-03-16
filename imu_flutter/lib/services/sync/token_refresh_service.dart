@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,22 +13,24 @@ class TokenRefreshService {
 
   // Configuration
   static const int _maxRetries = 5;
-  static const Duration _baseDelay = const Duration(seconds: 1);
-  static const Duration _maxDelay = const Duration(seconds: 30);
+  static const Duration _baseDelay = Duration(seconds: 1);
+  static const Duration _maxDelay = Duration(seconds: 30);
 
   // State
   int _retryCount = 0;
   bool _isRefreshing = false;
   Timer? _refreshTimer;
+  final Random _random = Random();
 
   TokenRefreshService({
     Dio? httpClient,
     FlutterSecureStorage? secureStorage,
-  }) : _httpClient = httpClient ?? Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-      )),
-       _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  })  : _httpClient = httpClient ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 30),
+              receiveTimeout: const Duration(seconds: 30),
+            )),
+        _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   /// Attempt to refresh the token with exponential backoff and jitter
   Future<String?> refreshToken() async {
@@ -39,15 +42,14 @@ class TokenRefreshService {
       final refreshToken = await _secureStorage.read(key: 'refresh_token');
       if (refreshToken == null) {
         logDebug('No refresh token available');
+        _isRefreshing = false;
         return null;
       }
 
       final authUrl = dotenv.env['AUTH_URL'] ?? 'https://your-auth-server.com';
 
-      // Calculate delay with exponential backoff and jitter
-      final delay = _calculateDelay();
-
-      logDebug('Attempting token refresh (attempt ${_retryCount + 1}, delay: ${delay.inSeconds}s)');
+      logDebug(
+          'Attempting token refresh (attempt ${_retryCount + 1})');
 
       final response = await _httpClient.post(
         '$authUrl/token/refresh',
@@ -91,14 +93,19 @@ class TokenRefreshService {
   Duration _calculateDelay() {
     // Exponential backoff: base_delay * 2^retryCount
     // Add jitter: random delay between 0-1000ms
-    final jitter = Random().nextInt(1000);
-    return _baseDelay * (2 ^ _retryCount) + Duration(milliseconds: jitter);
+    final jitter = _random.nextInt(1000);
+    final exponentialDelay = _baseDelay.inMilliseconds * (1 << _retryCount);
+    final delayMs = min(exponentialDelay + jitter, _maxDelay.inMilliseconds);
+    return Duration(milliseconds: delayMs);
   }
 
   /// Schedule a retry after failure
   void _scheduleRetry() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer(_calculateDelay().inMilliseconds, () async {
+    final delay = _calculateDelay();
+    logDebug('Scheduling token refresh retry in ${delay.inSeconds}s');
+
+    _refreshTimer = Timer(delay, () async {
       await refreshToken();
     });
   }
@@ -106,6 +113,7 @@ class TokenRefreshService {
   /// Force refresh (user-initiated)
   Future<String?> forceRefresh() async {
     _retryCount = 0;
+    _refreshTimer?.cancel();
     return await refreshToken();
   }
 
@@ -117,23 +125,25 @@ class TokenRefreshService {
   }
 }
 
-/// Provider for token refresh service
-final tokenRefreshServiceProvider = Provider<TokenRefreshService>((ref) {
-  return TokenRefreshService(
-    ref.watch(dioProvider),
-    ref.watch(secureStorageProvider),
-  );
-});
-
 /// Provider for Dio HTTP client
 final dioProvider = Provider<Dio>((ref) {
   return Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
-  );
+  ));
 });
 
 /// Provider for secure storage
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage();
+});
+
+/// Provider for token refresh service
+final tokenRefreshServiceProvider = Provider<TokenRefreshService>((ref) {
+  final service = TokenRefreshService(
+    httpClient: ref.watch(dioProvider),
+    secureStorage: ref.watch(secureStorageProvider),
+  );
+  ref.onDispose(() => service.dispose());
+  return service;
 });
