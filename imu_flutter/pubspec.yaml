@@ -16,20 +16,36 @@ dependencies:
   # Navigation
   go_router: ^13.1.0
 
-  # Local Storage
+  # Local Storage (Hive will be deprecated after PowerSync migration)
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.1
 
-  # Networking (future backend integration)
-  dio: ^5.4.0
+  # PowerSync - Offline-first sync engine
+  powersync: ^2.0.0
+  powersync_attachments_client: ^2.0.0
+
+  # UUID generation
+  uuid: ^4.5.1
+
+  # Environment configuration
+  flutter_dotenv: ^5.2.1
+
+  # HTTP client for auth
+  dio: ^5.7.0
+
+  # JWT decoding for offline auth
+  jwt_decoder: ^2.0.1
+
+  # Connectivity
+  connectivity_plus: ^6.0.0
+
+  # PocketBase (to be deprecated after migration)
   pocketbase: ^0.17.0
 
-  # Maps & Location (temporarily disabled - needs Mapbox SDK token)
-  # mapbox_gl: ^0.16.0
+  # Maps & Location
   geolocator: ^10.1.0
   geocoding: ^2.1.1
-  # map_launcher: ^6.2.2 (for opening external maps)
 
   # Media
   image_picker: ^1.0.7
@@ -52,10 +68,7 @@ dependencies:
   # Utilities
   intl: ^0.18.1
   url_launcher: ^6.2.2
-  connectivity_plus: ^5.0.2
-  flutter_dotenv: ^5.1.0
   quick_actions: ^1.0.7
-  uuid: ^4.5.3
   crypto: ^3.0.3
 
   # Permissions
