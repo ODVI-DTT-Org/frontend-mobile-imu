@@ -1,23 +1,20 @@
-// lib/core/utils/logger.dart
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
 
 void logDebug(String message) {
-  assert(() {
-    debugPrint(message);
-    return true;
-  }());
+  if (AppConfig.debugMode) {
+    debugPrint('[DEBUG] $message');
+  }
 }
 
 void logInfo(String message) {
-  assert(() {
-    debugPrint('[INFO] $message');
-    return true;
-  }());
+  debugPrint('[INFO] $message');
 }
 
-void logError(String message, [Object? error]) {
-  assert(() {
-    debugPrint('[ERROR] $message${error != null ? ' - $error' : ''}');
-    return true;
-  }());
+void logWarning(String message) {
+  debugPrint('[WARN] $message');
+}
+
+void logError(String message, [dynamic error]) {
+  debugPrint('[ERROR] $message ${error ?? ''}');
 }
