@@ -1,384 +1,48 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
-import 'package:imu_flutter/services/api/api_exception.dart';
 
-/// Authentication service for PocketBase backend
+/// Stub user model (will be replaced with JWT user)
+class StubUser {
+  final String id;
+  final String email;
+  final String name;
+
+  const StubUser({
+    required this.id,
+    required this.email,
+    required this.name,
+  });
+}
+
+/// Stub auth service (placeholder until JWT auth is implemented)
 class AuthService {
-  final PocketBase _pb;
-  final FlutterSecureStorage _secureStorage;
+  StubUser? _currentUser;
 
-  // Token storage keys (must match TokenManager)
-  static const _tokenKey = 'pb_auth_token';
-  static const _recordKey = 'pb_auth_record';
-
-  AuthService({
-    required PocketBase pb,
-    FlutterSecureStorage? secureStorage,
-  })  : _pb = pb,
-        _secureStorage = secureStorage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            );
-
-  /// Login with email and password
-  Future<RecordModel> loginWithEmailPassword({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      debugPrint('AuthService: Attempting login for $email');
-
-      final authRecord = await _pb.collection('users').authWithPassword(
-        email,
-        password,
-      );
-
-      debugPrint('AuthService: Login successful for user ${authRecord.record?.id}');
-
-      // Persist auth token to secure storage for session restoration
-      await _persistAuthToken();
-
-      return authRecord.record!;
-    } on ClientException catch (e) {
-      debugPrint('AuthService: Login failed - ${e.toString()}');
-      throw _handleAuthError(e);
-    } catch (e) {
-      debugPrint('AuthService: Unexpected error - $e');
-      throw ApiException(
-        message: 'An unexpected error occurred. Please try again.',
-        originalError: e,
-      );
-    }
+  Future<void> initialize() async {
+    // TODO: Implement JWT auth
   }
 
-  /// Login as superuser (admin)
-  Future<RecordModel> loginAsSuperuser({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      debugPrint('AuthService: Attempting superuser login for $email');
-
-      final authRecord = await _pb.collection('_superusers').authWithPassword(
-        email,
-        password,
-      );
-
-      debugPrint('AuthService: Superuser login successful');
-
-      // Persist auth token to secure storage for session restoration
-      await _persistAuthToken();
-
-      return authRecord.record!;
-    } on ClientException catch (e) {
-      debugPrint('AuthService: Superuser login failed - ${e.toString()}');
-      throw _handleAuthError(e);
-    } catch (e) {
-      debugPrint('AuthService: Unexpected error - $e');
-      throw ApiException(
-        message: 'An unexpected error occurred. Please try again.',
-        originalError: e,
-      );
-    }
+  Future<StubUser?> login(String email, String password) async {
+    // TODO: Implement login
+    throw UnimplementedError('JWT auth not yet implemented');
   }
 
-  /// Persist auth token to secure storage for session restoration
-  Future<void> _persistAuthToken() async {
-    try {
-      if (_pb.authStore.isValid) {
-        final token = _pb.authStore.token;
-        final record = _pb.authStore.model as RecordModel?;
-
-        // Save token
-        await _secureStorage.write(key: _tokenKey, value: token);
-
-        // Save record data as JSON
-        if (record != null) {
-          final recordJson = jsonEncode(record.toJson());
-          await _secureStorage.write(key: _recordKey, value: recordJson);
-        }
-
-        debugPrint('✅ AuthService: Auth token persisted to secure storage');
-      }
-    } catch (e) {
-      debugPrint('❌ AuthService: Failed to persist auth token - $e');
-    }
-  }
-
-  /// Logout current user
   Future<void> logout() async {
-    try {
-      _pb.authStore.clear();
-      // Clear the persisted auth tokens (matching TokenManager keys)
-      await _secureStorage.delete(key: _tokenKey);
-      await _secureStorage.delete(key: _recordKey);
-      debugPrint('AuthService: Logout successful');
-    } catch (e) {
-      debugPrint('AuthService: Logout error - $e');
-    }
+    _currentUser = null;
   }
 
-  /// Request password reset
-  Future<void> requestPasswordReset(String email) async {
-    try {
-      debugPrint('AuthService: Requesting password reset for $email');
-
-      await _pb.collection('users').requestPasswordReset(email);
-
-      debugPrint('AuthService: Password reset email sent');
-    } on ClientException catch (e) {
-      throw _handleAuthError(e);
-    } catch (e) {
-      throw ApiException(
-        message: 'Failed to request password reset.',
-        originalError: e,
-      );
-    }
-  }
-
-  /// Check if user is authenticated
-  bool get isAuthenticated => _pb.authStore.isValid;
-
-  /// Get current user record
-  RecordModel? get currentUser => _pb.authStore.model as RecordModel?;
-
-  /// Get current user ID
-  String? get currentUserId => (_pb.authStore.model as RecordModel?)?.id;
-
-  /// Get current user email
-  String? get currentUserEmail => (_pb.authStore.model as RecordModel?)?.data['email'] as String?;
-
-  /// Get current user name
-  String? get currentUserName {
-    final record = _pb.authStore.model as RecordModel?;
-    if (record == null) return null;
-
-    final firstName = record.data['first_name'] as String? ?? '';
-    final lastName = record.data['last_name'] as String? ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    return fullName.isNotEmpty ? fullName : record.data['email'] as String?;
-  }
-
-  /// Refresh auth token
-  Future<void> refreshToken() async {
-    try {
-      await _pb.collection('users').authRefresh();
-      debugPrint('AuthService: Token refreshed');
-    } catch (e) {
-      debugPrint('AuthService: Token refresh failed - $e');
-      rethrow;
-    }
-  }
-
-  /// Update user password
-  Future<void> updatePassword({
-    required String oldPassword,
-    required String newPassword,
-    required String confirmPassword,
-  }) async {
-    if (newPassword != confirmPassword) {
-      throw const ApiException(
-        message: 'Passwords do not match',
-        errorCode: 'PASSWORD_MISMATCH',
-      );
-    }
-
-    if (newPassword.length < 8) {
-      throw const ApiException(
-        message: 'Password must be at least 8 characters',
-        errorCode: 'PASSWORD_TOO_SHORT',
-      );
-    }
-
-    try {
-      final userId = currentUserId;
-      if (userId == null) {
-        throw const ApiException(
-          message: 'Not authenticated',
-          errorCode: 'NOT_AUTHENTICATED',
-        );
-      }
-
-      await _pb.collection('users').update(userId, body: {
-        'oldPassword': oldPassword,
-        'password': newPassword,
-        'passwordConfirm': confirmPassword,
-      });
-
-      debugPrint('AuthService: Password updated');
-    } on ClientException catch (e) {
-      throw _handleAuthError(e);
-    } catch (e) {
-      throw ApiException(
-        message: 'Failed to update password',
-        originalError: e,
-      );
-    }
-  }
-
-  /// Handle PocketBase auth errors
-  ApiException _handleAuthError(ClientException e) {
-    final response = e.response;
-
-    if (response != null) {
-      final data = response['data'] as Map<String, dynamic>?;
-      final message = response['message'] as String?;
-
-      // Check for specific error codes
-      if (data != null) {
-        // Validation errors
-        if (data.containsKey('email')) {
-          final emailError = data['email'];
-          if (emailError is Map && emailError.containsKey('code')) {
-            final code = emailError['code'] as String;
-            if (code == 'validation_invalid_email') {
-              return ApiException.validationError(
-                {'email': 'Please enter a valid email address'},
-              );
-            }
-          }
-        }
-
-        if (data.containsKey('password')) {
-          final passwordError = data['password'];
-          if (passwordError is Map && passwordError.containsKey('code')) {
-            final code = passwordError['code'] as String;
-            if (code == 'validation_required') {
-              return ApiException.validationError(
-                {'password': 'Password is required'},
-              );
-            }
-          }
-        }
-      }
-
-      // Auth failed
-      if (message?.contains('Invalid email or password') == true ||
-          message?.contains('Failed to authenticate') == true) {
-        return const ApiException(
-          message: 'Invalid email or password. Please try again.',
-          errorCode: 'INVALID_CREDENTIALS',
-        );
-      }
-
-      // Rate limited
-      if (message?.contains('Too many requests') == true ||
-          message?.contains('rate limit') == true) {
-        return const ApiException(
-          message: 'Too many login attempts. Please wait and try again.',
-          errorCode: 'RATE_LIMITED',
-          statusCode: 429,
-        );
-      }
-    }
-
-    // Default error
-    return ApiException(
-      message: 'Authentication failed. Please try again.',
-      statusCode: e.statusCode,
-      originalError: e,
-    );
-  }
+  bool get isAuthenticated => _currentUser != null;
+  StubUser? get currentUser => _currentUser;
+  String? get currentUserId => _currentUser?.id;
 }
 
-/// Provider for AuthService
-final authServiceProvider = Provider<AuthService>((ref) {
-  final pb = ref.watch(pocketBaseProvider);
-  return AuthService(pb: pb);
-});
+/// Providers
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-/// State notifier for auth state
-class AuthNotifier extends StateNotifier<AuthState> {
-  final AuthService _authService;
-
-  AuthNotifier(this._authService) : super(AuthState.initial());
-
-  /// Check current auth status
-  Future<void> checkAuthStatus() async {
-    state = state.copyWith(isLoading: true, error: null);
-
-    try {
-      final isAuthenticated = _authService.isAuthenticated;
-      final user = _authService.currentUser;
-
-      state = state.copyWith(
-        isAuthenticated: isAuthenticated,
-        user: user,
-        isLoading: false,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  /// Login with email and password
-  Future<bool> login(String email, String password) async {
-    state = state.copyWith(isLoading: true, error: null);
-
-    try {
-      final user = await _authService.loginWithEmailPassword(
-        email: email,
-        password: password,
-      );
-
-      state = state.copyWith(
-        isAuthenticated: true,
-        user: user,
-        isLoading: false,
-      );
-
-      return true;
-    } on ApiException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message,
-      );
-      return false;
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'An unexpected error occurred',
-      );
-      return false;
-    }
-  }
-
-  /// Logout
-  Future<void> logout() async {
-    state = state.copyWith(isLoading: true);
-
-    try {
-      await _authService.logout();
-
-      state = AuthState.initial();
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Failed to logout',
-      );
-    }
-  }
-
-  /// Clear error
-  void clearError() {
-    state = state.copyWith(error: null);
-  }
-}
-
-/// Auth state model
 class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
   final String? error;
-  final RecordModel? user;
+  final StubUser? user;
 
   const AuthState({
     required this.isAuthenticated,
@@ -388,15 +52,15 @@ class AuthState {
   });
 
   factory AuthState.initial() => const AuthState(
-        isAuthenticated: false,
-        isLoading: false,
-      );
+    isAuthenticated: false,
+    isLoading: false,
+  );
 
   AuthState copyWith({
     bool? isAuthenticated,
     bool? isLoading,
     String? error,
-    RecordModel? user,
+    StubUser? user,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -407,11 +71,50 @@ class AuthState {
   }
 }
 
-/// Provider for AuthNotifier
+class AuthNotifier extends StateNotifier<AuthState> {
+  final AuthService _authService;
+
+  AuthNotifier(this._authService) : super(AuthState.initial());
+
+  Future<void> checkAuthStatus() async {
+    state = state.copyWith(isLoading: true);
+    final isAuth = _authService.isAuthenticated;
+    state = state.copyWith(
+      isAuthenticated: isAuth,
+      user: _authService.currentUser,
+      isLoading: false,
+    );
+  }
+
+  Future<bool> login(String email, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final user = await _authService.login(email, password);
+      state = state.copyWith(
+        isAuthenticated: true,
+        user: user,
+        isLoading: false,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<void> logout() async {
+    await _authService.logout();
+    state = AuthState.initial();
+  }
+
+  void clearError() {
+    state = state.copyWith(error: null);
+  }
+}
+
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
   final notifier = AuthNotifier(authService);
-  // Check auth status on initialization to detect persisted PocketBase sessions
   notifier.checkAuthStatus();
   return notifier;
 });
