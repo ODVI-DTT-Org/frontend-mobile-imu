@@ -21,11 +21,21 @@ class AwsConfig {
     accessKeyId.isNotEmpty && secretAccessKey.isNotEmpty && bucket.isNotEmpty;
 }
 
-/// Application configuration loaded from environment files
+/// Application configuration for PowerSync + PostgreSQL
 class AppConfig {
   AppConfig._();
 
-  static late String _pocketbaseUrl;
+  // PowerSync
+  static late String _powerSyncUrl;
+
+  // PostgreSQL API
+  static late String _postgresApiUrl;
+
+  // JWT Auth
+  static late String _jwtSecret;
+  static late int _jwtExpiryHours;
+
+  // General
   static late String _appName;
   static late bool _debugMode;
   static late String _logLevel;
@@ -39,23 +49,36 @@ class AppConfig {
     try {
       await dotenv.load(fileName: envFile);
     } catch (e) {
-      debugPrint('Warning: Could not load $envFile, using defaults: $e');
+      debugPrint('Warning: Could not load $envFile: $e');
     }
 
-    _pocketbaseUrl = dotenv.env['POCKETBASE_URL'] ?? 'http://localhost:8090';
+    _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
+    _postgresApiUrl = dotenv.env['POSTGRES_API_URL'] ?? 'http://localhost:3000/api';
+    _jwtSecret = dotenv.env['JWT_SECRET'] ?? 'dev-secret';
+    _jwtExpiryHours = int.tryParse(dotenv.env['JWT_EXPIRY_HOURS'] ?? '24') ?? 24;
     _appName = dotenv.env['APP_NAME'] ?? 'IMU';
     _debugMode = dotenv.env['DEBUG_MODE'] == 'true';
     _logLevel = dotenv.env['LOG_LEVEL'] ?? 'info';
 
     debugPrint('AppConfig initialized:');
     debugPrint('  Environment: $environment');
-    debugPrint('  PocketBase URL: $_pocketbaseUrl');
-    debugPrint('  App Name: $_appName');
-    debugPrint('  Debug Mode: $_debugMode');
+    debugPrint('  PowerSync URL: $_powerSyncUrl');
+    debugPrint('  PostgreSQL API: $_postgresApiUrl');
   }
 
-  /// PocketBase backend URL
-  static String get pocketbaseUrl => _pocketbaseUrl;
+  // Getters
+
+  /// PowerSync instance URL
+  static String get powerSyncUrl => _powerSyncUrl;
+
+  /// PostgreSQL API endpoint URL
+  static String get postgresApiUrl => _postgresApiUrl;
+
+  /// JWT secret key for authentication
+  static String get jwtSecret => _jwtSecret;
+
+  /// JWT token expiry duration in hours
+  static int get jwtExpiryHours => _jwtExpiryHours;
 
   /// Application display name
   static String get appName => _appName;
