@@ -2,17 +2,17 @@ import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:powersync/powersync.dart';
 import '../../core/utils/logger.dart';
 
 /// Backend connector for PowerSync authentication
-class PowerSyncBackendConnector extends PowerSyncBackendConnector {
+/// This connector handles token refresh and credential management for PowerSync
+class IMUPowerSyncConnector {
   final Dio _httpClient;
   final FlutterSecureStorage _secureStorage;
   final String _powersyncUrl;
   final String _authUrl;
 
-  PowerSyncBackendConnector({
+  IMUPowerSyncConnector({
     required String powersyncUrl,
     required String authUrl,
   })  : _powersyncUrl = powersyncUrl,
@@ -23,7 +23,7 @@ class PowerSyncBackendConnector extends PowerSyncBackendConnector {
         )),
         _secureStorage = const FlutterSecureStorage();
 
-  @override
+  /// Fetch PowerSync authentication credentials
   Future<String?> fetchCredentials() async {
     try {
       // Get stored refresh token
@@ -54,7 +54,7 @@ class PowerSyncBackendConnector extends PowerSyncBackendConnector {
     }
   }
 
-  @override
+  /// Invalidate stored credentials
   Future<void> invalidateCredentials() async {
     await _secureStorage.delete(key: 'powersync_token');
     await _secureStorage.delete(key: 'refresh_token');
@@ -62,18 +62,16 @@ class PowerSyncBackendConnector extends PowerSyncBackendConnector {
     logDebug('Credentials invalidated');
   }
 
-  @override
-  Future<Uri> powersyncUri() async {
-    return Uri.parse(_powersyncUrl);
-  }
+  /// Get the PowerSync URI
+  Uri get powersyncUri => Uri.parse(_powersyncUrl);
 }
 
 /// Provider for PowerSync connector
-final powerSyncConnectorProvider = Provider<PowerSyncBackendConnector>((ref) {
+final powerSyncConnectorProvider = Provider<IMUPowerSyncConnector>((ref) {
   final powersyncUrl = dotenv.env['POWERSYNC_URL'] ?? 'https://your-instance.powersync.co';
   final authUrl = dotenv.env['AUTH_URL'] ?? 'https://your-auth-server.com';
 
-  return PowerSyncBackendConnector(
+  return IMUPowerSyncConnector(
     powersyncUrl: powersyncUrl,
     authUrl: authUrl,
   );

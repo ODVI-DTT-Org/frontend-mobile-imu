@@ -122,7 +122,7 @@ class UnifiedSyncService {
   Future<void> _processOperation(String id, Map<String, dynamic> data) async {
     try {
       // Process based on operation type
-      // This would integrate with PocketBase client
+      // TODO: Phase 2 - This will integrate with PowerSync client
       logDebug('Processing operation: $id');
       await _queueBox?.delete(id);
     } catch (e) {

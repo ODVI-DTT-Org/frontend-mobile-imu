@@ -11,7 +11,7 @@ class Client {
   final String? payrollDate;
   final int? tenure;
   final DateTime? birthDate;
-  final String? phone; // Changed from contactNumber to match PocketBase schema
+  final String? phone; // Primary contact number
   final String? remarks;
   final ClientType clientType;
   final MarketType? marketType;
@@ -56,6 +56,8 @@ class Client {
     required this.createdAt,
     this.updatedAt,
     this.isStarred = false,
+    this.agencyId,
+    this.caravanId,
   });
 
   String get fullName => '$firstName ${middleName != null ? '$middleName ' : ''}$lastName';
@@ -162,7 +164,7 @@ class Client {
       'addresses': addresses.map((a) => a.toJson()).toList(),
       'phoneNumbers': phoneNumbers.map((p) => p.toJson()).toList(),
       'touchpoints': touchpoints.map((t) => t.toJson()).toList(),
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'isStarred': isStarred,
     };
@@ -213,7 +215,7 @@ class Client {
     );
   }
 
-  /// Create Client from PowerSync row (snake_case column names)
+  /// Create Client from PowerSync/PostgreSQL row (snake_case column names)
   factory Client.fromRow(Map<String, dynamic> row) {
     return Client(
       id: row['id'] as String,
@@ -421,13 +423,13 @@ class Touchpoint {
     return ordinals[touchpointNumber - 1];
   }
 
-  /// Convert to PocketBase format (snake_case)
+  /// Convert to API format (snake_case for PostgreSQL/PowerSync)
   Map<String, dynamic> toJson() => {
     'id': id,
     'client_id': clientId,
     'agent_id': agentId,
     'touchpoint_number': touchpointNumber,
-    'type': type.pocketBaseValue,
+    'type': type.apiValue,
     'date': date.toIso8601String(),
     'address': address,
     'time_arrival': timeArrival != null
@@ -438,7 +440,7 @@ class Touchpoint {
         : null,
     'odometer_start': odometerArrival,
     'odometer_end': odometerDeparture,
-    'reason': reason.pocketBaseValue,
+    'reason': reason.apiValue,
     'next_visit_date': nextVisitDate?.toIso8601String(),
     'notes': remarks,
     'photo_path': photoPath,
@@ -447,7 +449,7 @@ class Touchpoint {
     'created': createdAt.toIso8601String(),
   };
 
-  /// Parse from PocketBase format (snake_case) or local format (camelCase)
+  /// Parse from API format (snake_case) or local format (camelCase)
   factory Touchpoint.fromJson(Map<String, dynamic> json) {
     TimeOfDay? parseTime(String? time) {
       if (time == null) return null;
@@ -465,14 +467,14 @@ class Touchpoint {
       clientId: getValue<String>('client_id', 'clientId') ?? '',
       agentId: getValue<String>('agent_id', 'agentId'),
       touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? 1,
-      type: TouchpointType.fromPocketBase(getValue<String>('type', 'type') ?? 'VISIT'),
+      type: TouchpointType.fromApi(getValue<String>('type', 'type') ?? 'VISIT'),
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
       address: getValue<String>('address', 'address'),
       timeArrival: parseTime(getValue<String>('time_arrival', 'timeArrival')),
       timeDeparture: parseTime(getValue<String>('time_departure', 'timeDeparture')),
       odometerArrival: getValue<String>('odometer_start', 'odometerArrival'),
       odometerDeparture: getValue<String>('odometer_end', 'odometerDeparture'),
-      reason: TouchpointReason.fromPocketBase(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
+      reason: TouchpointReason.fromApi(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
       nextVisitDate: getValue<String>('next_visit_date', 'nextVisitDate') != null
           ? DateTime.parse(getValue<String>('next_visit_date', 'nextVisitDate')!)
           : null,
@@ -487,19 +489,19 @@ class Touchpoint {
   }
 }
 
-/// Touchpoint type enum with PocketBase-compatible values
+/// Touchpoint type enum with API-compatible values
 enum TouchpointType {
   visit('VISIT'),
   call('CALL');
 
-  final String _pocketBaseValue;
-  const TouchpointType(this._pocketBaseValue);
+  final String _apiValue;
+  const TouchpointType(this._apiValue);
 
-  String get pocketBaseValue => _pocketBaseValue;
+  String get apiValue => _apiValue;
 
-  static TouchpointType fromPocketBase(String value) {
+  static TouchpointType fromApi(String value) {
     return TouchpointType.values.firstWhere(
-      (e) => e._pocketBaseValue == value.toUpperCase(),
+      (e) => e._apiValue == value.toUpperCase(),
       orElse: () => TouchpointType.visit,
     );
   }
@@ -522,7 +524,7 @@ class TouchpointPattern {
   }
 }
 
-/// Reason types for touchpoints with PocketBase-compatible values
+/// Reason types for touchpoints with API-compatible values
 enum TouchpointReason {
   abroad('ABROAD'),
   applyMembership('APPLY_MEMBERSHIP'),
@@ -551,14 +553,14 @@ enum TouchpointReason {
   interestedButDeclined('INTERESTED_BUT_DECLINED'),
   telemarketing('TELEMARKETING');
 
-  final String _pocketBaseValue;
-  const TouchpointReason(this._pocketBaseValue);
+  final String _apiValue;
+  const TouchpointReason(this._apiValue);
 
-  String get pocketBaseValue => _pocketBaseValue;
+  String get apiValue => _apiValue;
 
-  static TouchpointReason fromPocketBase(String value) {
+  static TouchpointReason fromApi(String value) {
     return TouchpointReason.values.firstWhere(
-      (e) => e._pocketBaseValue == value.toUpperCase(),
+      (e) => e._apiValue == value.toUpperCase(),
       orElse: () => TouchpointReason.interested,
     );
   }

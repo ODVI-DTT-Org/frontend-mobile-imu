@@ -15,7 +15,7 @@ apply from: "$flutterSdkPath/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
     namespace "com.odvi.imu"
-    compileSdk flutter.compileSdkVersion
+    compileSdk 36
     ndkVersion flutter.ndkVersion
 
     compileOptions {

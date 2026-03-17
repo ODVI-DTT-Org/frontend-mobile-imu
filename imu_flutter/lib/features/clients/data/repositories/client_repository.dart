@@ -1,97 +1,61 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:powersync/powersync.dart';
 import 'package:uuid/uuid.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/services/local_storage/hive_service.dart';
+import 'package:imu_flutter/shared/providers/app_providers.dart';
 import '../../../../core/utils/logger.dart';
-import '../models/client_model.dart';
-import '../../../../services/sync/powersync_service.dart';
 
-/// Repository for client CRUD operations using PowerSync
+/// Repository for client CRUD operations using Hive
+/// TODO: Phase 2 - Will be updated to use PowerSync
 class ClientRepository {
-  final PowerSyncDatabase _db;
+  final HiveService _hiveService;
   final _uuid = const Uuid();
 
-  ClientRepository(this._db) : _uuid = const Uuid();
+  ClientRepository(this._hiveService);
 
   /// Watch all clients with real-time updates
-  Stream<List<Client>> watchClients() {
-    return _db.watch(
-      'SELECT * FROM clients ORDER BY created_at DESC',
-    ).map((rows) => rows.map(Client.fromRow).toList());
+  Stream<List<Client>> watchClients() async* {
+    // For now, emit the current list and update on changes
+    // TODO: Phase 2 - Implement real-time updates with PowerSync
+    final clients = await getClients();
+    yield clients;
   }
 
   /// Watch single client by ID
-  Stream<Client?> watchClient(String id) {
-    return _db.watch(
-      'SELECT * FROM clients WHERE id = ?',
-      [id],
-    ).map((rows) {
-      if (rows.isEmpty) return null;
-      return Client.fromRow(rows.first);
-    });
+  Stream<Client?> watchClient(String id) async* {
+    // TODO: Phase 2 - Implement real-time updates with PowerSync
+    final client = await getClient(id);
+    yield client;
   }
 
   /// Get all clients (one-time fetch)
   Future<List<Client>> getClients() async {
-    final rows = await _db.getAll(
-      'SELECT * FROM clients ORDER BY created_at DESC',
-    );
-    return rows.map(Client.fromRow).toList();
+    final data = _hiveService.getAllClients();
+    return data.map((json) => Client.fromJson(json)).toList();
   }
 
   /// Get client by ID (one-time fetch)
   Future<Client?> getClient(String id) async {
-    final row = await _db.getOptional(
-      'SELECT * FROM clients WHERE id = ?',
-      [id],
-    );
-    if (row == null) return null;
-    return Client.fromRow(row);
+    final data = _hiveService.getClient(id);
+    if (data == null) return null;
+    return Client.fromJson(data);
   }
 
   /// Create a new client (offline-first)
   Future<Client> createClient(Client client) async {
     final id = client.id ?? _uuid.v4();
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now();
 
-    await _db.execute(
-      '''INSERT INTO clients (
-        id, first_name, last_name, middle_name, birth_date, email, phone,
-        agency_name, department, position, employment_status, payroll_date, tenure,
-        client_type, product_type, market_type, pension_type, pan, facebook_link, remarks,
-        agency_id, caravan_id, is_starred, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now, now)''',
-      [
-        id,
-        client.firstName,
-        client.lastName,
-        client.middleName,
-        client.birthDate,
-        client.email,
-        client.phone,
-        client.agencyName,
-        client.department
-        client.position,
-        client.employmentStatus,
-        client.payrollDate,
-        client.tenure,
-        client.clientType,
-        client.productType,
-        client.marketType,
-        client.pensionType,
-        client.pan,
-        client.facebookLink,
-        client.remarks,
-        client.agencyId,
-        client.caravanId,
-        client.isStarred ? 1 : 0,
-        now,
-        now,
-      ],
+    final newClient = client.copyWith(
+      id: id,
+      createdAt: client.createdAt ?? now,
+      updatedAt: now,
     );
 
+    await _hiveService.addClient(newClient.toJson());
     logDebug('Created client: $id');
-    return client.copyWith(id: id);
+    return newClient;
   }
 
   /// Update an existing client (offline-first)
@@ -100,91 +64,66 @@ class ClientRepository {
       throw ArgumentError('Client ID is required for update');
     }
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now();
+    final updatedClient = client.copyWith(updatedAt: now);
 
-    await _db.execute(
-      '''UPDATE clients SET
-        first_name = ?, last_name = ?, middle_name = ?, birth_date = ?,
-        email = ?, phone = ?, agency_name = ?, department = ?, position = ?,
-        employment_status = ?, payroll_date = ?, tenure = ?, client_type = ?,
-        product_type = ?, market_type = ?, pension_type = ?, pan = ?,
-        facebook_link = ?, remarks = ?, agency_id = ?, caravan_id = ?,
-        is_starred = ?, updated_at = ?
-      WHERE id = ?''',
-      [
-        client.firstName,
-        client.lastName,
-        client.middleName,
-        client.birthDate,
-        client.email,
-        client.phone,
-        client.agencyName,
-        client.department
-        client.position,
-        client.employmentStatus,
-        client.payrollDate
-        client.tenure,
-        client.clientType,
-        client.productType,
-        client.marketType,
-        client.pensionType,
-        client.pan,
-        client.facebookLink,
-        client.remarks,
-        client.agencyId,
-        client.caravanId,
-        client.isStarred ? 1 : 0,
-        now,
-        client.id,
-      ],
-    );
-
+    await _hiveService.updateClient(client.id!, updatedClient.toJson());
     logDebug('Updated client: ${client.id}');
-    return client.copyWith(updatedAt: DateTime.parse(now));
+    return updatedClient;
   }
 
   /// Delete a client (offline-first)
   Future<void> deleteClient(String id) async {
-    await _db.execute('DELETE FROM clients WHERE id = ?', [id]);
+    await _hiveService.deleteClient(id);
     logDebug('Deleted client: $id');
   }
 
   /// Toggle client starred status
   Future<void> toggleStar(String id) async {
-    await _db.execute(
-      'UPDATE clients SET is_starred = NOT is_starred WHERE id = ?',
-      [id],
-    );
+    final client = await getClient(id);
+    if (client == null) return;
+
+    final updatedClient = client.copyWith(isStarred: !client.isStarred);
+    await _hiveService.updateClient(id, updatedClient.toJson());
     logDebug('Toggled star for client: $id');
   }
 
   /// Search clients by name
-  Stream<List<Client>> searchClients(String query) {
-    final searchQuery = '%$query%';
-    return _db.watch(
-      'SELECT * FROM clients WHERE first_name LIKE ? OR last_name LIKE ? ORDER BY created_at DESC',
-      [searchQuery, searchQuery],
-    ).map((rows) => rows.map(Client.fromRow).toList());
+  Stream<List<Client>> searchClients(String query) async* {
+    // TODO: Phase 2 - Implement real-time search with PowerSync
+    final clients = await getClients();
+    if (query.isEmpty) {
+      yield clients;
+      return;
+    }
+
+    final searchQuery = query.toLowerCase();
+    final filtered = clients.where((c) {
+      return c.firstName.toLowerCase().contains(searchQuery) ||
+          c.lastName.toLowerCase().contains(searchQuery);
+    }).toList();
+    yield filtered;
   }
 
   /// Get clients by type
-  Stream<List<Client>> watchClientsByType(String clientType) {
-    return _db.watch(
-      'SELECT * FROM clients WHERE client_type = ? ORDER BY created_at DESC',
-      [clientType],
-    ).map((rows) => rows.map(Client.fromRow).toList());
+  Stream<List<Client>> watchClientsByType(String clientType) async* {
+    // TODO: Phase 2 - Implement with PowerSync
+    final clients = await getClients();
+    final filtered = clients.where((c) => c.clientType.name == clientType).toList();
+    yield filtered;
   }
 
   /// Get starred clients
-  Stream<List<Client>> watchStarredClients() {
-    return _db.watch(
-      'SELECT * FROM clients WHERE is_starred = 1 ORDER BY created_at DESC',
-    ).map((rows) => rows.map(Client.fromRow).toList());
+  Stream<List<Client>> watchStarredClients() async* {
+    // TODO: Phase 2 - Implement with PowerSync
+    final clients = await getClients();
+    final filtered = clients.where((c) => c.isStarred).toList();
+    yield filtered;
   }
 }
 
 /// Provider for client repository
-final clientRepositoryProvider = FutureProvider<ClientRepository>((ref) async {
-  final db = await ref.watch(powerSyncDatabaseProvider.future);
-  return ClientRepository(db);
+final clientRepositoryProvider = Provider<ClientRepository>((ref) {
+  final hiveService = ref.watch(hiveServiceProvider);
+  return ClientRepository(hiveService);
 });

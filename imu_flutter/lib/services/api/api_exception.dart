@@ -14,15 +14,16 @@ class ApiException implements Exception {
     this.data,
   });
 
-  /// Create from PocketBase error
-  factory ApiException.fromPocketBase(dynamic error) {
+  /// Create from API error
+  factory ApiException.fromError(dynamic error) {
     String message = 'An unexpected error occurred';
     int? statusCode;
     String? errorCode;
     Map<String, dynamic>? data;
 
-    if (error.toString().contains('ClientException')) {
-      // Parse ClientException
+    if (error.toString().contains('ClientException') ||
+        error.toString().contains('HttpException')) {
+      // Parse HTTP exception
       final errorStr = error.toString();
 
       // Extract status code

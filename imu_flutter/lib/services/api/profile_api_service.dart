@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' show MultipartFile;
-import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 
 /// User profile model
@@ -53,50 +51,38 @@ class UserProfile {
 }
 
 /// Profile API service
+/// TODO: Phase 1 - Will be updated to work with PowerSync/Supabase backend
 class ProfileApiService {
-  final PocketBase _pb;
-
-  ProfileApiService({required PocketBase pb}) : _pb = pb;
-
-  Future<UserProfile> fetchProfile(String userId) async {
+  Future<UserProfile?> fetchProfile(String userId) async {
     try {
-      debugPrint('ProfileApiService: Fetching profile for user $userId');
-      final result = await _pb.collection('users').getOne(userId);
-      debugPrint('ProfileApiService: Fetched profile for user ${result.id}');
-      return UserProfile.fromJson(result.data);
-    } on ClientException catch (e) {
-      debugPrint('ProfileApiService: Error fetching profile - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ProfileApiService: fetchProfile for user $userId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return null;
+    } catch (e) {
+      debugPrint('ProfileApiService: Error fetching profile - $e');
+      throw ApiException.fromError(e);
     }
   }
 
-  Future<UserProfile> updateProfile(String userId, Map<String, dynamic> data) async {
+  Future<UserProfile?> updateProfile(String userId, Map<String, dynamic> data) async {
     try {
-      debugPrint('ProfileApiService: Updating profile for user $userId');
-      final result = await _pb.collection('users').update(userId, body: data);
-      debugPrint('ProfileApiService: Updated profile for user ${result.id}');
-      return UserProfile.fromJson(result.data);
-    } on ClientException catch (e) {
-      debugPrint('ProfileApiService: Error updating profile - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ProfileApiService: updateProfile for user $userId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase update
+      return null;
+    } catch (e) {
+      debugPrint('ProfileApiService: Error updating profile - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   Future<String?> uploadAvatar(String userId, String filePath) async {
     try {
-      debugPrint('ProfileApiService: Uploading avatar for user $userId');
-      final result = await _pb.collection('users').update(
-        userId,
-        body: {},
-        files: [
-          await createMultipartFile(filePath),
-        ],
-      );
-      debugPrint('ProfileApiService: Uploaded avatar for user ${result.id}');
-      return result.data['avatar'] as String?;
-    } on ClientException catch (e) {
-      debugPrint('ProfileApiService: Error uploading avatar - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ProfileApiService: uploadAvatar for user $userId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement file upload
+      return null;
+    } catch (e) {
+      debugPrint('ProfileApiService: Error uploading avatar - $e');
+      throw ApiException.fromError(e);
     }
   }
 }
@@ -109,6 +95,5 @@ Future<MultipartFile> createMultipartFile(String filePath) async {
 
 /// Provider for ProfileApiService
 final profileApiServiceProvider = Provider<ProfileApiService>((ref) {
-  final pb = ref.watch(pocketBaseProvider);
-  return ProfileApiService(pb: pb);
+  return ProfileApiService();
 });

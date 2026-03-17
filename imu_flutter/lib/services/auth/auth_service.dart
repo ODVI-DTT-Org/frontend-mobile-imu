@@ -5,11 +5,13 @@ class StubUser {
   final String id;
   final String email;
   final String name;
+  final Map<String, dynamic> data;
 
   const StubUser({
     required this.id,
     required this.email,
     required this.name,
+    this.data = const {},
   });
 }
 

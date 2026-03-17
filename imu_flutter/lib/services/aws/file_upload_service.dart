@@ -151,72 +151,71 @@ class FileUploadService {
 
   /// Process all pending uploads
   /// Returns the number of successful uploads
-            // Load queue
-            final queueBox = await Hive.openBox<UploadQueueItem>(_queueBoxName);
-            final pendingItems = queueBox.values
-                .where((item) => item.attemptCount == null || item.attemptCount! < _maxRetries)
-                .toList();
+  Future<int> processPendingUploads() async {
+    try {
+      // Load queue
+      final queueBox = await Hive.openBox<UploadQueueItem>(_queueBoxName);
+      final pendingItems = queueBox.values
+          .where((item) => item.attemptCount == null || item.attemptCount! < _maxRetries)
+          .toList();
 
-            logDebug('Found ${pendingItems.length} pending uploads');
+      logDebug('Found ${pendingItems.length} pending uploads');
 
-            int successful = 0;
-            final List<String> toRemove = [];
+      int successful = 0;
+      final List<String> toRemove = [];
 
-            for (final item in pendingItems) {
-              try {
-                // Check if file still exists
-                final file = File(item.filePath);
-                if (!await file.exists()) {
-                  logDebug('File not found: ${item.filePath}, skipping upload');
-                  toRemove.add(item.id);
-                  continue;
-                }
-
-                // Upload file
-                String? url;
-                if (item.type == 'photo') {
-                  url = await uploadPhoto(file, item.touchpointId);
-                } else if (item.type == 'audio') {
-                  url = await uploadAudio(file, item.touchpointId);
-                }
-
-                if (url != null) {
-                  // Upload successful
-                  toRemove.add(item.id);
-                  successful++;
-                  logDebug('Queued upload completed successfully: ${item.id}');
-                } else {
-                  // Upload failed, retry later
-                  await _updateQueueItem(
-                    item.id,
-                    attemptCount: (item.attemptCount ?? 1) + 1,
-                    lastAttemptAt: DateTime.now(),
-                  );
-                  logDebug('Upload failed, will retry later: ${item.id}');
-                }
-              } catch (e) {
-                logError('Error processing queued upload: ${item.id}', e);
-                await _updateQueueItem(
-                  item.id,
-                  attemptCount: (item.attemptCount ?? 1) + 1,
-                  lastAttemptAt: DateTime.now(),
-                );
-              }
-            }
-
-            // Remove successful uploads from queue
-            for (final id in toRemove) {
-              await _removeFromQueue(id);
-            }
-
-            logDebug('Completed processing uploads: $successful successful, ${toRemove.length} completed');
-            return successful;
-          } catch (e) {
-            logError('Error processing pending uploads', e);
-            return 0;
+      for (final item in pendingItems) {
+        try {
+          // Check if file still exists
+          final file = File(item.filePath);
+          if (!await file.exists()) {
+            logDebug('File not found: ${item.filePath}, skipping upload');
+            toRemove.add(item.id);
+            continue;
           }
+
+          // Upload file
+          String? url;
+          if (item.type == 'photo') {
+            url = await uploadPhoto(file, item.touchpointId);
+          } else if (item.type == 'audio') {
+            url = await uploadAudio(file, item.touchpointId);
+          }
+
+          if (url != null) {
+            // Upload successful
+            toRemove.add(item.id);
+            successful++;
+            logDebug('Queued upload completed successfully: ${item.id}');
+          } else {
+            // Upload failed, retry later
+            await _updateQueueItem(
+              item.id,
+              attemptCount: (item.attemptCount ?? 1) + 1,
+              lastAttemptAt: DateTime.now(),
+            );
+            logDebug('Upload failed, will retry later: ${item.id}');
+          }
+        } catch (e) {
+          logError('Error processing queued upload: ${item.id}', e);
+          await _updateQueueItem(
+            item.id,
+            attemptCount: (item.attemptCount ?? 1) + 1,
+            lastAttemptAt: DateTime.now(),
+          );
         }
       }
+
+      // Remove successful uploads from queue
+      for (final id in toRemove) {
+        await _removeFromQueue(id);
+      }
+
+      logDebug('Completed processing uploads: $successful successful, ${toRemove.length} completed');
+      return successful;
+    } catch (e) {
+      logError('Error processing pending uploads', e);
+      return 0;
     }
   }
 

@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocketbase/pocketbase.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
 
 /// Pending operation in sync queue
 class PendingOperation {
@@ -66,6 +64,7 @@ class PendingOperation {
 }
 
 /// Sync queue service for offline operations
+/// TODO: Phase 2 - Will be updated to work with PowerSync
 class SyncQueueService extends ChangeNotifier {
   static const String _boxName = 'sync_queue';
   static const int _maxRetries = 3;
@@ -141,7 +140,9 @@ class SyncQueueService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> processQueue(PocketBase pb) async {
+  /// Process queue with backend client
+  /// TODO: Phase 2 - Implement with PowerSync
+  Future<void> processQueue() async {
     if (!_isInitialized) await init();
     if (_isSyncing) return;
     if (_pendingOperations.isEmpty) return;
@@ -149,64 +150,13 @@ class SyncQueueService extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    debugPrint('SyncQueueService: Processing ${_pendingOperations.length} operations');
+    debugPrint('SyncQueueService: Processing ${_pendingOperations.length} operations (PowerSync integration pending)');
 
-    final toRemove = <String>[];
-    final toUpdate = <PendingOperation>[];
-
-    for (final op in _pendingOperations) {
-      try {
-        await _processOperation(pb, op);
-        toRemove.add(op.id);
-        debugPrint('SyncQueueService: Successfully processed ${op.operation} for ${op.entityType}');
-      } catch (e) {
-        debugPrint('SyncQueueService: Failed to process ${op.operation} for ${op.entityType}: $e');
-
-        if (op.retryCount >= _maxRetries) {
-          // Max retries reached - keep in queue but mark as failed
-          toUpdate.add(op.copyWith(
-            error: e.toString(),
-          ));
-        } else {
-          // Increment retry count
-          toUpdate.add(op.copyWith(
-            retryCount: op.retryCount + 1,
-            error: e.toString(),
-          ));
-        }
-      }
-    }
-
-    // Remove successful operations
-    for (final id in toRemove) {
-      await removeOperation(id);
-    }
-
-    // Update failed operations
-    for (final op in toUpdate) {
-      await updateOperation(op);
-    }
+    // TODO: Phase 2 - Implement PowerSync sync
+    // For now, operations stay in queue until PowerSync is connected
 
     _isSyncing = false;
     notifyListeners();
-  }
-
-  Future<void> _processOperation(PocketBase pb, PendingOperation op) async {
-    final collection = _getCollectionName(op.entityType);
-
-    switch (op.operation) {
-      case 'CREATE':
-        await pb.collection(collection).create(body: op.data);
-        break;
-      case 'UPDATE':
-        await pb.collection(collection).update(op.id, body: op.data);
-        break;
-      case 'DELETE':
-        await pb.collection(collection).delete(op.id);
-        break;
-      default:
-        throw Exception('Unknown operation: ${op.operation}');
-    }
   }
 
   String _getCollectionName(String entityType) {

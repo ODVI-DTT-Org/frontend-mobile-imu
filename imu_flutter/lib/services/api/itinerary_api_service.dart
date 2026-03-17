@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocketbase/pocketbase.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
@@ -78,38 +76,18 @@ class ItineraryItem {
   }
 }
 
-/// Itinerary API service for PocketBase backend
+/// Itinerary API service
+/// TODO: Phase 1 - Will be updated to work with PowerSync/Supabase backend
 class ItineraryApiService {
-  final PocketBase _pb;
-
-  ItineraryApiService({required PocketBase pb}) : _pb = pb;
-
   /// Fetch itinerary for a specific date
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<List<ItineraryItem>> fetchItinerary(DateTime date) async {
     try {
       final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-      debugPrint('ItineraryApiService: Fetching itinerary for $dateStr');
-
-      final result = await _pb.collection('itinerary').getList(
-        page: 1,
-        perPage: 100,
-        filter: 'scheduled_date >= "$dateStr 00:00:00" && scheduled_date <= "$dateStr 23:59:59"',
-        sort: 'scheduled_time',
-        expand: 'client',
-      );
-
-      debugPrint('ItineraryApiService: Fetched ${result.items.length} items');
-
-      return result.items.map((item) => ItineraryItem.fromJson({
-        ...item.data,
-        'id': item.id,
-        'created': item.created,
-        'updated': item.updated,
-      })).toList();
-    } on ClientException catch (e) {
-      debugPrint('ItineraryApiService: Error fetching itinerary - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ItineraryApiService: fetchItinerary for $dateStr (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return [];
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -120,31 +98,12 @@ class ItineraryApiService {
   }
 
   /// Create itinerary item
-  Future<ItineraryItem> createItineraryItem(ItineraryItem item) async {
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<ItineraryItem?> createItineraryItem(ItineraryItem item) async {
     try {
-      debugPrint('ItineraryApiService: Creating itinerary item');
-
-      final result = await _pb.collection('itinerary').create(body: {
-        'client': item.clientId,
-        'scheduled_date': item.scheduledDate.toIso8601String(),
-        'scheduled_time': item.scheduledTime,
-        'status': item.status,
-        'touchpoint_number': item.touchpointNumber,
-        'touchpoint_type': item.touchpointType,
-        'notes': item.notes,
-      });
-
-      debugPrint('ItineraryApiService: Created itinerary item ${result.id}');
-
-      return ItineraryItem.fromJson({
-        ...result.data,
-        'id': result.id,
-        'created': result.created,
-        'updated': result.updated,
-      });
-    } on ClientException catch (e) {
-      debugPrint('ItineraryApiService: Error creating itinerary item - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ItineraryApiService: createItineraryItem (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase create
+      return null;
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -155,23 +114,12 @@ class ItineraryApiService {
   }
 
   /// Update itinerary item status
-  Future<ItineraryItem> updateItineraryStatus(String id, String status) async {
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<ItineraryItem?> updateItineraryStatus(String id, String status) async {
     try {
-      debugPrint('ItineraryApiService: Updating itinerary item $id status to $status');
-
-      final result = await _pb.collection('itinerary').update(id, body: {
-        'status': status,
-      });
-
-      return ItineraryItem.fromJson({
-        ...result.data,
-        'id': result.id,
-        'created': result.created,
-        'updated': result.updated,
-      });
-    } on ClientException catch (e) {
-      debugPrint('ItineraryApiService: Error updating itinerary item - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ItineraryApiService: updateItineraryStatus $id -> $status (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase update
+      return null;
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -182,27 +130,12 @@ class ItineraryApiService {
   }
 
   /// Fetch missed visits
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<List<ItineraryItem>> fetchMissedVisits() async {
     try {
-      debugPrint('ItineraryApiService: Fetching missed visits');
-
-      final result = await _pb.collection('itinerary').getList(
-        page: 1,
-        perPage: 100,
-        filter: 'status = "missed"',
-        sort: '-scheduled_date',
-        expand: 'client',
-      );
-
-      return result.items.map((item) => ItineraryItem.fromJson({
-        ...item.data,
-        'id': item.id,
-        'created': item.created,
-        'updated': item.updated,
-      })).toList();
-    } on ClientException catch (e) {
-      debugPrint('ItineraryApiService: Error fetching missed visits - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('ItineraryApiService: fetchMissedVisits (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return [];
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -215,8 +148,7 @@ class ItineraryApiService {
 
 /// Provider for ItineraryApiService
 final itineraryApiServiceProvider = Provider<ItineraryApiService>((ref) {
-  final pb = ref.watch(pocketBaseProvider);
-  return ItineraryApiService(pb: pb);
+  return ItineraryApiService();
 });
 
 /// Provider for today's itinerary

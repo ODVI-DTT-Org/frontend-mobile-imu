@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 
 /// Attendance record model
@@ -51,89 +49,62 @@ class AttendanceRecord {
 }
 
 /// Attendance API service
+/// TODO: Phase 1 - Will be updated to work with PowerSync/Supabase backend
 class AttendanceApiService {
-  final PocketBase _pb;
-
-  AttendanceApiService({required PocketBase pb}) : _pb = pb;
-
-  Future<AttendanceRecord> checkIn(String agentId, double latitude, double longitude) async {
+  /// Check in an agent
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<AttendanceRecord?> checkIn(String agentId, double latitude, double longitude) async {
     try {
-      debugPrint('AttendanceApiService: Checking in agent $agentId');
-
-      final now = DateTime.now();
-      final result = await _pb.collection('attendance').create(body: {
-        'agent_id': agentId,
-        'date': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
-        'status': 'present',
-        'check_in_time': now.toIso8601String(),
-        'check_in_latitude': latitude,
-        'check_in_longitude': longitude,
-      });
-
-      debugPrint('AttendanceApiService: Checked in agent ${result.id}');
-      return AttendanceRecord.fromJson(result.data);
-    } on ClientException catch (e) {
-      debugPrint('AttendanceApiService: Error checking in - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('AttendanceApiService: checkIn called for agent $agentId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase check-in
+      return null;
+    } catch (e) {
+      debugPrint('AttendanceApiService: Error checking in - $e');
+      throw ApiException.fromError(e);
     }
   }
 
-  Future<AttendanceRecord> checkOut(String attendanceId, double latitude, double longitude) async {
+  /// Check out
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<AttendanceRecord?> checkOut(String attendanceId, double latitude, double longitude) async {
     try {
-      debugPrint('AttendanceApiService: Checking out attendance $attendanceId');
-      final result = await _pb.collection('attendance').update(attendanceId, body: {
-        'check_out_time': DateTime.now().toIso8601String(),
-        'check_out_latitude': latitude,
-        'check_out_longitude': longitude,
-        'status': 'completed',
-      });
-
-      debugPrint('AttendanceApiService: Checked out attendance ${result.id}');
-      return AttendanceRecord.fromJson(result.data);
-    } on ClientException catch (e) {
-      debugPrint('AttendanceApiService: Error checking out - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('AttendanceApiService: checkOut called for attendance $attendanceId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase check-out
+      return null;
+    } catch (e) {
+      debugPrint('AttendanceApiService: Error checking out - $e');
+      throw ApiException.fromError(e);
     }
   }
 
+  /// Get today's attendance for an agent
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<AttendanceRecord?> getTodayAttendance(String agentId) async {
     try {
-      final now = DateTime.now();
-      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-
-      final result = await _pb.collection('attendance').getList(
-        page: 1,
-        perPage: 1,
-        filter: 'agent_id = "$agentId" && date = "$dateStr"',
-      );
-
-      if (result.items.isEmpty) return null;
-      return AttendanceRecord.fromJson(result.items.first.data);
-    } on ClientException catch (e) {
-      debugPrint('AttendanceApiService: Error getting today attendance - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('AttendanceApiService: getTodayAttendance called for agent $agentId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return null;
+    } catch (e) {
+      debugPrint('AttendanceApiService: Error getting today attendance - $e');
+      throw ApiException.fromError(e);
     }
   }
 
+  /// Get attendance history for an agent
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<List<AttendanceRecord>> getAttendanceHistory(String agentId, {int days = 30}) async {
     try {
-      final startDate = DateTime.now().subtract(Duration(days: days));
-      final result = await _pb.collection('attendance').getList(
-        page: 1,
-        perPage: days,
-        filter: 'agent_id = "$agentId" && date >= "${startDate.toIso8601String().split('T')[0]}"',
-        sort: '-date',
-      );
-
-      return result.items.map((item) => AttendanceRecord.fromJson(item.data)).toList();
-    } on ClientException catch (e) {
-      debugPrint('AttendanceApiService: Error getting attendance history - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('AttendanceApiService: getAttendanceHistory called for agent $agentId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return [];
+    } catch (e) {
+      debugPrint('AttendanceApiService: Error getting attendance history - $e');
+      throw ApiException.fromError(e);
     }
   }
 }
 
+/// Provider for AttendanceApiService
 final attendanceApiServiceProvider = Provider<AttendanceApiService>((ref) {
-  final pb = ref.watch(pocketBaseProvider);
-  return AttendanceApiService(pb: pb);
+  return AttendanceApiService();
 });

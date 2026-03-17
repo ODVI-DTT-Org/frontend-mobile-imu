@@ -14,7 +14,7 @@ enum ConnectivityStatus {
 class ConnectivityService {
   final Connectivity _connectivity = Connectivity();
   final _statusController = StreamController<ConnectivityStatus>.broadcast();
-  StreamSubscription<ConnectivityResult>? _subscription;
+  StreamSubscription<List<ConnectivityResult>>? _subscription;
   ConnectivityStatus _currentStatus = ConnectivityStatus.unknown;
 
   /// Stream of connectivity status changes
@@ -54,8 +54,8 @@ class ConnectivityService {
     return _currentStatus;
   }
 
-  void _updateStatusFromResult(ConnectivityResult result) {
-    _updateStatus([result]);
+  void _updateStatusFromResult(List<ConnectivityResult> results) {
+    _updateStatus(results);
   }
 
   void _updateStatus(List<ConnectivityResult> results) {

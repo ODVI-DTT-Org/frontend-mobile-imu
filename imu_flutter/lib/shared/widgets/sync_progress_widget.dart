@@ -254,7 +254,7 @@ class SyncProgressWidget extends ConsumerWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -381,7 +381,7 @@ class SyncProgressWidget extends ConsumerWidget {
       case SyncStage.preparing:
         return Colors.blue;
       case SyncStage.uploading:
-        return AppColors.primaryBlue;
+        return AppColors.primary;
       case SyncStage.downloading:
         return Colors.green;
       case SyncStage.complete:
@@ -490,7 +490,7 @@ class SyncStatusIndicator extends ConsumerWidget {
       case SyncStage.complete:
         return Colors.green;
       default:
-        return AppColors.primaryBlue;
+        return AppColors.primary;
     }
   }
 

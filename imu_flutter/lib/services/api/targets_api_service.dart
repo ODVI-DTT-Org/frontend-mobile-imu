@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 import 'package:imu_flutter/features/targets/data/models/target_model.dart';
 
@@ -56,74 +54,39 @@ class AgentTarget {
 }
 
 /// Targets API service
+/// TODO: Phase 1 - Will be updated to work with PowerSync/Supabase backend
 class TargetsApiService {
-  final PocketBase _pb;
-
-  TargetsApiService({required PocketBase pb}) : _pb = pb;
-
   Future<AgentTarget?> getCurrentMonthTarget(String agentId) async {
     try {
-      final now = DateTime.now();
-      final result = await _pb.collection('targets').getList(
-        page: 1,
-        perPage: 1,
-        filter: 'agent_id = "$agentId" && month = ${now.month} && year = ${now.year}',
-      );
-
-      if (result.items.isEmpty) return null;
-      return AgentTarget.fromJson(result.items.first.data);
-    } on ClientException catch (e) {
-      debugPrint('TargetsApiService: Error fetching current target - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('TargetsApiService: getCurrentMonthTarget for agent $agentId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return null;
+    } catch (e) {
+      debugPrint('TargetsApiService: Error fetching current target - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   Future<List<AgentTarget>> getTargetHistory(String agentId) async {
     try {
-      final result = await _pb.collection('targets').getList(
-        page: 1,
-        perPage: 12,
-        filter: 'agent_id = "$agentId"',
-        sort: '-year,-month',
-      );
-
-      return result.items.map((item) => AgentTarget.fromJson(item.data)).toList();
-    } on ClientException catch (e) {
-      debugPrint('TargetsApiService: Error fetching target history - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('TargetsApiService: getTargetHistory for agent $agentId (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return [];
+    } catch (e) {
+      debugPrint('TargetsApiService: Error fetching target history - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   /// Fetch targets - returns list of Target model for compatibility with app_providers
   Future<List<Target>> fetchTargets() async {
     try {
-      final result = await _pb.collection('targets').getList(
-        page: 1,
-        perPage: 50,
-      );
-
-      return result.items.map((item) {
-        final data = item.data;
-        return Target(
-          id: item.id,
-          userId: data['agent_id'] ?? '',
-          periodStart: DateTime.now(),
-          periodEnd: DateTime.now().add(const Duration(days: 7)),
-          period: _parsePeriod(data['period']),
-          clientVisitsTarget: data['target_visits'] ?? 0,
-          clientVisitsCompleted: data['completed_visits'] ?? 0,
-          touchpointsTarget: data['target_calls'] ?? 0,
-          touchpointsCompleted: data['completed_calls'] ?? 0,
-          newClientsTarget: data['target_new_clients'] ?? 0,
-          newClientsAdded: data['completed_new_clients'] ?? 0,
-          createdAt: data['created'] != null
-              ? DateTime.parse(data['created'])
-              : DateTime.now(),
-        );
-      }).toList();
-    } on ClientException catch (e) {
-      debugPrint('TargetsApiService: Error fetching targets - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('TargetsApiService: fetchTargets (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return [];
+    } catch (e) {
+      debugPrint('TargetsApiService: Error fetching targets - $e');
+      throw ApiException.fromError(e);
     }
   }
 
@@ -140,7 +103,7 @@ class TargetsApiService {
   }
 }
 
+/// Provider for TargetsApiService
 final targetsApiServiceProvider = Provider<TargetsApiService>((ref) {
-  final pb = ref.watch(pocketBaseProvider);
-  return TargetsApiService(pb: pb);
+  return TargetsApiService();
 });

@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/local_storage/hive_service.dart';
@@ -57,10 +56,18 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   return authState.isAuthenticated;
 });
 
-/// Current user record from PocketBase
-final currentUserRecordProvider = Provider<RecordModel?>((ref) {
+/// Current user record
+/// TODO: Phase 1 - Update to use new user model from Supabase
+final currentUserRecordProvider = Provider<Map<String, dynamic>?>((ref) {
   final authState = ref.watch(authNotifierProvider);
-  return authState.user;
+  // Convert auth user to generic map for compatibility
+  if (authState.user == null) return null;
+  return {
+    'id': authState.user?.id,
+    'email': authState.user?.data['email'],
+    'first_name': authState.user?.data['first_name'],
+    'last_name': authState.user?.data['last_name'],
+  };
 });
 
 /// Current user ID - derived from auth state
@@ -414,7 +421,7 @@ final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
           scheduledDate = lastTouchpoint.date.add(const Duration(days: 3));
         } else {
           // If no touchpoints, check if client was created more than 3 days ago
-          scheduledDate = client.createdAt.add(const Duration(days: 3));
+          scheduledDate = (client.createdAt ?? DateTime.now()).add(const Duration(days: 3));
         }
 
         // Check if overdue
@@ -426,9 +433,10 @@ final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
               ? client.addresses.first.fullAddress
               : null;
 
+          if (client.id == null) continue; // Skip clients without ID
           missedVisits.add(MissedVisit(
             id: '${client.id}_$nextTouchpointNum',
-            clientId: client.id,
+            clientId: client.id!,
             clientName: client.fullName,
             touchpointNumber: nextTouchpointNum,
             touchpointType: nextType,
@@ -601,7 +609,7 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
     await box.put(record.id, const JsonEncoder().convert(record.toJson()));
   }
 
-  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padStart(2, '0')}-${date.day.toString().padStart(2, '0')}';
 }
 
 // ==================== Profile Providers ====================
@@ -632,8 +640,10 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
       try {
         final profileApi = _ref.read(profileApiServiceProvider);
         final profile = await profileApi.fetchProfile(userId);
-        state = _convertToUserProfile(profile);
-        return;
+        if (profile != null) {
+          state = _convertToUserProfile(profile);
+          return;
+        }
       } catch (e) {
         debugPrint('Failed to fetch profile from API: $e');
       }

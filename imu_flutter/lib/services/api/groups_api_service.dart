@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:imu_flutter/services/api/pocketbase_client.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 
 /// Group model for client groups
@@ -41,108 +39,79 @@ class ClientGroup {
 }
 
 /// Groups API service
+/// TODO: Phase 1 - Will be updated to work with PowerSync/Supabase backend
 class GroupsApiService {
-  final PocketBase _pb;
-
-  GroupsApiService({required PocketBase pb}) : _pb = pb;
-
   /// Fetch all groups
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<List<ClientGroup>> fetchGroups() async {
     try {
-      debugPrint('GroupsApiService: Fetching groups');
-
-      final result = await _pb.collection('groups').getList(
-        page: 1,
-        perPage: 50,
-        expand: 'team_leader',
-      );
-
-      debugPrint('GroupsApiService: Fetched ${result.items.length} groups');
-
-      return result.items.map((item) => ClientGroup.fromJson(
-        item.data,
-        id: item.id,
-      )).toList();
-    } on ClientException catch (e) {
-      debugPrint('GroupsApiService: Error fetching groups - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('GroupsApiService: fetchGroups called (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return [];
+    } catch (e) {
+      debugPrint('GroupsApiService: Error fetching groups - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   /// Fetch single group
-  Future<ClientGroup> fetchGroup(String id) async {
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<ClientGroup?> fetchGroup(String id) async {
     try {
-      debugPrint('GroupsApiService: Fetching group $id');
-      final result = await _pb.collection('groups').getOne(
-        id,
-        expand: 'team_leader',
-      );
-
-      debugPrint('GroupsApiService: Fetched group ${result.id}');
-      return ClientGroup.fromJson(result.data, id: result.id);
-    } on ClientException catch (e) {
-      debugPrint('GroupsApiService: Error fetching group - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('GroupsApiService: fetchGroup called for $id (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      return null;
+    } catch (e) {
+      debugPrint('GroupsApiService: Error fetching group - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   /// Create group
-  Future<ClientGroup> createGroup(ClientGroup group) async {
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<ClientGroup?> createGroup(ClientGroup group) async {
     try {
-      debugPrint('GroupsApiService: Creating group ${group.name}');
-
-      final result = await _pb.collection('groups').create(body: {
-        'name': group.name,
-        'description': group.description,
-        'team_leader': group.teamLeaderId,
-      });
-
-      debugPrint('GroupsApiService: Created group ${result.id}');
-      return ClientGroup.fromJson(result.data, id: result.id);
-    } on ClientException catch (e) {
-      debugPrint('GroupsApiService: Error creating group - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('GroupsApiService: createGroup called for ${group.name} (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase create
+      return null;
+    } catch (e) {
+      debugPrint('GroupsApiService: Error creating group - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   /// Update group
-  Future<ClientGroup> updateGroup(ClientGroup group) async {
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
+  Future<ClientGroup?> updateGroup(ClientGroup group) async {
     try {
-      debugPrint('GroupsApiService: Updating group ${group.id}');
-
-      final result = await _pb.collection('groups').update(group.id, body: {
-        'name': group.name,
-        'description': group.description,
-        'team_leader': group.teamLeaderId,
-      });
-
-      debugPrint('GroupsApiService: Updated group ${result.id}');
-      return ClientGroup.fromJson(result.data, id: result.id);
-    } on ClientException catch (e) {
-      debugPrint('GroupsApiService: Error updating group - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('GroupsApiService: updateGroup called for ${group.id} (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase update
+      return null;
+    } catch (e) {
+      debugPrint('GroupsApiService: Error updating group - $e');
+      throw ApiException.fromError(e);
     }
   }
 
   /// Delete group
+  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<void> deleteGroup(String id) async {
     try {
-      debugPrint('GroupsApiService: Deleting group $id');
-      await _pb.collection('groups').delete(id);
-      debugPrint('GroupsApiService: Deleted group $id');
-    } on ClientException catch (e) {
-      debugPrint('GroupsApiService: Error deleting group - ${e.toString()}');
-      throw ApiException.fromPocketBase(e);
+      debugPrint('GroupsApiService: deleteGroup called for $id (PowerSync integration pending)');
+      // TODO: Phase 1 - Implement PowerSync/Supabase delete
+    } catch (e) {
+      debugPrint('GroupsApiService: Error deleting group - $e');
+      throw ApiException.fromError(e);
     }
   }
 }
 
-/// Provider
+/// Provider for GroupsApiService
 final groupsApiServiceProvider = Provider<GroupsApiService>((ref) {
-  final pb = ref.watch(pocketBaseProvider);
-  return GroupsApiService(pb: pb);
+  return GroupsApiService();
 });
 
+/// Provider for groups list
 final groupsProvider = FutureProvider<List<ClientGroup>>((ref) async {
   final groupsApi = ref.watch(groupsApiServiceProvider);
   return await groupsApi.fetchGroups();
