@@ -27,14 +27,12 @@ class BottomNavBar extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
     if (location == '/home') {
       return 0;
-    } else if (location == '/agencies') {
-      return 1;
     } else if (location == '/my-day') {
-      return 2;
+      return 1;
     } else if (location == '/itinerary') {
+      return 2;
+    } else if (location == '/clients') {
       return 3;
-    } else if (location == '/call-log') {
-      return 4;
     }
     return 0;
   }
@@ -46,16 +44,13 @@ class BottomNavBar extends StatelessWidget {
         context.go('/home');
         break;
       case 1:
-        context.go('/agencies');
-        break;
-      case 2:
         context.go('/my-day');
         break;
-      case 3:
+      case 2:
         context.go('/itinerary');
         break;
-      case 4:
-        context.go('/call-log');
+      case 3:
+        context.go('/clients');
         break;
     }
   }
@@ -88,28 +83,22 @@ class BottomNavBar extends StatelessWidget {
                 onTap: () => _onItemTapped(context, 0),
               ),
               _NavItem(
-                icon: LucideIcons.building2,
-                label: 'Agencies',
+                icon: LucideIcons.calendarDays,
+                label: 'My Day',
                 isSelected: currentIndex == 1,
                 onTap: () => _onItemTapped(context, 1),
               ),
               _NavItem(
-                icon: LucideIcons.calendarDays,
-                label: 'My Day',
+                icon: LucideIcons.mapPin,
+                label: 'Itinerary',
                 isSelected: currentIndex == 2,
                 onTap: () => _onItemTapped(context, 2),
               ),
               _NavItem(
-                icon: LucideIcons.mapPin,
-                label: 'Itinerary',
+                icon: LucideIcons.users,
+                label: 'Clients',
                 isSelected: currentIndex == 3,
                 onTap: () => _onItemTapped(context, 3),
-              ),
-              _NavItem(
-                icon: LucideIcons.phone,
-                label: 'Call',
-                isSelected: currentIndex == 4,
-                onTap: () => _onItemTapped(context, 4),
               ),
             ],
           ),

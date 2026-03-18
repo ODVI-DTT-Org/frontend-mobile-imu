@@ -22,7 +22,6 @@ import '../../features/calculator/presentation/pages/loan_calculator_page.dart';
 import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/agencies/presentation/pages/agencies_page.dart';
-import '../../features/call_log/presentation/pages/call_log_page.dart';
 import '../../shared/widgets/main_shell.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/auth/secure_storage_service.dart';
@@ -156,17 +155,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PermissionRequestPage(),
       ),
 
-      // Main app shell with bottom navigation (5 tabs: Home, Agencies, My Day, Itinerary, Call)
+      // Main app shell with bottom navigation (4 tabs: Home, My Day, Itinerary, Clients)
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
           GoRoute(
             path: '/home',
             builder: (context, state) => const HomePage(),
-          ),
-          GoRoute(
-            path: '/agencies',
-            builder: (context, state) => const AgenciesPage(),
           ),
           GoRoute(
             path: '/my-day',
@@ -177,16 +172,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ItineraryPage(),
           ),
           GoRoute(
-            path: '/call-log',
-            builder: (context, state) => const CallLogPage(),
+            path: '/clients',
+            builder: (context, state) => const ClientsPage(),
           ),
         ],
-      ),
-
-      // Client routes (no bottom nav)
-      GoRoute(
-        path: '/clients',
-        builder: (context, state) => const ClientsPage(),
       ),
       GoRoute(
         path: '/clients/:id',
