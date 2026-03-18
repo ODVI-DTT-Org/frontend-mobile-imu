@@ -7,6 +7,7 @@ import 'app.dart';
 import 'core/config/app_config.dart';
 import 'services/location/geolocation_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/dev_data_seeder.dart';
 import 'core/utils/notification_utils.dart';
 
 void main() async {
@@ -25,6 +26,9 @@ void main() async {
 
   // Initialize services
   await _initializeServices();
+
+  // Seed development data if needed
+  await DevDataSeeder.seedIfNeeded();
 
   // Run app
   runApp(const ProviderScope(child: IMUApp()));
