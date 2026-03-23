@@ -395,6 +395,17 @@ class Touchpoint {
   final String? photoPath;
   final double? latitude;
   final double? longitude;
+
+  // === Time In/Out fields (new) ===
+  final DateTime? timeIn;
+  final double? timeInGpsLat;
+  final double? timeInGpsLng;
+  final String? timeInGpsAddress;
+  final DateTime? timeOut;
+  final double? timeOutGpsLat;
+  final double? timeOutGpsLng;
+  final String? timeOutGpsAddress;
+
   final DateTime createdAt;
 
   Touchpoint({
@@ -415,12 +426,78 @@ class Touchpoint {
     this.photoPath,
     this.latitude,
     this.longitude,
+    this.timeIn,
+    this.timeInGpsLat,
+    this.timeInGpsLng,
+    this.timeInGpsAddress,
+    this.timeOut,
+    this.timeOutGpsLat,
+    this.timeOutGpsLng,
+    this.timeOutGpsAddress,
     required this.createdAt,
   });
 
   String get ordinal {
     const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
     return ordinals[touchpointNumber - 1];
+  }
+
+  Touchpoint copyWith({
+    String? id,
+    String? clientId,
+    String? agentId,
+    int? touchpointNumber,
+    TouchpointType? type,
+    DateTime? date,
+    String? address,
+    TimeOfDay? timeArrival,
+    TimeOfDay? timeDeparture,
+    String? odometerArrival,
+    String? odometerDeparture,
+    TouchpointReason? reason,
+    DateTime? nextVisitDate,
+    String? remarks,
+    String? photoPath,
+    double? latitude,
+    double? longitude,
+    DateTime? timeIn,
+    double? timeInGpsLat,
+    double? timeInGpsLng,
+    String? timeInGpsAddress,
+    DateTime? timeOut,
+    double? timeOutGpsLat,
+    double? timeOutGpsLng,
+    String? timeOutGpsAddress,
+    DateTime? createdAt,
+  }) {
+    return Touchpoint(
+      id: id ?? this.id,
+      clientId: clientId ?? this.clientId,
+      agentId: agentId ?? this.agentId,
+      touchpointNumber: touchpointNumber ?? this.touchpointNumber,
+      type: type ?? this.type,
+      date: date ?? this.date,
+      address: address ?? this.address,
+      timeArrival: timeArrival ?? this.timeArrival,
+      timeDeparture: timeDeparture ?? this.timeDeparture,
+      odometerArrival: odometerArrival ?? this.odometerArrival,
+      odometerDeparture: odometerDeparture ?? this.odometerDeparture,
+      reason: reason ?? this.reason,
+      nextVisitDate: nextVisitDate ?? this.nextVisitDate,
+      remarks: remarks ?? this.remarks,
+      photoPath: photoPath ?? this.photoPath,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      timeIn: timeIn ?? this.timeIn,
+      timeInGpsLat: timeInGpsLat ?? this.timeInGpsLat,
+      timeInGpsLng: timeInGpsLng ?? this.timeInGpsLng,
+      timeInGpsAddress: timeInGpsAddress ?? this.timeInGpsAddress,
+      timeOut: timeOut ?? this.timeOut,
+      timeOutGpsLat: timeOutGpsLat ?? this.timeOutGpsLat,
+      timeOutGpsLng: timeOutGpsLng ?? this.timeOutGpsLng,
+      timeOutGpsAddress: timeOutGpsAddress ?? this.timeOutGpsAddress,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 
   /// Convert to API format (snake_case for PostgreSQL/PowerSync)
@@ -446,6 +523,14 @@ class Touchpoint {
     'photo_path': photoPath,
     'latitude': latitude,
     'longitude': longitude,
+    'time_in': timeIn?.toIso8601String(),
+    'time_in_gps_lat': timeInGpsLat,
+    'time_in_gps_lng': timeInGpsLng,
+    'time_in_gps_address': timeInGpsAddress,
+    'time_out': timeOut?.toIso8601String(),
+    'time_out_gps_lat': timeOutGpsLat,
+    'time_out_gps_lng': timeOutGpsLng,
+    'time_out_gps_address': timeOutGpsAddress,
     'created': createdAt.toIso8601String(),
   };
 
@@ -482,6 +567,18 @@ class Touchpoint {
       photoPath: getValue<String>('photo_path', 'photoPath'),
       latitude: getValue<double>('latitude', 'latitude'),
       longitude: getValue<double>('longitude', 'longitude'),
+      timeIn: getValue<String>('time_in', 'timeIn') != null
+          ? DateTime.parse(getValue<String>('time_in', 'timeIn')!)
+          : null,
+      timeInGpsLat: getValue<double>('time_in_gps_lat', 'timeInGpsLat'),
+      timeInGpsLng: getValue<double>('time_in_gps_lng', 'timeInGpsLng'),
+      timeInGpsAddress: getValue<String>('time_in_gps_address', 'timeInGpsAddress'),
+      timeOut: getValue<String>('time_out', 'timeOut') != null
+          ? DateTime.parse(getValue<String>('time_out', 'timeOut')!)
+          : null,
+      timeOutGpsLat: getValue<double>('time_out_gps_lat', 'timeOutGpsLat'),
+      timeOutGpsLng: getValue<double>('time_out_gps_lng', 'timeOutGpsLng'),
+      timeOutGpsAddress: getValue<String>('time_out_gps_address', 'timeOutGpsAddress'),
       createdAt: getValue<String>('created', 'createdAt') != null
           ? DateTime.parse(getValue<String>('created', 'createdAt')!)
           : DateTime.now(),
