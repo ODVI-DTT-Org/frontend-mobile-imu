@@ -9,9 +9,9 @@ import '../../../../services/api/my_day_api_service.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';
 import '../widgets/client_card.dart';
-import '../widgets/time_in_bottom_sheet.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
+import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
 class MyDayPage extends ConsumerStatefulWidget {
   const MyDayPage({super.key});
@@ -67,25 +67,30 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     context.push('/clients');
   }
 
-  void _onClientTap(MyDayClient client) {
-    TimeInBottomSheet.show(
+  void _onClientTap(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    // Determine touchpoint type (normalize to 'Visit' or 'Call')
+    final touchpointType = client.touchpointType.toLowerCase() == 'call' ? 'Call' : 'Visit';
+
+    // Open the TouchpointForm which handles Time In/Out internally
+    final result = await showTouchpointForm(
       context: context,
-      client: client,
-      onTimeInToggle: (isTimeIn) async {
-        await ref.read(myDayStateProvider.notifier).setTimeIn(client.id, isTimeIn);
-      },
-      onSelfieCapture: (path) async {
-        if (path != null) {
-          await ref.read(myDayApiServiceProvider).uploadSelfie(client.id, path);
-        }
-      },
-      onTouchpointSelected: (number) {
-        // Touchpoint selected - update state if needed
-      },
-      onFormSubmit: (formData) async {
-        await ref.read(myDayStateProvider.notifier).submitVisitForm(client.id, formData);
-      },
+      touchpointNumber: client.touchpointNumber > 0 ? client.touchpointNumber : 1,
+      touchpointType: touchpointType,
+      clientName: client.fullName,
+      address: client.location,
     );
+
+    // Handle form submission result
+    if (result != null && mounted) {
+      await ref.read(myDayStateProvider.notifier).submitVisitForm(client.id, result);
+
+      // Upload selfie if photo was captured
+      if (result['photoPath'] != null) {
+        await ref.read(myDayApiServiceProvider).uploadSelfie(client.id, result['photoPath']);
+      }
+    }
   }
 
   @override
