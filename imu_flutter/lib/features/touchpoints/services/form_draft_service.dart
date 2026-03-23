@@ -32,10 +32,10 @@ class FormDraftService {
     });
   }
 
-  static Map<String, dynamic>? getDraft({
+  static Future<Map<String, dynamic>?> getDraft({
     required String clientId,
     required int touchpointNumber,
-  }) {
+  }) async {
     final box = _box!;
     final draft = box.get(_key(clientId, touchpointNumber));
 
@@ -44,7 +44,7 @@ class FormDraftService {
     // Check version compatibility
     final version = draft['version'] as int? ?? 0;
     if (version < kFormDraftVersion) {
-      deleteDraft(clientId: clientId, touchpointNumber: touchpointNumber);
+      await deleteDraft(clientId: clientId, touchpointNumber: touchpointNumber);
       return null;
     }
 
