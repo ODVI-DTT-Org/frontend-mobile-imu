@@ -53,11 +53,21 @@ class TouchpointFormState {
   final TimeCaptureState timeOut;
   final bool isSubmitting;
 
+  // Form field values
+  final String? reason;
+  final String? remarks;
+  final String? photoPath;
+  final String? audioPath;
+
   const TouchpointFormState({
     this.touchpointType = 'Visit',
     this.timeIn = const TimeCaptureState(),
     this.timeOut = const TimeCaptureState(),
     this.isSubmitting = false,
+    this.reason,
+    this.remarks,
+    this.photoPath,
+    this.audioPath,
   });
 
   /// Form fields are enabled after Time In is captured (for Visit type)
@@ -131,12 +141,24 @@ class TouchpointFormState {
     TimeCaptureState? timeIn,
     TimeCaptureState? timeOut,
     bool? isSubmitting,
+    String? reason,
+    String? remarks,
+    String? photoPath,
+    String? audioPath,
+    bool clearReason = false,
+    bool clearRemarks = false,
+    bool clearPhotoPath = false,
+    bool clearAudioPath = false,
   }) {
     return TouchpointFormState(
       touchpointType: touchpointType ?? this.touchpointType,
       timeIn: timeIn ?? this.timeIn,
       timeOut: timeOut ?? this.timeOut,
       isSubmitting: isSubmitting ?? this.isSubmitting,
+      reason: clearReason ? null : (reason ?? this.reason),
+      remarks: clearRemarks ? null : (remarks ?? this.remarks),
+      photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
+      audioPath: clearAudioPath ? null : (audioPath ?? this.audioPath),
     );
   }
 }
@@ -211,6 +233,22 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
     state = state.copyWith(
       timeOut: state.timeOut.copyWith(clearError: true),
     );
+  }
+
+  void setReason(String? reason) {
+    state = state.copyWith(reason: reason);
+  }
+
+  void setRemarks(String? remarks) {
+    state = state.copyWith(remarks: remarks);
+  }
+
+  void setPhotoPath(String? photoPath) {
+    state = state.copyWith(photoPath: photoPath);
+  }
+
+  void setAudioPath(String? audioPath) {
+    state = state.copyWith(audioPath: audioPath);
   }
 
   void reset() {
