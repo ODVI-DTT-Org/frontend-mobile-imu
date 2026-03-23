@@ -1,12 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/media/camera_service.dart';
-import '../../../../services/location/geolocation_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../providers/touchpoint_form_provider.dart';
+import './time_capture_section.dart';
 
-class TouchpointFormModal extends StatefulWidget {
+class TouchpointFormModal extends ConsumerStatefulWidget {
   final int touchpointNumber;
   final String touchpointType; // 'Visit' or 'Call'
   final String clientName;
@@ -21,17 +23,14 @@ class TouchpointFormModal extends StatefulWidget {
   });
 
   @override
-  State<TouchpointFormModal> createState() => _TouchpointFormModalState();
+  ConsumerState<TouchpointFormModal> createState() => _TouchpointFormModalState();
 }
 
-class _TouchpointFormModalState extends State<TouchpointFormModal> {
+class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   final _formKey = GlobalKey<FormState>();
   final _remarksController = TextEditingController();
   final _cameraService = CameraService();
-  final _geoService = GeolocationService();
 
-  TimeOfDay? _timeArrival;
-  TimeOfDay? _timeDeparture;
   final _odometerArrivalController = TextEditingController();
   final _odometerDepartureController = TextEditingController();
   DateTime? _nextVisitDate;
@@ -40,15 +39,6 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
   // Photo capture
   File? _capturedPhoto;
   bool _isCapturingPhoto = false;
-
-  // GPS capture
-  LocationData? _capturedLocation;
-  bool _isCapturingLocation = false;
-
-  // Touchpoint pattern: Visit-Call-Call-Visit-Call-Call-Visit
-  static const List<String> _touchpointPattern = [
-    'Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'
-  ];
 
   // Reason types from the design
   static const List<Map<String, dynamic>> _reasons = [
@@ -88,12 +78,10 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
   @override
   void initState() {
     super.initState();
-    // Auto-capture GPS for Visit type
-    if (widget.touchpointType == 'Visit') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _captureGps();
-      });
-    }
+    // Initialize the provider with the touchpoint type
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(touchpointFormProvider.notifier).setTouchpointType(widget.touchpointType);
+    });
   }
 
   @override
@@ -193,144 +181,183 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
                           style: TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ],
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
-                      // Reason dropdown
-                      const Text(
-                        'Reason *',
-                        style: TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _selectedReason,
-                        decoration: const InputDecoration(
-                          hintText: 'Select reason',
-                        ),
-                        items: _reasons
-                            .map((reason) => DropdownMenuItem<String>(
-                                  value: reason['value'] as String,
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: reason['color'],
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(reason['label']),
-                                    ],
-                                  ),
-                                ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() => _selectedReason = value);
-                        },
-                        validator: (value) {
-                          if (value == null) return 'Required';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Visit-specific fields
+                      // Time In section for Visit type
                       if (widget.touchpointType == 'Visit') ...[
-                        // Photo Capture Section
-                        const Text(
-                          'Photo Evidence',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildPhotoCapture(),
-                        const SizedBox(height: 16),
-
-                        // GPS Location Section
-                        const Text(
-                          'GPS Location',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildGpsCapture(),
-                        const SizedBox(height: 16),
-
-                        // Time of Arrival
-                        _buildTimeField(
-                          label: 'Time of Arrival',
-                          value: _timeArrival,
-                          onTap: () => _selectTime(true),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Time of Departure
-                        _buildTimeField(
-                          label: 'Time of Departure',
-                          value: _timeDeparture,
-                          onTap: () => _selectTime(false),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Odometer Arrival
-                        const Text(
-                          'Odometer Arrival',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _odometerArrivalController,
-                          decoration: const InputDecoration(
-                            hintText: 'e.g., 12,345',
-                            suffixText: 'km',
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Odometer Departure
-                        const Text(
-                          'Odometer Departure',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _odometerDepartureController,
-                          decoration: const InputDecoration(
-                            hintText: 'e.g., 12,350',
-                            suffixText: 'km',
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
+                        TimeCaptureSection(
+                          label: 'TIME IN',
+                          buttonLabel: 'CAPTURE TIME IN',
+                          status: ref.watch(touchpointFormProvider).timeIn.isCapturing
+                              ? TimeCaptureStatus.capturing
+                              : ref.watch(touchpointFormProvider).timeIn.isCaptured
+                                  ? TimeCaptureStatus.captured
+                                  : TimeCaptureStatus.notCaptured,
+                          capturedTime: ref.watch(touchpointFormProvider).timeIn.time,
+                          gpsLat: ref.watch(touchpointFormProvider).timeIn.gpsLat,
+                          gpsLng: ref.watch(touchpointFormProvider).timeIn.gpsLng,
+                          gpsAddress: ref.watch(touchpointFormProvider).timeIn.gpsAddress,
+                          isEnabled: true,
+                          showGps: true,
+                          onCapture: (time, lat, lng, address) {
+                            ref.read(touchpointFormProvider.notifier).setTimeIn(time, lat, lng, address);
+                          },
                         ),
                         const SizedBox(height: 16),
                       ],
 
-                      // Next Visit Date
-                      _buildDateField(
-                        label: 'Next Visit Date',
-                        value: _nextVisitDate,
-                        onTap: _selectNextVisitDate,
-                      ),
-                      const SizedBox(height: 16),
+                      // Form fields wrapped in IgnorePointer for Visit type
+                      IgnorePointer(
+                        ignoring: !ref.watch(touchpointFormProvider).canFillForm,
+                        child: Opacity(
+                          opacity: ref.watch(touchpointFormProvider).canFillForm ? 1.0 : 0.5,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Reason dropdown
+                              const Text(
+                                'Reason *',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _selectedReason,
+                                decoration: const InputDecoration(
+                                  hintText: 'Select reason',
+                                ),
+                                items: _reasons
+                                    .map((reason) => DropdownMenuItem<String>(
+                                          value: reason['value'] as String,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: reason['color'],
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(reason['label']),
+                                            ],
+                                          ),
+                                        ),)
+                                    .toList(),
+                                onChanged: (value) {
+                                  setState(() => _selectedReason = value);
+                                },
+                                validator: (value) {
+                                  if (value == null) return 'Required';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 20),
 
-                      // Remarks
-                      const Text(
-                        'Remarks',
-                        style: TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _remarksController,
-                        decoration: const InputDecoration(
-                          hintText: 'Enter remarks...',
+                              // Visit-specific fields
+                              if (widget.touchpointType == 'Visit') ...[
+                                // Photo Capture Section
+                                const Text(
+                                  'Photo Evidence',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildPhotoCapture(),
+                                const SizedBox(height: 16),
+
+                                // Odometer Arrival
+                                const Text(
+                                  'Odometer Arrival',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _odometerArrivalController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'e.g., 12,345',
+                                    suffixText: 'km',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Odometer Departure
+                                const Text(
+                                  'Odometer Departure',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _odometerDepartureController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'e.g., 12,350',
+                                    suffixText: 'km',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              // Next Visit Date
+                              _buildDateField(
+                                label: 'Next Visit Date',
+                                value: _nextVisitDate,
+                                onTap: _selectNextVisitDate,
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Remarks
+                              const Text(
+                                'Remarks',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _remarksController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Enter remarks...',
+                                ),
+                                maxLines: 4,
+                              ),
+                            ],
+                          ),
                         ),
-                        maxLines: 4,
                       ),
+
+                      // Time Out section for Visit type (before submit button)
+                      if (widget.touchpointType == 'Visit') ...[
+                        const SizedBox(height: 16),
+                        TimeCaptureSection(
+                          label: 'TIME OUT',
+                          buttonLabel: 'CAPTURE TIME OUT',
+                          status: ref.watch(touchpointFormProvider).timeOut.isCapturing
+                              ? TimeCaptureStatus.capturing
+                              : ref.watch(touchpointFormProvider).timeOut.isCaptured
+                                  ? TimeCaptureStatus.captured
+                                  : TimeCaptureStatus.notCaptured,
+                          capturedTime: ref.watch(touchpointFormProvider).timeOut.time,
+                          gpsLat: ref.watch(touchpointFormProvider).timeOut.gpsLat,
+                          gpsLng: ref.watch(touchpointFormProvider).timeOut.gpsLng,
+                          gpsAddress: ref.watch(touchpointFormProvider).timeOut.gpsAddress,
+                          isEnabled: ref.watch(touchpointFormProvider).timeIn.isCaptured,
+                          showGps: true,
+                          minTime: ref.watch(touchpointFormProvider).timeIn.time,
+                          onCapture: (time, lat, lng, address) {
+                            final timeIn = ref.read(touchpointFormProvider).timeIn.time;
+                            if (timeIn != null && !time.isAfter(timeIn)) {
+                              _showTimeOutValidationError(timeIn, time);
+                              return;
+                            }
+                            ref.read(touchpointFormProvider.notifier).setTimeOut(time, lat, lng, address);
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 32),
 
                       // Submit button
@@ -338,7 +365,9 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _handleSubmit,
+                          onPressed: ref.watch(touchpointFormProvider).canSubmit
+                              ? _handleSubmit
+                              : null,
                           child: const Text('SAVE TOUCHPOINT'),
                         ),
                       ),
@@ -349,28 +378,6 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeField({
-    required String label,
-    required TimeOfDay? value,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(LucideIcons.clock),
-        ),
-        child: Text(
-          value != null ? _formatTime(value) : 'Select time',
-          style: TextStyle(
-            color: value != null ? Colors.black : Colors.grey[500],
-          ),
         ),
       ),
     );
@@ -398,22 +405,6 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
     );
   }
 
-  Future<void> _selectTime(bool isArrival) async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time != null) {
-      setState(() {
-        if (isArrival) {
-          _timeArrival = time;
-        } else {
-          _timeDeparture = time;
-        }
-      });
-    }
-  }
-
   Future<void> _selectNextVisitDate() async {
     final date = await showDatePicker(
       context: context,
@@ -430,17 +421,40 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
     if (_formKey.currentState!.validate()) {
       HapticUtils.success();
 
+      // Get Time In/Out data from provider
+      final formState = ref.read(touchpointFormProvider);
+      final timeIn = formState.timeIn;
+      final timeOut = formState.timeOut;
+
       // Return the form data
       Navigator.pop(context, {
         'reason': _selectedReason,
-        'timeArrival': _timeArrival != null ? _formatTime(_timeArrival!) : null,
-        'timeDeparture': _timeDeparture != null ? _formatTime(_timeDeparture!) : null,
+        // Time In/Out from provider (for Visit type)
+        'timeIn': timeIn.time?.toIso8601String(),
+        'timeInGpsLat': timeIn.gpsLat,
+        'timeInGpsLng': timeIn.gpsLng,
+        'timeInGpsAddress': timeIn.gpsAddress,
+        'timeOut': timeOut.time?.toIso8601String(),
+        'timeOutGpsLat': timeOut.gpsLat,
+        'timeOutGpsLng': timeOut.gpsLng,
+        'timeOutGpsAddress': timeOut.gpsAddress,
+        // Legacy fields for backwards compatibility
+        'timeArrival': timeIn.time != null ? _formatDateTime(timeIn.time!) : null,
+        'timeDeparture': timeOut.time != null ? _formatDateTime(timeOut.time!) : null,
         'odometerArrival': _odometerArrivalController.text,
         'odometerDeparture': _odometerDepartureController.text,
-        'nextVisitDate': _nextVisitDate != null ? _nextVisitDate!.toIso8601String() : null,
+        'nextVisitDate': _nextVisitDate?.toIso8601String(),
         'remarks': _remarksController.text,
         'photoPath': _capturedPhoto?.path,
-        'location': _capturedLocation?.toJson(),
+        // Use Time In GPS as primary location (for backwards compatibility)
+        'location': timeIn.gpsLat != null && timeIn.gpsLng != null
+            ? {
+                'latitude': timeIn.gpsLat,
+                'longitude': timeIn.gpsLng,
+                'address': timeIn.gpsAddress,
+                'accuracy': null,
+              }
+            : null,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -450,6 +464,32 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
         ),
       );
     }
+  }
+
+  /// Shows validation error when Time Out is not after Time In
+  void _showTimeOutValidationError(DateTime timeIn, DateTime timeOut) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Invalid Time'),
+          ],
+        ),
+        content: const Text(
+          'Time Out must be after Time In.\n\n'
+          'Please select a later time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPhotoCapture() {
@@ -532,125 +572,15 @@ class _TouchpointFormModalState extends State<TouchpointFormModal> {
     }
   }
 
-  Widget _buildGpsCapture() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _capturedLocation != null ? Colors.green[50] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _capturedLocation != null ? Colors.green[200]! : Colors.grey[300]!,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _capturedLocation != null ? LucideIcons.mapPin : LucideIcons.crosshair,
-            color: _capturedLocation != null ? Colors.green : Colors.grey[500],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _isCapturingLocation
-                ? const Row(
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Text('Capturing GPS location...'),
-                    ],
-                  )
-                : _capturedLocation != null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Location Captured',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: Colors.green[800],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${_capturedLocation!.latitude.toStringAsFixed(6)}, ${_capturedLocation!.longitude.toStringAsFixed(6)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          if (_capturedLocation!.accuracy != null)
-                            Text(
-                              'Accuracy: ${_capturedLocation!.accuracy!.toStringAsFixed(0)}m',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                        ],
-                      )
-                    : Text(
-                        'GPS will be captured automatically',
-                        style: TextStyle(color: Colors.grey[500]),
-                      ),
-          ),
-          if (!_isCapturingLocation && _capturedLocation == null)
-            TextButton(
-              onPressed: _captureGps,
-              child: const Text('Capture Now'),
-            ),
-          if (_capturedLocation != null)
-            IconButton(
-              icon: const Icon(LucideIcons.refreshCw, size: 18),
-              onPressed: _captureGps,
-              tooltip: 'Recapture GPS',
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _captureGps() async {
-    HapticUtils.lightImpact();
-    setState(() => _isCapturingLocation = true);
-
-    try {
-      final position = await _geoService.getCurrentPosition();
-      if (position != null) {
-        final address = await _geoService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        setState(() {
-          _capturedLocation = LocationData.fromPosition(position, address: address);
-        });
-        HapticUtils.success();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not capture GPS location. Please check permissions.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } finally {
-      setState(() => _isCapturingLocation = false);
-    }
-  }
-
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  String _formatTime(TimeOfDay time) {
-    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+  String _formatDateTime(DateTime time) {
+    final hour = time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
     final minute = time.minute.toString().padLeft(2, '0');
-    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    final period = time.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
   }
 }
