@@ -1,3 +1,38 @@
+/// Valid roles in the new role system
+/// Note: 'staff' and 'field_agent' kept for migration compatibility
+enum UserRole {
+  admin,
+  areaManager,
+  assistantAreaManager,
+  caravan,
+  staff, // Internal use only
+  fieldAgent, // Legacy - maps to 'caravan'
+}
+
+/// Extension to convert legacy role names to new role names
+extension UserRoleExtension on UserRole {
+  String get roleName {
+    switch (this) {
+      case UserRole.admin:
+        return 'Admin';
+      case UserRole.areaManager:
+        return 'Area Manager';
+      case UserRole.assistantAreaManager:
+        return 'Assistant Area Manager';
+      case UserRole.caravan:
+      case UserRole.fieldAgent:
+        return 'Caravan';
+      case UserRole.staff:
+        return 'Staff';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  bool get isManagerRole => this == UserRole.areaManager || this == UserRole.assistantAreaManager;
+  bool get isAdmin => this == UserRole.admin;
+}
+
 /// User profile model
 class UserProfile {
   final String id;
@@ -6,8 +41,11 @@ class UserProfile {
   final String lastName;
   final String email;
   final String phone;
-  final String role;
+  final UserRole role;
   final String? profilePhotoUrl;
+  // Manager assignment fields
+  final String? areaManagerId;
+  final String? assistantAreaManagerId;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -20,6 +58,8 @@ class UserProfile {
     required this.phone,
     required this.role,
     this.profilePhotoUrl,
+    this.areaManagerId,
+    this.assistantAreaManagerId,
     required this.createdAt,
     this.updatedAt,
   });
@@ -40,8 +80,10 @@ class UserProfile {
     String? lastName,
     String? email,
     String? phone,
-    String? role,
+    UserRole? role,
     String? profilePhotoUrl,
+    String? areaManagerId,
+    String? assistantAreaManagerId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -54,6 +96,8 @@ class UserProfile {
       phone: phone ?? this.phone,
       role: role ?? this.role,
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
+      areaManagerId: areaManagerId ?? this.areaManagerId,
+      assistantAreaManagerId: assistantAreaManagerId ?? this.assistantAreaManagerId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -80,8 +124,10 @@ class UserProfile {
       lastName: json['lastName'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
-      role: json['role'] ?? 'Field Agent',
+      role: _parseUserRole(json['role']),
       profilePhotoUrl: json['profilePhotoUrl'],
+      areaManagerId: json['areaManagerId'],
+      assistantAreaManagerId: json['assistantAreaManagerId'],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
@@ -89,6 +135,33 @@ class UserProfile {
           ? DateTime.parse(json['updatedAt'])
           : null,
     );
+  }
+
+  static UserRole _parseUserRole(dynamic role) {
+    if (role == null) return UserRole.caravan;
+    if (role is UserRole) return role;
+    if (role is String) {
+      switch (role.toLowerCase()) {
+        case 'admin':
+          return UserRole.admin;
+        case 'area_manager':
+        case 'area manager':
+          return UserRole.areaManager;
+        case 'assistant_area_manager':
+        case 'assistant area manager':
+          return UserRole.assistantAreaManager;
+        case 'caravan':
+        case 'field_agent':
+        case 'field agent':
+        case 'field agent - caravan':
+          return UserRole.caravan;
+        case 'staff':
+          return UserRole.staff;
+        default:
+          return UserRole.caravan;
+      }
+    }
+    return UserRole.caravan;
   }
 
   // Mock profile for development
@@ -100,7 +173,7 @@ class UserProfile {
       lastName: 'Dela Cruz',
       email: 'juan.delacruz@company.com',
       phone: '+63 912 345 6789',
-      role: 'Field Agent - Caravan',
+      role: UserRole.caravan,
       createdAt: DateTime(2024, 1, 15),
     );
   }
