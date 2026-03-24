@@ -29,6 +29,9 @@ extension UserRoleExtension on UserRole {
     }
   }
 
+  /// Display name for UI (alias for roleName)
+  String get displayName => roleName;
+
   bool get isManagerRole => this == UserRole.areaManager || this == UserRole.assistantAreaManager;
   bool get isAdmin => this == UserRole.admin;
 }
