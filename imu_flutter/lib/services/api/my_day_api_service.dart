@@ -13,12 +13,12 @@ class MyDayTask {
   final String clientId;
   final String clientName;
   final String taskType; // visit, call, follow_up, document
-            final String status;
-            final int priority;
-            final DateTime scheduledTime;
-            final DateTime? completedTime;
-            final String? notes;
-            final DateTime createdAt;
+  final String status;
+  final int priority;
+  final DateTime scheduledTime;
+  final DateTime? completedTime;
+  final String? notes;
+  final DateTime createdAt;
 
   MyDayTask({
     required this.id,
@@ -52,6 +52,22 @@ class MyDayTask {
   }
 }
 
+/// My Day API service
+/// Uses PowerSync/Supabase backend for data
+class MyDayApiService {
+  /// Fetch today's tasks from backend
+  /// TODO: Phase 1 - Implement PowerSync/Supabase fetch
+  Future<List<MyDayTask>> fetchTodayTasks() async {
+    try {
+      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
+      debugPrint('MyDayApiService: fetchTodayTasks (PowerSync integration pending)');
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching today tasks: $e');
+      return [];
+    }
+  }
+
   /// Complete task
   /// TODO: Phase 1 - Implement PowerSync/Supabase update
   Future<MyDayTask?> completeTask(String taskId, {String? notes}) async {
@@ -75,7 +91,7 @@ class MyDayTask {
         'completed': tasks.where((t) => t.status == 'completed').length,
         'in_progress': tasks.where((t) => t.status == 'in_progress').length,
         'pending': tasks.where((t) => t.status == 'pending').length,
-      }
+      };
     } catch (e) {
       debugPrint('Error fetching my day task: $e');
       return {'total': 0, 'completed': 0, 'in_progress': 0, 'pending': 0};
@@ -95,10 +111,42 @@ class MyDayTask {
     }
   }
 
+  /// Set time in for a client
+  Future<bool> setTimeIn(String clientId, bool isTimeIn) async {
+    try {
+      debugPrint('MyDayApiService: setTimeIn(clientId, isTimeIn)');
+      return true;
+    } catch (e) {
+      debugPrint('Error setting time in: $e');
+      throw ApiException.fromError(e);
+    }
+  }
+
+  /// Set timeOut for a client
+  Future<bool> setTimeOut(String clientId, bool isTimeOut) async {
+    try {
+      debugPrint('MyDayApiService: setTimeOut(clientId, isTimeOut)');
+      return true;
+    } catch (e) {
+      debugPrint('Error setting time out: $e');
+      throw ApiException.fromError(e);
+    }
+  }
+
+  /// Upload selfie for time in
+  Future<String?> uploadSelfie(String clientId, String photoPath) async {
+    try {
+      debugPrint('MyDayApiService: uploadSelfie (PowerSync integration pending)');
+      return null;
+    } catch (e) {
+      debugPrint('Error uploading selfie: $e');
+      return null;
+    }
+  }
+
   /// Submit visit form
   Future<Map<String, dynamic>?> submitVisitForm(String clientId, Map<String, dynamic> formData) async {
     try {
-      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
       debugPrint('MyDayApiService: submitVisitForm($clientId, formData)');
       return {};
     } catch (e) {
@@ -108,5 +156,7 @@ class MyDayTask {
   }
 }
 
-}
-
+/// Provider for MyDayApiService
+final myDayApiServiceProvider = Provider<MyDayApiService>((ref) {
+  return MyDayApiService();
+});
