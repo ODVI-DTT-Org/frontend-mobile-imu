@@ -41,7 +41,7 @@ class BulkTimeInState {
     this.timeOutGpsLat,
     this.timeOutGpsLng,
     this.timeOutGpsAddress,
-    this.isCapturingGps: false,
+    this.isCapturingGps = false,
     this.errorMessage,
   });
 
@@ -59,36 +59,105 @@ class BulkTimeInState {
     Set<String>? visitedClientIds,
     DateTime? timeOut,
     double? timeOutGpsLat,
-    double? timeOutGpsLng;
+    double? timeOutGpsLng,
     String? timeOutGpsAddress,
     bool? isCapturingGps,
     String? errorMessage,
   }) {
-  return BulkTimeInState(
-    selectedClients: selectedClients ?? [],
-    timeIn: timeIn,
-    timeInGpsLat: timeInGpsLat,
-    timeInGpsAddress: timeInGpsAddress,
-    visitedClientIds: visitedClientIds ?? {},
-    timeOut: timeOut,
-    timeOutGpsLat: timeOutGpsLat,
-    timeOutGpsLng: timeOutGpsLng,
-    timeOutGpsAddress: timeOutGpsAddress,
-    isCapturingGps: capturing,
-    errorMessage: errorMessage,
-  });
+    return BulkTimeInState(
+      selectedClients: selectedClients ?? this.selectedClients,
+      timeIn: timeIn ?? this.timeIn,
+      timeInGpsLat: timeInGpsLat ?? this.timeInGpsLat,
+      timeInGpsLng: timeInGpsLng ?? this.timeInGpsLng,
+      timeInGpsAddress: timeInGpsAddress ?? this.timeInGpsAddress,
+      visitedClientIds: visitedClientIds ?? this.visitedClientIds,
+      timeOut: timeOut ?? this.timeOut,
+      timeOutGpsLat: timeOutGpsLat ?? this.timeOutGpsLat,
+      timeOutGpsLng: timeOutGpsLng ?? this.timeOutGpsLng,
+      timeOutGpsAddress: timeOutGpsAddress ?? this.timeOutGpsAddress,
+      isCapturingGps: isCapturingGps ?? this.isCapturingGps,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
+  }
 }
-```
 
-- [ ] **Step 2: Commit bulk time in provider**
+class BulkTimeInNotifier extends StateNotifier<BulkTimeInState> {
+  BulkTimeInNotifier() : super(const BulkTimeInState());
 
-```bash
-cd mobile/imu_flutter && git add lib/features/my_day/providers/bulk_time_in_provider.dart && git commit -m "feat(mobile): add BulkTimeInProvider for bulk time in/out
+  void selectClients(List<BulkClient> clients) {
+    state = state.copyWith(selectedClients: clients);
+  }
 
-- BulkClient model for selected clients
-- BulkTimeInState with time in/out, GPS, visited tracking
-- BulkTimeInNotifier with state management methods
-- Computed properties
+  void addClient(BulkClient client) {
+    if (!state.selectedClients.any((c) => c.id == client.id)) {
+      state = state.copyWith(
+        selectedClients: [...state.selectedClients, client],
+      );
+    }
+  }
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-```
+  void removeClient(String clientId) {
+    state = state.copyWith(
+      selectedClients: state.selectedClients.where((c) => c.id != clientId).toList(),
+    );
+  }
+
+  Future<void> setTimeIn({
+    required DateTime time,
+    double? lat,
+    double? lng,
+    String? address,
+  }) async {
+    state = state.copyWith(
+      timeIn: time,
+      timeInGpsLat: lat,
+      timeInGpsLng: lng,
+      timeInGpsAddress: address,
+    );
+  }
+
+  Future<void> setTimeOut({
+    required DateTime time,
+    double? lat,
+    double? lng,
+    String? address,
+  }) async {
+    state = state.copyWith(
+      timeOut: time,
+      timeOutGpsLat: lat,
+      timeOutGpsLng: lng,
+      timeOutGpsAddress: address,
+    );
+  }
+
+  void markClientVisited(String clientId) {
+    if (!state.visitedClientIds.contains(clientId)) {
+      state = state.copyWith(
+        visitedClientIds: {...state.visitedClientIds, clientId},
+      );
+    }
+  }
+
+  void unmarkClientVisited(String clientId) {
+    state = state.copyWith(
+      visitedClientIds: state.visitedClientIds.where((id) => id != clientId).toSet(),
+    );
+  }
+
+  void setCapturingGps(bool capturing) {
+    state = state.copyWith(isCapturingGps: capturing);
+  }
+
+  void setError(String? error) {
+    state = state.copyWith(errorMessage: error);
+  }
+
+  void reset() {
+    state = const BulkTimeInState();
+  }
+}
+
+/// Provider for bulk time in state
+final bulkTimeInProvider = StateNotifierProvider<BulkTimeInNotifier, BulkTimeInState>((ref) {
+  return BulkTimeInNotifier();
+});
