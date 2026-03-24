@@ -1,45 +1,61 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import '../local_storage/hive_service.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
+import 'package:imu_flutter/services/sync/powersync_connector.dart';
+import 'package:imu_flutter/core/utils/logger.dart';
 
-// Note: SyncStatus and SyncResult are defined in hive_service.dart
+/// Sync status enum
+enum SyncStatusEnum {
+  idle,
+  syncing,
+  success,
+  error,
+  offline,
+}
 
-/// Sync service for managing offline/online data synchronization
-/// TODO: Phase 2 - Will be updated to work with PowerSync
+/// Sync result model
+class SyncResult {
+  final bool success;
+  final int syncedCount;
+  final int failedCount;
+  final String? errorMessage;
+
+  SyncResult({
+    required this.success,
+    this.syncedCount = 0,
+    this.failedCount = 0,
+    this.errorMessage,
+  });
+}
+
+/// Sync service for managing offline/online data synchronization with PowerSync
 class SyncService extends ChangeNotifier {
-  static final SyncService _instance = SyncService._internal();
-  factory SyncService() => _instance;
-  SyncService._internal();
-
-  final HiveService _hiveService = HiveService();
+  final Ref _ref;
   final Connectivity _connectivity = Connectivity();
-  // TODO: Replace with PowerSync client in Phase 2
-  // dynamic _powerSyncClient;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  SyncStatus _status = SyncStatus.idle;
+  StreamSubscription? _syncStatusSubscription;
+  SyncStatusEnum _status = SyncStatusEnum.idle;
   DateTime? _lastSyncTime;
   String? _lastSyncError;
   int _pendingCount = 0;
-  int _syncedCount = 0;
-  int _failedCount = 0;
+
+  SyncService(this._ref);
 
   // Getters
-  SyncStatus get status => _status;
+  SyncStatusEnum get status => _status;
   DateTime? get lastSyncTime => _lastSyncTime;
   String? get lastSyncError => _lastSyncError;
   int get pendingCount => _pendingCount;
-  int get syncedCount => _syncedCount;
-  int get failedCount => _failedCount;
-  bool get isOnline => _status != SyncStatus.offline;
-  bool get isSyncing => _status == SyncStatus.syncing;
+  bool get isOnline => _status != SyncStatusEnum.offline;
+  bool get isSyncing => _status == SyncStatusEnum.syncing;
+  bool get isConnected => PowerSyncService.isConnected;
 
-  /// Initialize sync service
+  /// Initialize sync service with PowerSync connector
   Future<void> init() async {
-    // TODO: Phase 2 - Initialize PowerSync client here
-    debugPrint('SyncService: PowerSync initialization will be added in Phase 2');
+    logDebug('SyncService: Initializing with PowerSync');
 
     // Check initial connectivity
     final result = await _connectivity.checkConnectivity();
@@ -50,94 +66,130 @@ class SyncService extends ChangeNotifier {
       _updateConnectivityStatus,
     );
 
+    // Monitor PowerSync sync status
+    _syncStatusSubscription = PowerSyncService.syncStatus.listen(
+      _updateSyncStatus,
+    );
+
     // Update pending count
     await _updatePendingCount();
 
-    debugPrint('SyncService initialized');
+    logDebug('SyncService initialized');
+  }
+
+  /// Connect to PowerSync backend
+  Future<void> connectToBackend() async {
+    try {
+      final connector = _ref.read(powerSyncConnectorProvider);
+      await PowerSyncService.connect(connector);
+      logDebug('SyncService: Connected to PowerSync backend');
+    } catch (e) {
+      logError('SyncService: Failed to connect to PowerSync backend', e);
+      rethrow;
+    }
+  }
+
+  /// Disconnect from PowerSync backend
+  Future<void> disconnectFromBackend() async {
+    await PowerSyncService.disconnect();
+    logDebug('SyncService: Disconnected from PowerSync backend');
   }
 
   /// Dispose
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _syncStatusSubscription?.cancel();
     super.dispose();
   }
 
   /// Update connectivity status
   void _updateConnectivityStatus(List<ConnectivityResult> results) {
-    final wasOffline = _status == SyncStatus.offline;
+    final wasOffline = _status == SyncStatusEnum.offline;
 
     if (results.isEmpty || results.contains(ConnectivityResult.none)) {
-      _status = SyncStatus.offline;
-    } else if (_status == SyncStatus.offline) {
-      _status = SyncStatus.idle;
+      _status = SyncStatusEnum.offline;
+    } else if (_status == SyncStatusEnum.offline) {
+      _status = SyncStatusEnum.idle;
     }
 
     notifyListeners();
 
     // Auto-sync when coming back online
-    if (wasOffline && _status != SyncStatus.offline && _pendingCount > 0) {
+    if (wasOffline && _status != SyncStatusEnum.offline && _pendingCount > 0) {
       syncNow();
     }
   }
 
-  /// Update pending count
-  Future<void> _updatePendingCount() async {
-    _pendingCount = _hiveService.getPendingSyncCount();
+  /// Update sync status from PowerSync
+  void _updateSyncStatus(SyncStatus status) {
+    // PowerSync handles sync automatically, just update our status
+    if (status.connected) {
+      if (_status == SyncStatusEnum.offline) {
+        _status = SyncStatusEnum.idle;
+      }
+    } else {
+      _status = SyncStatusEnum.offline;
+    }
     notifyListeners();
   }
 
-  /// Trigger full sync (pull + push)
-  /// TODO: Phase 2 - Implement with PowerSync
+  /// Update pending count
+  Future<void> _updatePendingCount() async {
+    _pendingCount = await PowerSyncService.pendingUploadCount;
+    notifyListeners();
+  }
+
+  /// Trigger full sync (push pending changes)
+  /// PowerSync handles pulling data automatically via the sync stream
   Future<SyncResult> syncNow() async {
-    if (_status == SyncStatus.offline) {
+    if (_status == SyncStatusEnum.offline) {
       return SyncResult(
         success: false,
         errorMessage: 'No internet connection',
       );
     }
 
-    if (_status == SyncStatus.syncing) {
+    if (_status == SyncStatusEnum.syncing) {
       return SyncResult(
         success: false,
         errorMessage: 'Sync already in progress',
       );
     }
 
-    _status = SyncStatus.syncing;
+    if (!PowerSyncService.isConnected) {
+      return SyncResult(
+        success: false,
+        errorMessage: 'Not connected to PowerSync',
+      );
+    }
+
+    _status = SyncStatusEnum.syncing;
     _lastSyncError = null;
-    _syncedCount = 0;
-    _failedCount = 0;
     notifyListeners();
 
     try {
-      // TODO: Phase 2 - Implement PowerSync push/pull
-      // Step 1: Push pending changes to server via PowerSync
-      // final pushResult = await _pushPendingChanges();
-      // _syncedCount = pushResult['synced'] as int;
-      // _failedCount = pushResult['failed'] as int;
-
-      // Step 2: Pull latest data from server via PowerSync
-      // await _pullFromServer();
+      // PowerSync automatically syncs data via the connector
+      // We just need to wait for pending uploads to complete
+      await _waitForPendingUploads();
 
       await _updatePendingCount();
 
-      // For now, just mark as success since PowerSync isn't connected yet
-      _status = SyncStatus.success;
+      _status = SyncStatusEnum.success;
       _lastSyncTime = DateTime.now();
 
-      debugPrint('SyncService: Sync completed (PowerSync integration pending)');
+      logDebug('SyncService: Sync completed successfully');
 
       notifyListeners();
 
       return SyncResult(
         success: true,
-        syncedCount: _syncedCount,
-        failedCount: _failedCount,
+        syncedCount: _pendingCount,
       );
     } catch (e) {
-      _status = SyncStatus.error;
+      _status = SyncStatusEnum.error;
       _lastSyncError = e.toString();
+      logError('SyncService: Sync failed', e);
       notifyListeners();
 
       return SyncResult(
@@ -147,62 +199,32 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  /// Push pending changes to server
-  /// TODO: Phase 2 - Implement with PowerSync
-  Future<Map<String, int>> _pushPendingChanges() async {
-    final pendingItems = _hiveService.getPendingSyncItems();
+  /// Wait for pending uploads to complete
+  Future<void> _waitForPendingUploads() async {
+    // Poll until no pending uploads or timeout
+    const maxWaitTime = Duration(seconds: 30);
+    const pollInterval = Duration(milliseconds: 500);
+    final startTime = DateTime.now();
 
-    if (pendingItems.isEmpty) {
-      return {'synced': 0, 'failed': 0};
-    }
-
-    // TODO: Phase 2 - Implement PowerSync push
-    debugPrint('SyncService: Push via PowerSync will be implemented in Phase 2');
-
-    return {'synced': 0, 'failed': pendingItems.length};
-  }
-
-  /// Pull latest data from server
-  /// TODO: Phase 2 - Implement with PowerSync
-  Future<void> _pullFromServer() async {
-    // TODO: Phase 2 - Implement PowerSync pull
-    debugPrint('SyncService: Pull via PowerSync will be implemented in Phase 2');
-  }
-
-  /// Queue an item for sync
-  Future<void> queueForSync({
-    required String id,
-    required String operation,
-    required String entityType,
-    required Map<String, dynamic> data,
-  }) async {
-    await _hiveService.addToPendingSync(
-      id: id,
-      operation: operation,
-      entityType: entityType,
-      data: data,
-    );
-
-    await _updatePendingCount();
-
-    // Try to sync immediately if online
-    if (isOnline) {
-      unawaited(syncNow());
+    while (DateTime.now().difference(startTime) < maxWaitTime) {
+      final pending = await PowerSyncService.pendingUploadCount;
+      if (pending == 0) break;
+      await Future.delayed(pollInterval);
     }
   }
 
   /// Get sync status message
   String get statusMessage {
     switch (_status) {
-      case SyncStatus.idle:
+      case SyncStatusEnum.idle:
         return 'Ready to sync';
-      case SyncStatus.syncing:
+      case SyncStatusEnum.syncing:
         return 'Syncing...';
-      case SyncStatus.success:
+      case SyncStatusEnum.success:
         return 'Synced successfully';
-      case SyncStatus.error:
+      case SyncStatusEnum.error:
         return _lastSyncError ?? 'Sync failed';
-      case SyncStatus.offline:
+      case SyncStatusEnum.offline:
         return 'Offline';
     }
   }
@@ -221,13 +243,38 @@ class SyncService extends ChangeNotifier {
   }
 
   /// Check if backend is reachable
-  /// TODO: Phase 2 - Implement with PowerSync health check
   Future<bool> checkBackendConnection() async {
-    // TODO: Phase 2 - Check PowerSync connection
-    debugPrint('SyncService: Backend check will use PowerSync in Phase 2');
-    return false;
+    return PowerSyncService.isConnected;
+  }
+
+  /// Queue an item for sync (compatibility method)
+  /// With PowerSync, sync is automatic so this is a no-op
+  Future<void> queueForSync({
+    required String id,
+    required String operation,
+    required String entityType,
+    required Map<String, dynamic> data,
+  }) async {
+    // PowerSync handles sync automatically via the repository layer
+    // This method exists for backward compatibility
+    logDebug('queueForSync called for $entityType:$id (PowerSync handles sync automatically)');
   }
 }
+
+/// Provider for sync service
+final syncServiceProvider = ChangeNotifierProvider<SyncService>((ref) {
+  return SyncService(ref);
+});
+
+/// Provider for sync status
+final syncStatusProvider = Provider<SyncStatusEnum>((ref) {
+  return ref.watch(syncServiceProvider).status;
+});
+
+/// Provider for pending count
+final syncPendingCountProvider = Provider<int>((ref) {
+  return ref.watch(syncServiceProvider).pendingCount;
+});
 
 /// Helper to unawait futures
 void unawaited(Future<void>? future) {

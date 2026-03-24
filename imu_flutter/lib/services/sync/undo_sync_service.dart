@@ -52,7 +52,7 @@ class SyncOperation {
 
 /// Service for tracking and undoing sync operations
 class UndoSyncService {
-  final PowerSyncService _powerSyncService;
+  final PowerSyncService? _powerSyncService;
   final List<SyncOperation> _operationHistory = [];
   final StreamController<List<SyncOperation>> _historyController =
       StreamController<List<SyncOperation>>.broadcast();
@@ -134,7 +134,7 @@ class UndoSyncService {
     }
 
     try {
-      final db = await _powerSyncService.database;
+      final db = await PowerSyncService.database;
 
       switch (operation.operationType) {
         case 'INSERT':
@@ -253,8 +253,8 @@ class UndoSyncService {
 
 /// Provider for undo sync service
 final undoSyncServiceProvider = Provider<UndoSyncService>((ref) {
-  final powerSyncService = ref.watch(powerSyncServiceProvider);
-  final service = UndoSyncService(powerSyncService);
+  // PowerSyncService uses static methods, so we don't need to watch a provider
+  final service = UndoSyncService(null);
   ref.onDispose(() => service.dispose());
   return service;
 });

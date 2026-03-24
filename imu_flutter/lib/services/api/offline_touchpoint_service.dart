@@ -34,7 +34,8 @@ class OfflineTouchpointService extends ChangeNotifier {
   Future<Touchpoint> createTouchpointOffline(Touchpoint touchpoint) async {
     if (_connectivityService.isOnline) {
       // If online, try to sync directly
-      return await _touchpointApi.createTouchpoint(touchpoint);
+      final result = await _touchpointApi.createTouchpoint(touchpoint);
+      return result ?? touchpoint;
     }
 
     // Queue for offline sync
@@ -54,7 +55,8 @@ class OfflineTouchpointService extends ChangeNotifier {
   Future<Touchpoint> updateTouchpointOffline(Touchpoint touchpoint) async {
     if (_connectivityService.isOnline) {
       // If online, try to sync directly
-      return await _touchpointApi.updateTouchpoint(touchpoint);
+      final result = await _touchpointApi.updateTouchpoint(touchpoint);
+      return result ?? touchpoint;
     }
 
     // Queue for offline sync

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../../core/services/test_data_generator.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -22,36 +21,23 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
 
   // Services
   final _hiveService = HiveService();
-  late final TestDataGenerator _testDataGenerator;
   late final LocationService _locationService;
 
   // State
-  Map<String, int> _dataStats = {};
   bool _isLoading = false;
   String? _statusMessage;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _testDataGenerator = TestDataGenerator(_hiveService);
+    _tabController = TabController(length: 2, vsync: this);
     _locationService = LocationService();
-    _loadStats();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadStats() async {
-    if (!_hiveService.isInitialized) {
-      await _hiveService.init();
-    }
-    setState(() {
-      _dataStats = _testDataGenerator.getDataStats();
-    });
   }
 
   void _setStatus(String message) {
@@ -61,160 +47,6 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
         setState(() => _statusMessage = null);
       }
     });
-  }
-
-  // Test Data Generation Methods
-  Future<void> _generateSmallDataset() async {
-    HapticUtils.mediumImpact();
-    setState(() => _isLoading = true);
-    try {
-      final count = await _testDataGenerator.generateSmallDataset();
-      await _loadStats();
-      ref.invalidate(clientsProvider); // Refresh clients list
-      _setStatus('Generated $count test clients');
-      HapticUtils.success();
-    } catch (e) {
-      _setStatus('Error: $e');
-      HapticUtils.error();
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _generateLargeDataset() async {
-    HapticUtils.mediumImpact();
-    setState(() => _isLoading = true);
-    try {
-      final count = await _testDataGenerator.generateLargeDataset();
-      await _loadStats();
-      ref.invalidate(clientsProvider); // Refresh clients list
-      _setStatus('Generated $count test clients');
-      HapticUtils.success();
-    } catch (e) {
-      _setStatus('Error: $e');
-      HapticUtils.error();
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _generateLimitBreakerDataset() async {
-    HapticUtils.mediumImpact();
-
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Generate 1000 Clients?'),
-        content: const Text(
-            'This will generate 1000 test clients which may take a while and use significant storage. Continue?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Generate'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final count = await _testDataGenerator.generateLimitBreakerDataset();
-      await _loadStats();
-      ref.invalidate(clientsProvider); // Refresh clients list
-      _setStatus('Generated $count test clients');
-      HapticUtils.success();
-    } catch (e) {
-      _setStatus('Error: $e');
-      HapticUtils.error();
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _clearTestData() async {
-    HapticUtils.mediumImpact();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear Test Data?'),
-        content: const Text('This will delete all clients with test IDs. Continue?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final count = await _testDataGenerator.clearTestData();
-      await _loadStats();
-      ref.invalidate(clientsProvider); // Refresh clients list
-      _setStatus('Deleted $count test clients');
-      HapticUtils.success();
-    } catch (e) {
-      _setStatus('Error: $e');
-      HapticUtils.error();
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _clearAllData() async {
-    HapticUtils.mediumImpact();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear ALL Data?'),
-        content: const Text(
-            'This will delete ALL client data including real clients. This cannot be undone!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete All'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final count = await _testDataGenerator.clearAllData();
-      await _loadStats();
-      ref.invalidate(clientsProvider); // Refresh clients list
-      _setStatus('Deleted $count total clients');
-      HapticUtils.success();
-    } catch (e) {
-      _setStatus('Error: $e');
-      HapticUtils.error();
-    } finally {
-      setState(() => _isLoading = false);
-    }
   }
 
   @override
@@ -230,7 +62,6 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(icon: Icon(LucideIcons.database), text: 'Test Data'),
             Tab(icon: Icon(LucideIcons.mapPin), text: 'GPS Tracker'),
             Tab(icon: Icon(LucideIcons.info), text: 'System Info'),
           ],
@@ -241,15 +72,6 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
           TabBarView(
             controller: _tabController,
             children: [
-              _TestDataTab(
-                dataStats: _dataStats,
-                isLoading: _isLoading,
-                onGenerateSmall: _generateSmallDataset,
-                onGenerateLarge: _generateLargeDataset,
-                onGenerateLimitBreaker: _generateLimitBreakerDataset,
-                onClearTestData: _clearTestData,
-                onClearAllData: _clearAllData,
-              ),
               _GpsTrackerTab(locationService: _locationService),
               _SystemInfoTab(hiveService: _hiveService),
             ],
@@ -273,178 +95,6 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-// Test Data Tab
-class _TestDataTab extends StatelessWidget {
-  final Map<String, int> dataStats;
-  final bool isLoading;
-  final VoidCallback onGenerateSmall;
-  final VoidCallback onGenerateLarge;
-  final VoidCallback onGenerateLimitBreaker;
-  final VoidCallback onClearTestData;
-  final VoidCallback onClearAllData;
-
-  const _TestDataTab({
-    required this.dataStats,
-    required this.isLoading,
-    required this.onGenerateSmall,
-    required this.onGenerateLarge,
-    required this.onGenerateLimitBreaker,
-    required this.onClearTestData,
-    required this.onClearAllData,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Data Statistics Card
-          _buildSectionCard(
-            title: 'Data Statistics',
-            child: Column(
-              children: [
-                _buildStatRow('Total Clients', dataStats['total'] ?? 0),
-                _buildStatRow('Test Clients', dataStats['testClients'] ?? 0),
-                _buildStatRow('Real Clients', dataStats['realClients'] ?? 0),
-                _buildStatRow('Potential', dataStats['potentialClients'] ?? 0),
-                _buildStatRow('Existing', dataStats['existingClients'] ?? 0),
-                _buildStatRow('Total Touchpoints', dataStats['totalTouchpoints'] ?? 0),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Generate Test Data Card
-          _buildSectionCard(
-            title: 'Generate Test Data',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Generate realistic test client data for development and testing.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                _buildActionButton(
-                  label: 'Small Dataset (10 clients)',
-                  icon: LucideIcons.package,
-                  color: Colors.blue,
-                  onPressed: isLoading ? null : onGenerateSmall,
-                ),
-                const SizedBox(height: 8),
-                _buildActionButton(
-                  label: 'Large Dataset (100 clients)',
-                  icon: LucideIcons.box,
-                  color: Colors.orange,
-                  onPressed: isLoading ? null : onGenerateLarge,
-                ),
-                const SizedBox(height: 8),
-                _buildActionButton(
-                  label: 'Limit Breaker (1000 clients)',
-                  icon: LucideIcons.database,
-                  color: Colors.red,
-                  onPressed: isLoading ? null : onGenerateLimitBreaker,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Clear Data Card
-          _buildSectionCard(
-            title: 'Clear Data',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildActionButton(
-                  label: 'Clear Test Data Only',
-                  icon: LucideIcons.trash2,
-                  color: Colors.orange,
-                  onPressed: isLoading ? null : onClearTestData,
-                ),
-                const SizedBox(height: 8),
-                _buildActionButton(
-                  label: 'Clear ALL Data',
-                  icon: LucideIcons.trash,
-                  color: Colors.red,
-                  onPressed: isLoading ? null : onClearAllData,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionCard({required String title, required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatRow(String label, int value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey[600])),
-          Text(
-            value.toString(),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback? onPressed,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 12),
       ),
     );
   }

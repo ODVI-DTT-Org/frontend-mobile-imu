@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/sync/sync_service.dart';
-import '../../services/local_storage/hive_service.dart' show SyncStatus;
-
-/// Sync service provider
-final syncServiceProvider = ChangeNotifierProvider<SyncService>((ref) {
-  return SyncService();
-});
 
 /// Sync status indicator widget
 class SyncStatusWidget extends ConsumerWidget {
@@ -52,8 +46,8 @@ class SyncStatusWidget extends ConsumerWidget {
     );
   }
 
-  Widget _buildIcon(SyncStatus status) {
-    if (status == SyncStatus.syncing) {
+  Widget _buildIcon(SyncStatusEnum status) {
+    if (status == SyncStatusEnum.syncing) {
       return SizedBox(
         width: 16,
         height: 16,
@@ -71,60 +65,60 @@ class SyncStatusWidget extends ConsumerWidget {
     );
   }
 
-  IconData _getIconData(SyncStatus status) {
+  IconData _getIconData(SyncStatusEnum status) {
     switch (status) {
-      case SyncStatus.idle:
+      case SyncStatusEnum.idle:
         return Icons.cloud_done;
-      case SyncStatus.syncing:
+      case SyncStatusEnum.syncing:
         return Icons.sync;
-      case SyncStatus.success:
+      case SyncStatusEnum.success:
         return Icons.check_circle;
-      case SyncStatus.error:
+      case SyncStatusEnum.error:
         return Icons.error_outline;
-      case SyncStatus.offline:
+      case SyncStatusEnum.offline:
         return Icons.cloud_off;
     }
   }
 
-  Color _getBackgroundColor(SyncStatus status) {
+  Color _getBackgroundColor(SyncStatusEnum status) {
     switch (status) {
-      case SyncStatus.idle:
+      case SyncStatusEnum.idle:
         return Colors.grey[200]!;
-      case SyncStatus.syncing:
+      case SyncStatusEnum.syncing:
         return Colors.blue[100]!;
-      case SyncStatus.success:
+      case SyncStatusEnum.success:
         return Colors.green[100]!;
-      case SyncStatus.error:
+      case SyncStatusEnum.error:
         return Colors.red[100]!;
-      case SyncStatus.offline:
+      case SyncStatusEnum.offline:
         return Colors.orange[100]!;
     }
   }
 
-  Color _getTextColor(SyncStatus status) {
+  Color _getTextColor(SyncStatusEnum status) {
     switch (status) {
-      case SyncStatus.idle:
+      case SyncStatusEnum.idle:
         return Colors.grey[700]!;
-      case SyncStatus.syncing:
+      case SyncStatusEnum.syncing:
         return Colors.blue[700]!;
-      case SyncStatus.success:
+      case SyncStatusEnum.success:
         return Colors.green[700]!;
-      case SyncStatus.error:
+      case SyncStatusEnum.error:
         return Colors.red[700]!;
-      case SyncStatus.offline:
+      case SyncStatusEnum.offline:
         return Colors.orange[700]!;
     }
   }
 
   String _getLabel(SyncService syncService) {
-    if (syncService.pendingCount > 0 && syncService.status != SyncStatus.syncing) {
+    if (syncService.pendingCount > 0 && syncService.status != SyncStatusEnum.syncing) {
       return '${syncService.pendingCount} pending';
     }
     return syncService.statusMessage;
   }
 
   void _handleTap(BuildContext context, SyncService syncService) {
-    if (syncService.status == SyncStatus.offline) {
+    if (syncService.status == SyncStatusEnum.offline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No internet connection. Changes will sync when online.'),
@@ -144,7 +138,7 @@ class ConnectivityBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final syncService = ref.watch(syncServiceProvider);
 
-    if (syncService.status != SyncStatus.offline) {
+    if (syncService.status != SyncStatusEnum.offline) {
       return const SizedBox.shrink();
     }
 
@@ -203,14 +197,14 @@ class SyncStatusSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _buildStatusRow(
-            icon: syncService.status == SyncStatus.offline
+            icon: syncService.status == SyncStatusEnum.offline
                 ? Icons.cloud_off
                 : Icons.cloud_done,
             label: 'Connection',
-            value: syncService.status == SyncStatus.offline
+            value: syncService.status == SyncStatusEnum.offline
                 ? 'Offline'
                 : 'Connected',
-            color: syncService.status == SyncStatus.offline
+            color: syncService.status == SyncStatusEnum.offline
                 ? Colors.orange
                 : Colors.green,
           ),
@@ -237,7 +231,7 @@ class SyncStatusSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           if (syncService.pendingCount > 0 &&
-              syncService.status != SyncStatus.offline)
+              syncService.status != SyncStatusEnum.offline)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -298,17 +292,17 @@ class SyncStatusSheet extends ConsumerWidget {
     );
   }
 
-  Color _getStatusColor(SyncStatus status) {
+  Color _getStatusColor(SyncStatusEnum status) {
     switch (status) {
-      case SyncStatus.idle:
+      case SyncStatusEnum.idle:
         return Colors.grey;
-      case SyncStatus.syncing:
+      case SyncStatusEnum.syncing:
         return Colors.blue;
-      case SyncStatus.success:
+      case SyncStatusEnum.success:
         return Colors.green;
-      case SyncStatus.error:
+      case SyncStatusEnum.error:
         return Colors.red;
-      case SyncStatus.offline:
+      case SyncStatusEnum.offline:
         return Colors.orange;
     }
   }

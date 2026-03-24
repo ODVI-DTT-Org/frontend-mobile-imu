@@ -1,78 +1,145 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:powersync/powersync.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
+import '../auth/auth_service.dart';
+import '../auth/jwt_auth_service.dart';
 
-/// Backend connector for PowerSync authentication
-/// This connector handles token refresh and credential management for PowerSync
-class IMUPowerSyncConnector {
+/// Backend connector for PowerSync
+/// Handles authentication credentials and data upload to PostgreSQL backend
+class IMUPowerSyncConnector extends PowerSyncBackendConnector {
   final Dio _httpClient;
-  final FlutterSecureStorage _secureStorage;
+  final JwtAuthService _authService;
   final String _powersyncUrl;
-  final String _authUrl;
+  final String _apiUrl;
 
   IMUPowerSyncConnector({
+    required JwtAuthService authService,
     required String powersyncUrl,
-    required String authUrl,
-  })  : _powersyncUrl = powersyncUrl,
-        _authUrl = authUrl,
-        _httpClient = Dio(BaseOptions(
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
-        )),
-        _secureStorage = const FlutterSecureStorage();
+    required String apiUrl,
+    Dio? httpClient,
+  })  : _authService = authService,
+        _powersyncUrl = powersyncUrl,
+        _apiUrl = apiUrl,
+        _httpClient = httpClient ??
+            Dio(
+              BaseOptions(
+                connectTimeout: const Duration(seconds: 30),
+                receiveTimeout: const Duration(seconds: 30),
+              ),
+            );
 
   /// Fetch PowerSync authentication credentials
-  Future<String?> fetchCredentials() async {
+  @override
+  Future<PowerSyncCredentials?> fetchCredentials() async {
     try {
-      // Get stored refresh token
-      final refreshToken = await _secureStorage.read(key: 'refresh_token');
-      if (refreshToken == null) {
-        logDebug('No refresh token found - user needs to login');
+      // Get the current access token from JWT auth service
+      final token = _authService.accessToken;
+
+      if (token == null) {
+        logDebug('No access token - user needs to login');
         return null;
       }
 
-      // Refresh the PowerSync token
-      final response = await _httpClient.post(
-        '$_authUrl/token/refresh',
-        data: {'refresh_token': refreshToken},
-      );
-
-      if (response.statusCode == 200 && response.data['token'] != null) {
-        final token = response.data['token'] as String;
-        await _secureStorage.write(key: 'powersync_token', value: token);
-        logDebug('PowerSync token refreshed successfully');
-        return token;
+      // Check if token needs refresh
+      if (_authService.needsRefresh) {
+        logDebug('Token needs refresh, refreshing...');
+        await _authService.refreshTokens();
       }
 
-      logDebug('Token refresh failed: ${response.statusCode}');
-      return null;
+      // Return the credentials for PowerSync authentication
+      logDebug('PowerSync credentials fetched successfully');
+      final endpoint = _powersyncUrl.isNotEmpty ? _powersyncUrl : '';
+      final accessToken = _authService.accessToken;
+
+      if (endpoint.isEmpty || accessToken == null) {
+        return null;
+      }
+
+      return PowerSyncCredentials(
+        endpoint: endpoint,
+        token: accessToken,
+      );
     } catch (e) {
       logError('Failed to fetch PowerSync credentials', e);
       return null;
     }
   }
 
-  /// Invalidate stored credentials
-  Future<void> invalidateCredentials() async {
-    await _secureStorage.delete(key: 'powersync_token');
-    await _secureStorage.delete(key: 'refresh_token');
-    await _secureStorage.delete(key: 'access_token');
-    logDebug('Credentials invalidated');
+  /// Upload local changes to the backend
+  @override
+  Future<void> uploadData(PowerSyncDatabase database) async {
+    try {
+      final token = _authService.accessToken;
+      if (token == null) {
+        logDebug('No access token - skipping upload');
+        return;
+      }
+
+      // Get pending CRUD operations
+      final batch = await database.getCrudBatch();
+      if (batch == null) {
+        logDebug('No pending uploads');
+        return;
+      }
+
+      logDebug('Uploading ${batch.crud.length} operations to backend');
+
+      // Prepare operations for upload
+      final operations = batch.crud.map((op) {
+        return {
+          'table': op.table,
+          'op': op.op,
+          'id': op.id,
+          'data': op.opData,
+        };
+      }).toList();
+
+      // Send to backend upload endpoint
+      final response = await _httpClient.post(
+        '$_apiUrl/upload',
+        data: {'operations': operations},
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        // Mark batch as complete
+        await batch.complete();
+        logDebug('Upload completed successfully');
+      } else {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      logError('Upload failed with DioException', e);
+      // Don't complete the batch - will retry on next sync
+      rethrow;
+    } catch (e) {
+      logError('Upload failed', e);
+      rethrow;
+    }
   }
 
   /// Get the PowerSync URI
   Uri get powersyncUri => Uri.parse(_powersyncUrl);
+
+  /// Invalidate stored credentials
+  @override
+  Future<void> invalidateCredentials() async {
+    await _authService.logout();
+    logDebug('Credentials invalidated');
+  }
 }
 
 /// Provider for PowerSync connector
 final powerSyncConnectorProvider = Provider<IMUPowerSyncConnector>((ref) {
-  final powersyncUrl = dotenv.env['POWERSYNC_URL'] ?? 'https://your-instance.powersync.co';
-  final authUrl = dotenv.env['AUTH_URL'] ?? 'https://your-auth-server.com';
+  final jwtAuth = ref.watch(jwtAuthProvider);
 
   return IMUPowerSyncConnector(
-    powersyncUrl: powersyncUrl,
-    authUrl: authUrl,
+    authService: jwtAuth,
+    powersyncUrl: AppConfig.powerSyncUrl,
+    apiUrl: AppConfig.postgresApiUrl,
   );
 });

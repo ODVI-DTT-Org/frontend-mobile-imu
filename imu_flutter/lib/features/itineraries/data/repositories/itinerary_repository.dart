@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:imu_flutter/services/local_storage/hive_service.dart';
-import 'package:imu_flutter/shared/providers/app_providers.dart';
+import 'package:uuid/uuid.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/core/utils/logger.dart';
 
 /// Itinerary model for scheduled visits
@@ -74,57 +74,268 @@ class Itinerary {
       'updated_at': updatedAt?.toIso8601String(),
     };
   }
+
+  /// Create a copy with updated fields
+  Itinerary copyWith({
+    String? id,
+    String? caravanId,
+    String? clientId,
+    DateTime? scheduledDate,
+    String? scheduledTime,
+    String? status,
+    String? priority,
+    String? notes,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Itinerary(
+      id: id ?? this.id,
+      caravanId: caravanId ?? this.caravanId,
+      clientId: clientId ?? this.clientId,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      scheduledTime: scheduledTime ?? this.scheduledTime,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }
 
-/// Repository for itinerary operations using Hive
-/// TODO: Phase 2 - Will be updated to use PowerSync
+/// Repository for itinerary operations using PowerSync
 class ItineraryRepository {
-  final HiveService _hiveService;
-
-  ItineraryRepository(this._hiveService);
+  final _uuid = const Uuid();
 
   /// Watch all itineraries with real-time updates
   Stream<List<Itinerary>> watchItineraries() async* {
-    // For now, emit the current list and update on changes
-    // TODO: Phase 2 - Implement real-time updates with PowerSync
-    final itineraries = await getItineraries();
-    yield itineraries;
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch(
+        'SELECT * FROM itineraries ORDER BY scheduled_date ASC, scheduled_time ASC',
+      )) {
+        yield row.map(Itinerary.fromJson).toList();
+      }
+    } catch (e) {
+      logError('Error watching itineraries', e);
+      yield [];
+    }
   }
 
   /// Watch itineraries for a specific caravan
   Stream<List<Itinerary>> watchCaravanItineraries(String caravanId) async* {
-    final itineraries = await getCaravanItineraries(caravanId);
-    yield itineraries;
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch(
+        'SELECT * FROM itineraries WHERE caravan_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC',
+        parameters: [caravanId],
+      )) {
+        yield row.map(Itinerary.fromJson).toList();
+      }
+    } catch (e) {
+      logError('Error watching itineraries for caravan $caravanId', e);
+      yield [];
+    }
   }
 
   /// Watch itineraries for a specific date
   Stream<List<Itinerary>> watchDateItineraries(DateTime date) async* {
-    final itineraries = await getDateItineraries(date);
-    yield itineraries;
+    try {
+      final db = await PowerSyncService.database;
+      final dateStr = date.toIso8601String().split('T').first;
+      await for (final row in db.watch(
+        'SELECT * FROM itineraries WHERE DATE(scheduled_date) = ? ORDER BY scheduled_time ASC',
+        parameters: [dateStr],
+      )) {
+        yield row.map(Itinerary.fromJson).toList();
+      }
+    } catch (e) {
+      logError('Error watching itineraries for date $date', e);
+      yield [];
+    }
+  }
+
+  /// Watch a single itinerary by ID
+  Stream<Itinerary?> watchItinerary(String itineraryId) async* {
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch(
+        'SELECT * FROM itineraries WHERE id = ?',
+        parameters: [itineraryId],
+      )) {
+        yield row.isNotEmpty ? Itinerary.fromJson(row.first) : null;
+      }
+    } catch (e) {
+      logError('Error watching itinerary $itineraryId', e);
+      yield null;
+    }
   }
 
   /// Get all itineraries (one-time fetch)
   Future<List<Itinerary>> getItineraries() async {
-    // TODO: Phase 2 - Implement with PowerSync
-    // For now, return mock/empty list
-    return [];
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll(
+        'SELECT * FROM itineraries ORDER BY scheduled_date ASC, scheduled_time ASC',
+      );
+      return results.map(Itinerary.fromJson).toList();
+    } catch (e) {
+      logError('Error getting itineraries', e);
+      return [];
+    }
   }
 
   /// Get itineraries for a specific caravan
   Future<List<Itinerary>> getCaravanItineraries(String caravanId) async {
-    // TODO: Phase 2 - Implement with PowerSync
-    return [];
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll(
+        'SELECT * FROM itineraries WHERE caravan_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC',
+        [caravanId],
+      );
+      return results.map(Itinerary.fromJson).toList();
+    } catch (e) {
+      logError('Error getting itineraries for caravan $caravanId', e);
+      return [];
+    }
   }
 
   /// Get itineraries for a specific date
   Future<List<Itinerary>> getDateItineraries(DateTime date) async {
-    // TODO: Phase 2 - Implement with PowerSync
-    return [];
+    try {
+      final db = await PowerSyncService.database;
+      final dateStr = date.toIso8601String().split('T').first;
+      final results = await db.getAll(
+        'SELECT * FROM itineraries WHERE DATE(scheduled_date) = ? ORDER BY scheduled_time ASC',
+        [dateStr],
+      );
+      return results.map(Itinerary.fromJson).toList();
+    } catch (e) {
+      logError('Error getting itineraries for date $date', e);
+      return [];
+    }
+  }
+
+  /// Get a single itinerary by ID
+  Future<Itinerary?> getItinerary(String itineraryId) async {
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll(
+        'SELECT * FROM itineraries WHERE id = ?',
+        [itineraryId],
+      );
+      return results.isNotEmpty ? Itinerary.fromJson(results.first) : null;
+    } catch (e) {
+      logError('Error getting itinerary $itineraryId', e);
+      return null;
+    }
+  }
+
+  /// Create a new itinerary
+  Future<Itinerary> createItinerary(Itinerary itinerary) async {
+    try {
+      final db = await PowerSyncService.database;
+      final id = itinerary.id.isEmpty ? _uuid.v4() : itinerary.id;
+      final now = DateTime.now().toIso8601String();
+
+      await db.execute(
+        '''INSERT INTO itineraries (
+          id, caravan_id, client_id, scheduled_date, scheduled_time,
+          status, priority, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+        [
+          id,
+          itinerary.caravanId,
+          itinerary.clientId,
+          itinerary.scheduledDate?.toIso8601String(),
+          itinerary.scheduledTime,
+          itinerary.status ?? 'pending',
+          itinerary.priority ?? 'normal',
+          itinerary.notes,
+        ],
+      );
+
+      logDebug('Created itinerary: $id');
+      return itinerary.copyWith(id: id, createdAt: DateTime.parse(now));
+    } catch (e) {
+      logError('Error creating itinerary', e);
+      rethrow;
+    }
+  }
+
+  /// Update an existing itinerary
+  Future<void> updateItinerary(Itinerary itinerary) async {
+    try {
+      final db = await PowerSyncService.database;
+
+      await db.execute(
+        '''UPDATE itineraries SET
+          caravan_id = ?, client_id = ?, scheduled_date = ?,
+          scheduled_time = ?, status = ?, priority = ?, notes = ?
+        WHERE id = ?''',
+        [
+          itinerary.caravanId,
+          itinerary.clientId,
+          itinerary.scheduledDate?.toIso8601String(),
+          itinerary.scheduledTime,
+          itinerary.status,
+          itinerary.priority,
+          itinerary.notes,
+          itinerary.id,
+        ],
+      );
+
+      logDebug('Updated itinerary: ${itinerary.id}');
+    } catch (e) {
+      logError('Error updating itinerary', e);
+      rethrow;
+    }
+  }
+
+  /// Delete an itinerary
+  Future<void> deleteItinerary(String itineraryId) async {
+    try {
+      final db = await PowerSyncService.database;
+      await db.execute('DELETE FROM itineraries WHERE id = ?', [itineraryId]);
+      logDebug('Deleted itinerary: $itineraryId');
+    } catch (e) {
+      logError('Error deleting itinerary', e);
+      rethrow;
+    }
+  }
+
+  /// Update itinerary status
+  Future<void> updateStatus(String itineraryId, String status) async {
+    try {
+      final db = await PowerSyncService.database;
+      await db.execute(
+        'UPDATE itineraries SET status = ? WHERE id = ?',
+        [status, itineraryId],
+      );
+      logDebug('Updated itinerary status: $itineraryId -> $status');
+    } catch (e) {
+      logError('Error updating itinerary status', e);
+      rethrow;
+    }
+  }
+
+  /// Get itineraries count for a caravan
+  Future<int> getCaravanItinerariesCount(String caravanId) async {
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.get(
+        'SELECT COUNT(*) as count FROM itineraries WHERE caravan_id = ?',
+        [caravanId],
+      );
+      return results?['count'] as int? ?? 0;
+    } catch (e) {
+      logError('Error getting itineraries count', e);
+      return 0;
+    }
   }
 }
 
 /// Provider for itinerary repository
 final itineraryRepositoryProvider = Provider<ItineraryRepository>((ref) {
-  final hiveService = ref.watch(hiveServiceProvider);
-  return ItineraryRepository(hiveService);
+  return ItineraryRepository();
 });

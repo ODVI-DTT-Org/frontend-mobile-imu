@@ -81,7 +81,7 @@ class ConflictSnackbar {
           ),
         ],
       ),
-      backgroundColor: AppColors.warningOrange,
+      backgroundColor: AppColors.warning,
       duration: const Duration(seconds: 5),
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.all(16),

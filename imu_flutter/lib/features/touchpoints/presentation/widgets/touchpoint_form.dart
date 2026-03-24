@@ -28,7 +28,6 @@ class TouchpointFormModal extends ConsumerStatefulWidget {
 
 class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   final _formKey = GlobalKey<FormState>();
-  final _remarksController = TextEditingController();
   final _cameraService = CameraService();
 
   final _odometerArrivalController = TextEditingController();
@@ -40,34 +39,34 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   File? _capturedPhoto;
   bool _isCapturingPhoto = false;
 
-  // Reason types from the design
+  // Reason types - synced with database touchpoint_reasons table
   static const List<Map<String, dynamic>> _reasons = [
-    {'value': 'INTERESTED', 'label': 'Interested', 'color': Colors.green},
-    {'value': 'NOT_INTERESTED', 'label': 'Not Interested', 'color': Colors.red},
-    {'value': 'UNDECIDED', 'label': 'Undecided', 'color': Colors.orange},
-    {'value': 'LOAN_INQUIRY', 'label': 'Loan Inquiry', 'color': Colors.blue},
-    {'value': 'FOR_UPDATE', 'label': 'For Update', 'color': Colors.purple},
-    {'value': 'FOR_VERIFICATION', 'label': 'For Verification', 'color': Colors.teal},
-    {'value': 'FOR_PROCESSING', 'label': 'For Processing', 'color': Colors.indigo},
-    {'value': 'FOR_ADA_COMPLIANCE', 'label': 'For ADA Compliance', 'color': Colors.cyan},
-    {'value': 'FOR_APPLY_MEMBERSHIP', 'label': 'Apply Membership', 'color': Colors.lime},
-    {'value': 'NOT_AROUND', 'label': 'Not Around', 'color': Colors.grey},
-    {'value': 'NOT_AMENABLE', 'label': 'Not Amenable', 'color': Colors.brown},
-    {'value': 'NOT_IN_LIST', 'label': 'Not In List', 'color': Colors.grey},
-    {'value': 'UNLOCATED', 'label': 'Unlocated', 'color': Colors.grey},
-    {'value': 'MOVED_OUT', 'label': 'Moved Out', 'color': Colors.grey},
-    {'value': 'ABROAD', 'label': 'Abroad', 'color': Colors.blueGrey},
-    {'value': 'DECEASED', 'label': 'Deceased', 'color': Colors.black54},
-    {'value': 'OVERAGE', 'label': 'Overage', 'color': Colors.amber},
-    {'value': 'POOR_HEALTH', 'label': 'Poor Health', 'color': Colors.deepOrange},
-    {'value': 'BACKED_OUT', 'label': 'Backed Out', 'color': Colors.redAccent},
-    {'value': 'DISAPPROVED', 'label': 'Disapproved', 'color': Colors.red},
-    {'value': 'RETURNED_ATM', 'label': 'Returned ATM', 'color': Colors.pink},
-    {'value': 'WITH_OTHER_LENDING', 'label': 'With Other Lending', 'color': Colors.deepPurple},
-    {'value': 'INACCESSIBLE_AREA', 'label': 'Inaccessible Area', 'color': Colors.blueGrey},
-    {'value': 'CI_BI', 'label': 'CI/BI', 'color': Colors.blue},
-    {'value': 'TELEMARKETING', 'label': 'Telemarketing', 'color': Colors.lightBlue},
-    {'value': 'INTERESTED_BUT_DECLINED', 'label': 'Interested but Declined', 'color': Colors.amber},
+    {'value': 'ABROAD', 'label': 'Abroad', 'color': Color(0xFF546E7A)},
+    {'value': 'APPLY_MEMBERSHIP', 'label': 'Apply for PUSU Membership / LIKA Membership', 'color': Color(0xFF66BB6A)},
+    {'value': 'BACKED_OUT', 'label': 'Backed Out', 'color': Color(0xFFEF5350)},
+    {'value': 'CI_BI', 'label': 'CI/BI', 'color': Color(0xFF42A5F5)},
+    {'value': 'DECEASED', 'label': 'Deceased', 'color': Color(0xFF424242)},
+    {'value': 'DISAPPROVED', 'label': 'Disapproved', 'color': Color(0xFFE53935)},
+    {'value': 'FOR_ADA_COMPLIANCE', 'label': 'For ADA Compliance', 'color': Color(0xFF26C6DA)},
+    {'value': 'FOR_PROCESSING', 'label': 'For Processing / Approval / Request / Buy-Out', 'color': Color(0xFF5C6BC0)},
+    {'value': 'FOR_UPDATE', 'label': 'For Update', 'color': Color(0xFFAB47BC)},
+    {'value': 'FOR_VERIFICATION', 'label': 'For Verification', 'color': Color(0xFF26A69A)},
+    {'value': 'INACCESSIBLE_AREA', 'label': 'Inaccessible / Critical Area', 'color': Color(0xFF78909C)},
+    {'value': 'INTERESTED', 'label': 'Interested', 'color': Color(0xFF4CAF50)},
+    {'value': 'LOAN_INQUIRY', 'label': 'Loan Inquiry', 'color': Color(0xFF2196F3)},
+    {'value': 'MOVED_OUT', 'label': 'Moved Out', 'color': Color(0xFF9E9E9E)},
+    {'value': 'NOT_AMENABLE', 'label': 'Not Amenable to Our Product Criteria', 'color': Color(0xFF8D6E63)},
+    {'value': 'NOT_AROUND', 'label': 'Not Around', 'color': Color(0xFFBDBDBD)},
+    {'value': 'NOT_IN_LIST', 'label': 'Not In the List', 'color': Color(0xFF9E9E9E)},
+    {'value': 'NOT_INTERESTED', 'label': 'Not Interested', 'color': Color(0xFFF44336)},
+    {'value': 'OVERAGE', 'label': 'Overage', 'color': Color(0xFFFFA726)},
+    {'value': 'POOR_HEALTH', 'label': 'Poor Health Condition', 'color': Color(0xFFFF7043)},
+    {'value': 'RETURNED_ATM', 'label': 'Returned ATM / Pick-up ATM', 'color': Color(0xFFEC407A)},
+    {'value': 'UNDECIDED', 'label': 'Undecided', 'color': Color(0xFFFF9800)},
+    {'value': 'UNLOCATED', 'label': 'Unlocated', 'color': Color(0xFFBDBDBD)},
+    {'value': 'WITH_OTHER_LENDING', 'label': 'With Other Lending', 'color': Color(0xFF7E57C2)},
+    {'value': 'INTERESTED_FAMILY_DECLINED', 'label': 'Interested, But Declined Due to Family''s Decision', 'color': Color(0xFFFFB300)},
+    {'value': 'TELEMARKETING', 'label': 'Telemarketing', 'color': Color(0xFF29B6F6)},
   ];
 
   String get _ordinal {
@@ -86,7 +85,6 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
   @override
   void dispose() {
-    _remarksController.dispose();
     _odometerArrivalController.dispose();
     _odometerDepartureController.dispose();
     super.dispose();
@@ -311,20 +309,6 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                                 onTap: _selectNextVisitDate,
                               ),
                               const SizedBox(height: 16),
-
-                              // Remarks
-                              const Text(
-                                'Remarks',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _remarksController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Enter remarks...',
-                                ),
-                                maxLines: 4,
-                              ),
                             ],
                           ),
                         ),
@@ -444,7 +428,6 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         'odometerArrival': _odometerArrivalController.text,
         'odometerDeparture': _odometerDepartureController.text,
         'nextVisitDate': _nextVisitDate?.toIso8601String(),
-        'remarks': _remarksController.text,
         'photoPath': _capturedPhoto?.path,
         // Use Time In GPS as primary location (for backwards compatibility)
         'location': timeIn.gpsLat != null && timeIn.gpsLng != null

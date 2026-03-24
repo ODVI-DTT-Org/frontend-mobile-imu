@@ -164,17 +164,4 @@ class UserProfile {
     return UserRole.caravan;
   }
 
-  // Mock profile for development
-  static UserProfile mock() {
-    return UserProfile(
-      id: 'user-1',
-      employeeId: 'EMP-2024-001',
-      firstName: 'Juan',
-      lastName: 'Dela Cruz',
-      email: 'juan.delacruz@company.com',
-      phone: '+63 912 345 6789',
-      role: UserRole.caravan,
-      createdAt: DateTime(2024, 1, 15),
-    );
-  }
 }

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
-import '../../../../services/sync/sync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
 
@@ -18,8 +17,6 @@ class AddProspectClientPage extends ConsumerStatefulWidget {
 class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
   final _formKey = GlobalKey<FormState>();
   final _hiveService = HiveService();
-  final _syncService = SyncService();
-
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _middleNameController = TextEditingController();
@@ -157,15 +154,7 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
       // Save to Hive
       await _hiveService.saveClient(clientId, clientData);
 
-      // Queue for sync
-      await _syncService.queueForSync(
-        id: clientId,
-        operation: 'CREATE',
-        entityType: 'client',
-        data: clientData,
-      );
-
-      // Refresh providers
+      // PowerSync will handle sync automatically via the repository
       ref.invalidate(clientsProvider);
 
       HapticUtils.success();

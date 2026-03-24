@@ -164,7 +164,6 @@ class OfflineNotificationService {
         type.replaceAll('_', ' ').toUpperCase(),
         importance: Importance.high,
         priority: Priority.high,
-        payload: data?.toString(),
       );
 
       const iosDetails = DarwinNotificationDetails(

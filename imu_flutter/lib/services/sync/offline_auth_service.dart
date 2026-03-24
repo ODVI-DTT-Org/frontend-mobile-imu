@@ -46,11 +46,15 @@ class OfflineAuthService {
 
       final row = results.first;
       return UserProfile(
-        userId: row['user_id'] as String,
-        name: row['name'] as String,
+        id: row['id'] as String? ?? row['user_id'] as String,
+        employeeId: row['employee_id'] as String? ?? '',
+        firstName: row['first_name'] as String? ?? (row['name'] as String?)?.split(' ').first ?? '',
+        lastName: row['last_name'] as String? ?? (row['name'] as String?)?.split(' ').last ?? '',
         email: row['email'] as String,
+        phone: row['phone'] as String? ?? '',
         role: row['role'] as String,
-        avatarUrl: row['avatar_url'] as String?,
+        profilePhotoUrl: row['profile_photo_url'] as String? ?? row['avatar_url'] as String?,
+        createdAt: DateTime.now(),
       );
     } catch (e) {
       logError('Failed to get cached user profile', e);
@@ -80,15 +84,18 @@ class OfflineAuthService {
   Future<void> cacheUserProfile(UserProfile profile) async {
     await _db.execute(
       '''INSERT OR REPLACE INTO user_profiles
-      (id, user_id, name, email, role, avatar_url)
-      VALUES (?, ?, ?, ?, ?, ?)''',
+      (id, employee_id, first_name, last_name, email, phone, role, profile_photo_url, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
-        profile.userId,
-        profile.userId,
-        profile.name,
+        profile.id,
+        profile.employeeId,
+        profile.firstName,
+        profile.lastName,
         profile.email,
+        profile.phone,
         profile.role,
-        profile.avatarUrl,
+        profile.profilePhotoUrl,
+        profile.createdAt.toIso8601String(),
       ],
     );
     logDebug('User profile cached');

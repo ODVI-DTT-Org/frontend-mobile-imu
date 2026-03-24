@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:imu_flutter/services/api/sync_queue_service.dart';
 
 import '../../mocks/mocks.dart';

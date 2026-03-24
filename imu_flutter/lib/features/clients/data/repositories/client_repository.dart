@@ -2,128 +2,261 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
-import 'package:imu_flutter/services/local_storage/hive_service.dart';
-import 'package:imu_flutter/shared/providers/app_providers.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import '../../../../core/utils/logger.dart';
 
-/// Repository for client CRUD operations using Hive
-/// TODO: Phase 2 - Will be updated to use PowerSync
+/// Repository for client CRUD operations using PowerSync
 class ClientRepository {
-  final HiveService _hiveService;
   final _uuid = const Uuid();
 
-  ClientRepository(this._hiveService);
-
-  /// Watch all clients with real-time updates
+  /// Watch all clients with real-time updates from PowerSync
   Stream<List<Client>> watchClients() async* {
-    // For now, emit the current list and update on changes
-    // TODO: Phase 2 - Implement real-time updates with PowerSync
-    final clients = await getClients();
-    yield clients;
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch('SELECT * FROM clients')) {
+        final clients = row.map(Client.fromRow).toList();
+        yield clients;
+      }
+    } catch (e) {
+      logError('Error watching clients', e);
+      yield [];
+    }
   }
 
   /// Watch single client by ID
   Stream<Client?> watchClient(String id) async* {
-    // TODO: Phase 2 - Implement real-time updates with PowerSync
-    final client = await getClient(id);
-    yield client;
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch(
+        'SELECT * FROM clients WHERE id = ?',
+        parameters: [id],
+      )) {
+        yield row.isNotEmpty ? Client.fromRow(row.first) : null;
+      }
+    } catch (e) {
+      logError('Error watching client $id', e);
+      yield null;
+    }
   }
 
   /// Get all clients (one-time fetch)
   Future<List<Client>> getClients() async {
-    final data = _hiveService.getAllClients();
-    return data.map((json) => Client.fromJson(json)).toList();
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll('SELECT * FROM clients');
+      return results.map(Client.fromRow).toList();
+    } catch (e) {
+      logError('Error getting clients', e);
+      return [];
+    }
   }
 
-  /// Get client by ID (one-time fetch)
+  /// Get client by ID
   Future<Client?> getClient(String id) async {
-    final data = _hiveService.getClient(id);
-    if (data == null) return null;
-    return Client.fromJson(data);
-  }
-
-  /// Create a new client (offline-first)
-  Future<Client> createClient(Client client) async {
-    final id = client.id ?? _uuid.v4();
-    final now = DateTime.now();
-
-    final newClient = client.copyWith(
-      id: id,
-      createdAt: client.createdAt ?? now,
-      updatedAt: now,
-    );
-
-    await _hiveService.addClient(newClient.toJson());
-    logDebug('Created client: $id');
-    return newClient;
-  }
-
-  /// Update an existing client (offline-first)
-  Future<Client> updateClient(Client client) async {
-    if (client.id == null) {
-      throw ArgumentError('Client ID is required for update');
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll(
+        'SELECT * FROM clients WHERE id = ?',
+        [id],
+      );
+      return results.isNotEmpty ? Client.fromRow(results.first) : null;
+    } catch (e) {
+      logError('Error getting client $id', e);
+      return null;
     }
-
-    final now = DateTime.now();
-    final updatedClient = client.copyWith(updatedAt: now);
-
-    await _hiveService.updateClient(client.id!, updatedClient.toJson());
-    logDebug('Updated client: ${client.id}');
-    return updatedClient;
   }
 
-  /// Delete a client (offline-first)
-  Future<void> deleteClient(String id) async {
-    await _hiveService.deleteClient(id);
-    logDebug('Deleted client: $id');
-  }
-
-  /// Toggle client starred status
-  Future<void> toggleStar(String id) async {
-    final client = await getClient(id);
-    if (client == null) return;
-
-    final updatedClient = client.copyWith(isStarred: !client.isStarred);
-    await _hiveService.updateClient(id, updatedClient.toJson());
-    logDebug('Toggled star for client: $id');
-  }
-
-  /// Search clients by name
-  Stream<List<Client>> searchClients(String query) async* {
-    // TODO: Phase 2 - Implement real-time search with PowerSync
-    final clients = await getClients();
-    if (query.isEmpty) {
-      yield clients;
-      return;
+  /// Search clients by query
+  Future<List<Client>> searchClients(String searchQuery) async {
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll(
+        '''SELECT * FROM clients
+           WHERE first_name LIKE ?
+           OR last_name LIKE ?
+           OR email LIKE ?
+           OR phone LIKE ?''',
+        ['%$searchQuery%', '%$searchQuery%', '%$searchQuery%', '%$searchQuery%'],
+      );
+      return results.map(Client.fromRow).toList();
+    } catch (e) {
+      logError('Error searching clients', e);
+      return [];
     }
-
-    final searchQuery = query.toLowerCase();
-    final filtered = clients.where((c) {
-      return c.firstName.toLowerCase().contains(searchQuery) ||
-          c.lastName.toLowerCase().contains(searchQuery);
-    }).toList();
-    yield filtered;
   }
 
   /// Get clients by type
   Stream<List<Client>> watchClientsByType(String clientType) async* {
-    // TODO: Phase 2 - Implement with PowerSync
-    final clients = await getClients();
-    final filtered = clients.where((c) => c.clientType.name == clientType).toList();
-    yield filtered;
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch(
+        'SELECT * FROM clients WHERE client_type = ?',
+        parameters: [clientType],
+      )) {
+        yield row.map(Client.fromRow).toList();
+      }
+    } catch (e) {
+      logError('Error watching clients by type', e);
+      yield [];
+    }
   }
 
   /// Get starred clients
   Stream<List<Client>> watchStarredClients() async* {
-    // TODO: Phase 2 - Implement with PowerSync
-    final clients = await getClients();
-    final filtered = clients.where((c) => c.isStarred).toList();
-    yield filtered;
+    try {
+      final db = await PowerSyncService.database;
+      await for (final row in db.watch(
+        'SELECT * FROM clients WHERE is_starred = 1',
+      )) {
+        yield row.map(Client.fromRow).toList();
+      }
+    } catch (e) {
+      logError('Error watching starred clients', e);
+      yield [];
+    }
+  }
+
+  /// Create a new client
+  Future<Client> createClient(Client client) async {
+    try {
+      final db = await PowerSyncService.database;
+      final id = (client.id == null || client.id!.isEmpty) ? _uuid.v4() : client.id!;
+      final now = DateTime.now().toIso8601String();
+
+      await db.execute(
+        '''INSERT INTO clients (
+          id, first_name, last_name, middle_name, birth_date, email, phone,
+          agency_name, department, position, employment_status, payroll_date,
+          tenure, client_type, product_type, market_type, pension_type, pan,
+          facebook_link, remarks, agency_id, caravan_id, is_starred, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        [
+          id,
+          client.firstName,
+          client.lastName,
+          client.middleName,
+          client.birthDate?.toIso8601String(),
+          client.email,
+          client.phone,
+          client.agencyName,
+          client.department,
+          client.position,
+          client.employmentStatus,
+          client.payrollDate,
+          client.tenure,
+          client.clientType.name,
+          client.productType.name,
+          client.marketType?.name,
+          client.pensionType.name,
+          client.pan,
+          client.facebookLink,
+          client.remarks,
+          client.agencyId,
+          client.caravanId,
+          client.isStarred ? 1 : 0,
+          now,
+          now,
+        ],
+      );
+
+      logDebug('Created client: $id');
+      return client.copyWith(id: id, createdAt: DateTime.parse(now));
+    } catch (e) {
+      logError('Error creating client', e);
+      rethrow;
+    }
+  }
+
+  /// Update an existing client
+  Future<void> updateClient(Client client) async {
+    try {
+      final db = await PowerSyncService.database;
+
+      await db.execute(
+        '''UPDATE clients SET
+          first_name = ?, last_name = ?, middle_name = ?, birth_date = ?,
+          email = ?, phone = ?, agency_name = ?, department = ?,
+          position = ?, employment_status = ?, payroll_date = ?, tenure = ?,
+          client_type = ?, product_type = ?, market_type = ?, pension_type = ?,
+          pan = ?, facebook_link = ?, remarks = ?, agency_id = ?,
+          caravan_id = ?, is_starred = ?, updated_at = ?
+        WHERE id = ?''',
+        [
+          client.firstName,
+          client.lastName,
+          client.middleName,
+          client.birthDate?.toIso8601String(),
+          client.email,
+          client.phone,
+          client.agencyName,
+          client.department,
+          client.position,
+          client.employmentStatus,
+          client.payrollDate,
+          client.tenure,
+          client.clientType.name,
+          client.productType.name,
+          client.marketType?.name,
+          client.pensionType.name,
+          client.pan,
+          client.facebookLink,
+          client.remarks,
+          client.agencyId,
+          client.caravanId,
+          client.isStarred ? 1 : 0,
+          DateTime.now().toIso8601String(),
+          client.id,
+        ],
+      );
+
+      logDebug('Updated client: ${client.id}');
+    } catch (e) {
+      logError('Error updating client', e);
+      rethrow;
+    }
+  }
+
+  /// Delete a client
+  Future<void> deleteClient(String id) async {
+    try {
+      final db = await PowerSyncService.database;
+      await db.execute('DELETE FROM clients WHERE id = ?', [id]);
+      logDebug('Deleted client: $id');
+    } catch (e) {
+      logError('Error deleting client', e);
+      rethrow;
+    }
+  }
+
+  /// Toggle client star status
+  Future<void> toggleStar(String id) async {
+    try {
+      final db = await PowerSyncService.database;
+      await db.execute(
+        'UPDATE clients SET is_starred = CASE WHEN is_starred = 1 THEN 0 ELSE 1 END WHERE id = ?',
+        [id],
+      );
+      logDebug('Toggled star for client: $id');
+    } catch (e) {
+      logError('Error toggling star', e);
+      rethrow;
+    }
+  }
+
+  /// Get clients count
+  Future<int> getClientsCount() async {
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.get('SELECT COUNT(*) as count FROM clients');
+      return results?['count'] as int? ?? 0;
+    } catch (e) {
+      logError('Error getting clients count', e);
+      return 0;
+    }
   }
 }
 
 /// Provider for client repository
 final clientRepositoryProvider = Provider<ClientRepository>((ref) {
-  final hiveService = ref.watch(hiveServiceProvider);
-  return ClientRepository(hiveService);
+  return ClientRepository();
 });

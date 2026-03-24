@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../services/sync/sync_service.dart';
 
@@ -48,27 +49,25 @@ class _PullToRefreshState extends State<PullToRefresh> {
   }
 }
 
-/// Sync-enabled pull to refresh
-class SyncPullToRefresh extends StatelessWidget {
+/// Sync-enabled pull to refresh using Riverpod
+class SyncPullToRefresh extends ConsumerWidget {
   final Widget child;
-  final SyncService? syncService;
 
   const SyncPullToRefresh({
     super.key,
     required this.child,
-    this.syncService,
   });
 
-  Future<void> _handleRefresh() async {
-    final service = syncService ?? SyncService();
-    await service.syncNow();
+  Future<void> _handleRefresh(WidgetRef ref) async {
+    final syncService = ref.read(syncServiceProvider);
+    await syncService.syncNow();
     HapticUtils.success();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return PullToRefresh(
-      onRefresh: _handleRefresh,
+      onRefresh: () => _handleRefresh(ref),
       refreshMessage: 'Syncing data...',
       child: child,
     );

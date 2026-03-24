@@ -11,7 +11,6 @@ import '../../services/local_storage/hive_service.dart';
 import '../../services/sync/sync_service.dart';
 import '../../services/location/geolocation_service.dart';
 import '../../core/services/location_service.dart';
-import '../../core/services/test_data_generator.dart';
 import '../../features/targets/data/models/target_model.dart';
 import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
@@ -34,10 +33,8 @@ final hiveServiceProvider = Provider<HiveService>((ref) {
   return HiveService();
 });
 
-/// Sync service provider
-final syncServiceProvider = Provider<SyncService>((ref) {
-  return SyncService();
-});
+/// Sync service provider - re-exported from sync_service.dart
+// This is now defined in lib/services/sync/sync_service.dart
 
 /// Geolocation service provider
 final geolocationServiceProvider = Provider<GeolocationService>((ref) {
@@ -60,13 +57,13 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
 /// TODO: Phase 1 - Update to use new user model from Supabase
 final currentUserRecordProvider = Provider<Map<String, dynamic>?>((ref) {
   final authState = ref.watch(authNotifierProvider);
-  // Convert auth user to generic map for compatibility
   if (authState.user == null) return null;
+  final user = authState.user!;
   return {
-    'id': authState.user?.id,
-    'email': authState.user?.data['email'],
-    'first_name': authState.user?.data['first_name'],
-    'last_name': authState.user?.data['last_name'],
+    'id': user.id,
+    'email': user.email,
+    'first_name': user.firstName,
+    'last_name': user.lastName,
   };
 });
 
@@ -82,16 +79,16 @@ final currentUserNameProvider = Provider<String?>((ref) {
   final user = authState.user;
   if (user == null) return null;
 
-  final firstName = user.data['first_name'] as String? ?? '';
-  final lastName = user.data['last_name'] as String? ?? '';
+  final firstName = user.firstName;
+  final lastName = user.lastName;
   final fullName = '$firstName $lastName'.trim();
-  return fullName.isNotEmpty ? fullName : user.data['email'] as String?;
+  return fullName.isNotEmpty ? fullName : user.email;
 });
 
 /// Current user email - derived from auth state
 final currentUserEmailProvider = Provider<String?>((ref) {
   final authState = ref.watch(authNotifierProvider);
-  return authState.user?.data['email'] as String?;
+  return authState.user?.email;
 });
 
 // ==================== Client Providers ====================
@@ -204,11 +201,8 @@ final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
 
 // ==================== Sync Providers ====================
 
-/// Sync status
-final syncStatusProvider = Provider<SyncStatus>((ref) {
-  final syncService = ref.watch(syncServiceProvider);
-  return syncService.status;
-});
+/// Sync status - re-exported from sync_service.dart
+// This is now defined in lib/services/sync/sync_service.dart
 
 /// Pending sync count
 final pendingSyncCountProvider = Provider<int>((ref) {
@@ -281,18 +275,6 @@ final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
 });
 
-/// Test data generator
-final testDataGeneratorProvider = Provider<TestDataGenerator>((ref) {
-  final hiveService = ref.watch(hiveServiceProvider);
-  return TestDataGenerator(hiveService);
-});
-
-/// Data statistics for debug dashboard
-final dataStatsProvider = Provider<Map<String, int>>((ref) {
-  final generator = ref.watch(testDataGeneratorProvider);
-  return generator.getDataStats();
-});
-
 // ==================== Target Providers ====================
 
 /// Selected target period
@@ -314,8 +296,8 @@ final targetsProvider = FutureProvider<List<Target>>((ref) async {
     }
   }
 
-  // Fall back to mock data for now
-  return _getMockTargets();
+  // Return empty list if no targets available
+  return [];
 });
 
 /// Current period target
@@ -336,59 +318,6 @@ final currentTargetProvider = Provider<Target?>((ref) {
   );
 });
 
-/// Helper to generate mock targets
-List<Target> _getMockTargets() {
-  final now = DateTime.now();
-  final weekStart = now.subtract(Duration(days: now.weekday - 1));
-  final weekEnd = weekStart.add(const Duration(days: 6));
-  final monthStart = DateTime(now.year, now.month, 1);
-  final monthEnd = DateTime(now.year, now.month + 1, 0);
-
-  return [
-    Target(
-      id: 'daily-1',
-      userId: 'user-1',
-      periodStart: DateTime(now.year, now.month, now.day),
-      periodEnd: DateTime(now.year, now.month, now.day, 23, 59, 59),
-      period: TargetPeriod.daily,
-      clientVisitsTarget: 5,
-      clientVisitsCompleted: 3,
-      touchpointsTarget: 10,
-      touchpointsCompleted: 6,
-      newClientsTarget: 2,
-      newClientsAdded: 1,
-      createdAt: now,
-    ),
-    Target(
-      id: 'weekly-1',
-      userId: 'user-1',
-      periodStart: weekStart,
-      periodEnd: weekEnd,
-      period: TargetPeriod.weekly,
-      clientVisitsTarget: 25,
-      clientVisitsCompleted: 18,
-      touchpointsTarget: 50,
-      touchpointsCompleted: 35,
-      newClientsTarget: 10,
-      newClientsAdded: 7,
-      createdAt: weekStart,
-    ),
-    Target(
-      id: 'monthly-1',
-      userId: 'user-1',
-      periodStart: monthStart,
-      periodEnd: monthEnd,
-      period: TargetPeriod.monthly,
-      clientVisitsTarget: 100,
-      clientVisitsCompleted: 45,
-      touchpointsTarget: 200,
-      touchpointsCompleted: 90,
-      newClientsTarget: 40,
-      newClientsAdded: 18,
-      createdAt: monthStart,
-    ),
-  ];
-}
 
 // ==================== Missed Visits Providers ====================
 
@@ -609,7 +538,7 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
     await box.put(record.id, const JsonEncoder().convert(record.toJson()));
   }
 
-  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padStart(2, '0')}-${date.day.toString().padStart(2, '0')}';
+  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
 // ==================== Profile Providers ====================
@@ -649,8 +578,8 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
       }
     }
 
-    // Fall back to mock data
-    state = UserProfile.mock();
+    // No profile available - return null
+    state = null;
   }
 
   UserProfile _convertToUserProfile(dynamic apiProfile) {

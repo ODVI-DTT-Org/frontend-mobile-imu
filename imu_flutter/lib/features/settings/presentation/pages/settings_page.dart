@@ -642,7 +642,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ElevatedButton(
             onPressed: () {
               if (newPasswordController.text == confirmPasswordController.text &&
-                  newPasswordController.text.length >= 8) {
+                  newPasswordController.text.length >= 6) {
                 HapticUtils.success();
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(

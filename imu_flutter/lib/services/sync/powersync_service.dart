@@ -4,6 +4,8 @@ import 'package:powersync/powersync.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../core/utils/logger.dart';
+// import '../../core/config/app_config.dart';
+import 'powersync_connector.dart';
 
 /// PowerSync database schema matching PostgreSQL tables
 const Schema _powerSyncSchema = Schema([
@@ -91,6 +93,7 @@ const Schema _powerSyncSchema = Schema([
 class PowerSyncService {
   static PowerSyncDatabase? _database;
   static const String _databaseName = 'imu_powersync.db';
+  static bool _isConnected = false;
 
   /// Get the database path
   static Future<String> _getDatabasePath() async {
@@ -116,6 +119,38 @@ class PowerSyncService {
     return db;
   }
 
+  /// Connect to PowerSync with the provided connector
+  static Future<void> connect(IMUPowerSyncConnector connector) async {
+    if (_isConnected) {
+      logDebug('Already connected to PowerSync');
+      return;
+    }
+
+    try {
+      final db = await database;
+
+      await db.connect(connector: connector);
+      _isConnected = true;
+      logDebug('Connected to PowerSync');
+    } catch (e) {
+      logError('Failed to connect to PowerSync', e);
+      rethrow;
+    }
+  }
+
+  /// Disconnect from PowerSync
+  static Future<void> disconnect() async {
+    if (!_isConnected || _database == null) return;
+
+    try {
+      await _database!.disconnect();
+      _isConnected = false;
+      logDebug('Disconnected from PowerSync');
+    } catch (e) {
+      logError('Failed to disconnect from PowerSync', e);
+    }
+  }
+
   /// Get sync status stream
   static Stream<SyncStatus> get syncStatus {
     if (_database == null) {
@@ -125,22 +160,51 @@ class PowerSyncService {
     return Stream.periodic(
       const Duration(seconds: 1),
       (_) => SyncStatus(
-        connected: _database?.connected ?? false,
+        connected: _isConnected && (_database?.connected ?? false),
         pendingUploads: 0,
       ),
     );
   }
 
   /// Check if connected to PowerSync service
-  static bool get isConnected => _database?.connected ?? false;
+  static bool get isConnected => _isConnected && (_database?.connected ?? false);
 
   /// Get pending upload count
-  static int get pendingUploadCount => 0; // Simplified for now
+  static Future<int> get pendingUploadCount async {
+    if (_database == null) return 0;
+    try {
+      final batch = await _database!.getCrudBatch();
+      return batch?.crud.length ?? 0;
+    } catch (e) {
+      logError('Failed to get pending upload count', e);
+      return 0;
+    }
+  }
+
+  /// Execute a SQL query
+  static Future<List<Map<String, dynamic>>> query(
+    String sql, [
+    List<Object?> parameters = const [],
+  ]) async {
+    final db = await database;
+    return await db.getAll(sql, parameters);
+  }
+
+  /// Execute a SQL statement
+  static Future<void> execute(
+    String sql, [
+    List<Object?> parameters = const [],
+  ]) async {
+    final db = await database;
+    await db.execute(sql, parameters);
+  }
 
   /// Close the database
   static Future<void> close() async {
+    await disconnect();
     await _database?.close();
     _database = null;
+    _isConnected = false;
     logDebug('PowerSync database closed');
   }
 }
@@ -170,4 +234,9 @@ final powerSyncDatabaseProvider = FutureProvider<PowerSyncDatabase>((ref) async 
 /// Provider for sync status stream
 final syncStatusProvider = StreamProvider<SyncStatus>((ref) {
   return PowerSyncService.syncStatus;
+});
+
+/// Provider for PowerSync service
+final powerSyncServiceProvider = Provider<PowerSyncService>((ref) {
+  return PowerSyncService();
 });

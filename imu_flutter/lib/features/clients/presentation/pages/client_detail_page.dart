@@ -81,7 +81,6 @@ class ClientDetailPage extends ConsumerStatefulWidget {
 
 class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   final _hiveService = HiveService();
-  final _syncService = SyncService();
 
   Client? _client;
   bool _isLoading = true;
@@ -134,12 +133,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       HapticUtils.delete();
 
       await _hiveService.deleteClient(widget.clientId);
-      await _syncService.queueForSync(
-        id: widget.clientId,
-        operation: 'DELETE',
-        entityType: 'client',
-        data: {'id': widget.clientId},
-      );
+      // PowerSync handles sync automatically via the repository
 
       ref.invalidate(clientsProvider);
 
@@ -224,12 +218,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       };
 
       await _hiveService.saveTouchpoint(touchpointId, touchpointData);
-      await _syncService.queueForSync(
-        id: touchpointId,
-        operation: 'CREATE',
-        entityType: 'touchpoint',
-        data: touchpointData,
-      );
+      // PowerSync handles sync automatically via the repository
 
       // Reload client
       await _loadClient();

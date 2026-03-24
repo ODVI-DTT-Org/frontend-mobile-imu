@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
-import '../../../../services/sync/sync_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../data/models/client_model.dart';
 
@@ -18,7 +17,6 @@ class EditClientPage extends StatefulWidget {
 class _EditClientPageState extends State<EditClientPage> {
   final _formKey = GlobalKey<FormState>();
   final _hiveService = HiveService();
-  final _syncService = SyncService();
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -218,13 +216,7 @@ class _EditClientPageState extends State<EditClientPage> {
         ...updatedData,
       });
 
-      // Queue for sync
-      await _syncService.queueForSync(
-        id: widget.clientId,
-        operation: 'UPDATE',
-        entityType: 'client',
-        data: updatedData,
-      );
+      // PowerSync handles sync automatically
 
       HapticUtils.success();
 
@@ -280,12 +272,7 @@ class _EditClientPageState extends State<EditClientPage> {
 
       await _hiveService.deleteClient(widget.clientId);
 
-      await _syncService.queueForSync(
-        id: widget.clientId,
-        operation: 'DELETE',
-        entityType: 'client',
-        data: {'id': widget.clientId},
-      );
+      // PowerSync handles sync automatically
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

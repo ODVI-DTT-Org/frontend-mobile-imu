@@ -1,50 +1,84 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'jwt_auth_service.dart';
 
-/// Stub user model (will be replaced with JWT user)
-class StubUser {
-  final String id;
-  final String email;
-  final String name;
-  final Map<String, dynamic> data;
+// Re-export JwtUser for convenience
+export 'jwt_auth_service.dart' show JwtUser;
 
-  const StubUser({
-    required this.id,
-    required this.email,
-    required this.name,
-    this.data = const {},
-  });
-}
-
-/// Stub auth service (placeholder until JWT auth is implemented)
+/// Main authentication service wrapping JWT auth
 class AuthService {
-  StubUser? _currentUser;
+  final JwtAuthService _jwtAuth;
 
-  Future<void> initialize() async {
-    // TODO: Implement JWT auth
-  }
+  AuthService({JwtAuthService? jwtAuth}) : _jwtAuth = jwtAuth ?? JwtAuthService();
 
-  Future<StubUser?> login(String email, String password) async {
-    // TODO: Implement login
-    throw UnimplementedError('JWT auth not yet implemented');
-  }
+  /// Initialize authentication service
+  Future<void> initialize() => _jwtAuth.initialize();
 
-  Future<void> logout() async {
-    _currentUser = null;
-  }
+  /// Login with email and password
+  Future<JwtUser> login(String email, String password) =>
+      _jwtAuth.login(email: email, password: password);
 
-  bool get isAuthenticated => _currentUser != null;
-  StubUser? get currentUser => _currentUser;
-  String? get currentUserId => _currentUser?.id;
+  /// Logout current user
+  Future<void> logout() => _jwtAuth.logout();
+
+  /// Refresh authentication tokens
+  Future<void> refreshToken() => _jwtAuth.refreshTokens();
+
+  /// Register new user
+  Future<JwtUser> register({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    String role = 'field_agent',
+  }) =>
+      _jwtAuth.register(
+        email: email,
+        password: password,
+        firstName: firstName,
+        lastName: lastName,
+        role: role,
+      );
+
+  /// Check if user is authenticated
+  bool get isAuthenticated => _jwtAuth.isAuthenticated;
+
+  /// Get current user
+  JwtUser? get currentUser => _jwtAuth.currentUser;
+
+  /// Get current user ID
+  String? get currentUserId => _jwtAuth.currentUser?.id;
+
+  /// Get current user email
+  String? get currentUserEmail => _jwtAuth.currentUser?.email;
+
+  /// Get current user name
+  String? get currentUserName => _jwtAuth.currentUser?.fullName;
+
+  /// Get current user role
+  String? get currentUserRole => _jwtAuth.currentUser?.role;
+
+  /// Get authorization header
+  String? get authHeader => _jwtAuth.authHeader;
+
+  /// Check if token needs refresh
+  bool get needsRefresh => _jwtAuth.needsRefresh;
 }
 
-/// Providers
-final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+/// Provider for JWT auth service
+final jwtAuthProvider = Provider<JwtAuthService>((ref) => JwtAuthService());
 
+/// Provider for main auth service
+final authServiceProvider = Provider<AuthService>((ref) {
+  final jwtAuth = ref.watch(jwtAuthProvider);
+  return AuthService(jwtAuth: jwtAuth);
+});
+
+/// Authentication state
 class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
   final String? error;
-  final StubUser? user;
+  final JwtUser? user;
 
   const AuthState({
     required this.isAuthenticated,
@@ -62,7 +96,7 @@ class AuthState {
     bool? isAuthenticated,
     bool? isLoading,
     String? error,
-    StubUser? user,
+    JwtUser? user,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -71,23 +105,33 @@ class AuthState {
       user: user ?? this.user,
     );
   }
+
+  @override
+  String toString() => 'AuthState(isAuthenticated: $isAuthenticated, isLoading: $isLoading, user: ${user?.email})';
 }
 
+/// Authentication state notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
 
   AuthNotifier(this._authService) : super(AuthState.initial());
 
+  /// Check current authentication status
   Future<void> checkAuthStatus() async {
     state = state.copyWith(isLoading: true);
-    final isAuth = _authService.isAuthenticated;
-    state = state.copyWith(
-      isAuthenticated: isAuth,
-      user: _authService.currentUser,
-      isLoading: false,
-    );
+    try {
+      await _authService.initialize();
+      state = state.copyWith(
+        isAuthenticated: _authService.isAuthenticated,
+        user: _authService.currentUser,
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
   }
 
+  /// Login with email and password
   Future<bool> login(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -104,19 +148,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Logout current user
   Future<void> logout() async {
+    state = state.copyWith(isLoading: true);
     await _authService.logout();
     state = AuthState.initial();
   }
 
+  /// Refresh authentication
+  Future<void> refresh() async {
+    try {
+      await _authService.refreshToken();
+      state = state.copyWith(
+        isAuthenticated: _authService.isAuthenticated,
+        user: _authService.currentUser,
+      );
+    } catch (e) {
+      state = AuthState.initial();
+    }
+  }
+
+  /// Clear any error message
   void clearError() {
     state = state.copyWith(error: null);
   }
 }
 
+/// Provider for authentication state
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
   final notifier = AuthNotifier(authService);
+  // Check auth status on initialization
   notifier.checkAuthStatus();
   return notifier;
 });
