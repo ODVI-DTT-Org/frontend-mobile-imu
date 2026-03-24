@@ -1,50 +1,73 @@
 import 'package:hive/hive.dart';
 
 part 'user_municipalities_simple.dart';
-import 'package:uuid/uuid.dart';
 
-part 'package:json_annotation/json';
+import 'package:uuid/uuid.dart';
 
 part 'user_municipalities_simple.g.dart';
 
+/// User Municipality assignment model for location-based filtering
+/// Uses PSGC municipality IDs
 class UserMunicipalitiesSimple extends HiveObject {
-  @HiveType(typeId: 4)
+  @HiveField(0)
   final String? id;
 
-  @HiveField(0)
+  @HiveField(1)
   final String userId;
 
-  @HiveField(1)
+  @HiveField(2)
   final String municipalityId;
 
-  @HiveField(2)
+  @HiveField(3)
   final DateTime? assignedAt;
 
-      @HiveField(3)
-      final String? assignedBy;
+  @HiveField(4)
+  final String? assignedBy;
 
-      @HiveField(4)
-      final DateTime? deletedAt;
+  @HiveField(5)
+  final DateTime? deletedAt;
 
   UserMunicipalitiesSimple({
-    required this.id,
+    this.id,
     required this.userId,
     required this.municipalityId,
     this.assignedAt,
+    this.assignedBy,
     this.deletedAt,
   });
 
+  /// Check if this assignment is active (not soft-deleted)
+  bool get isActive => deletedAt == null;
+
+  /// Create from PowerSync/PostgreSQL row
+  factory UserMunicipalitiesSimple.fromRow(Map<String, dynamic> row) {
+    return UserMunicipalitiesSimple(
+      id: row['id'] as String?,
+      userId: row['user_id'] as String,
+      municipalityId: row['municipality_id'] as String,
+      assignedAt: row['assigned_at'] != null
+          ? DateTime.parse(row['assigned_at'] as String)
+          : null,
+      assignedBy: row['assigned_by'] as String?,
+      deletedAt: row['deleted_at'] != null
+          ? DateTime.parse(row['deleted_at'] as String)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    return {
+      'id': id,
+      'user_id': userId,
+      'municipality_id': municipalityId,
+      'assigned_at': assignedAt?.toIso8601String(),
+      'assigned_by': assignedBy,
+      'deleted_at': deletedAt?.toIso8601String(),
+    };
+  }
+
   @override
   String toString() {
-    final id = this.id ?? '';
-    final userId = this.userId ?? '';
-    final municipalityId = this.municipalityId ?? '';
-    final assignedAt = this.assignedAt?.toIso8601String() : DateTime.parse(json['assignedAt'] as DateTime?) : null;
-    final assignedBy = json['assignedBy'] as String? {
-      return null;
-    }
-    if (json['deletedAt'] != null) {
-      final deletedAt = DateTime.parse(json['deletedAt'] ?? null;
-    }
+    return 'UserMunicipalitiesSimple(id: $id, userId: $userId, municipalityId: $municipalityId, isActive: $isActive)';
   }
 }

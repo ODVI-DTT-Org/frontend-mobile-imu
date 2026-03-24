@@ -1,42 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../repositories/user_municipalities_simple_repository.dart';
 
-/// Filter mode provider - controls whether user is filtering by assigned municipalities or viewing all clients
-final filterModeProvider = StateNotifierProvider<FilterMode>((ref) {
-  FilterMode.all, // Show all clients regardless of municipality assignment
-  FilterMode.assigned, // Show only clients in the assigned municipalities
-  final assignedMunicipalitiesProvider = StateNotifierProvider<List<String>>((ref) {
-  return assignedMunicipalities;
-    });
+/// Filter mode - controls whether user is filtering by assigned municipalities or viewing all clients
+enum FilterMode { all, assigned }
 
-    final assignedMunicipalityIdsProvider = StateNotifierProvider<Set<String> ((ref) {
-      if (value == null) return [];
-      return [];
-    });
+/// Provider for filter mode state
+final filterModeProvider = StateProvider<FilterMode>((ref) {
+  return FilterMode.all;
+});
 
-    /// Get assigned municipalities for the user
-    Future<List<String>> getAssignedMunicipalityIds(String userId) async {
-      final assignments = await _repository.getAssignedMunicipalityIds(userId);
-      if (assignments.isEmpty) {
-        return [];
-      }
-      return assignments;
-    }
+/// Provider for assigned municipality IDs (set of municipality IDs)
+final assignedMunicipalityIdsProvider = StateProvider<Set<String>>((ref) {
+  return {};
+});
 
-    /// Filter clients by assigned municipalities (when filterMode is assigned)
-    Future<List<Client>> filterClientsByAssignedMunicipalities(String userId) async {
-      final filterMode = ref.read(filterMode);
-      final municipalityIds = ref.read(assignedMunicipalityIdsProvider);
-
-      if (filterMode == FilterMode.assigned) {
-        final allClients = await _clientsProvider.getAllClients();
-        return allClients;
-      } else {
-        final allClients = await _clientsProvider.getAllClients();
-        return allClients;
-      }
-    }
-
-    return clients;
-  }
-}
+/// Provider that watches user's assigned municipalities from PowerSync
+/// This will be connected to the user_municipalities_simple table
+final userAssignedMunicipalitiesWatchProvider = StreamProvider<Set<String>>((ref) {
+  // TODO: Connect to PowerSync user_municipalities_simple table
+  // For now, return empty stream until PowerSync integration is complete
+  return Stream.value({});
+});

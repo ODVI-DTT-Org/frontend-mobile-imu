@@ -9,6 +9,7 @@ import 'powersync_connector.dart';
 
 /// PowerSync database schema matching PostgreSQL tables
 const Schema _powerSyncSchema = Schema([
+  // Client data
   Table('clients', [
     Column.text('first_name'),
     Column.text('last_name'),
@@ -80,12 +81,50 @@ const Schema _powerSyncSchema = Schema([
     Column.text('priority'),
     Column.text('notes'),
   ]),
+  // User profile data
   Table('user_profiles', [
     Column.text('user_id'),
     Column.text('name'),
     Column.text('email'),
     Column.text('role'),
+    Column.text('area_manager_id'),
+    Column.text('assistant_area_manager_id'),
     Column.text('avatar_url'),
+  ]),
+  // User municipality assignments
+  Table('user_municipalities_simple', [
+    Column.text('user_id'),
+    Column.text('municipality_id'),
+    Column.text('assigned_at'),
+    Column.text('assigned_by'),
+    Column.text('deleted_at'),
+  ]),
+  // PSGC geographic data (regions)
+  Table('psgc_regions', [
+    Column.text('name'),
+    Column.text('code'),
+  ]),
+  // PSGC provinces
+  Table('psgc_provinces', [
+    Column.text('region'),
+    Column.text('name'),
+    Column.text('code'),
+  ]),
+  // PSGC municipalities/cities
+  Table('psgc_municipalities', [
+    Column.text('region'),
+    Column.text('province'),
+    Column.text('name'),
+    Column.text('code'),
+    Column.text('is_city'),
+  ]),
+  // PSGC barangays
+  Table('psgc_barangays', [
+    Column.text('region'),
+    Column.text('province'),
+    Column.text('mun_city'),
+    Column.text('barangay'),
+    Column.text('zip_code'),
   ]),
 ]);
 
