@@ -170,7 +170,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
             ),
             Text(
-              profile.role,
+              profile.role.displayName,
               style: TextStyle(color: Colors.grey[600]),
             ),
             const SizedBox(height: 32),
