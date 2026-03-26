@@ -95,14 +95,16 @@ class TouchpointRepository {
 
       await db.execute(
         '''INSERT INTO touchpoints (
-          id, client_id, caravan_id, touchpoint_number, type, date, address,
+          id, client_id, user_id, touchpoint_number, type, date, address,
           time_arrival, time_departure, odometer_arrival, odometer_departure,
-          reason, next_visit_date, notes, photo_url, audio_url, latitude, longitude
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          reason, status, next_visit_date, notes, photo_url, audio_url, latitude, longitude,
+          time_in, time_in_gps_lat, time_in_gps_lng, time_in_gps_address,
+          time_out, time_out_gps_lat, time_out_gps_lng, time_out_gps_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         [
           id,
           touchpoint.clientId,
-          touchpoint.agentId,
+          touchpoint.userId, // Changed from agentId
           touchpoint.touchpointNumber,
           touchpoint.type.apiValue,
           touchpoint.date.toIso8601String(),
@@ -116,12 +118,22 @@ class TouchpointRepository {
           touchpoint.odometerArrival,
           touchpoint.odometerDeparture,
           touchpoint.reason.apiValue,
+          touchpoint.status.apiValue, // NEW: status field
           touchpoint.nextVisitDate?.toIso8601String(),
           touchpoint.remarks,
           touchpoint.photoPath,
-          null, // audio_url - not currently used in model
+          touchpoint.audioPath,
           touchpoint.latitude,
           touchpoint.longitude,
+          // NEW: Time In/Out GPS fields
+          touchpoint.timeIn?.toIso8601String(),
+          touchpoint.timeInGpsLat,
+          touchpoint.timeInGpsLng,
+          touchpoint.timeInGpsAddress,
+          touchpoint.timeOut?.toIso8601String(),
+          touchpoint.timeOutGpsLat,
+          touchpoint.timeOutGpsLng,
+          touchpoint.timeOutGpsAddress,
         ],
       );
 
@@ -130,7 +142,7 @@ class TouchpointRepository {
       return Touchpoint(
         id: id,
         clientId: touchpoint.clientId,
-        agentId: touchpoint.agentId,
+        userId: touchpoint.userId,
         touchpointNumber: touchpoint.touchpointNumber,
         type: touchpoint.type,
         date: touchpoint.date,
@@ -140,11 +152,21 @@ class TouchpointRepository {
         odometerArrival: touchpoint.odometerArrival,
         odometerDeparture: touchpoint.odometerDeparture,
         reason: touchpoint.reason,
+        status: touchpoint.status, // NEW: status field
         nextVisitDate: touchpoint.nextVisitDate,
         remarks: touchpoint.remarks,
         photoPath: touchpoint.photoPath,
+        audioPath: touchpoint.audioPath,
         latitude: touchpoint.latitude,
         longitude: touchpoint.longitude,
+        timeIn: touchpoint.timeIn,
+        timeInGpsLat: touchpoint.timeInGpsLat,
+        timeInGpsLng: touchpoint.timeInGpsLng,
+        timeInGpsAddress: touchpoint.timeInGpsAddress,
+        timeOut: touchpoint.timeOut,
+        timeOutGpsLat: touchpoint.timeOutGpsLat,
+        timeOutGpsLng: touchpoint.timeOutGpsLng,
+        timeOutGpsAddress: touchpoint.timeOutGpsAddress,
         createdAt: touchpoint.createdAt,
       );
     } catch (e) {
@@ -160,15 +182,17 @@ class TouchpointRepository {
 
       await db.execute(
         '''UPDATE touchpoints SET
-          client_id = ?, caravan_id = ?, touchpoint_number = ?, type = ?,
+          client_id = ?, user_id = ?, touchpoint_number = ?, type = ?,
           date = ?, address = ?, time_arrival = ?, time_departure = ?,
           odometer_arrival = ?, odometer_departure = ?, reason = ?,
-          next_visit_date = ?, notes = ?, photo_url = ?, audio_url = ?,
-          latitude = ?, longitude = ?
+          status = ?, next_visit_date = ?, notes = ?, photo_url = ?, audio_url = ?,
+          latitude = ?, longitude = ?,
+          time_in = ?, time_in_gps_lat = ?, time_in_gps_lng = ?, time_in_gps_address = ?,
+          time_out = ?, time_out_gps_lat = ?, time_out_gps_lng = ?, time_out_gps_address = ?
         WHERE id = ?''',
         [
           touchpoint.clientId,
-          touchpoint.agentId,
+          touchpoint.userId, // Changed from agentId
           touchpoint.touchpointNumber,
           touchpoint.type.apiValue,
           touchpoint.date.toIso8601String(),
@@ -182,12 +206,22 @@ class TouchpointRepository {
           touchpoint.odometerArrival,
           touchpoint.odometerDeparture,
           touchpoint.reason.apiValue,
+          touchpoint.status.apiValue, // NEW: status field
           touchpoint.nextVisitDate?.toIso8601String(),
           touchpoint.remarks,
           touchpoint.photoPath,
-          null, // audio_url - not currently used in model
+          touchpoint.audioPath,
           touchpoint.latitude,
           touchpoint.longitude,
+          // NEW: Time In/Out GPS fields
+          touchpoint.timeIn?.toIso8601String(),
+          touchpoint.timeInGpsLat,
+          touchpoint.timeInGpsLng,
+          touchpoint.timeInGpsAddress,
+          touchpoint.timeOut?.toIso8601String(),
+          touchpoint.timeOutGpsLat,
+          touchpoint.timeOutGpsLng,
+          touchpoint.timeOutGpsAddress,
           touchpoint.id,
         ],
       );
@@ -244,7 +278,7 @@ class TouchpointRepository {
     return Touchpoint(
       id: row['id'] as String,
       clientId: row['client_id'] as String,
-      agentId: row['caravan_id'] as String?,
+      userId: row['user_id'] as String?, // Changed from caravan_id
       touchpointNumber: row['touchpoint_number'] as int,
       type: TouchpointType.fromApi(row['type'] as String? ?? 'VISIT'),
       date: row['date'] != null ? DateTime.parse(row['date'] as String) : DateTime.now(),
@@ -254,13 +288,24 @@ class TouchpointRepository {
       odometerArrival: row['odometer_arrival'] as String?,
       odometerDeparture: row['odometer_departure'] as String?,
       reason: TouchpointReason.fromApi(row['reason'] as String? ?? 'INTERESTED'),
+      status: TouchpointStatus.fromApi(row['status'] as String? ?? 'Interested'), // NEW: status field
       nextVisitDate: row['next_visit_date'] != null
           ? DateTime.parse(row['next_visit_date'] as String)
           : null,
       remarks: row['notes'] as String?,
       photoPath: row['photo_url'] as String?,
+      audioPath: row['audio_url'] as String?,
       latitude: row['latitude'] as double?,
       longitude: row['longitude'] as double?,
+      // NEW: Time In/Out GPS fields
+      timeIn: row['time_in'] != null ? DateTime.parse(row['time_in'] as String) : null,
+      timeInGpsLat: row['time_in_gps_lat'] as double?,
+      timeInGpsLng: row['time_in_gps_lng'] as double?,
+      timeInGpsAddress: row['time_in_gps_address'] as String?,
+      timeOut: row['time_out'] != null ? DateTime.parse(row['time_out'] as String) : null,
+      timeOutGpsLat: row['time_out_gps_lat'] as double?,
+      timeOutGpsLng: row['time_out_gps_lng'] as double?,
+      timeOutGpsAddress: row['time_out_gps_address'] as String?,
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
