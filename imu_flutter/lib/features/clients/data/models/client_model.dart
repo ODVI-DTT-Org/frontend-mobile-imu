@@ -21,7 +21,7 @@ class Client {
   final String? email;
   final String? facebookLink;
   final String? agencyId;
-  final String? caravanId;
+  final String? municipality;
   final List<Address> addresses;
   final List<PhoneNumber> phoneNumbers;
   final List<Touchpoint> touchpoints;
@@ -57,7 +57,7 @@ class Client {
     this.updatedAt,
     this.isStarred = false,
     this.agencyId,
-    this.caravanId,
+    this.municipality,
   });
 
   String get fullName => '$firstName ${middleName != null ? '$middleName ' : ''}$lastName';
@@ -79,6 +79,20 @@ class Client {
     final next = completedTouchpoints;
     if (next >= 7) return null;
     return TouchpointPattern.types[next];
+  }
+
+  /// Check if client's address matches the given PSGC municipality code
+  /// This is used for territory-based filtering
+  bool matchesMunicipality(String? municipalityCode) {
+    if (municipalityCode == null || municipalityCode.isEmpty) return true;
+
+    // Check if any of the client's addresses match the municipality
+    for (final address in addresses) {
+      // Direct match on city field (which stores PSGC code)
+      if (address.city == municipalityCode) return true;
+    }
+
+    return false;
   }
 
   Client copyWith({
@@ -217,10 +231,24 @@ class Client {
 
   /// Create Client from PowerSync/PostgreSQL row (snake_case column names)
   factory Client.fromRow(Map<String, dynamic> row) {
+    // Helper to parse ProductType from backend values
+    ProductType parseProductType(String? value) {
+      if (value == null) return ProductType.sssPensioner;
+      final upper = value.toUpperCase();
+      if (upper == 'PENSION_LOAN' || upper == 'SSS_PENSION_LOAN') {
+        return ProductType.sssPensioner;
+      } else if (upper == 'GSIS_PENSION_LOAN') {
+        return ProductType.gsisPensioner;
+      } else if (upper == 'CASH_LOAN' || upper == 'PRIVATE') {
+        return ProductType.private;
+      }
+      return ProductType.sssPensioner;
+    }
+
     return Client(
       id: row['id'] as String,
-      firstName: row['first_name'] as String,
-      lastName: row['last_name'] as String,
+      firstName: row['first_name'] as String? ?? '',
+      lastName: row['last_name'] as String? ?? '',
       middleName: row['middle_name'] as String?,
       birthDate: row['birth_date'] != null ? DateTime.parse(row['birth_date'] as String) : null,
       email: row['email'] as String?,
@@ -235,10 +263,7 @@ class Client {
         (e) => e.name.toUpperCase() == (row['client_type'] as String?)?.toUpperCase(),
         orElse: () => ClientType.potential,
       ),
-      productType: ProductType.values.firstWhere(
-        (e) => e.name.toUpperCase() == (row['product_type'] as String?)?.toUpperCase(),
-        orElse: () => ProductType.sssPensioner,
-      ),
+      productType: parseProductType(row['product_type'] as String?),
       marketType: row['market_type'] != null
           ? MarketType.values.firstWhere(
               (e) => e.name.toUpperCase() == (row['market_type'] as String).toUpperCase(),
@@ -255,8 +280,8 @@ class Client {
       facebookLink: row['facebook_link'] as String?,
       remarks: row['remarks'] as String?,
       agencyId: row['agency_id'] as String?,
-      caravanId: row['caravan_id'] as String?,
-      isStarred: (row['is_starred'] as int?) == 1,
+      municipality: row['municipality'] as String?,
+      isStarred: (row['is_starred'] as bool?) ?? false,
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
@@ -380,7 +405,7 @@ class PhoneNumber {
 class Touchpoint {
   final String id;
   final String clientId;
-  final String? agentId; // The agent/caravan who created this touchpoint
+  final String? userId; // The user (caravan/tele) who created this touchpoint (was agentId)
   final int touchpointNumber; // 1-7
   final TouchpointType type;
   final DateTime date;
@@ -390,9 +415,11 @@ class Touchpoint {
   final String? odometerArrival;
   final String? odometerDeparture;
   final TouchpointReason reason;
+  final TouchpointStatus status; // New: status field (Interested, Undecided, Not Interested, Completed)
   final DateTime? nextVisitDate;
   final String? remarks;
   final String? photoPath;
+  final String? audioPath;
   final double? latitude;
   final double? longitude;
 
@@ -411,7 +438,7 @@ class Touchpoint {
   Touchpoint({
     required this.id,
     required this.clientId,
-    this.agentId,
+    this.userId,
     required this.touchpointNumber,
     required this.type,
     required this.date,
@@ -421,9 +448,11 @@ class Touchpoint {
     this.odometerArrival,
     this.odometerDeparture,
     required this.reason,
+    this.status = TouchpointStatus.interested, // Default status
     this.nextVisitDate,
     this.remarks,
     this.photoPath,
+    this.audioPath,
     this.latitude,
     this.longitude,
     this.timeIn,
@@ -437,6 +466,9 @@ class Touchpoint {
     required this.createdAt,
   });
 
+  // Legacy getter for backward compatibility
+  String? get agentId => userId;
+
   String get ordinal {
     const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
     return ordinals[touchpointNumber - 1];
@@ -445,7 +477,8 @@ class Touchpoint {
   Touchpoint copyWith({
     String? id,
     String? clientId,
-    String? agentId,
+    String? userId,
+    String? agentId, // Legacy parameter name for backward compatibility
     int? touchpointNumber,
     TouchpointType? type,
     DateTime? date,
@@ -455,9 +488,11 @@ class Touchpoint {
     String? odometerArrival,
     String? odometerDeparture,
     TouchpointReason? reason,
+    TouchpointStatus? status,
     DateTime? nextVisitDate,
     String? remarks,
     String? photoPath,
+    String? audioPath,
     double? latitude,
     double? longitude,
     DateTime? timeIn,
@@ -473,7 +508,7 @@ class Touchpoint {
     return Touchpoint(
       id: id ?? this.id,
       clientId: clientId ?? this.clientId,
-      agentId: agentId ?? this.agentId,
+      userId: userId ?? agentId ?? this.userId, // Support both parameter names
       touchpointNumber: touchpointNumber ?? this.touchpointNumber,
       type: type ?? this.type,
       date: date ?? this.date,
@@ -483,9 +518,11 @@ class Touchpoint {
       odometerArrival: odometerArrival ?? this.odometerArrival,
       odometerDeparture: odometerDeparture ?? this.odometerDeparture,
       reason: reason ?? this.reason,
+      status: status ?? this.status,
       nextVisitDate: nextVisitDate ?? this.nextVisitDate,
       remarks: remarks ?? this.remarks,
       photoPath: photoPath ?? this.photoPath,
+      audioPath: audioPath ?? this.audioPath,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       timeIn: timeIn ?? this.timeIn,
@@ -504,7 +541,7 @@ class Touchpoint {
   Map<String, dynamic> toJson() => {
     'id': id,
     'client_id': clientId,
-    'agent_id': agentId,
+    'user_id': userId, // Changed from agent_id
     'touchpoint_number': touchpointNumber,
     'type': type.apiValue,
     'date': date.toIso8601String(),
@@ -515,12 +552,14 @@ class Touchpoint {
     'time_departure': timeDeparture != null
         ? '${timeDeparture!.hour.toString().padLeft(2, '0')}:${timeDeparture!.minute.toString().padLeft(2, '0')}'
         : null,
-    'odometer_start': odometerArrival,
-    'odometer_end': odometerDeparture,
+    'odometer_arrival': odometerArrival,
+    'odometer_departure': odometerDeparture,
     'reason': reason.apiValue,
+    'status': status.apiValue, // New: status field
     'next_visit_date': nextVisitDate?.toIso8601String(),
     'notes': remarks,
-    'photo_path': photoPath,
+    'photo_url': photoPath, // Changed to photo_url for API compatibility
+    'audio_url': audioPath, // Changed to audio_url for API compatibility
     'latitude': latitude,
     'longitude': longitude,
     'time_in': timeIn?.toIso8601String(),
@@ -531,7 +570,7 @@ class Touchpoint {
     'time_out_gps_lat': timeOutGpsLat,
     'time_out_gps_lng': timeOutGpsLng,
     'time_out_gps_address': timeOutGpsAddress,
-    'created': createdAt.toIso8601String(),
+    'created_at': createdAt.toIso8601String(),
   };
 
   /// Parse from API format (snake_case) or local format (camelCase)
@@ -550,7 +589,7 @@ class Touchpoint {
     return Touchpoint(
       id: json['id'] ?? '',
       clientId: getValue<String>('client_id', 'clientId') ?? '',
-      agentId: getValue<String>('agent_id', 'agentId'),
+      userId: getValue<String>('user_id', 'userId') ?? getValue<String>('agent_id', 'agentId'),
       touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? 1,
       type: TouchpointType.fromApi(getValue<String>('type', 'type') ?? 'VISIT'),
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
@@ -560,11 +599,13 @@ class Touchpoint {
       odometerArrival: getValue<String>('odometer_start', 'odometerArrival'),
       odometerDeparture: getValue<String>('odometer_end', 'odometerDeparture'),
       reason: TouchpointReason.fromApi(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
+      status: TouchpointStatus.fromApi(getValue<String>('status', 'status') ?? 'INTERESTED'),
       nextVisitDate: getValue<String>('next_visit_date', 'nextVisitDate') != null
           ? DateTime.parse(getValue<String>('next_visit_date', 'nextVisitDate')!)
           : null,
       remarks: getValue<String>('notes', 'remarks'),
-      photoPath: getValue<String>('photo_path', 'photoPath'),
+      photoPath: getValue<String>('photo_url', 'photoUrl') ?? getValue<String>('photo_path', 'photoPath'),
+      audioPath: getValue<String>('audio_url', 'audioUrl') ?? getValue<String>('audio_path', 'audioPath'),
       latitude: getValue<double>('latitude', 'latitude'),
       longitude: getValue<double>('longitude', 'longitude'),
       timeIn: getValue<String>('time_in', 'timeIn') != null
@@ -579,8 +620,8 @@ class Touchpoint {
       timeOutGpsLat: getValue<double>('time_out_gps_lat', 'timeOutGpsLat'),
       timeOutGpsLng: getValue<double>('time_out_gps_lng', 'timeOutGpsLng'),
       timeOutGpsAddress: getValue<String>('time_out_gps_address', 'timeOutGpsAddress'),
-      createdAt: getValue<String>('created', 'createdAt') != null
-          ? DateTime.parse(getValue<String>('created', 'createdAt')!)
+      createdAt: getValue<String>('created_at', 'createdAt') != null
+          ? DateTime.parse(getValue<String>('created_at', 'createdAt')!)
           : DateTime.now(),
     );
   }
@@ -659,6 +700,26 @@ enum TouchpointReason {
     return TouchpointReason.values.firstWhere(
       (e) => e._apiValue == value.toUpperCase(),
       orElse: () => TouchpointReason.interested,
+    );
+  }
+}
+
+/// Touchpoint status enum with API-compatible values
+enum TouchpointStatus {
+  interested('Interested'),
+  undecided('Undecided'),
+  notInterested('Not Interested'),
+  completed('Completed');
+
+  final String _apiValue;
+  const TouchpointStatus(this._apiValue);
+
+  String get apiValue => _apiValue;
+
+  static TouchpointStatus fromApi(String value) {
+    return TouchpointStatus.values.firstWhere(
+      (e) => e._apiValue == value,
+      orElse: () => TouchpointStatus.interested,
     );
   }
 }
