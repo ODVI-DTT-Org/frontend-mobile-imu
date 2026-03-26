@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/media/camera_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../providers/touchpoint_form_provider.dart';
+import '../../../clients/data/models/client_model.dart';
 import './time_capture_section.dart';
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
@@ -34,10 +36,20 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   final _odometerDepartureController = TextEditingController();
   DateTime? _nextVisitDate;
   String? _selectedReason;
+  TouchpointStatus? _selectedStatus; // New: status field
+
+  // Status options for touchpoints
+  static const List<Map<String, dynamic>> _statusOptions = [
+    {'value': 'Interested', 'label': 'Interested', 'color': Color(0xFF4CAF50)},
+    {'value': 'Undecided', 'label': 'Undecided', 'color': Color(0xFFFF9800)},
+    {'value': 'Not Interested', 'label': 'Not Interested', 'color': Color(0xFFF44336)},
+    {'value': 'Completed', 'label': 'Completed', 'color': Color(0xFF2196F3)},
+  ];
 
   // Photo capture
   File? _capturedPhoto;
   bool _isCapturingPhoto = false;
+  bool _hasPhotoError = false;
 
   // Reason types - synced with database touchpoint_reasons table
   static const List<Map<String, dynamic>> _reasons = [
@@ -79,6 +91,22 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     super.initState();
     // Initialize the provider with the touchpoint type
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Validate the touchpoint sequence
+      final validation = TouchpointValidationService.validateTouchpointSequence(
+        touchpointNumber: widget.touchpointNumber,
+        touchpointType: widget.touchpointType == 'Visit'
+            ? TouchpointType.visit
+            : TouchpointType.call,
+      );
+
+      if (!validation.isValid) {
+        // Show validation error
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showSequenceValidationError(validation);
+        });
+        return;
+      }
+
       ref.read(touchpointFormProvider.notifier).setTouchpointType(widget.touchpointType);
     });
   }
@@ -181,6 +209,10 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                       ],
                       const SizedBox(height: 16),
 
+                      // Touchpoint Sequence Info Card
+                      _buildSequenceInfoCard(),
+                      const SizedBox(height: 16),
+
                       // Time In section for Visit type
                       if (widget.touchpointType == 'Visit') ...[
                         TimeCaptureSection(
@@ -213,15 +245,32 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Reason dropdown
-                              const Text(
-                                'Reason *',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
+                              _buildFieldLabel('Reason', isRequired: true),
                               const SizedBox(height: 8),
                               DropdownButtonFormField<String>(
                                 value: _selectedReason,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   hintText: 'Select reason',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
+                                  ),
+                                  errorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                                  ),
+                                  focusedErrorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                                  ),
                                 ),
                                 items: _reasons
                                     .map((reason) => DropdownMenuItem<String>(
@@ -252,28 +301,101 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                               ),
                               const SizedBox(height: 20),
 
+                              // Status dropdown (NEW)
+                              _buildFieldLabel('Status', isRequired: true),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _selectedStatus?.apiValue,
+                                decoration: InputDecoration(
+                                  hintText: 'Select status',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
+                                  ),
+                                  errorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                                  ),
+                                  focusedErrorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                                  ),
+                                ),
+                                items: _statusOptions
+                                    .map((status) => DropdownMenuItem<String>(
+                                          value: status['value'] as String,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: status['color'],
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(status['label']),
+                                            ],
+                                          ),
+                                        ),)
+                                    .toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedStatus = TouchpointStatus.fromApi(value!);
+                                  });
+                                },
+                                validator: (value) {
+                                  if (value == null) return 'Required';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 20),
+
                               // Visit-specific fields
                               if (widget.touchpointType == 'Visit') ...[
                                 // Photo Capture Section
-                                const Text(
-                                  'Photo Evidence',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
+                                _buildFieldLabel('Photo Evidence', isRequired: true),
                                 const SizedBox(height: 8),
                                 _buildPhotoCapture(),
+                                if (_hasPhotoError)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4, left: 12),
+                                    child: Text(
+                                      'Photo is required',
+                                      style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                                    ),
+                                  ),
                                 const SizedBox(height: 16),
 
                                 // Odometer Arrival
-                                const Text(
-                                  'Odometer Arrival',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
+                                _buildFieldLabel('Odometer Arrival', isOptional: true),
                                 const SizedBox(height: 8),
                                 TextFormField(
                                   controller: _odometerArrivalController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText: 'e.g., 12,345',
                                     suffixText: 'km',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
+                                    ),
                                   ),
                                   keyboardType: TextInputType.number,
                                   inputFormatters: [
@@ -283,16 +405,25 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                                 const SizedBox(height: 16),
 
                                 // Odometer Departure
-                                const Text(
-                                  'Odometer Departure',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
+                                _buildFieldLabel('Odometer Departure', isOptional: true),
                                 const SizedBox(height: 8),
                                 TextFormField(
                                   controller: _odometerDepartureController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText: 'e.g., 12,350',
                                     suffixText: 'km',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
+                                    ),
                                   ),
                                   keyboardType: TextInputType.number,
                                   inputFormatters: [
@@ -307,6 +438,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                                 label: 'Next Visit Date',
                                 value: _nextVisitDate,
                                 onTap: _selectNextVisitDate,
+                                isOptional: true,
                               ),
                               const SizedBox(height: 16),
                             ],
@@ -371,21 +503,63 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     required String label,
     required DateTime? value,
     required VoidCallback onTap,
+    bool isOptional = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(LucideIcons.calendar),
-        ),
-        child: Text(
-          value != null ? _formatDate(value) : 'Select date',
-          style: TextStyle(
-            color: value != null ? Colors.black : Colors.grey[500],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldLabel(label, isOptional: isOptional),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              hintText: 'Select date',
+              suffixIcon: const Icon(LucideIcons.calendar),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
+              ),
+            ),
+            child: Text(
+              value != null ? _formatDate(value) : 'Select date',
+              style: TextStyle(
+                color: value != null ? Colors.black : Colors.grey[500],
+              ),
+            ),
           ),
         ),
-      ),
+      ],
+    );
+  }
+
+  /// Helper widget for form field labels
+  Widget _buildFieldLabel(String label, {bool isRequired = false, bool isOptional = false}) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        if (isRequired)
+          const Text(
+            ' *',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          ),
+        if (isOptional)
+          Text(
+            ' (Optional)',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+      ],
     );
   }
 
@@ -402,6 +576,19 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   }
 
   void _handleSubmit() {
+    // Validate photo evidence for Visit type
+    if (widget.touchpointType == 'Visit' && _capturedPhoto == null) {
+      setState(() => _hasPhotoError = true);
+      HapticUtils.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please capture a photo evidence'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       HapticUtils.success();
 
@@ -413,6 +600,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       // Return the form data
       Navigator.pop(context, {
         'reason': _selectedReason,
+        'status': _selectedStatus?.apiValue ?? 'Interested', // NEW: status field
         // Time In/Out from provider (for Visit type)
         'timeIn': timeIn.time?.toIso8601String(),
         'timeInGpsLat': timeIn.gpsLat,
@@ -425,8 +613,8 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         // Legacy fields for backwards compatibility
         'timeArrival': timeIn.time != null ? _formatDateTime(timeIn.time!) : null,
         'timeDeparture': timeOut.time != null ? _formatDateTime(timeOut.time!) : null,
-        'odometerArrival': _odometerArrivalController.text,
-        'odometerDeparture': _odometerDepartureController.text,
+        'odometerArrival': _odometerArrivalController.text.isEmpty ? null : _odometerArrivalController.text,
+        'odometerDeparture': _odometerDepartureController.text.isEmpty ? null : _odometerDepartureController.text,
         'nextVisitDate': _nextVisitDate?.toIso8601String(),
         'photoPath': _capturedPhoto?.path,
         // Use Time In GPS as primary location (for backwards compatibility)
@@ -547,7 +735,10 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     try {
       final photo = await _cameraService.capturePhoto();
       if (photo != null) {
-        setState(() => _capturedPhoto = photo);
+        setState(() {
+          _capturedPhoto = photo;
+          _hasPhotoError = false; // Reset error when photo is captured
+        });
         HapticUtils.success();
       }
     } finally {
@@ -565,6 +756,140 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
+  }
+
+  /// Build the touchpoint sequence information card
+  Widget _buildSequenceInfoCard() {
+    final sequence = TouchpointValidationService.getSequenceDisplay();
+    final currentIndex = widget.touchpointNumber - 1;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                LucideIcons.info,
+                size: 16,
+                color: Colors.blue[700],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Touchpoint Sequence',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[700],
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(sequence.length, (index) {
+              final isCurrent = index == currentIndex;
+              final isPast = index < currentIndex;
+              final isFuture = index > currentIndex;
+
+              Color bgColor;
+              Color textColor;
+              Border? border;
+
+              if (isCurrent) {
+                bgColor = Colors.blue[600]!;
+                textColor = Colors.white;
+                border = Border.all(color: Colors.blue[800]!, width: 2);
+              } else if (isPast) {
+                bgColor = Colors.green[200]!;
+                textColor = Colors.green[900]!;
+              } else {
+                bgColor = Colors.grey[200]!;
+                textColor = Colors.grey[600]!;
+              }
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(6),
+                  border: border,
+                ),
+                child: Text(
+                  sequence[index],
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                    color: textColor,
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Creating: $_ordinal ${widget.touchpointType}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.blue[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show sequence validation error dialog
+  void _showSequenceValidationError(validation) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Invalid Touchpoint Type'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(validation.error ?? 'Invalid touchpoint sequence'),
+            const SizedBox(height: 16),
+            const Text(
+              'Expected Sequence:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...TouchpointValidationService.getSequenceDisplay().map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 4),
+                child: Text('• $item'),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      // Close the form modal as well
+      Navigator.pop(context);
+    });
   }
 }
 
