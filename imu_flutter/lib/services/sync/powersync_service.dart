@@ -9,7 +9,7 @@ import 'powersync_connector.dart';
 
 /// PowerSync database schema matching PostgreSQL tables
 const Schema _powerSyncSchema = Schema([
-  // Client data
+  // Client data - Note: PowerSync automatically adds an 'id' column
   Table('clients', [
     Column.text('first_name'),
     Column.text('last_name'),
@@ -31,7 +31,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('facebook_link'),
     Column.text('remarks'),
     Column.text('agency_id'),
-    Column.text('caravan_id'),
+    Column.text('municipality'),
     Column.integer('is_starred'),
   ]),
   Table('addresses', [
@@ -55,7 +55,7 @@ const Schema _powerSyncSchema = Schema([
   ]),
   Table('touchpoints', [
     Column.text('client_id'),
-    Column.text('caravan_id'),
+    Column.text('user_id'),
     Column.integer('touchpoint_number'),
     Column.text('type'),
     Column.text('date'),
@@ -65,15 +65,24 @@ const Schema _powerSyncSchema = Schema([
     Column.text('odometer_arrival'),
     Column.text('odometer_departure'),
     Column.text('reason'),
+    Column.text('status'),
     Column.text('next_visit_date'),
     Column.text('notes'),
     Column.text('photo_url'),
     Column.text('audio_url'),
     Column.real('latitude'),
     Column.real('longitude'),
+    Column.text('time_in'),
+    Column.real('time_in_gps_lat'),
+    Column.real('time_in_gps_lng'),
+    Column.text('time_in_gps_address'),
+    Column.text('time_out'),
+    Column.real('time_out_gps_lat'),
+    Column.real('time_out_gps_lng'),
+    Column.text('time_out_gps_address'),
   ]),
   Table('itineraries', [
-    Column.text('caravan_id'),
+    Column.text('user_id'),
     Column.text('client_id'),
     Column.text('scheduled_date'),
     Column.text('scheduled_time'),
@@ -92,39 +101,31 @@ const Schema _powerSyncSchema = Schema([
     Column.text('avatar_url'),
   ]),
   // User municipality assignments
-  Table('user_municipalities_simple', [
+  Table('user_locations', [
     Column.text('user_id'),
     Column.text('municipality_id'),
     Column.text('assigned_at'),
     Column.text('assigned_by'),
     Column.text('deleted_at'),
   ]),
-  // PSGC geographic data (regions)
-  Table('psgc_regions', [
-    Column.text('name'),
-    Column.text('code'),
-  ]),
-  // PSGC provinces
-  Table('psgc_provinces', [
-    Column.text('region'),
-    Column.text('name'),
-    Column.text('code'),
-  ]),
-  // PSGC municipalities/cities
-  Table('psgc_municipalities', [
+  // PSGC geographic data (single table with all locations)
+  // Note: PowerSync automatically adds an 'id' column, so we don't define it here
+  Table('psgc', [
     Column.text('region'),
     Column.text('province'),
-    Column.text('name'),
-    Column.text('code'),
-    Column.text('is_city'),
-  ]),
-  // PSGC barangays
-  Table('psgc_barangays', [
-    Column.text('region'),
-    Column.text('province'),
+    Column.text('mun_city_kind'),
     Column.text('mun_city'),
     Column.text('barangay'),
     Column.text('zip_code'),
+  ]),
+  // Touchpoint reasons (global data)
+  // Note: PowerSync automatically adds an 'id' column, so we don't define it here
+  Table('touchpoint_reasons', [
+    Column.text('code'),
+    Column.text('label'),
+    Column.text('color'),
+    Column.integer('sort_order'),
+    Column.integer('is_active'),
   ]),
 ]);
 
@@ -133,6 +134,8 @@ class PowerSyncService {
   static PowerSyncDatabase? _database;
   static const String _databaseName = 'imu_powersync.db';
   static bool _isConnected = false;
+  static IMUPowerSyncConnector? _currentConnector;
+  static bool _isConnecting = false;
 
   /// Get the database path
   static Future<String> _getDatabasePath() async {
@@ -160,18 +163,41 @@ class PowerSyncService {
 
   /// Connect to PowerSync with the provided connector
   static Future<void> connect(IMUPowerSyncConnector connector) async {
-    if (_isConnected) {
-      logDebug('Already connected to PowerSync');
+    // Prevent multiple simultaneous connection attempts
+    if (_isConnecting) {
+      logDebug('PowerSync connection already in progress, waiting...');
+      while (_isConnecting) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      if (_isConnected) {
+        logDebug('PowerSync already connected after waiting');
+        return;
+      }
+    }
+
+    // If already connected with the same connector, do nothing
+    if (_isConnected && _currentConnector == connector) {
+      logDebug('Already connected to PowerSync with the same connector');
       return;
     }
 
+    // If connected with a different connector, disconnect first
+    if (_isConnected && _currentConnector != connector) {
+      logDebug('Disconnecting from PowerSync (different connector)');
+      await disconnect();
+    }
+
+    _isConnecting = true;
     try {
       final db = await database;
 
       await db.connect(connector: connector);
+      _currentConnector = connector;
       _isConnected = true;
+      _isConnecting = false;
       logDebug('Connected to PowerSync');
     } catch (e) {
+      _isConnecting = false;
       logError('Failed to connect to PowerSync', e);
       rethrow;
     }
@@ -184,6 +210,7 @@ class PowerSyncService {
     try {
       await _database!.disconnect();
       _isConnected = false;
+      _currentConnector = null;
       logDebug('Disconnected from PowerSync');
     } catch (e) {
       logError('Failed to disconnect from PowerSync', e);
@@ -195,18 +222,64 @@ class PowerSyncService {
     if (_database == null) {
       return Stream.value(SyncStatus());
     }
-    // Return a simple status stream based on connection state
-    return Stream.periodic(
-      const Duration(seconds: 1),
-      (_) => SyncStatus(
-        connected: _isConnected && (_database?.connected ?? false),
-        pendingUploads: 0,
-      ),
-    );
+    // Return the actual sync status stream from the database
+    return _database!.statusStream.map((status) => SyncStatus(
+      connected: status.connected,
+      uploading: status.uploading,
+      downloading: status.downloading,
+      lastSyncAt: DateTime.now(),
+      pendingUploads: 0,
+    ));
+  }
+
+  /// Wait for initial sync to complete (with timeout)
+  static Future<void> waitForInitialSync({Duration timeout = const Duration(seconds: 30)}) async {
+    final db = await database;
+
+    if (!db.connected) {
+      logDebug('PowerSync not connected, skipping initial sync wait');
+      return;
+    }
+
+    logDebug('Waiting for initial PowerSync sync...');
+
+    // Create a completer that will complete when sync finishes or times out
+    final completer = Completer<void>();
+    StreamSubscription? subscription;
+
+    // Timeout timer
+    final timeoutTimer = Timer(timeout, () {
+      subscription?.cancel();
+      if (!completer.isCompleted) {
+        logWarning('Initial sync timed out after ${timeout.inSeconds} seconds');
+        completer.complete();
+      }
+    });
+
+    // Listen to sync status
+    subscription = db.statusStream.listen((status) {
+      if (status.connected && !status.downloading) {
+        // Sync has completed or is not downloading
+        logDebug('Initial sync completed');
+        timeoutTimer.cancel();
+        subscription?.cancel();
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      }
+    });
+
+    return completer.future;
   }
 
   /// Check if connected to PowerSync service
-  static bool get isConnected => _isConnected && (_database?.connected ?? false);
+  static bool get isConnected {
+    // Check if we have a database and it's connected
+    if (_database == null) return false;
+    if (!_isConnected) return false;
+    // Only return true if the database is actually connected
+    return _database!.connected;
+  }
 
   /// Get pending upload count
   static Future<int> get pendingUploadCount async {
@@ -244,6 +317,8 @@ class PowerSyncService {
     await _database?.close();
     _database = null;
     _isConnected = false;
+    _currentConnector = null;
+    _isConnecting = false;
     logDebug('PowerSync database closed');
   }
 }
