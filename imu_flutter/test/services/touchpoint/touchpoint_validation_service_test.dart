@@ -298,10 +298,11 @@ void main() {
           firstName: 'John',
           lastName: 'Doe',
           clientType: ClientType.potential,
-          productType: 'LOAN',
-          marketType: 'RETAIL',
-          pensionType: 'SSS',
-          touchpoints: [],
+          productType: ProductType.sssPensioner,
+          marketType: MarketType.residential,
+          pensionType: PensionType.sss,
+          touchpoints: const [],
+          createdAt: DateTime.now(),
         );
 
         final nextNumber = TouchpointValidationService.getNextTouchpointNumber(client);
@@ -310,25 +311,28 @@ void main() {
       });
 
       test('should return 2 for client with 1 touchpoint', () {
+        final now = DateTime.now();
         final client = Client(
           id: 'test-client-2',
           firstName: 'Jane',
           lastName: 'Smith',
           clientType: ClientType.existing,
-          productType: 'LOAN',
-          marketType: 'RETAIL',
-          pensionType: 'SSS',
+          productType: ProductType.gsisPensioner,
+          marketType: MarketType.commercial,
+          pensionType: PensionType.gsis,
           touchpoints: [
             Touchpoint(
               id: 'tp-1',
               clientId: 'test-client-2',
               touchpointNumber: 1,
               type: TouchpointType.visit,
-              date: DateTime.now(),
+              date: now,
               reason: TouchpointReason.interested,
               status: TouchpointStatus.interested,
+              createdAt: now,
             ),
           ],
+          createdAt: DateTime.now(),
         );
 
         final nextNumber = TouchpointValidationService.getNextTouchpointNumber(client);
@@ -337,7 +341,8 @@ void main() {
       });
 
       test('should return null for client with all 7 touchpoints', () {
-        final touchpoints = List.generate(7, (index) {
+        final now = DateTime.now();
+        final touchpoints = List<Touchpoint>.generate(7, (index) {
           final number = index + 1;
           return Touchpoint(
             id: 'tp-$number',
@@ -346,9 +351,10 @@ void main() {
             type: number == 1 || number == 4 || number == 7
                 ? TouchpointType.visit
                 : TouchpointType.call,
-            date: DateTime.now(),
+            date: now,
             reason: TouchpointReason.interested,
             status: TouchpointStatus.completed,
+            createdAt: now,
           );
         });
 
@@ -357,10 +363,11 @@ void main() {
           firstName: 'Complete',
           lastName: 'Client',
           clientType: ClientType.existing,
-          productType: 'LOAN',
-          marketType: 'RETAIL',
-          pensionType: 'SSS',
+          productType: ProductType.private,
+          marketType: MarketType.industrial,
+          pensionType: PensionType.private,
           touchpoints: touchpoints,
+          createdAt: DateTime.now(),
         );
 
         final nextNumber = TouchpointValidationService.getNextTouchpointNumber(client);
@@ -374,10 +381,11 @@ void main() {
           firstName: 'New',
           lastName: 'Client',
           clientType: ClientType.potential,
-          productType: 'LOAN',
-          marketType: 'RETAIL',
-          pensionType: 'SSS',
-          touchpoints: [],
+          productType: ProductType.sssPensioner,
+          marketType: MarketType.residential,
+          pensionType: PensionType.sss,
+          touchpoints: const [],
+          createdAt: DateTime.now(),
         );
 
         final result = TouchpointValidationService.canCreateTouchpoint(client);
@@ -390,43 +398,48 @@ void main() {
       });
 
       test('canCreateTouchpoint should return correct result for client with 3 touchpoints', () {
+        final now = DateTime.now();
         final client = Client(
           id: 'test-client-partial',
           firstName: 'Partial',
           lastName: 'Client',
           clientType: ClientType.existing,
-          productType: 'LOAN',
-          marketType: 'RETAIL',
-          pensionType: 'SSS',
+          productType: ProductType.gsisPensioner,
+          marketType: MarketType.commercial,
+          pensionType: PensionType.gsis,
           touchpoints: [
             Touchpoint(
               id: 'tp-1',
               clientId: 'test-client-partial',
               touchpointNumber: 1,
               type: TouchpointType.visit,
-              date: DateTime.now(),
+              date: now,
               reason: TouchpointReason.interested,
               status: TouchpointStatus.interested,
+              createdAt: now,
             ),
             Touchpoint(
               id: 'tp-2',
               clientId: 'test-client-partial',
               touchpointNumber: 2,
               type: TouchpointType.call,
-              date: DateTime.now(),
+              date: now,
               reason: TouchpointReason.interested,
               status: TouchpointStatus.interested,
+              createdAt: now,
             ),
             Touchpoint(
               id: 'tp-3',
               clientId: 'test-client-partial',
               touchpointNumber: 3,
               type: TouchpointType.call,
-              date: DateTime.now(),
+              date: now,
               reason: TouchpointReason.interested,
               status: TouchpointStatus.undecided,
+              createdAt: now,
             ),
           ],
+          createdAt: DateTime.now(),
         );
 
         final result = TouchpointValidationService.canCreateTouchpoint(client);
@@ -439,7 +452,8 @@ void main() {
       });
 
       test('canCreateTouchpoint should return correct result for complete client', () {
-        final touchpoints = List.generate(7, (index) {
+        final now = DateTime.now();
+        final touchpoints = List<Touchpoint>.generate(7, (index) {
           final number = index + 1;
           return Touchpoint(
             id: 'tp-$number',
@@ -448,9 +462,10 @@ void main() {
             type: number == 1 || number == 4 || number == 7
                 ? TouchpointType.visit
                 : TouchpointType.call,
-            date: DateTime.now(),
+            date: now,
             reason: TouchpointReason.interested,
             status: TouchpointStatus.completed,
+            createdAt: now,
           );
         });
 
@@ -459,10 +474,11 @@ void main() {
           firstName: 'Done',
           lastName: 'Client',
           clientType: ClientType.existing,
-          productType: 'LOAN',
-          marketType: 'RETAIL',
-          pensionType: 'SSS',
+          productType: ProductType.private,
+          marketType: MarketType.industrial,
+          pensionType: PensionType.private,
           touchpoints: touchpoints,
+          createdAt: DateTime.now(),
         );
 
         final result = TouchpointValidationService.canCreateTouchpoint(client);
