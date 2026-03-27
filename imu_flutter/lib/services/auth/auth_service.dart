@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'jwt_auth_service.dart';
+import 'secure_storage_service.dart';
 import '../sync/powersync_service.dart';
 import '../sync/powersync_connector.dart';
 import '../../core/utils/logger.dart';
@@ -144,8 +145,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true);
     try {
       await _authService.initialize();
+
+      // Check if user has PIN setup as secondary auth indicator
+      final secureStorage = SecureStorageService();
+      final hasPin = await secureStorage.hasPin();
+
+      // Consider authenticated if either:
+      // 1. JWT token is valid, OR
+      // 2. User has PIN setup (for PIN-based auth flow)
+      final isAuth = _authService.isAuthenticated || hasPin;
+
       state = state.copyWith(
-        isAuthenticated: _authService.isAuthenticated,
+        isAuthenticated: isAuth,
         user: _authService.currentUser,
         isLoading: false,
       );
