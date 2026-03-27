@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
+import 'package:imu_flutter/services/auth/offline_auth_service.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
 import 'package:imu_flutter/core/utils/haptic_utils.dart';
+import 'package:imu_flutter/shared/utils/loading_helper.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -18,6 +20,29 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
+
+  // Offline auth state
+  final _offlineAuthService = OfflineAuthService();
+  bool _canLoginOffline = false;
+  Duration? _gracePeriodRemaining;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOfflineCapability();
+  }
+
+  Future<void> _checkOfflineCapability() async {
+    final canOffline = await _offlineAuthService.canLoginOffline();
+    final gracePeriod = await _offlineAuthService.getGracePeriodRemaining();
+    // Check if widget is still mounted before calling setState
+    if (mounted) {
+      setState(() {
+        _canLoginOffline = canOffline;
+        _gracePeriodRemaining = gracePeriod;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -33,13 +58,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     HapticUtils.lightImpact();
 
-    final success = await ref.read(authNotifierProvider.notifier).login(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+    await LoadingHelper.withLoading(
+      ref: ref,
+      message: 'Signing in...',
+      operation: () async {
+        await ref.read(authNotifierProvider.notifier).login(
+              _emailController.text.trim(),
+              _passwordController.text,
+            );
+      },
+      onError: (e) {
+        HapticUtils.error();
+      },
+    );
 
     // Navigation is handled automatically by the router based on auth state
     // No manual navigation needed here
+  }
+
+  Future<void> _handleOfflineLogin() async {
+    HapticUtils.lightImpact();
+
+    // Navigate to PIN entry for offline authentication
+    if (mounted) {
+      context.go('/pin-entry?offline=true');
+    }
+  }
+
+  String _formatGracePeriod(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    if (hours > 0) {
+      return '$hours hour${hours > 1 ? 's' : ''} $minutes min';
+    } else {
+      return '$minutes minute${minutes > 1 ? 's' : ''}';
+    }
   }
 
   @override
@@ -47,22 +100,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final authState = ref.watch(authNotifierProvider);
     final isOnline = ref.watch(isOnlineProvider);
 
+    // Listen to auth state changes for error handling
     ref.listen<AuthState>(authNotifierProvider, (prev, next) {
       if (next.error != null && next.error != prev?.error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'Dismiss',
-              textColor: Colors.white,
-              onPressed: () {
-                ref.read(authNotifierProvider.notifier).clearError();
-              },
-            ),
-          ),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(next.error!),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(
+                  label: 'Dismiss',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    ref.read(authNotifierProvider.notifier).clearError();
+                  },
+                ),
+              ),
+            );
+          }
+        });
       }
     });
 
@@ -78,29 +136,63 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               children: [
                 const SizedBox(height: 48),
 
-                // Offline banner
+                // Offline banner with login option
                 if (!isOnline)
                   Container(
                     margin: const EdgeInsets.only(bottom: 24),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: _canLoginOffline ? Colors.green.shade50 : Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(
+                        color: _canLoginOffline ? Colors.green.shade200 : Colors.orange.shade200,
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.cloud_off, color: Colors.orange.shade700, size: 20),
+                        Icon(
+                          _canLoginOffline ? Icons.lock_open : Icons.cloud_off,
+                          color: _canLoginOffline ? Colors.green.shade700 : Colors.orange.shade700,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            'You are offline. Login requires internet connection.',
-                            style: TextStyle(
-                              color: Colors.orange.shade700,
-                              fontSize: 13,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _canLoginOffline
+                                    ? 'Offline login available!'
+                                    : 'You are offline. Login requires internet connection.',
+                                style: TextStyle(
+                                  color: _canLoginOffline ? Colors.green.shade700 : Colors.orange.shade700,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (_canLoginOffline && _gracePeriodRemaining != null)
+                                Text(
+                                  'Grace period: ${_formatGracePeriod(_gracePeriodRemaining!)} remaining',
+                                  style: TextStyle(
+                                    color: Colors.green.shade600,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
+                        if (_canLoginOffline)
+                          ElevatedButton.icon(
+                            onPressed: _handleOfflineLogin,
+                            icon: const Icon(Icons.fingerprint, size: 16),
+                            label: const Text('PIN Login'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              textStyle: const TextStyle(fontSize: 12),
+                            ),
+                          ),
                       ],
                     ),
                   ),

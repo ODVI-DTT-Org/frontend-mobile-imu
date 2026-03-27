@@ -4,7 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/auth/session_service.dart';
+import '../../../../services/sync/powersync_service.dart';
+import '../../../../services/sync/sync_preferences_service.dart';
+import '../../../../services/api/background_sync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/utils/loading_helper.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -15,6 +19,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   final SessionService _sessionService = SessionService();
+  final SyncPreferencesService _syncPreferences = SyncPreferencesService();
 
   // Settings state
   bool _notificationsEnabled = true;
@@ -24,6 +29,74 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _syncFrequency = 'Real-time';
   String _themeMode = 'System';
   int _sessionTimeout = 15;
+
+  // Sync state
+  String _lastSyncTime = 'Loading...';
+  bool _isSyncing = false;
+
+  // PowerSync test logs
+  final List<String> _powerSyncLogs = [];
+  bool _isTestingPowerSync = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastSyncTime();
+  }
+
+  Future<void> _loadLastSyncTime() async {
+    final time = await _syncPreferences.getTimeSinceLastSync();
+    if (mounted) {
+      setState(() {
+        _lastSyncTime = time;
+      });
+    }
+  }
+
+  Future<void> _performManualSync() async {
+    setState(() => _isSyncing = true);
+
+    try {
+      final syncService = ref.read(backgroundSyncServiceProvider);
+      final result = await syncService.performSync();
+
+      if (result.success) {
+        await _syncPreferences.saveLastSyncTime();
+        await _loadLastSyncTime();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sync completed successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sync failed: ${result.errorMessage}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -181,6 +254,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   _showStorageDialog();
                 },
               ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.refreshCw,
+                title: 'Sync Now',
+                subtitle: 'Last sync: $_lastSyncTime',
+                trailing: _isSyncing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+                onTap: _isSyncing
+                    ? null
+                    : () {
+                        HapticUtils.lightImpact();
+                        _performManualSync();
+                      },
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.activity,
+                title: 'Test PowerSync',
+                subtitle: 'Run diagnostics and view sync logs',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  _showPowerSyncTestDialog();
+                },
+              ),
             ]),
             const SizedBox(height: 24),
 
@@ -335,7 +437,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required IconData icon,
     required String title,
     required String subtitle,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
+    Widget? trailing,
   }) {
     return InkWell(
       onTap: onTap,
@@ -375,7 +478,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ],
               ),
             ),
-            Icon(LucideIcons.chevronRight, color: Colors.grey[400], size: 18),
+            if (trailing != null) trailing else Icon(LucideIcons.chevronRight, color: Colors.grey[400], size: 18),
           ],
         ),
       ),
@@ -567,17 +670,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (newPinController.text == confirmPinController.text &&
                   newPinController.text.length == 6) {
                 HapticUtils.success();
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('PIN changed successfully'),
-                    backgroundColor: Colors.green,
-                  ),
+
+                await LoadingHelper.withLoading(
+                  ref: ref,
+                  message: 'Changing PIN...',
+                  operation: () async {
+                    // Simulate API call for PIN change
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  },
+                  onError: (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to change PIN'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
                 );
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('PIN changed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -640,17 +765,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (newPasswordController.text == confirmPasswordController.text &&
                   newPasswordController.text.length >= 6) {
                 HapticUtils.success();
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Password changed successfully'),
-                    backgroundColor: Colors.green,
-                  ),
+
+                await LoadingHelper.withLoading(
+                  ref: ref,
+                  message: 'Changing password...',
+                  operation: () async {
+                    // Simulate API call for password change
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  },
+                  onError: (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to change password'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
                 );
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password changed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -678,12 +825,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           children: [
             const Text('App Storage Usage:'),
             const SizedBox(height: 12),
-            _buildStorageItem('Cache', '45 MB', () {
+            _buildStorageItem('Cache', '45 MB', () async {
               HapticUtils.mediumImpact();
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cache cleared')),
+
+              await LoadingHelper.withLoading(
+                ref: ref,
+                message: 'Clearing cache...',
+                operation: () async {
+                  // Simulate cache clearing
+                  await Future.delayed(const Duration(milliseconds: 800));
+                },
+                onError: (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to clear cache'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
               );
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cache cleared')),
+                );
+              }
             }),
             _buildStorageItem('Offline Data', '12 MB', null),
             _buildStorageItem('App Data', '28 MB', null),
@@ -697,12 +866,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             child: const Text('Close'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               HapticUtils.mediumImpact();
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('All cache cleared')),
+
+              await LoadingHelper.withLoading(
+                ref: ref,
+                message: 'Clearing all cache...',
+                operation: () async {
+                  // Simulate cache clearing
+                  await Future.delayed(const Duration(milliseconds: 1000));
+                },
+                onError: (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to clear cache'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
               );
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('All cache cleared')),
+                );
+              }
             },
             child: const Text('Clear All Cache'),
           ),
@@ -876,5 +1067,292 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
     );
+  }
+
+  void _showPowerSyncTestDialog() {
+    _powerSyncLogs.clear();
+    _addLog('🔧 PowerSync Test Started');
+    _addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(LucideIcons.activity, color: Color(0xFF0F172A)),
+              SizedBox(width: 12),
+              Text('PowerSync Diagnostics'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Test status
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _isTestingPowerSync
+                        ? const Color(0xFF3B82F6).withOpacity(0.1)
+                        : (_powerSyncLogs.any((log) => log.contains('❌'))
+                            ? const Color(0xFFEF4444).withOpacity(0.1)
+                            : const Color(0xFF22C55E).withOpacity(0.1)),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _isTestingPowerSync
+                          ? const Color(0xFF3B82F6)
+                          : (_powerSyncLogs.any((log) => log.contains('❌'))
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF22C55E)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_isTestingPowerSync)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else if (_powerSyncLogs.any((log) => log.contains('❌')))
+                        const Icon(LucideIcons.xCircle, color: Color(0xFFEF4444), size: 16)
+                      else
+                        const Icon(LucideIcons.checkCircle, color: Color(0xFF22C55E), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _isTestingPowerSync
+                              ? 'Running tests...'
+                              : (_powerSyncLogs.any((log) => log.contains('❌'))
+                                  ? 'Tests completed with errors'
+                                  : 'All tests passed'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: _isTestingPowerSync
+                                ? const Color(0xFF3B82F6)
+                                : (_powerSyncLogs.any((log) => log.contains('❌'))
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFF22C55E)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Logs display
+                const Text(
+                  'Test Logs:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 300),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _powerSyncLogs.isEmpty
+                          ? [
+                              const Text(
+                                'No logs yet. Tap "Run Tests" to begin.',
+                                style: TextStyle(color: Colors.grey, fontSize: 11, fontFamily: 'monospace'),
+                              ),
+                            ]
+                          : _powerSyncLogs
+                              .map((log) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Text(
+                                      log,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontFamily: 'monospace',
+                                        color: log.contains('✅')
+                                            ? const Color(0xFF22C55E)
+                                            : (log.contains('❌') || log.contains('⚠️'))
+                                                ? const Color(0xFFEF4444)
+                                                : (log.contains('🔧') || log.contains('━━━'))
+                                                    ? const Color(0xFFF59E0B)
+                                                    : Colors.grey[300],
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: _isTestingPowerSync
+                  ? null
+                  : () {
+                      HapticUtils.lightImpact();
+                      Navigator.pop(context);
+                    },
+              child: const Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: _isTestingPowerSync
+                  ? null
+                  : () async {
+                      HapticUtils.lightImpact();
+                      await _runPowerSyncTests(setDialogState);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Run Tests'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addLog(String message) {
+    setState(() {
+      _powerSyncLogs.add(message);
+    });
+  }
+
+  Future<void> _runPowerSyncTests(StateSetter setDialogState) async {
+    setDialogState(() => _isTestingPowerSync = true);
+    _addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    try {
+      // Test 1: Database initialization
+      _addLog('📍 Test 1: Database Connection');
+      try {
+        final db = await PowerSyncService.database;
+        _addLog('  ✅ Database initialized successfully');
+        _addLog('  📊 Database connected: ${db.connected}');
+      } catch (e) {
+        _addLog('  ❌ Database initialization failed: $e');
+        rethrow;
+      }
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Test 2: Read from clients table
+      _addLog('📍 Test 2: Read from Clients Table');
+      try {
+        final db = await PowerSyncService.database;
+        final clients = await db.getAll('SELECT * FROM clients LIMIT 5');
+        _addLog('  ✅ Successfully read ${clients.length} client(s)');
+        if (clients.isNotEmpty) {
+          final firstClient = clients.first;
+          _addLog('  📝 Sample: ${firstClient['first_name']} ${firstClient['last_name']}');
+        } else {
+          _addLog('  ⚠️  No clients found (table is empty)');
+        }
+      } catch (e) {
+        _addLog('  ❌ Failed to read clients: $e');
+      }
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Test 3: Check other tables
+      _addLog('📍 Test 3: Check Table Schema');
+      try {
+        final db = await PowerSyncService.database;
+
+        // Check if key tables exist
+        final tables = ['clients', 'addresses', 'touchpoints', 'user_profiles'];
+        for (final table in tables) {
+          try {
+            final result = await db.getAll("SELECT COUNT(*) as count FROM $table");
+            final count = result.first['count'] as int;
+            _addLog('  ✅ $table: $count row(s)');
+          } catch (e) {
+            _addLog('  ⚠️  $table: ${e.toString().substring(0, 50)}...');
+          }
+        }
+      } catch (e) {
+        _addLog('  ❌ Schema check failed: $e');
+      }
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Test 4: Write test
+      _addLog('📍 Test 4: Write Test (Addresses)');
+      try {
+        final db = await PowerSyncService.database;
+
+        // Try to get a client ID to associate with
+        final clients = await db.getAll('SELECT id FROM clients LIMIT 1');
+
+        if (clients.isNotEmpty) {
+          final clientId = clients.first['id'] as String;
+          final testId = DateTime.now().millisecondsSinceEpoch.toString();
+
+          await db.execute(
+            '''INSERT INTO addresses (id, client_id, type, street, city, province, postal_code, is_primary, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            [
+              testId,
+              clientId,
+              'home',
+              'Test Street',
+              'Test City',
+              'Test Province',
+              '1234',
+              0,
+              DateTime.now().toIso8601String(),
+              DateTime.now().toIso8601String(),
+            ],
+          );
+
+          _addLog('  ✅ Successfully inserted test address');
+
+          // Clean up the test data
+          await db.execute('DELETE FROM addresses WHERE id = ?', [testId]);
+          _addLog('  ✅ Cleaned up test data');
+        } else {
+          _addLog('  ⚠️  Skipped (no clients to associate with)');
+        }
+      } catch (e) {
+        _addLog('  ❌ Write test failed: $e');
+      }
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Test 5: Sync status
+      _addLog('📍 Test 5: Sync Status');
+      try {
+        final db = await PowerSyncService.database;
+        _addLog('  ℹ️  DB Connected: ${db.connected}');
+        _addLog('  ℹ️  Service Connected: ${PowerSyncService.isConnected}');
+        _addLog('  ℹ️  Pending Uploads: ${await PowerSyncService.pendingUploadCount}');
+      } catch (e) {
+        _addLog('  ❌ Sync status check failed: $e');
+      }
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Summary
+      _addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      _addLog('✅ All tests completed!');
+      _addLog('ℹ️  Timestamp: ${DateTime.now().toIso8601String()}');
+      _addLog('ℹ️  Tests run: 5 (Connection, Read, Schema, Write, Sync)');
+
+    } catch (e) {
+      _addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      _addLog('❌ Test suite failed: $e');
+    } finally {
+      setDialogState(() => _isTestingPowerSync = false);
+    }
   }
 }

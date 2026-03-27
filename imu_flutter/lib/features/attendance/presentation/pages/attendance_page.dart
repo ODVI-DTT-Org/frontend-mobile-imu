@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/attendance_record.dart';
 
 class AttendancePage extends ConsumerStatefulWidget {
@@ -14,7 +15,6 @@ class AttendancePage extends ConsumerStatefulWidget {
 }
 
 class _AttendancePageState extends ConsumerState<AttendancePage> {
-  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -96,14 +96,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : () => _handleCheck(isCheckedIn),
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(icon),
+              onPressed: () => _handleCheck(isCheckedIn),
+              icon: Icon(icon),
               label: Text(label, style: const TextStyle(fontSize: 18)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: color,
@@ -334,53 +328,61 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
 
   Future<void> _handleCheck(bool isCheckingOut) async {
     HapticUtils.mediumImpact();
-    setState(() => _isLoading = true);
 
-    try {
-      final locationAsync = ref.read(currentLocationProvider);
+    await LoadingHelper.withLoading(
+      ref: ref,
+      message: isCheckingOut ? 'Checking out...' : 'Checking in...',
+      operation: () async {
+        final locationAsync = ref.read(currentLocationProvider);
 
-      await locationAsync.when(
-        data: (location) async {
-          final attendanceLocation = AttendanceLocation(
-            latitude: location?.latitude ?? 0,
-            longitude: location?.longitude ?? 0,
-            address: location?.address,
-            timestamp: DateTime.now(),
-          );
-
-          final notifier = ref.read(todayAttendanceProvider.notifier);
-          if (isCheckingOut) {
-            await notifier.checkOut(attendanceLocation);
-          } else {
-            await notifier.checkIn(attendanceLocation);
-          }
-        },
-        loading: () async {
-          // Use default location if GPS unavailable
-          final attendanceLocation = AttendanceLocation(
-            latitude: 0,
-            longitude: 0,
-            timestamp: DateTime.now(),
-          );
-
-          final notifier = ref.read(todayAttendanceProvider.notifier);
-          if (isCheckingOut) {
-            await notifier.checkOut(attendanceLocation);
-          } else {
-            await notifier.checkIn(attendanceLocation);
-          }
-        },
-        error: (_, __) async {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Could not get location. Please enable GPS.')),
+        await locationAsync.when(
+          data: (location) async {
+            final attendanceLocation = AttendanceLocation(
+              latitude: location?.latitude ?? 0,
+              longitude: location?.longitude ?? 0,
+              address: location?.address,
+              timestamp: DateTime.now(),
             );
-          }
-        },
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+
+            final notifier = ref.read(todayAttendanceProvider.notifier);
+            if (isCheckingOut) {
+              await notifier.checkOut(attendanceLocation);
+            } else {
+              await notifier.checkIn(attendanceLocation);
+            }
+          },
+          loading: () async {
+            // Use default location if GPS unavailable
+            final attendanceLocation = AttendanceLocation(
+              latitude: 0,
+              longitude: 0,
+              timestamp: DateTime.now(),
+            );
+
+            final notifier = ref.read(todayAttendanceProvider.notifier);
+            if (isCheckingOut) {
+              await notifier.checkOut(attendanceLocation);
+            } else {
+              await notifier.checkIn(attendanceLocation);
+            }
+          },
+          error: (_, __) async {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not get location. Please enable GPS.')),
+              );
+            }
+          },
+        );
+      },
+      onError: (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to ${isCheckingOut ? "check out" : "check in"}: $e')),
+          );
+        }
+      },
+    );
   }
 
   String _formatTime(DateTime time) {

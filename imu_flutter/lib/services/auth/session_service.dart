@@ -129,6 +129,29 @@ class SessionService extends ChangeNotifier {
     return _isLocked || !_isSessionValid;
   }
 
+  /// Get session elapsed time since start
+  Duration? get sessionElapsed {
+    if (_sessionStartTime == null) return null;
+    return DateTime.now().difference(_sessionStartTime!);
+  }
+
+  /// Get session remaining time
+  Duration? get sessionRemaining {
+    if (_sessionStartTime == null) return null;
+    final elapsed = DateTime.now().difference(_sessionStartTime!);
+    final remaining = sessionTimeout - elapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  /// Reset session start time (e.g., after successful token refresh)
+  /// This extends the full 8-hour session timeout
+  void resetSessionStartTime() {
+    _sessionStartTime = DateTime.now();
+    _resetSessionTimer();
+    notifyListeners();
+    debugPrint('Session start time reset');
+  }
+
   @override
   void dispose() {
     _inactivityTimer?.cancel();

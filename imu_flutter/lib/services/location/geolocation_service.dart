@@ -56,37 +56,46 @@ class GeolocationService {
     LocationAccuracy accuracy = LocationAccuracy.high,
     Duration timeout = const Duration(seconds: 30),
   }) async {
+    debugPrint('GeolocationService: Getting current position...');
+
     // Check if location service is enabled
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      debugPrint('GeolocationService: Location service is disabled');
       return (null, LocationResult.serviceDisabled, 'GPS is disabled. Please enable location services in your device settings.');
     }
 
     // Check and request permission
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
+      debugPrint('GeolocationService: Requesting location permission...');
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
+        debugPrint('GeolocationService: Location permission denied');
         return (null, LocationResult.permissionDenied, 'Location permission denied. Please allow location access to capture your time-in location.');
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
+      debugPrint('GeolocationService: Location permission permanently denied');
       return (null, LocationResult.permissionDeniedForever, 'Location permission permanently denied. Please enable it in app settings.');
     }
 
     try {
+      debugPrint('GeolocationService: Fetching GPS location...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: accuracy,
         timeLimit: timeout,
       );
 
       _lastKnownPosition = position;
+      debugPrint('GeolocationService: Got position - Lat: ${position.latitude}, Lng: ${position.longitude}, Accuracy: ${position.accuracy}m');
       return (position, LocationResult.success, null);
     } on TimeoutException {
+      debugPrint('GeolocationService: Location request timed out');
       return (null, LocationResult.timeout, 'Location request timed out. Please try again.');
     } catch (e) {
-      debugPrint('Error getting current position: $e');
+      debugPrint('GeolocationService: Error getting current position: $e');
       return (null, LocationResult.error, 'Failed to get location: ${e.toString()}');
     }
   }
@@ -109,6 +118,7 @@ class GeolocationService {
     double longitude,
   ) async {
     try {
+      debugPrint('GeolocationService: Getting address for coordinates ($latitude, $longitude)...');
       final placemarks = await placemarkFromCoordinates(latitude, longitude);
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
@@ -123,11 +133,14 @@ class GeolocationService {
             place.administrativeArea!,
           if (place.country != null && place.country!.isNotEmpty) place.country!,
         ];
-        return parts.join(', ');
+        final address = parts.join(', ');
+        debugPrint('GeolocationService: Got address: $address');
+        return address;
       }
+      debugPrint('GeolocationService: No placemarks found for coordinates');
       return null;
     } catch (e) {
-      debugPrint('Error getting address: $e');
+      debugPrint('GeolocationService: Error getting address: $e');
       return null;
     }
   }
@@ -135,13 +148,17 @@ class GeolocationService {
   /// Get coordinates from address (forward geocoding)
   Future<Location?> getCoordinatesFromAddress(String address) async {
     try {
+      debugPrint('GeolocationService: Getting coordinates for address: $address');
       final locations = await locationFromAddress(address);
       if (locations.isNotEmpty) {
-        return locations.first;
+        final location = locations.first;
+        debugPrint('GeolocationService: Got coordinates - Lat: ${location.latitude}, Lng: ${location.longitude}');
+        return location;
       }
+      debugPrint('GeolocationService: No locations found for address');
       return null;
     } catch (e) {
-      debugPrint('Error getting coordinates: $e');
+      debugPrint('GeolocationService: Error getting coordinates: $e');
       return null;
     }
   }

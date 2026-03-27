@@ -4,7 +4,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 // Models
 class PsgcRegion {
@@ -142,7 +141,7 @@ class PsgcApiService {
 
   PsgcApiService({required this.baseUrl, this.authToken});
 
-  Map<String, String> get _headers => {
+  Map<String, String> get _headers {
     if (authToken != null) {
       return {
         'Content-Type': 'application/json',

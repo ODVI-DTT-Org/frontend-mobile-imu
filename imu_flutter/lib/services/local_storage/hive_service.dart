@@ -14,6 +14,9 @@ class HiveService {
   static const String _pendingSyncBox = 'pending_sync';
   static const String _cacheBox = 'cache';
   static const String _attendanceBox = 'attendance';
+  static const String _agenciesBox = 'agencies';
+  static const String _groupsBox = 'groups';
+  static const String _itinerariesBox = 'itineraries';
 
   bool _isInitialized = false;
 
@@ -31,6 +34,9 @@ class HiveService {
       Hive.openBox<String>(_pendingSyncBox),
       Hive.openBox<String>(_cacheBox),
       Hive.openBox<String>(_attendanceBox),
+      Hive.openBox<String>(_agenciesBox),
+      Hive.openBox<String>(_groupsBox),
+      Hive.openBox<String>(_itinerariesBox),
     ]);
 
     _isInitialized = true;
@@ -260,6 +266,151 @@ class HiveService {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  // ==================== Agencies ====================
+
+  /// Save an agency
+  Future<void> saveAgency(String id, Map<String, dynamic> agency) async {
+    final box = Hive.box<String>(_agenciesBox);
+    await box.put(id, jsonEncode(agency));
+  }
+
+  /// Add an agency (alias for saveAgency with auto-ID extraction)
+  Future<void> addAgency(Map<String, dynamic> agency) async {
+    final id = agency['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+    await saveAgency(id, agency);
+  }
+
+  /// Get an agency by ID
+  Future<Map<String, dynamic>?> getAgency(String id) async {
+    final box = Hive.box<String>(_agenciesBox);
+    final data = box.get(id);
+    if (data != null) {
+      return jsonDecode(data) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Get all agencies
+  List<Map<String, dynamic>> getAllAgencies() {
+    final box = Hive.box<String>(_agenciesBox);
+    return box.values
+        .map((data) => jsonDecode(data) as Map<String, dynamic>)
+        .toList();
+  }
+
+  /// Update an agency (alias for saveAgency)
+  Future<void> updateAgency(Map<String, dynamic> agency) async {
+    final id = agency['id'] as String?;
+    if (id == null) throw ArgumentError('Agency ID is required');
+    await saveAgency(id, agency);
+  }
+
+  /// Delete an agency
+  Future<void> deleteAgency(String id) async {
+    final box = Hive.box<String>(_agenciesBox);
+    await box.delete(id);
+  }
+
+  // ==================== Groups ====================
+
+  /// Save a group
+  Future<void> saveGroup(String id, Map<String, dynamic> group) async {
+    final box = Hive.box<String>(_groupsBox);
+    await box.put(id, jsonEncode(group));
+  }
+
+  /// Add a group (alias for saveGroup with auto-ID extraction)
+  Future<void> addGroup(Map<String, dynamic> group) async {
+    final id = group['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+    await saveGroup(id, group);
+  }
+
+  /// Get a group by ID
+  Future<Map<String, dynamic>?> getGroup(String id) async {
+    final box = Hive.box<String>(_groupsBox);
+    final data = box.get(id);
+    if (data != null) {
+      return jsonDecode(data) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Get all groups
+  List<Map<String, dynamic>> getAllGroups() {
+    final box = Hive.box<String>(_groupsBox);
+    return box.values
+        .map((data) => jsonDecode(data) as Map<String, dynamic>)
+        .toList();
+  }
+
+  /// Update a group (alias for saveGroup)
+  Future<void> updateGroup(Map<String, dynamic> group) async {
+    final id = group['id'] as String?;
+    if (id == null) throw ArgumentError('Group ID is required');
+    await saveGroup(id, group);
+  }
+
+  /// Delete a group
+  Future<void> deleteGroup(String id) async {
+    final box = Hive.box<String>(_groupsBox);
+    await box.delete(id);
+  }
+
+  // ==================== Itineraries ====================
+
+  /// Save an itinerary
+  Future<void> saveItinerary(String id, Map<String, dynamic> itinerary) async {
+    final box = Hive.box<String>(_itinerariesBox);
+    await box.put(id, jsonEncode(itinerary));
+  }
+
+  /// Add an itinerary (alias for saveItinerary with auto-ID extraction)
+  Future<void> addItinerary(Map<String, dynamic> itinerary) async {
+    final id = itinerary['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString();
+    await saveItinerary(id, itinerary);
+  }
+
+  /// Get an itinerary by ID
+  Future<Map<String, dynamic>?> getItinerary(String id) async {
+    final box = Hive.box<String>(_itinerariesBox);
+    final data = box.get(id);
+    if (data != null) {
+      return jsonDecode(data) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Get all itineraries
+  List<Map<String, dynamic>> getAllItineraries() {
+    final box = Hive.box<String>(_itinerariesBox);
+    return box.values
+        .map((data) => jsonDecode(data) as Map<String, dynamic>)
+        .toList();
+  }
+
+  /// Get itineraries by date
+  List<Map<String, dynamic>> getItinerariesByDate(DateTime date) {
+    final allItineraries = getAllItineraries();
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return allItineraries.where((i) {
+      final scheduledDate = i['scheduled_date'] as String?;
+      return scheduledDate == dateStr;
+    }).toList();
+  }
+
+  /// Update an itinerary (alias for saveItinerary)
+  Future<void> updateItinerary(Map<String, dynamic> itinerary) async {
+    final id = itinerary['id'] as String?;
+    if (id == null) throw ArgumentError('Itinerary ID is required');
+    await saveItinerary(id, itinerary);
+  }
+
+  /// Delete an itinerary
+  Future<void> deleteItinerary(String id) async {
+    final box = Hive.box<String>(_itinerariesBox);
+    await box.delete(id);
   }
 
   // ==================== Clear All ====================

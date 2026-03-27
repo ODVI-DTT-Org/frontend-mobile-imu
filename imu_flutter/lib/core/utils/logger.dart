@@ -13,9 +13,15 @@ void logInfo(String message) {
   debugPrint('[INFO] $message');
 }
 
-/// Log a warning message
-void logWarning(String message) {
+/// Log a warning message with optional error object
+void logWarning(String message, [Object? error, StackTrace? stackTrace]) {
   debugPrint('[WARN] $message');
+  if (error != null) {
+    debugPrint('  Warning: $error');
+  }
+  if (stackTrace != null) {
+    debugPrint('  Stack: $stackTrace');
+  }
 }
 
 /// Log an error message with optional error object

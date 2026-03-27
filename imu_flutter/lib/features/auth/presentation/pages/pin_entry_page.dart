@@ -1,24 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/auth/secure_storage_service.dart';
 import '../../../../services/auth/session_service.dart';
+import '../../../../services/auth/auth_service.dart';
+import '../../../../services/auth/offline_auth_service.dart';
+import '../../../../services/auth/jwt_auth_service.dart';
+import '../../../../services/sync/powersync_service.dart';
+import '../../../../services/sync/powersync_connector.dart' show powerSyncConnectorProvider;
+import '../../../../shared/utils/loading_helper.dart';
+import '../../../../shared/providers/app_providers.dart' show offlineAuthProvider;
+import '../../../../core/utils/logger.dart';
 
-class PinEntryPage extends StatefulWidget {
+class PinEntryPage extends ConsumerStatefulWidget {
   const PinEntryPage({super.key});
 
   @override
-  State<PinEntryPage> createState() => _PinEntryPageState();
+  ConsumerState<PinEntryPage> createState() => _PinEntryPageState();
 }
 
-class _PinEntryPageState extends State<PinEntryPage> {
+class _PinEntryPageState extends ConsumerState<PinEntryPage> {
   final _secureStorage = SecureStorageService();
   final _sessionService = SessionService();
+  final _offlineAuthService = OfflineAuthService();
+  final _jwtAuthService = JwtAuthService.instance;
+
   String _pin = '';
   bool _hasError = false;
   int _attempts = 0;
   bool _isVerifying = false;
+  String? _errorMessage;
+  bool _isOfflineMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if this is offline mode (from query parameter)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final location = GoRouterState.of(context).uri.toString();
+      _isOfflineMode = location.contains('offline=true');
+      setState(() {});
+    });
+  }
 
   void _onPinEntered(String digit) {
     HapticFeedback.lightImpact();
@@ -27,6 +52,7 @@ class _PinEntryPageState extends State<PinEntryPage> {
       setState(() {
         _pin += digit;
         _hasError = false;
+        _errorMessage = null;
       });
 
       if (_pin.length == 6) {
@@ -43,46 +69,204 @@ class _PinEntryPageState extends State<PinEntryPage> {
     }
   }
 
+  Future<void> _handleOfflineAuth() async {
+    logDebug('Handling offline authentication...');
+
+    // Authenticate with PIN using cached credentials
+    final result = await _offlineAuthService.authenticateWithPin(_pin);
+
+    if (!result.success) {
+      if (result.requiresReauth) {
+        throw Exception('Session expired. Please login with your password.');
+      } else {
+        throw Exception(result.error ?? 'Authentication failed');
+      }
+    }
+
+    // Update JWT service with cached token
+    final jwtUser = _getUserFromResult(result.user!);
+    await _jwtAuthService.setOfflineAuth(
+      token: result.token!,
+      user: jwtUser,
+    );
+
+    // CRITICAL: Update AuthNotifier state so router knows user is authenticated
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    // Access the internal state and update it
+    // We need to manually update the AuthNotifier since there's no public method for it
+    // For now, we'll trigger a status check
+    await authNotifier.checkAuthStatus();
+
+    logDebug('Offline authentication successful for ${result.user!.id}');
+  }
+
+  Future<void> _handleOnlineAuth() async {
+    logDebug('Handling online authentication...');
+
+    try {
+      // Try to refresh tokens to ensure we have a valid session (with timeout)
+      final authService = ref.read(authServiceProvider);
+
+      // Check if token is still valid before refreshing
+      if (authService.isAuthenticated && !authService.needsRefresh) {
+        logDebug('Token is still valid, skipping refresh');
+      } else {
+        logDebug('Refreshing tokens after PIN entry...');
+
+        // Add timeout to prevent hanging
+        await authService.refreshToken().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            logWarning('Token refresh timed out, continuing anyway...');
+          },
+        );
+
+        logDebug('Token refresh completed');
+        // Reset session start time to extend the 8-hour timeout
+        _sessionService.resetSessionStartTime();
+      }
+
+      // CRITICAL: Update AuthNotifier state so router knows user is authenticated
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      await authNotifier.checkAuthStatus();
+
+      logDebug('Online authentication successful');
+    } catch (e) {
+      logWarning('Online auth had issues but continuing: $e');
+      // Don't throw - allow authentication to proceed even if refresh fails
+    }
+  }
+
+  JwtUser _getUserFromResult(OfflineAuthUser user) {
+    return JwtUser(
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      expiresAt: null, // Will be validated when needed
+    );
+  }
+
   Future<void> _verifyPin() async {
     setState(() => _isVerifying = true);
 
     try {
-      final isValid = await _secureStorage.verifyPin(_pin);
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: _isOfflineMode ? 'Authenticating offline...' : 'Verifying PIN...',
+        operation: () async {
+          logDebug('Starting PIN verification...');
+          // Add timeout to PIN verification
+          final isValid = await _secureStorage.verifyPin(_pin).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              logError('PIN verification timed out');
+              throw Exception('PIN verification timed out. Please try again.');
+            },
+          );
+          logDebug('PIN verification result: $isValid');
 
-      if (isValid) {
-        HapticFeedback.mediumImpact();
-        // Start the session after successful PIN verification
-        _sessionService.startSession();
-        if (mounted) {
-          context.go('/home');
-        }
+          if (isValid) {
+            logDebug('PIN is valid, proceeding with authentication...');
+            HapticFeedback.mediumImpact();
+
+            // Handle offline authentication
+            if (_isOfflineMode) {
+              logDebug('Handling offline authentication...');
+              await _handleOfflineAuth();
+              logDebug('Offline authentication completed');
+            } else {
+              logDebug('Handling online authentication...');
+              await _handleOnlineAuth();
+              logDebug('Online authentication completed');
+            }
+
+            // Start the session after successful authentication
+            logDebug('Starting session...');
+            _sessionService.startSession();
+            logDebug('Session started');
+
+            // CRITICAL: Wait for router to pick up auth state change
+            // This prevents race condition where navigation happens before router sees auth update
+            logDebug('Waiting for router to pick up auth state...');
+            await Future.delayed(const Duration(milliseconds: 500));
+            logDebug('Delay completed, proceeding with navigation setup');
+
+            // Connect to PowerSync in background (non-blocking)
+            final connector = ref.read(powerSyncConnectorProvider);
+            if (connector != null) {
+              logDebug('PowerSync connector found, connecting in background...');
+              // Connect to PowerSync in background without blocking
+              PowerSyncService.connect(connector).then((_) {
+                logDebug('PowerSync connected successfully');
+                // Wait for initial sync in background (non-blocking)
+                PowerSyncService.waitForInitialSync(
+                  timeout: const Duration(seconds: 30),
+                ).then((_) {
+                  logDebug('PowerSync initial sync completed');
+                }).catchError((e) {
+                  logWarning('PowerSync initial sync failed (non-critical): $e');
+                });
+              }).catchError((e) {
+                logWarning('PowerSync connection failed (non-critical): $e');
+                // Don't block authentication - continue anyway
+              });
+            }
+            logDebug('Authentication flow completed successfully');
+          } else {
+            logDebug('PIN is invalid, throwing exception');
+            throw Exception('Invalid PIN');
+          }
+        },
+        onError: (e) {
+          logError('PIN verification error: $e');
+          setState(() {
+            _isVerifying = false;
+            _hasError = true;
+            _attempts++;
+            _errorMessage = e.toString().contains('Invalid PIN')
+                ? 'Incorrect PIN. Please try again.'
+                : 'Session expired. Please login with your password.';
+            _pin = '';
+          });
+          HapticFeedback.heavyImpact();
+        },
+      );
+
+      // Success handling - only navigate if no error
+      if (mounted && !_hasError) {
+        logDebug('Navigation to /home - mounted: $mounted, hasError: $_hasError');
+        // Check auth state before navigating
+        final authState = ref.read(authNotifierProvider);
+        logDebug('Auth state before navigation: ${authState.isAuthenticated}, user: ${authState.user?.email}');
+
+        // CRITICAL: Explicitly hide loading overlay before navigation
+        LoadingHelper.hide(ref);
+        logDebug('Loading overlay hidden');
+
+        // Small delay to ensure overlay is removed
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        context.go('/sync-loading');
+        logDebug('Navigation command sent');
       } else {
-        HapticFeedback.heavyImpact();
-        setState(() {
-          _hasError = true;
-          _pin = '';
-          _attempts++;
-          _isVerifying = false;
-        });
+        logWarning('Not navigating - mounted: $mounted, hasError: $_hasError');
+        LoadingHelper.hide(ref);
+      }
 
-        if (_attempts >= 3) {
-          _showTooManyAttemptsDialog();
-        }
+      // Check if too many attempts
+      if (_attempts >= 3) {
+        _showTooManyAttemptsDialog();
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-          _pin = '';
-          _isVerifying = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error verifying PIN: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      logError('Unexpected error in _verifyPin: $e');
+      setState(() {
+        _isVerifying = false;
+        _hasError = true;
+        _errorMessage = 'An error occurred. Please try again.';
+        _pin = '';
+      });
     }
   }
 
@@ -185,10 +369,21 @@ class _PinEntryPageState extends State<PinEntryPage> {
                   ),
                 ),
               ],
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: Colors.orange[600],
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const Spacer(),
               // Use password instead link
               TextButton(
-                onPressed: () => context.go('/login'),
+                onPressed: () => context.go('/login?use_password=true'),
                 child: const Text('Use password instead'),
               ),
               const SizedBox(height: 24),

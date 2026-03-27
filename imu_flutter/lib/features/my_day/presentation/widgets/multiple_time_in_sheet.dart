@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/location/geolocation_service.dart';
+import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/my_day_client.dart';
 
 /// Bottom sheet for bulk time-in of multiple clients
-class MultipleTimeInSheet extends StatefulWidget {
+class MultipleTimeInSheet extends ConsumerStatefulWidget {
   final List<MyDayClient> clients;
   final Function(List<String> clientIds, String? address, String timestamp) onBulkTimeIn;
 
@@ -38,10 +40,10 @@ class MultipleTimeInSheet extends StatefulWidget {
   }
 
   @override
-  State<MultipleTimeInSheet> createState() => _MultipleTimeInSheetState();
+  ConsumerState<MultipleTimeInSheet> createState() => _MultipleTimeInSheetState();
 }
 
-class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
+class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
   final GeolocationService _geoService = GeolocationService();
   final Set<String> _selectedClientIds = {};
   bool _isLoading = false;
@@ -49,6 +51,15 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
   String? _capturedTimestamp;
   bool _locationCaptured = false;
   String? _locationError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Automatically capture GPS when sheet opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _captureLocation();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +213,39 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
   }
 
   Widget _buildLocationStatus() {
+    // Show loading state on initial load
+    if (_isLoading && !_locationCaptured && _locationError == null) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3B82F6).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF3B82F6)),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Capturing location automatically...',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF3B82F6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Show error state if location capture failed
     if (_locationError != null && !_locationCaptured) {
       return Container(
@@ -477,7 +521,11 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
     });
 
     try {
-      final (position, result, errorMessage) = await _geoService.getCurrentPositionWithResult();
+      final (position, result, errorMessage) = await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Capturing location...',
+        operation: () => _geoService.getCurrentPositionWithResult(),
+      ) ?? (null, LocationResult.error, 'Failed to capture location');
 
       if (position == null) {
         setState(() {
@@ -507,9 +555,13 @@ class _MultipleTimeInSheetState extends State<MultipleTimeInSheet> {
         return;
       }
 
-      final address = await _geoService.getAddressFromCoordinates(
-        position.latitude,
-        position.longitude,
+      final address = await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Getting address...',
+        operation: () => _geoService.getAddressFromCoordinates(
+          position.latitude,
+          position.longitude,
+        ),
       );
 
       final timestamp = DateTime.now();

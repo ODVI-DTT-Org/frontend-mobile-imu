@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../shared/utils/loading_helper.dart';
 import 'agencies_page.dart';
 
 class AddProspectAgencyPage extends ConsumerStatefulWidget {
@@ -44,7 +45,6 @@ class _AddProspectAgencyPageState extends ConsumerState<AddProspectAgencyPage> {
     if (!_formKey.currentState!.validate()) return;
 
     HapticUtils.mediumImpact();
-    setState(() => _isSaving = true);
 
     try {
       final agencyId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -61,12 +61,31 @@ class _AddProspectAgencyPageState extends ConsumerState<AddProspectAgencyPage> {
 
       // TODO: Save to backend/Hive when integrated
       // For now, just return the new agency to the caller
-      HapticUtils.success();
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Saving agency...',
+        operation: () async {
+          await Future.delayed(const Duration(milliseconds: 500)); // Simulate save
+          HapticUtils.success();
+          return agencyData;
+        },
+        onError: (e) {
+          HapticUtils.error();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to save agency: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: const Text('Prospect agency added successfully'),
+            content: Text('Prospect agency added successfully'),
             backgroundColor: Colors.green,
           ),
         );
@@ -79,14 +98,10 @@ class _AddProspectAgencyPageState extends ConsumerState<AddProspectAgencyPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: const Text('Failed to save agency'),
+            content: Text('Failed to save agency'),
             backgroundColor: Colors.red,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
       }
     }
   }

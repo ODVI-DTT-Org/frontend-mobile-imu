@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
+import 'package:imu_flutter/services/auth/auth_service.dart';
+import 'package:imu_flutter/core/config/app_config.dart';
 
 /// Itinerary item model for scheduled visits
 class ItineraryItem {
@@ -10,15 +14,17 @@ class ItineraryItem {
   final String clientName;
   final DateTime scheduledDate;
   final String? scheduledTime;
-  final String status; // scheduled, completed, missed, rescheduled
-  final int touchpointNumber;
-  final String touchpointType;
+  final String status; // pending, in_progress, completed, cancelled
+  final String priority; // low, normal, high
+  final int? touchpointNumber;
+  final String? touchpointType;
   final String? notes;
   final String? address;
   final double? latitude;
   final double? longitude;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String? createdBy;
 
   ItineraryItem({
     required this.id,
@@ -27,67 +33,320 @@ class ItineraryItem {
     required this.scheduledDate,
     this.scheduledTime,
     required this.status,
-    required this.touchpointNumber,
-    required this.touchpointType,
+    this.priority = 'normal',
+    this.touchpointNumber,
+    this.touchpointType,
     this.notes,
     this.address,
     this.latitude,
     this.longitude,
     required this.createdAt,
     this.updatedAt,
+    this.createdBy,
   });
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) {
+    // Handle client name from expand object or from flat fields
+    String clientName = '';
+    if (json['expand'] != null && json['expand']['client_id'] != null) {
+      final client = json['expand']['client_id'] as Map<String, dynamic>;
+      final firstName = client['first_name'] ?? '';
+      final lastName = client['last_name'] ?? '';
+      clientName = '$firstName $lastName'.trim();
+    } else if (json['client_first_name'] != null || json['client_last_name'] != null) {
+      final firstName = json['client_first_name'] ?? '';
+      final lastName = json['client_last_name'] ?? '';
+      clientName = '$firstName $lastName'.trim();
+    } else if (json['client_name'] != null) {
+      clientName = json['client_name'];
+    }
+
+    // Get address from expand or flat field
+    String? address;
+    if (json['expand'] != null && json['expand']['client_id'] != null) {
+      final client = json['expand']['client_id'] as Map<String, dynamic>;
+      address = client['address'];
+    }
+    if (address == null) {
+      address = json['address'];
+    }
+
+    // Parse scheduled date - convert UTC timestamps to local time
+    // Backend can send either:
+    // 1. Simple date format: "2026-03-27" (already local date)
+    // 2. ISO timestamp format: "2026-03-26T16:00:00.000Z" (UTC time - need to convert)
+    final scheduledDateStr = json['scheduled_date'];
+    DateTime scheduledDate;
+
+    if (scheduledDateStr.contains('T')) {
+      // ISO timestamp format - parse as UTC then convert to local
+      final parsedDate = DateTime.parse(scheduledDateStr); // This creates a UTC DateTime
+      final localDate = parsedDate.toLocal(); // Convert to local timezone
+      // Create a local DateTime from the LOCAL date components
+      scheduledDate = DateTime(localDate.year, localDate.month, localDate.day);
+    } else {
+      // Simple date format - parse directly as local
+      final dateParts = scheduledDateStr.split('-');
+      scheduledDate = DateTime(
+        int.parse(dateParts[0]), // year
+        int.parse(dateParts[1]), // month
+        int.parse(dateParts[2]), // day
+      );
+    }
+
+    debugPrint('[ItineraryItem] Parsing date: $scheduledDateStr -> $scheduledDate (UTC: ${scheduledDate.toUtc()}, Local: ${DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day)})');
+
     return ItineraryItem(
       id: json['id'] ?? '',
       clientId: json['client_id'] ?? '',
-      clientName: json['client_name'] ?? json['expand']?['client']?['first_name'] ?? '',
-      scheduledDate: DateTime.parse(json['scheduled_date']),
+      clientName: clientName,
+      scheduledDate: scheduledDate,
       scheduledTime: json['scheduled_time'],
-      status: json['status'] ?? 'scheduled',
-      touchpointNumber: json['touchpoint_number'] ?? 1,
-      touchpointType: json['touchpoint_type'] ?? 'visit',
+      status: json['status'] ?? 'pending',
+      priority: json['priority'] ?? 'normal',
+      touchpointNumber: json['touchpoint_number'],
+      touchpointType: json['touchpoint_type'],
       notes: json['notes'],
-      address: json['address'],
+      address: address,
       latitude: json['latitude']?.toDouble(),
       longitude: json['longitude']?.toDouble(),
-      createdAt: DateTime.parse(json['created']),
-      updatedAt: json['updated'] != null ? DateTime.parse(json['updated']) : null,
+      createdAt: DateTime.parse(json['created'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
+      updatedAt: json['updated'] != null || json['updated_at'] != null
+          ? DateTime.parse(json['updated'] ?? json['updated_at'])
+          : null,
+      createdBy: json['created_by'],
     );
   }
 
   Map<String, dynamic> toJson() {
+    // Format date as YYYY-MM-DD using local date components (not UTC)
+    final dateStr = '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}';
     return {
       'id': id,
       'client_id': clientId,
-      'client_name': clientName,
-      'scheduled_date': scheduledDate.toIso8601String(),
+      'scheduled_date': dateStr,
       'scheduled_time': scheduledTime,
       'status': status,
-      'touchpoint_number': touchpointNumber,
-      'touchpoint_type': touchpointType,
+      'priority': priority,
       'notes': notes,
-      'address': address,
-      'latitude': latitude,
-      'longitude': longitude,
-      'created': createdAt.toIso8601String(),
-      'updated': updatedAt?.toIso8601String(),
     };
+  }
+
+  ItineraryItem copyWith({
+    String? id,
+    String? clientId,
+    String? clientName,
+    DateTime? scheduledDate,
+    String? scheduledTime,
+    String? status,
+    String? priority,
+    int? touchpointNumber,
+    String? touchpointType,
+    String? notes,
+    String? address,
+    double? latitude,
+    double? longitude,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? createdBy,
+  }) {
+    return ItineraryItem(
+      id: id ?? this.id,
+      clientId: clientId ?? this.clientId,
+      clientName: clientName ?? this.clientName,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      scheduledTime: scheduledTime ?? this.scheduledTime,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      touchpointNumber: touchpointNumber ?? this.touchpointNumber,
+      touchpointType: touchpointType ?? this.touchpointType,
+      notes: notes ?? this.notes,
+      address: address ?? this.address,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdBy: createdBy ?? this.createdBy,
+    );
   }
 }
 
 /// Itinerary API service
-/// TODO: Phase 1 - Will be updated to work with PowerSync/Supabase backend
 class ItineraryApiService {
+  final Dio _dio;
+  final JwtAuthService _authService;
+
+  ItineraryApiService({Dio? dio, JwtAuthService? authService})
+      : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
+        _authService = authService ?? JwtAuthService();
+
   /// Fetch itinerary for a specific date
-  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<List<ItineraryItem>> fetchItinerary(DateTime date) async {
     try {
       final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-      debugPrint('ItineraryApiService: fetchItinerary for $dateStr (PowerSync integration pending)');
-      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
-      return [];
+      debugPrint('ItineraryApiService: Fetching itinerary for $dateStr...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/itineraries',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        queryParameters: {
+          'date': dateStr,
+        },
+      );
+
+      debugPrint('ItineraryApiService: Response status: ${response.statusCode}');
+      debugPrint('ItineraryApiService: Response data: ${response.data}');
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>? ?? [];
+        debugPrint('ItineraryApiService: Got ${items.length} itinerary items from API');
+
+        if (items.isNotEmpty) {
+          debugPrint('ItineraryApiService: First item: ${items[0]}');
+        }
+
+        return items.map((item) {
+          final itineraryData = item as Map<String, dynamic>;
+          debugPrint('ItineraryApiService: Parsing item: $itineraryData');
+          return ItineraryItem.fromJson(itineraryData);
+        }).toList();
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch itinerary: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ItineraryApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch itinerary',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Fetch all itineraries
+  Future<List<ItineraryItem>> fetchItineraries({
+    int page = 1,
+    int perPage = 20,
+    String? clientId,
+    String? status,
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      debugPrint('ItineraryApiService: Fetching itineraries...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/itineraries',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        queryParameters: {
+          'page': page,
+          'perPage': perPage,
+          if (clientId != null) 'client_id': clientId,
+          if (status != null) 'status': status,
+          if (startDate != null) 'start_date': startDate,
+          if (endDate != null) 'end_date': endDate,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>? ?? [];
+        debugPrint('ItineraryApiService: Got ${items.length} itineraries from API');
+
+        return items.map((item) {
+          final itineraryData = item as Map<String, dynamic>;
+          return ItineraryItem.fromJson(itineraryData);
+        }).toList();
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch itineraries: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ItineraryApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch itineraries',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Fetch single itinerary by ID
+  Future<ItineraryItem?> fetchItineraryById(String id) async {
+    try {
+      debugPrint('ItineraryApiService: Fetching itinerary $id...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/itineraries/$id',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final itineraryData = response.data as Map<String, dynamic>;
+        debugPrint('ItineraryApiService: Got itinerary: ${itineraryData['id']}');
+        return ItineraryItem.fromJson(itineraryData);
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch itinerary: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        return null; // Itinerary not found
+      }
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -98,12 +357,70 @@ class ItineraryApiService {
   }
 
   /// Create itinerary item
-  /// TODO: Phase 1 - Implement with PowerSync/Supabase
-  Future<ItineraryItem?> createItineraryItem(ItineraryItem item) async {
+  Future<ItineraryItem?> createItinerary({
+    required String clientId,
+    required DateTime scheduledDate,
+    String? scheduledTime,
+    String status = 'pending',
+    String priority = 'normal',
+    String? notes,
+  }) async {
     try {
-      debugPrint('ItineraryApiService: createItineraryItem (PowerSync integration pending)');
-      // TODO: Phase 1 - Implement PowerSync/Supabase create
-      return null;
+      debugPrint('ItineraryApiService: Creating itinerary item...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      // Format date as YYYY-MM-DD using local date components (not UTC)
+      final dateStr = '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}';
+      debugPrint('ItineraryApiService: Sending scheduled_date: $dateStr (from DateTime: $scheduledDate)');
+
+      final requestData = {
+        'client_id': clientId,
+        'scheduled_date': dateStr,
+        if (scheduledTime != null) 'scheduled_time': scheduledTime,
+        'status': status,
+        'priority': priority,
+        if (notes != null) 'notes': notes,
+      };
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/itineraries',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: requestData,
+      );
+
+      if (response.statusCode == 201) {
+        final itineraryData = response.data as Map<String, dynamic>;
+        debugPrint('ItineraryApiService: Itinerary created successfully: ${itineraryData['id']}');
+        return ItineraryItem.fromJson(itineraryData);
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to create itinerary item: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+
+      // Extract the actual error message from the response
+      String errorMessage = 'Failed to create itinerary item';
+      if (e.response?.data != null) {
+        final responseData = e.response!.data as Map<String, dynamic>;
+        errorMessage = responseData['message'] ?? errorMessage;
+      }
+
+      throw ApiException(
+        message: errorMessage,
+        originalError: e,
+      );
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -113,13 +430,120 @@ class ItineraryApiService {
     }
   }
 
-  /// Update itinerary item status
-  /// TODO: Phase 1 - Implement with PowerSync/Supabase
-  Future<ItineraryItem?> updateItineraryStatus(String id, String status) async {
+  /// Add client to My Day (today's itinerary)
+  Future<Map<String, dynamic>> addToMyDay({
+    required String clientId,
+    String? scheduledTime,
+    int? priority,
+    String? notes,
+  }) async {
     try {
-      debugPrint('ItineraryApiService: updateItineraryStatus $id -> $status (PowerSync integration pending)');
-      // TODO: Phase 1 - Implement PowerSync/Supabase update
-      return null;
+      debugPrint('ItineraryApiService: Adding client to My Day...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final requestData = {
+        'client_id': clientId,
+        if (scheduledTime != null) 'scheduled_time': scheduledTime,
+        if (priority != null) 'priority': priority,
+        if (notes != null) 'notes': notes,
+      };
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/add-client',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: requestData,
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('ItineraryApiService: Client added to My Day successfully');
+        return response.data as Map<String, dynamic>;
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to add client to My Day: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ItineraryApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to add client to My Day',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Update itinerary item
+  Future<ItineraryItem?> updateItinerary({
+    required String id,
+    String? clientId,
+    DateTime? scheduledDate,
+    String? scheduledTime,
+    String? status,
+    String? priority,
+    String? notes,
+  }) async {
+    try {
+      debugPrint('ItineraryApiService: Updating itinerary $id...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final requestData = {
+        if (clientId != null) 'client_id': clientId,
+        if (scheduledDate != null) 'scheduled_date': scheduledDate.toIso8601String().split('T').first,
+        if (scheduledTime != null) 'scheduled_time': scheduledTime,
+        if (status != null) 'status': status,
+        if (priority != null) 'priority': priority,
+        if (notes != null) 'notes': notes,
+      };
+
+      final response = await _dio.put(
+        '${AppConfig.postgresApiUrl}/itineraries/$id',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: requestData,
+      );
+
+      if (response.statusCode == 200) {
+        final itineraryData = response.data as Map<String, dynamic>;
+        debugPrint('ItineraryApiService: Itinerary updated successfully: ${itineraryData['id']}');
+        return ItineraryItem.fromJson(itineraryData);
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to update itinerary item: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        return null; // Itinerary not found
+      }
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -129,13 +553,104 @@ class ItineraryApiService {
     }
   }
 
+  /// Update itinerary item status
+  Future<ItineraryItem?> updateItineraryStatus(String id, String status) async {
+    return updateItinerary(id: id, status: status);
+  }
+
+  /// Delete itinerary item
+  Future<void> deleteItinerary(String id) async {
+    try {
+      debugPrint('ItineraryApiService: Deleting itinerary $id...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.delete(
+        '${AppConfig.postgresApiUrl}/itineraries/$id',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('ItineraryApiService: Itinerary deleted successfully');
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to delete itinerary item: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ItineraryApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to delete itinerary item',
+        originalError: e,
+      );
+    }
+  }
+
   /// Fetch missed visits
-  /// TODO: Phase 1 - Implement with PowerSync/Supabase
   Future<List<ItineraryItem>> fetchMissedVisits() async {
     try {
-      debugPrint('ItineraryApiService: fetchMissedVisits (PowerSync integration pending)');
-      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
-      return [];
+      debugPrint('ItineraryApiService: Fetching missed visits...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ItineraryApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final today = DateTime.now();
+      final pastDate = today.subtract(const Duration(days: 30));
+      final dateStr = '${pastDate.year}-${pastDate.month.toString().padLeft(2, '0')}-${pastDate.day.toString().padLeft(2, '0')}';
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/itineraries',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        queryParameters: {
+          'start_date': dateStr,
+          'end_date': today.toIso8601String().split('T').first,
+          'status': 'pending',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>? ?? [];
+        debugPrint('ItineraryApiService: Got ${items.length} missed visits from API');
+
+        return items.map((item) {
+          final itineraryData = item as Map<String, dynamic>;
+          return ItineraryItem.fromJson(itineraryData);
+        }).toList();
+      } else {
+        debugPrint('ItineraryApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch missed visits: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ItineraryApiService: DioException - ${e.message}');
+      debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
       throw ApiException(
@@ -148,13 +663,30 @@ class ItineraryApiService {
 
 /// Provider for ItineraryApiService
 final itineraryApiServiceProvider = Provider<ItineraryApiService>((ref) {
-  return ItineraryApiService();
+  final jwtAuth = ref.watch(jwtAuthProvider);
+  return ItineraryApiService(authService: jwtAuth);
 });
 
-/// Provider for today's itinerary
+/// Provider for today's itinerary (fetches wider range for Yesterday/Today/Tomorrow tabs)
+/// Fetches from yesterday to 7 days ahead to support all tabs
 final todayItineraryProvider = FutureProvider<List<ItineraryItem>>((ref) async {
   final itineraryApi = ref.watch(itineraryApiServiceProvider);
-  return await itineraryApi.fetchItinerary(DateTime.now());
+
+  // Fetch a wider range: yesterday to 7 days ahead
+  final now = DateTime.now();
+  final yesterday = now.subtract(const Duration(days: 1));
+  final nextWeek = now.add(const Duration(days: 7));
+
+  final yesterdayStr = '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+  final nextWeekStr = '${nextWeek.year}-${nextWeek.month.toString().padLeft(2, '0')}-${nextWeek.day.toString().padLeft(2, '0')}';
+
+  debugPrint('ItineraryApiService: Fetching itineraries from $yesterdayStr to $nextWeekStr');
+
+  return await itineraryApi.fetchItineraries(
+    startDate: yesterdayStr,
+    endDate: nextWeekStr,
+    perPage: 100, // Fetch all items in the range
+  );
 });
 
 /// Provider for missed visits

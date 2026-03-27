@@ -71,8 +71,11 @@ class S3Service {
     }
 
     try {
+      debugPrint('S3Service: Starting upload of $fileName to $path');
+
       // Read file bytes
       final bytes = await file.readAsBytes();
+      debugPrint('S3Service: Read ${bytes.length} bytes from file');
 
       // Determine content type based on file extension
       final contentType = _getContentType(fileName);
@@ -96,6 +99,8 @@ class S3Service {
         now: now,
       );
 
+      debugPrint('S3Service: Uploading to S3...');
+
       // Make the PUT request
       final response = await _dio.put(
         url,
@@ -104,6 +109,12 @@ class S3Service {
           headers: headers,
           contentType: contentType,
         ),
+        onSendProgress: (sent, total) {
+          if (total > 0) {
+            final progress = (sent / total * 100).toInt();
+            debugPrint('S3Service: Upload progress: $progress%');
+          }
+        },
       );
 
       if (response.statusCode == 200) {

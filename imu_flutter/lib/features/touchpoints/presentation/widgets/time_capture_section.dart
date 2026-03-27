@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/location/geolocation_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../shared/utils/loading_helper.dart';
 
 /// Status enum for time capture operations
 enum TimeCaptureStatus {
@@ -15,7 +17,7 @@ enum TimeCaptureStatus {
 }
 
 /// A widget for capturing Time In/Out with optional GPS location
-class TimeCaptureSection extends StatefulWidget {
+class TimeCaptureSection extends ConsumerStatefulWidget {
   /// Label displayed above the section (e.g., "TIME IN", "TIME OUT")
   final String label;
 
@@ -73,10 +75,10 @@ class TimeCaptureSection extends StatefulWidget {
   });
 
   @override
-  State<TimeCaptureSection> createState() => _TimeCaptureSectionState();
+  ConsumerState<TimeCaptureSection> createState() => _TimeCaptureSectionState();
 }
 
-class _TimeCaptureSectionState extends State<TimeCaptureSection> {
+class _TimeCaptureSectionState extends ConsumerState<TimeCaptureSection> {
   final _geoService = GeolocationService();
 
   @override
@@ -361,45 +363,12 @@ class _TimeCaptureSectionState extends State<TimeCaptureSection> {
       selectedTime.minute,
     );
 
-    // If GPS is enabled, show dialog asking about GPS capture
+    // If GPS is enabled, automatically capture GPS
     if (widget.showGps) {
-      _showGpsOptionsDialog(selectedDateTime);
+      _captureWithGps(selectedDateTime);
     } else {
       // Capture time only
       widget.onCapture(selectedDateTime, null, null, null);
-    }
-  }
-
-  /// Shows dialog with GPS capture options
-  Future<void> _showGpsOptionsDialog(DateTime selectedTime) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Capture GPS?'),
-        content: const Text(
-          'Would you like to capture your GPS location along with the time? '
-          'This helps verify your visit location.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'skip'),
-            child: const Text('SKIP GPS'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, 'capture'),
-            icon: const Icon(LucideIcons.mapPin, size: 18),
-            label: const Text('CAPTURE GPS'),
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted) return;
-
-    if (result == 'capture') {
-      _captureWithGps(selectedTime);
-    } else if (result == 'skip') {
-      _captureWithoutGps(selectedTime);
     }
   }
 
@@ -411,19 +380,29 @@ class _TimeCaptureSectionState extends State<TimeCaptureSection> {
     widget.onCapture(selectedTime, null, null, null);
 
     try {
-      // Get GPS position with detailed result
-      final (position, result, errorMessage) = await _geoService.getCurrentPositionWithResult(
-        accuracy: LocationAccuracy.high,
-        timeout: const Duration(seconds: 30),
-      );
+      // Get GPS position with detailed result using LoadingHelper
+      final (position, result, errorMessage) = await LoadingHelper.withLoadingTimeout(
+        ref: ref,
+        operation: () => _geoService.getCurrentPositionWithResult(
+          accuracy: LocationAccuracy.high,
+          timeout: const Duration(seconds: 30),
+        ),
+        message: 'Capturing location...',
+        timeout: const Duration(seconds: 35),
+        timeoutMessage: 'GPS capture timed out. Please try again.',
+      ) ?? (null, LocationResult.timeout, 'Operation timed out');
 
       if (!mounted) return;
 
       if (result == LocationResult.success && position != null) {
-        // Get address from coordinates
-        final address = await _geoService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
+        // Show loading for address lookup
+        final address = await LoadingHelper.withLoading(
+          ref: ref,
+          message: 'Getting address...',
+          operation: () => _geoService.getAddressFromCoordinates(
+            position.latitude,
+            position.longitude,
+          ),
         );
 
         if (!mounted) return;

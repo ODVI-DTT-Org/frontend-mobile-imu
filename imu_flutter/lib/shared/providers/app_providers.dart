@@ -1,5 +1,16 @@
 // Re-export connectivity providers
 export '../../services/connectivity_service.dart' show isOnlineProvider, connectivityStatusProvider;
+// Re-export API service providers
+export '../../services/api/client_api_service.dart' show clientApiServiceProvider;
+export '../../services/api/touchpoint_api_service.dart' show touchpointApiServiceProvider;
+export '../../services/api/attendance_api_service.dart' show attendanceApiServiceProvider;
+export '../../services/api/my_day_api_service.dart' show myDayApiServiceProvider;
+export '../../services/api/approvals_api_service.dart' show approvalsApiServiceProvider;
+// Re-export background sync providers
+export '../../services/api/background_sync_service.dart' show backgroundSyncServiceProvider, backgroundSyncStatusProvider, BackgroundSyncStatus, BackgroundSyncService;
+// Re-export auth providers
+export '../../services/auth/jwt_auth_service.dart' show jwtAuthProvider;
+export '../../services/auth/offline_auth_service.dart' show offlineAuthProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -16,6 +27,7 @@ import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
 import '../../features/profile/data/models/user_profile.dart';
 import '../../services/auth/auth_service.dart';
+import '../../services/auth/offline_auth_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/api/client_api_service.dart';
 import '../../services/api/touchpoint_api_service.dart';
@@ -24,7 +36,9 @@ import '../../services/api/targets_api_service.dart';
 import '../../services/api/attendance_api_service.dart' hide AttendanceRecord;
 import '../../services/api/profile_api_service.dart' hide UserProfile;
 import '../../services/api/my_day_api_service.dart';
+import '../../services/api/approvals_api_service.dart';
 import '../../services/api/groups_api_service.dart';
+import '../../services/sync/powersync_service.dart';
 
 // ==================== Service Providers ====================
 
@@ -91,9 +105,14 @@ final currentUserEmailProvider = Provider<String?>((ref) {
   return authState.user?.email;
 });
 
+/// Offline auth service provider
+final offlineAuthProvider = Provider<OfflineAuthService>((ref) {
+  return OfflineAuthService();
+});
+
 // ==================== Client Providers ====================
 
-/// All clients - uses API when online, falls back to Hive when offline
+/// All clients - tries PowerSync first, then REST API, then Hive cache
 final clientsProvider = FutureProvider<List<Client>>((ref) async {
   final hiveService = ref.watch(hiveServiceProvider);
   final isOnline = ref.watch(isOnlineProvider);
@@ -102,26 +121,64 @@ final clientsProvider = FutureProvider<List<Client>>((ref) async {
     await hiveService.init();
   }
 
+  debugPrint('=== FETCHING CLIENTS ===');
+  debugPrint('Is Online: $isOnline');
+  debugPrint('PowerSync Connected: ${PowerSyncService.isConnected}');
+
+  // Try to fetch from PowerSync first
+  if (PowerSyncService.isConnected) {
+    try {
+      debugPrint('Fetching clients from PowerSync...');
+      final result = await PowerSyncService.query('SELECT * FROM clients ORDER BY created_at DESC');
+      debugPrint('PowerSync returned ${result.length} clients');
+
+      if (result.isNotEmpty) {
+        final clients = result.map((row) {
+          debugPrint('PowerSync client row: $row');
+          return Client.fromRow(row);
+        }).toList();
+        debugPrint('Converted ${clients.length} clients from PowerSync');
+        return clients;
+      } else {
+        debugPrint('PowerSync query returned empty results');
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch clients from PowerSync: $e');
+    }
+  } else {
+    debugPrint('PowerSync not connected, skipping');
+  }
+
+  // Try REST API if online
   if (isOnline) {
     try {
+      debugPrint('Fetching clients from REST API...');
       final clientApi = ref.watch(clientApiServiceProvider);
       final clients = await clientApi.fetchClients();
+      debugPrint('REST API returned ${clients.length} clients');
 
-      // Cache clients to Hive for offline use
-      for (final client in clients) {
-        await hiveService.addClient(client.toJson());
+      if (clients.isNotEmpty) {
+        // Cache clients to Hive for offline use
+        for (final client in clients) {
+          await hiveService.addClient(client.toJson());
+        }
+        debugPrint('Cached ${clients.length} clients to Hive');
+        return clients;
+      } else {
+        debugPrint('REST API returned empty results');
       }
-
-      return clients;
     } catch (e) {
-      // Fall back to local cache on error
-      debugPrint('Failed to fetch clients from API: $e');
+      debugPrint('Failed to fetch clients from REST API: $e');
     }
   }
 
-  // Use local cache
+  // Fall back to local Hive cache
+  debugPrint('Using local Hive cache for clients');
   final clientsData = hiveService.getAllClients();
-  return clientsData.map((data) => Client.fromJson(data)).toList();
+  final clients = clientsData.map((data) => Client.fromJson(data)).toList();
+  debugPrint('Hive cache returned ${clients.length} clients');
+  debugPrint('=== END CLIENT FETCH ===');
+  return clients;
 });
 
 /// Filtered clients by search query
@@ -254,6 +311,9 @@ final bottomNavIndexProvider = StateProvider<int>((ref) => 0);
 
 /// Is loading overlay visible
 final isLoadingOverlayVisibleProvider = StateProvider<bool>((ref) => false);
+
+/// Loading overlay message
+final loadingMessageProvider = StateProvider<String?>((ref) => null);
 
 /// Snackbar message
 final snackbarMessageProvider = StateProvider<String?>((ref) => null);
@@ -419,7 +479,7 @@ const _attendanceBox = 'attendance';
 
 /// Today's attendance record
 final todayAttendanceProvider = StateNotifierProvider<TodayAttendanceNotifier, AttendanceRecord?>((ref) {
-  return TodayAttendanceNotifier(ref.watch(hiveServiceProvider));
+  return TodayAttendanceNotifier(ref.watch(hiveServiceProvider), ref);
 });
 
 /// Is user currently checked in
@@ -482,29 +542,43 @@ final attendanceStatsProvider = Provider<Map<String, dynamic>>((ref) {
 /// Today's Attendance Notifier
 class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
   final HiveService _hiveService;
+  final Ref _ref;
+  bool _isLoading = false;
 
-  TodayAttendanceNotifier(this._hiveService) : super(null) {
+  TodayAttendanceNotifier(this._hiveService, this._ref) : super(null) {
     _loadToday();
   }
 
-  Future<void> _loadToday() async {
-    if (!_hiveService.isInitialized) await _hiveService.init();
-    final today = _formatDate(DateTime.now());
-    final box = Hive.box<String>(_attendanceBox);
-    final data = box.get(today);
+  bool get isLoading => _isLoading;
 
-    if (data != null) {
-      state = AttendanceRecord.fromJson(
-        Map<String, dynamic>.from(const JsonDecoder().convert(data)),
-      );
-    } else {
-      state = null;
+  Future<void> _loadToday() async {
+    _isLoading = true;
+    try {
+      if (!_hiveService.isInitialized) await _hiveService.init();
+      final today = _formatDate(DateTime.now());
+      final box = Hive.box<String>(_attendanceBox);
+      final data = box.get(today);
+
+      if (data != null) {
+        state = AttendanceRecord.fromJson(
+          Map<String, dynamic>.from(const JsonDecoder().convert(data)),
+        );
+      } else {
+        state = null;
+      }
+    } finally {
+      _isLoading = false;
     }
   }
 
   Future<void> checkIn(AttendanceLocation location) async {
     final now = DateTime.now();
-    final userId = 'user-1'; // TODO: Get from auth provider
+    final userId = _ref.read(currentUserIdProvider);
+
+    if (userId == null) {
+      debugPrint('TodayAttendanceNotifier: Cannot check in - no user ID available');
+      return;
+    }
 
     final record = AttendanceRecord(
       id: _formatDate(now),
@@ -556,30 +630,38 @@ final isProfileLoadingProvider = Provider<bool>((ref) {
 /// Profile Notifier
 class UserProfileNotifier extends StateNotifier<UserProfile?> {
   final Ref _ref;
+  bool _isLoading = false;
 
   UserProfileNotifier(this._ref) : super(null) {
     _loadProfile();
   }
 
+  bool get isLoading => _isLoading;
+
   Future<void> _loadProfile() async {
-    final isOnline = _ref.read(isOnlineProvider);
-    final userId = _ref.read(currentUserIdProvider);
+    _isLoading = true;
+    try {
+      final isOnline = _ref.read(isOnlineProvider);
+      final userId = _ref.read(currentUserIdProvider);
 
-    if (isOnline && userId != null) {
-      try {
-        final profileApi = _ref.read(profileApiServiceProvider);
-        final profile = await profileApi.fetchProfile(userId);
-        if (profile != null) {
-          state = _convertToUserProfile(profile);
-          return;
+      if (isOnline && userId != null) {
+        try {
+          final profileApi = _ref.read(profileApiServiceProvider);
+          final profile = await profileApi.fetchProfile(userId);
+          if (profile != null) {
+            state = _convertToUserProfile(profile);
+            return;
+          }
+        } catch (e) {
+          debugPrint('Failed to fetch profile from API: $e');
         }
-      } catch (e) {
-        debugPrint('Failed to fetch profile from API: $e');
       }
-    }
 
-    // No profile available - return null
-    state = null;
+      // No profile available - return null
+      state = null;
+    } finally {
+      _isLoading = false;
+    }
   }
 
   UserProfile _convertToUserProfile(dynamic apiProfile) {

@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
+import '../../../../shared/utils/loading_helper.dart';
+import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
 
-class EditClientPage extends StatefulWidget {
+class EditClientPage extends ConsumerStatefulWidget {
   final String clientId;
 
   const EditClientPage({super.key, required this.clientId});
 
   @override
-  State<EditClientPage> createState() => _EditClientPageState();
+  ConsumerState<EditClientPage> createState() => _EditClientPageState();
 }
 
-class _EditClientPageState extends State<EditClientPage> {
+class _EditClientPageState extends ConsumerState<EditClientPage> {
   final _formKey = GlobalKey<FormState>();
   final _hiveService = HiveService();
 
@@ -38,8 +41,8 @@ class _EditClientPageState extends State<EditClientPage> {
   String _clientType = 'POTENTIAL';
 
   // Address and phone lists
-  List<Map<String, dynamic>> _addresses = [];
-  List<Map<String, dynamic>> _phoneNumbers = [];
+  List<Map<String, Object?>> _addresses = [];
+  List<Map<String, Object?>> _phoneNumbers = [];
 
   @override
   void initState() {
@@ -54,9 +57,25 @@ class _EditClientPageState extends State<EditClientPage> {
 
     final clientData = _hiveService.getClient(widget.clientId);
     if (clientData != null && mounted) {
-      _client = Client.fromJson(clientData);
-      _populateForm();
-      setState(() => _isLoading = false);
+      try {
+        // Try fromRow first for API data (snake_case), fallback to fromJson for camelCase
+        try {
+          _client = Client.fromRow(clientData);
+        } catch (e) {
+          // If fromRow fails, try fromJson
+          _client = Client.fromJson(clientData);
+        }
+        _populateForm();
+        setState(() => _isLoading = false);
+      } catch (e) {
+        debugPrint('Error loading client: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading client: $e')),
+          );
+          context.pop();
+        }
+      }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -179,70 +198,69 @@ class _EditClientPageState extends State<EditClientPage> {
     if (!_formKey.currentState!.validate()) return;
 
     HapticUtils.mediumImpact();
-    setState(() => _isSaving = true);
 
-    try {
-      final updatedData = {
-        'id': widget.clientId,
-        'firstName': _firstNameController.text.trim(),
-        'middleName': _middleNameController.text.trim().isEmpty
-            ? null
-            : _middleNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        'contactNumber': _contactNumberController.text.trim().isEmpty
-            ? null
-            : _contactNumberController.text.trim(),
-        'email': _emailController.text.trim().isEmpty
-            ? null
-            : _emailController.text.trim(),
-        'facebookLink': _facebookController.text.trim().isEmpty
-            ? null
-            : _facebookController.text.trim(),
-        'remarks': _remarksController.text.trim().isEmpty
-            ? null
-            : _remarksController.text.trim(),
-        'productType': _productType.toLowerCase().replaceAll(' ', ''),
-        'pensionType': _pensionType.toLowerCase(),
-        'marketType': _marketType.toLowerCase(),
-        'clientType': _clientType.toLowerCase(),
-        'addresses': _addresses,
-        'phoneNumbers': _phoneNumbers,
-        'updatedAt': DateTime.now().toIso8601String(),
-      };
+    await LoadingHelper.withLoading(
+      ref: ref,
+      message: 'Updating client...',
+      operation: () async {
+        final updatedData = {
+          'id': widget.clientId,
+          'firstName': _firstNameController.text.trim(),
+          'middleName': _middleNameController.text.trim().isEmpty
+              ? null
+              : _middleNameController.text.trim(),
+          'lastName': _lastNameController.text.trim(),
+          'contactNumber': _contactNumberController.text.trim().isEmpty
+              ? null
+              : _contactNumberController.text.trim(),
+          'email': _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
+          'facebookLink': _facebookController.text.trim().isEmpty
+              ? null
+              : _facebookController.text.trim(),
+          'remarks': _remarksController.text.trim().isEmpty
+              ? null
+              : _remarksController.text.trim(),
+          'productType': _productType.toLowerCase().replaceAll(' ', ''),
+          'pensionType': _pensionType.toLowerCase(),
+          'marketType': _marketType.toLowerCase(),
+          'clientType': _clientType.toLowerCase(),
+          'addresses': _addresses,
+          'phoneNumbers': _phoneNumbers,
+          'updatedAt': DateTime.now().toIso8601String(),
+        };
 
-      // Save to local storage (saveClient updates if exists)
-      await _hiveService.saveClient(widget.clientId, {
-        ..._client!.toJson(),
-        ...updatedData,
-      });
+        // Save to local storage (saveClient updates if exists)
+        await _hiveService.saveClient(widget.clientId, {
+          ..._client!.toJson(),
+          ...updatedData,
+        });
 
-      // PowerSync handles sync automatically
+        // PowerSync handles sync automatically
+      },
+      onError: (e) {
+        HapticUtils.error();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update client: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
 
-      HapticUtils.success();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Client updated successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        context.pop(true); // Return true to indicate success
-      }
-    } catch (e) {
-      HapticUtils.error();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update client: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+    HapticUtils.success();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Client updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      context.pop(true); // Return true to indicate success
     }
   }
 
@@ -270,9 +288,25 @@ class _EditClientPageState extends State<EditClientPage> {
     if (confirmed == true && mounted) {
       HapticUtils.delete();
 
-      await _hiveService.deleteClient(widget.clientId);
-
-      // PowerSync handles sync automatically
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Deleting client...',
+        operation: () async {
+          await _hiveService.deleteClient(widget.clientId);
+          // PowerSync handles sync automatically
+        },
+        onError: (e) {
+          HapticUtils.error();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to delete client: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -22,12 +22,18 @@ class Client {
   final String? facebookLink;
   final String? agencyId;
   final String? municipality;
+  final String? psgcId; // Foreign key to PSGC table
+  final String? region; // Region from PSGC (e.g., NCR, Region I)
+  final String? province; // Province from PSGC (e.g., Metro Manila, Pangasinan)
+  final String? barangay; // Barangay from PSGC
   final List<Address> addresses;
   final List<PhoneNumber> phoneNumbers;
   final List<Touchpoint> touchpoints;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final bool isStarred;
+  final bool loanReleased;
+  final DateTime? loanReleasedAt;
 
   Client({
     required this.id,
@@ -56,8 +62,14 @@ class Client {
     required this.createdAt,
     this.updatedAt,
     this.isStarred = false,
+    this.loanReleased = false,
+    this.loanReleasedAt,
     this.agencyId,
     this.municipality,
+    this.psgcId,
+    this.region,
+    this.province,
+    this.barangay,
   });
 
   String get fullName => '$firstName ${middleName != null ? '$middleName ' : ''}$lastName';
@@ -122,6 +134,12 @@ class Client {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isStarred,
+    bool? loanReleased,
+    DateTime? loanReleasedAt,
+    String? psgcId,
+    String? region,
+    String? province,
+    String? barangay,
   }) {
     return Client(
       id: id ?? this.id,
@@ -150,6 +168,12 @@ class Client {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isStarred: isStarred ?? this.isStarred,
+      loanReleased: loanReleased ?? this.loanReleased,
+      loanReleasedAt: loanReleasedAt ?? this.loanReleasedAt,
+      psgcId: psgcId ?? this.psgcId,
+      region: region ?? this.region,
+      province: province ?? this.province,
+      barangay: barangay ?? this.barangay,
     );
   }
 
@@ -181,6 +205,12 @@ class Client {
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'isStarred': isStarred,
+      'loanReleased': loanReleased,
+      'loanReleasedAt': loanReleasedAt?.toIso8601String(),
+      'psgcId': psgcId,
+      'region': region,
+      'province': province,
+      'barangay': barangay,
     };
   }
 
@@ -226,6 +256,12 @@ class Client {
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
       isStarred: json['isStarred'] ?? false,
+      loanReleased: json['loanReleased'] ?? false,
+      loanReleasedAt: json['loanReleasedAt'] != null ? DateTime.parse(json['loanReleasedAt']) : null,
+      psgcId: json['psgc_id'] ?? json['psgcId'],
+      region: json['psgc_region'] ?? json['region'],
+      province: json['psgc_province'] ?? json['province'],
+      barangay: json['psgc_barangay'] ?? json['barangay'],
     );
   }
 
@@ -281,7 +317,15 @@ class Client {
       remarks: row['remarks'] as String?,
       agencyId: row['agency_id'] as String?,
       municipality: row['municipality'] as String?,
+      psgcId: row['psgc_id']?.toString(),
+      region: row['region'] as String?,
+      province: row['province'] as String?,
+      barangay: row['barangay'] as String?,
       isStarred: (row['is_starred'] as bool?) ?? false,
+      loanReleased: (row['loan_released'] as bool?) ?? false,
+      loanReleasedAt: row['loan_released_at'] != null
+          ? DateTime.parse(row['loan_released_at'] as String)
+          : null,
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
