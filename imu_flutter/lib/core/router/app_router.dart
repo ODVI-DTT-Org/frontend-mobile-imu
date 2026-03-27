@@ -155,6 +155,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/pin-entry';
       }
 
+      // CRITICAL FIX: Authenticated user on PIN entry page -> redirect to sync-loading
+      // This prevents the redirect loop where user stays on PIN entry after successful PIN verification
+      if (state.matchedLocation.startsWith('/pin-entry') && isAuth) {
+        return '/sync-loading';
+      }
+
       return null;
     },
     routes: [
