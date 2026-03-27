@@ -28,6 +28,11 @@ class SecureStorageService {
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userIdKey = 'user_id';
   static const String _deviceIdKey = 'device_id';
+  static const String _lastLoginTimeKey = 'last_login_time';
+  static const String _lastOnlineLoginKey = 'last_online_login_time';
+
+  // Offline grace period: 8 hours
+  static const Duration offlineGracePeriod = Duration(hours: 8);
 
   /// Generate a random salt for PIN hashing
   String _generateSalt() {
@@ -156,5 +161,72 @@ class SecureStorageService {
     } else {
       await clearAll();
     }
+  }
+
+  // ===== OFFLINE AUTHENTICATION =====
+
+  /// Save last login time (both online and PIN-based logins)
+  Future<void> saveLastLoginTime() async {
+    final now = DateTime.now().toIso8601String();
+    await _storage.write(key: _lastLoginTimeKey, value: now);
+    debugPrint('SecureStorageService: Last login time saved: $now');
+  }
+
+  /// Save last ONLINE login time (for grace period calculation)
+  Future<void> saveLastOnlineLoginTime() async {
+    final now = DateTime.now().toIso8601String();
+    await _storage.write(key: _lastOnlineLoginKey, value: now);
+    debugPrint('SecureStorageService: Last online login time saved: $now');
+  }
+
+  /// Get last login time
+  Future<DateTime?> getLastLoginTime() async {
+    final timeStr = await _storage.read(key: _lastLoginTimeKey);
+    if (timeStr == null) return null;
+    return DateTime.tryParse(timeStr);
+  }
+
+  /// Get last online login time
+  Future<DateTime?> getLastOnlineLoginTime() async {
+    final timeStr = await _storage.read(key: _lastOnlineLoginKey);
+    if (timeStr == null) return null;
+    return DateTime.tryParse(timeStr);
+  }
+
+  /// Check if offline login is allowed (within grace period)
+  Future<bool> canLoginOffline() async {
+    // Must have a PIN set up
+    final hasPinSetup = await isPinSetupComplete();
+    if (!hasPinSetup) return false;
+
+    // Must have cached auth token
+    final hasToken = await getToken() != null;
+    if (!hasToken) return false;
+
+    // Check if within grace period (8 hours from last online login)
+    final lastOnlineLogin = await getLastOnlineLoginTime();
+    if (lastOnlineLogin == null) return false;
+
+    final now = DateTime.now();
+    final timeSinceLastOnline = now.difference(lastOnlineLogin);
+
+    return timeSinceLastOnline < offlineGracePeriod;
+  }
+
+  /// Get remaining offline grace period
+  Future<Duration?> getOfflineGracePeriodRemaining() async {
+    final lastOnlineLogin = await getLastOnlineLoginTime();
+    if (lastOnlineLogin == null) return null;
+
+    final now = DateTime.now();
+    final timeSinceLastOnline = now.difference(lastOnlineLogin);
+    final remaining = offlineGracePeriod - timeSinceLastOnline;
+
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  /// Check if user needs online re-authentication
+  Future<bool> needsOnlineReauth() async {
+    return !(await canLoginOffline());
   }
 }

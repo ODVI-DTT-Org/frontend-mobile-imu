@@ -16,6 +16,7 @@ class CameraService {
     CameraDevice preferredCameraDevice = CameraDevice.rear,
   }) async {
     try {
+      debugPrint('CameraService: Capturing photo from camera...');
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: imageQuality,
@@ -23,6 +24,7 @@ class CameraService {
       );
 
       if (photo != null) {
+        debugPrint('CameraService: Photo captured successfully');
         return File(photo.path);
       }
       return null;

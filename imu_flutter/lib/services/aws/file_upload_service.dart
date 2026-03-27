@@ -67,11 +67,13 @@ class FileUploadService {
   /// Returns the URL of the uploaded photo or null if failed
   Future<String?> uploadPhoto(File photo, String touchpointId) async {
     try {
-      logDebug('Uploading photo for touchpoint: $touchpointId');
+      logDebug('FileUploadService: Starting photo upload for touchpoint: $touchpointId');
 
       // Generate filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = '${touchpointId}_photo_$timestamp.jpg';
+
+      logDebug('FileUploadService: Generated filename: $filename');
 
       // Upload to S3 (path: photos/touchpoints/{touchpointId}, filename)
       final url = await _s3Service.uploadFile(
@@ -81,14 +83,14 @@ class FileUploadService {
       );
 
       if (url != null) {
-        logDebug('Photo uploaded successfully: $url');
+        logDebug('FileUploadService: Photo uploaded successfully: $url');
         return url;
       } else {
-        logError('Failed to upload photo for touchpoint: $touchpointId');
+        logError('FileUploadService: Failed to upload photo for touchpoint: $touchpointId');
         return null;
       }
     } catch (e) {
-      logError('Error uploading photo', e);
+      logError('FileUploadService: Error uploading photo', e);
       return null;
     }
   }
@@ -97,11 +99,13 @@ class FileUploadService {
   /// Returns the URL of the uploaded audio or null if failed
   Future<String?> uploadAudio(File audio, String touchpointId) async {
     try {
-      logDebug('Uploading audio for touchpoint: $touchpointId');
+      logDebug('FileUploadService: Starting audio upload for touchpoint: $touchpointId');
 
       // Generate filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = '${touchpointId}_audio_$timestamp.m4a';
+
+      logDebug('FileUploadService: Generated filename: $filename');
 
       // Upload to S3 (path: audio/touchpoints/{touchpointId}, filename)
       final url = await _s3Service.uploadFile(
@@ -111,14 +115,14 @@ class FileUploadService {
       );
 
       if (url != null) {
-        logDebug('Audio uploaded successfully: $url');
+        logDebug('FileUploadService: Audio uploaded successfully: $url');
         return url;
       } else {
-        logError('Failed to upload audio for touchpoint: $touchpointId');
+        logError('FileUploadService: Failed to upload audio for touchpoint: $touchpointId');
         return null;
       }
     } catch (e) {
-      logError('Error uploading audio', e);
+      logError('FileUploadService: Error uploading audio', e);
       return null;
     }
   }

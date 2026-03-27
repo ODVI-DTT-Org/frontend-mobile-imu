@@ -1,5 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'jwt_auth_service.dart';
+import '../sync/powersync_service.dart';
+import '../sync/powersync_connector.dart';
+import '../../core/utils/logger.dart';
+import '../../core/config/app_config.dart';
 
 // Re-export JwtUser for convenience
 export 'jwt_auth_service.dart' show JwtUser;
@@ -62,10 +67,27 @@ class AuthService {
 
   /// Check if token needs refresh
   bool get needsRefresh => _jwtAuth.needsRefresh;
+
+  /// Check if token refresh should be attempted (expires within 5 minutes)
+  bool get shouldAttemptRefresh => _jwtAuth.shouldAttemptRefresh;
+
+  /// Get time until token expires
+  Duration? get timeUntilExpiry => _jwtAuth.timeUntilExpiry;
 }
 
 /// Provider for JWT auth service
-final jwtAuthProvider = Provider<JwtAuthService>((ref) => JwtAuthService());
+/// Provider for JWT auth service (singleton to maintain token state)
+final jwtAuthProvider = Provider<JwtAuthService>((ref) {
+  final service = JwtAuthService();
+  // Initialize to load stored tokens
+  service.initialize().catchError((e) {
+    debugPrint('JwtAuthService initialization error: $e');
+  });
+  ref.onDispose(() {
+    // Service will be disposed automatically
+  });
+  return service;
+});
 
 /// Provider for main auth service
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -113,6 +135,7 @@ class AuthState {
 /// Authentication state notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
+  IMUPowerSyncConnector? _powerSyncConnector;
 
   AuthNotifier(this._authService) : super(AuthState.initial());
 
@@ -136,6 +159,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final user = await _authService.login(email, password);
+
+      // Connect to PowerSync after successful login
+      // NOTE: PowerSync connection failures should NOT affect login success
+      // Users should be able to use the app even if PowerSync fails
+      try {
+        logDebug('Connecting to PowerSync...');
+        // Use the shared JWT auth service from provider
+        _powerSyncConnector = IMUPowerSyncConnector(
+          authService: _authService._jwtAuth,
+          powersyncUrl: AppConfig.powerSyncUrl,
+          apiUrl: AppConfig.postgresApiUrl,
+        );
+        await PowerSyncService.connect(_powerSyncConnector!);
+        logDebug('PowerSync connected successfully');
+      } catch (e) {
+        // Log the error but DON'T fail the login
+        // PowerSync sync errors are non-critical - app can still function
+        logError('PowerSync connection failed (app will continue without sync)', e);
+        // Store the error for display but don't set loading to false yet
+        state = state.copyWith(
+          isAuthenticated: true,
+          user: user,
+          isLoading: false,
+        );
+        return true; // Login succeeds even if PowerSync fails
+      }
+
       state = state.copyWith(
         isAuthenticated: true,
         user: user,
@@ -151,6 +201,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Logout current user
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
+
+    // Disconnect from PowerSync
+    try {
+      await PowerSyncService.disconnect();
+      logDebug('PowerSync disconnected');
+    } catch (e) {
+      logError('Failed to disconnect PowerSync', e);
+    }
+
     await _authService.logout();
     state = AuthState.initial();
   }

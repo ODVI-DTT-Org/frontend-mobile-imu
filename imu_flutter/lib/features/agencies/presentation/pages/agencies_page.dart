@@ -326,7 +326,7 @@ class _AgencyCard extends StatelessWidget {
         child: InkWell(
           onTap: () {
             HapticUtils.lightImpact();
-            // TODO: Navigate to agency detail
+            context.push('/agencies/${agency.id}');
           },
           borderRadius: BorderRadius.circular(12),
           child: Padding(

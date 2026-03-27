@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/missed_visit_model.dart';
 
 import '../../../../features/clients/data/models/client_model.dart';
@@ -147,14 +148,31 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
       initialDate: DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
-    ).then((date) {
+    ).then((date) async {
       if (date != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Rescheduled ${visit.clientName} to ${_formatDate(date)}'),
-          ),
+        await LoadingHelper.withLoading(
+          ref: ref,
+          message: 'Rescheduling visit...',
+          operation: () async {
+            await Future.delayed(const Duration(milliseconds: 500)); // Simulate save
+            // TODO: Save rescheduled date to backend
+          },
+          onError: (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to reschedule: $e')),
+              );
+            }
+          },
         );
-        // TODO: Save rescheduled date
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Rescheduled ${visit.clientName} to ${_formatDate(date)}'),
+            ),
+          );
+        }
       }
     });
   }

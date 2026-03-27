@@ -1,11 +1,22 @@
-// NEW VERSION of the Clients page
+// Simplified Clients page with My Clients / All Clients filters and pagination
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../services/api/my_day_api_service.dart';
+import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider;
+import '../../../../shared/providers/filter_providers.dart';
+import '../../../../shared/utils/loading_helper.dart';
+import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
 import '../providers/clients_provider.dart';
+
+// Provider to check if client is in My Day
+final _isInMyDayProvider = FutureProvider.family<bool, String>((ref, clientId) async {
+  final myDayApiService = ref.watch(myDayApiServiceProvider);
+  return await myDayApiService.isInMyDay(clientId);
+});
 
 class ClientsPage extends ConsumerStatefulWidget {
   const ClientsPage({super.key});
@@ -17,12 +28,13 @@ class ClientsPage extends ConsumerStatefulWidget {
 class _ClientsPageState extends ConsumerState<ClientsPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedTouchpoint = 'all'; // 'all', 1-7, or null for archive
-  bool _showInterestedOnly = false;
-  String? _selectedMarketType;
-  String? _selectedProductType;
-  String? _selectedPensionType;
-  bool _isLoading = false;
+  bool _showMyClientsOnly = true; // true = My Clients, false = All Clients
+
+  // Pagination
+  final int _itemsPerPage = 20;
+  int _currentPage = 1;
+  List<Client> _allClients = [];
+  List<Client> _filteredClients = [];
 
   @override
   void initState() {
@@ -33,6 +45,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   void _onSearchChanged() {
     setState(() {
       _searchQuery = _searchController.text;
+      _currentPage = 1; // Reset to first page on search
     });
   }
 
@@ -42,181 +55,200 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     super.dispose();
   }
 
-  Future<void> _loadClients() async {
-    setState(() => _isLoading = true);
-    try {
-      await Future.delayed(const Duration(milliseconds: 100));
-    } finally {
-      setState(() => _isLoading = false);
+  List<Client> _getPaginatedClients() {
+    if (_filteredClients.isEmpty) return [];
+
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+
+    if (startIndex >= _filteredClients.length) return [];
+    if (endIndex > _filteredClients.length) {
+      return _filteredClients.sublist(startIndex);
     }
+    return _filteredClients.sublist(startIndex, endIndex);
   }
 
-  /// Filter clients based on current filters
-  List<Client> get _filteredClients {
-    final clientsAsync = ref.watch(clientsProvider);
-    final query = _searchQuery.toLowerCase();
+  int get _totalPages => (_filteredClients.length / _itemsPerPage).ceil();
 
-    return clientsAsync.when(
-      data: (clients) => clients.where((client) {
-        final matchesSearch = query.isEmpty ||
-            client.fullName.toLowerCase().contains(query) ||
-            (client.addresses.isNotEmpty &&
-             client.addresses.first.city.toLowerCase().contains(query));
-
-        // Filter by Interested status
-        final matchesInterested = !_showInterestedOnly || client.isStarred;
-
-        // Filter by touchpoint
-        final matchesTouchpoint = _selectedTouchpoint == 'all' ||
-            _getLatestTouchpointNumber(client) == (int.tryParse(_selectedTouchpoint) ?? 0);
-
-        // Filter by market/product/pension type
-        final matchesMarketType = _selectedMarketType == null ||
-            client.marketType?.name.toUpperCase() == _selectedMarketType;
-        final matchesProductType = _selectedProductType == null ||
-            client.productType.name.toUpperCase() == _selectedProductType;
-        final matchesPensionType = _selectedPensionType == null ||
-            client.pensionType.name.toUpperCase() == _selectedPensionType;
-
-        return matchesSearch && matchesInterested &&
-               matchesTouchpoint && matchesMarketType &&
-               matchesProductType && matchesPensionType;
-      }).toList(),
-      loading: () => [],
-      error: (_, __) => [],
-    );
-  }
-
-  int _getLatestTouchpointNumber(Client client) {
-    if (client.touchpoints.isEmpty) return 0;
-    return client.touchpoints.last.touchpointNumber;
+  void _goToPage(int page) {
+    HapticUtils.lightImpact();
+    setState(() {
+      _currentPage = page;
+    });
   }
 
   void _handleRefresh() async {
     HapticUtils.lightImpact();
+    // Refresh clients
     ref.invalidate(clientsProvider);
-    await _loadClients();
   }
 
   void _showAddClientModal() {
     context.push('/clients/add');
   }
 
-  void _clearFilters() {
-    setState(() {
-      _selectedTouchpoint = 'all';
-      _selectedMarketType = null;
-      _selectedProductType = null;
-      _selectedPensionType = null;
-      _showInterestedOnly = false;
-    });
+  Future<void> _addToMyDay(Client client) async {
+    if (client.id == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Client ID is missing'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+      return;
+    }
+
+    HapticUtils.lightImpact();
+    final myDayApiService = ref.read(myDayApiServiceProvider);
+
+    try {
+      final success = await myDayApiService.addToMyDay(client.id!);
+      if (success && mounted) {
+        HapticUtils.success();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${client.fullName} added to My Day'),
+            backgroundColor: const Color(0xFF22C55E),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        ref.invalidate(_isInMyDayProvider(client.id!));
+      }
+    } catch (e) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add to My Day: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final clients = _filteredClients;
+    final clientsAsync = ref.watch(clientsProvider);
+    final assignedMunicipalities = ref.watch(assignedMunicipalitiesProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          HapticUtils.lightImpact();
-          _showAddClientModal();
-        },
-        backgroundColor: const Color(0xFF0F172A),
-        child: const Icon(LucideIcons.plus, color: Colors.white),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 32 : 17,
-                vertical: 16,
-              ),
-              child: Row(
-                children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: () {
-                      HapticUtils.lightImpact();
-                      context.go('/home');
-                    },
-                    child: Row(
-                      children: [
-                        Icon(
-                          LucideIcons.chevronLeft,
-                          size: 20,
-                          color: const Color(0xFF0F172A),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Home',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  // Title
-                  const Text(
-                    'My Clients',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const Spacer(),
-                  const SizedBox(width: 50),
-                ],
-              ),
-            ),
+    return clientsAsync.when(
+      data: (clients) {
+        // Filter clients based on selected mode
+        _allClients = clients;
+        final query = _searchQuery.toLowerCase();
 
-            // Interested Tab
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-              child: Row(
-                children: [
-                  _buildInterestedChip(),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+        _filteredClients = clients.where((client) {
+          // Filter by view mode
+          final matchesViewMode = !_showMyClientsOnly ||
+              (client.municipality != null && assignedMunicipalities.contains(client.municipality));
 
-          // Touchpoint Selector (horizontal scroll)
-          Container(
-            height: 40,
-            padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildTouchpointChip('all', 'All'),
-                _buildTouchpointChip('1st', '1st'),
-                _buildTouchpointChip('2nd', '2nd'),
-                _buildTouchpointChip('3rd', '3rd'),
-                _buildTouchpointChip('4th', '4th'),
-                _buildTouchpointChip('5th', '5th'),
-                _buildTouchpointChip('6th', '6th'),
-                _buildTouchpointChip('7th', '7th'),
-                _buildArchiveChip(),
-              ],
-            ),
+          // Filter by search
+          final matchesSearch = query.isEmpty ||
+              client.fullName.toLowerCase().contains(query) ||
+              (client.addresses.isNotEmpty &&
+               client.addresses.first.city.toLowerCase().contains(query));
+
+          return matchesViewMode && matchesSearch;
+        }).toList();
+
+        final paginatedClients = _getPaginatedClients();
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              HapticUtils.lightImpact();
+              _showAddClientModal();
+            },
+            backgroundColor: const Color(0xFF0F172A),
+            child: const Icon(LucideIcons.plus, color: Colors.white),
           ),
-          const SizedBox(height: 12),
-
-          // Search Bar with Filter
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-            child: Row(
+          body: SafeArea(
+            child: Column(
               children: [
-                Expanded(
+                // Header
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 32 : 17,
+                    vertical: 16,
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          // Back button
+                          GestureDetector(
+                            onTap: () {
+                              HapticUtils.lightImpact();
+                              context.go('/home');
+                            },
+                            child: Row(
+                              children: [
+                                Icon(
+                                  LucideIcons.chevronLeft,
+                                  size: 20,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Home',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          // Title
+                          Text(
+                            _showMyClientsOnly ? 'My Clients' : 'All Clients',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const Spacer(),
+                          const SizedBox(width: 50),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Toggle between My Clients and All Clients
+                      Row(
+                        children: [
+                          _buildFilterToggle('My Clients', _showMyClientsOnly, () {
+                            HapticUtils.lightImpact();
+                            setState(() {
+                              _showMyClientsOnly = true;
+                              _currentPage = 1;
+                            });
+                          }),
+                          const SizedBox(width: 8),
+                          _buildFilterToggle('All Clients', !_showMyClientsOnly, () {
+                            HapticUtils.lightImpact();
+                            setState(() {
+                              _showMyClientsOnly = false;
+                              _currentPage = 1;
+                            });
+                          }),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Search Bar
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
@@ -242,142 +274,326 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Filter button
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
+
+                const SizedBox(height: 12),
+
+                // Top Pagination Info
+                if (_filteredClients.isNotEmpty)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
+                    child: _buildTopPagination(),
                   ),
-                  child: IconButton(
-                    icon: const Icon(LucideIcons.slidersHorizontal),
-                    color: const Color(0xFF0F172A),
-                    onPressed: _showFilterModal,
-                  ),
+
+                const SizedBox(height: 8),
+
+                // Client list
+                Expanded(
+                  child: paginatedClients.isEmpty
+                      ? _buildEmptyState()
+                      : RefreshIndicator(
+                          onRefresh: () async => _handleRefresh(),
+                          child: ListView.builder(
+                            padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
+                            itemCount: paginatedClients.length,
+                            itemBuilder: (context, index) {
+                              final client = paginatedClients[index];
+                              return _buildClientCard(client);
+                            },
+                          ),
+                        ),
                 ),
+
+                // Bottom Pagination
+                if (_filteredClients.isNotEmpty)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17, vertical: 16),
+                    child: _buildBottomPagination(),
+                  ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Client list
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : clients.isEmpty
-                    ? _buildEmptyState()
-                    : RefreshIndicator(
-                        onRefresh: () async => _handleRefresh(),
-                        child: ListView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-                          itemCount: clients.length,
-                          itemBuilder: (context, index) {
-                            final client = clients[index];
-                            return _buildClientCard(client);
-                          },
+        );
+      },
+      loading: () => Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Header skeleton
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 80,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Search bar skeleton
+                    Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Filter chips skeleton
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-          ),
-        ],
-      ),
-    ),
-    );
-  }
-
-  Widget _buildInterestedChip() {
-    return GestureDetector(
-      onTap: () {
-        HapticUtils.lightImpact();
-        setState(() {
-          _showInterestedOnly = !_showInterestedOnly;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: _showInterestedOnly
-              ? const Color(0xFF22C55E)
-              : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              LucideIcons.star,
-              size: 14,
-              color: _showInterestedOnly
-                  ? Colors.white
-                  : const Color(0xFF0F172A),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Interested',
-              style: TextStyle(
-                color: _showInterestedOnly
-                  ? Colors.white
-                  : const Color(0xFF0F172A),
-                fontWeight: FontWeight.w500,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              // List skeleton
+              const Expanded(
+                child: ClientListSkeleton(itemCount: 7),
+              ),
+            ],
+          ),
+        ),
+      ),
+      error: (error, _) => Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  LucideIcons.alertCircle,
+                  size: 40,
+                  color: Colors.red.shade400,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load clients',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                style: TextStyle(color: Colors.grey.shade500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(clientsProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTouchpointChip(String value, String label) {
-    final isSelected = _selectedTouchpoint == value;
+  Widget _buildFilterToggle(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () {
-        HapticUtils.lightImpact();
-        setState(() {
-          _selectedTouchpoint = value;
-        });
-      },
+      onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF0F172A)
-              : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF0F172A)
+                : Colors.grey.shade300,
+            width: 1,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : const Color(0xFF64748B),
-            fontWeight: FontWeight.w500,
-            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildArchiveChip() {
-    final isSelected = _selectedTouchpoint == 'archive';
+  Widget _buildTopPagination() {
+    final startIndex = (_currentPage - 1) * _itemsPerPage + 1;
+    final endIndex = (_currentPage * _itemsPerPage).clamp(1, _filteredClients.length);
+
+    return Row(
+      children: [
+        Text(
+          'Showing $startIndex-$endIndex of ${_filteredClients.length} clients',
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const Spacer(),
+        if (_totalPages > 1)
+          Text(
+            'Page $_currentPage of $_totalPages',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBottomPagination() {
+    if (_totalPages <= 1) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Previous button
+          _buildPageButton(
+            icon: LucideIcons.chevronLeft,
+            enabled: _currentPage > 1,
+            onTap: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
+          ),
+          const SizedBox(width: 8),
+
+          // Page numbers
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: _buildPageNumbers(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Next button
+          _buildPageButton(
+            icon: LucideIcons.chevronRight,
+            enabled: _currentPage < _totalPages,
+            onTap: _currentPage < _totalPages ? () => _goToPage(_currentPage + 1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers() {
+    // Show max 5 page numbers
+    final startPage = (_currentPage - 2).clamp(1, _totalPages);
+    final endPage = (_currentPage + 2).clamp(1, _totalPages);
+
+    final pages = List.generate(endPage - startPage + 1, (index) => startPage + index);
+
+    return pages.map((page) {
+      final isCurrentPage = page == _currentPage;
+      return GestureDetector(
+        onTap: () => _goToPage(page),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isCurrentPage
+                ? const Color(0xFF0F172A)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isCurrentPage
+                  ? const Color(0xFF0F172A)
+                  : Colors.grey.shade300,
+              width: 1,
+            ),
+          ),
+          child: Text(
+            '$page',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isCurrentPage ? FontWeight.w600 : FontWeight.w500,
+              color: isCurrentPage ? Colors.white : Colors.grey.shade700,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _buildPageButton({
+    required IconData icon,
+    required bool enabled,
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
-      onTap: () {
-        HapticUtils.lightImpact();
-        setState(() {
-          _selectedTouchpoint = 'archive';
-        });
-      },
+      onTap: enabled ? onTap : null,
       child: Container(
-        margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF0F172A)
-              : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
+          color: enabled ? const Color(0xFF0F172A) : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
-          LucideIcons.archive,
-          size: 16,
-          color: isSelected ? Colors.white : const Color(0xFF64748B),
+          icon,
+          size: 18,
+          color: enabled ? Colors.white : Colors.grey.shade400,
         ),
       ),
     );
@@ -403,7 +619,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            _searchQuery.isEmpty ? 'No clients yet' : 'No clients found',
+            _searchQuery.isEmpty
+                ? (_showMyClientsOnly ? 'No assigned clients' : 'No clients yet')
+                : 'No clients found',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -443,6 +661,18 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         ? client.touchpoints.last
         : null;
 
+    final myDayApiService = ref.watch(myDayApiServiceProvider);
+    final isInMyDayValue = client.id != null
+        ? ref.watch(_isInMyDayProvider(client.id!))
+        : const AsyncValue.data(false);
+
+    final primaryPhone = client.phoneNumbers.isNotEmpty
+        ? client.phoneNumbers.first.number
+        : null;
+    final primaryAddress = client.addresses.isNotEmpty
+        ? client.addresses.first.fullAddress
+        : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -460,74 +690,183 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       child: InkWell(
         onTap: () {
           HapticUtils.lightImpact();
-          context.push('/clients/${client.id}');
+          if (client.id != null) {
+            context.push('/clients/${client.id}');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Client ID is missing'),
+                backgroundColor: Color(0xFFEF4444),
+              ),
+            );
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Touchpoint badge
-              if (latestTouchpoint != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    latestTouchpoint.ordinal,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF3B82F6),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 12),
-              // Client info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      client.fullName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
+              // Top row: badge + name + status
+              Row(
+                children: [
+                  // Touchpoint badge
+                  if (latestTouchpoint != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        latestTouchpoint.ordinal,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3B82F6),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
+                    const SizedBox(width: 12),
+                  ],
+                  // Client name with "In My Day" badge
+                  Expanded(
+                    child: Row(
                       children: [
-                        Icon(
-                          LucideIcons.mapPin,
-                          size: 14,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            client.addresses.isNotEmpty
-                              ? client.addresses.first.street
-                              : 'No address',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                            client.fullName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if ((isInMyDayValue.value ?? false) == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF22C55E).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  LucideIcons.check,
+                                  size: 10,
+                                  color: const Color(0xFF22C55E),
+                                ),
+                                const SizedBox(width: 2),
+                                const Text(
+                                  'In My Day',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF22C55E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  // Chevron
+                  Icon(
+                    LucideIcons.chevronRight,
+                    size: 18,
+                    color: Colors.grey.shade400,
+                  ),
+                ],
               ),
-              Icon(
-                LucideIcons.chevronRight,
-                size: 18,
-                color: Colors.grey.shade400,
+              const SizedBox(height: 8),
+              // Address row
+              Row(
+                children: [
+                  Icon(
+                    LucideIcons.mapPin,
+                    size: 14,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      client.addresses.isNotEmpty
+                          ? client.addresses.first.street
+                          : 'No address',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Quick actions and Add button row
+              Row(
+                children: [
+                  // Quick actions: Call and Navigate
+                  if (primaryPhone != null)
+                    _QuickActionButton(
+                      icon: LucideIcons.phone,
+                      label: 'Call',
+                      onTap: () => _callClient(primaryPhone),
+                    ),
+                  if (primaryPhone != null && primaryAddress != null)
+                    const SizedBox(width: 8),
+                  if (primaryAddress != null)
+                    _QuickActionButton(
+                      icon: LucideIcons.navigation,
+                      label: 'Navigate',
+                      onTap: () => _navigateToAddress(primaryAddress),
+                    ),
+                  if ((primaryPhone != null || primaryAddress != null))
+                    const SizedBox(width: 8),
+                  // Spacer to push button to the right
+                  const Spacer(),
+                  // "Add to My Day" button
+                  if ((isInMyDayValue.value ?? false) == true)
+                    Icon(
+                      LucideIcons.checkCircle,
+                      size: 20,
+                      color: const Color(0xFF22C55E),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: () => _addToMyDay(client),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              LucideIcons.plus,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Add',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -536,117 +875,78 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     );
   }
 
-  void _showFilterModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filter Clients',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.x),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text('Market Type', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Wrap(
-                  children: MarketType.values.map((type) => _buildFilterChip(
-                    type.name.toUpperCase(),
-                    _selectedMarketType == type.name.toUpperCase(),
-                    () => setState(() {
-                      _selectedMarketType = _selectedMarketType == type.name.toUpperCase()
-                          ? null
-                          : type.name.toUpperCase();
-                    }),
-                  )).toList(),
-                ),
-                const SizedBox(height: 16),
-                const Text('Product Type', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Wrap(
-                  children: ProductType.values.map((type) => _buildFilterChip(
-                    type.name.toUpperCase(),
-                    _selectedProductType == type.name.toUpperCase(),
-                    () => setState(() {
-                      _selectedProductType = _selectedProductType == type.name.toUpperCase()
-                          ? null
-                          : type.name.toUpperCase();
-                    }),
-                  )).toList(),
-                ),
-                const SizedBox(height: 16),
-                const Text('Pension Type', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Wrap(
-                  children: PensionType.values.map((type) => _buildFilterChip(
-                    type.name.toUpperCase(),
-                    _selectedPensionType == type.name.toUpperCase(),
-                    () => setState(() {
-                      _selectedPensionType = _selectedPensionType == type.name.toUpperCase()
-                          ? null
-                          : type.name.toUpperCase();
-                    }),
-                  )).toList(),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _clearFilters();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade200,
-                      foregroundColor: const Color(0xFF0F172A),
-                    ),
-                    child: const Text('Clear Filters'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  void _callClient(String? phone) {
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No phone number available'),
+          backgroundColor: Color(0xFF64748B),
         ),
-      ),
+      );
+      return;
+    }
+    HapticUtils.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Calling $phone...')),
     );
   }
 
-  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+  void _navigateToAddress(String? address) {
+    if (address == null || address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No address available'),
+          backgroundColor: Color(0xFF64748B),
+        ),
+      );
+      return;
+    }
+    HapticUtils.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Navigating to $address...')),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(right: 8, bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0F172A) : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey.shade700,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 12,
+              color: const Color(0xFF0F172A),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
         ),
       ),
     );

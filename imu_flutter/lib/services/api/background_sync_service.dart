@@ -1,126 +1,484 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'client_api_service.dart';
-import 'touchpoint_api_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/widgets.dart';
 import '../connectivity_service.dart';
-import '../local_storage/hive_service.dart';
-import '../../shared/providers/app_providers.dart';
-
-// Re-export needed providers
-export 'client_api_service.dart' show clientApiServiceProvider;
-export 'touchpoint_api_service.dart' show touchpointApiServiceProvider;
+import '../sync/powersync_service.dart';
+import '../auth/jwt_auth_service.dart';
+import '../auth/auth_service.dart' show jwtAuthProvider;
+import '../sync/powersync_connector.dart';
+import '../../core/utils/logger.dart';
+import '../../core/config/app_config.dart';
 
 /// Background sync service for automatic data synchronization
+///
+/// This service manages:
+/// - App lifecycle-based sync (foreground/background)
+/// - Network connectivity change-based sync
+/// - Periodic interval-based sync
+/// - Post-mutation sync (after create/update operations)
+///
+/// Integrates with PowerSync for automatic two-way sync.
 class BackgroundSyncService extends ChangeNotifier {
-  final ClientApiService _clientApi;
-  final TouchpointApiService _touchpointApi;
   final ConnectivityService _connectivityService;
-  final HiveService _hiveService;
+  final JwtAuthService _authService;
 
   Timer? _syncTimer;
+  Timer? _pendingCheckTimer;
+  StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
+  AppLifecycleState? _lifecycleState;
+
+  // Sync state
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
-  int _syncIntervalMinutes = 5; // Default 5 minutes
-  int _syncAttempts = 0;
-  static const int maxSyncAttempts = 3;
+  String? _lastSyncError;
+  int _pendingCount = 0;
+  bool _isInitialized = false;
+
+  // Configuration
+  Duration _syncInterval = const Duration(minutes: 5); // Default 5 minutes
+  Duration _pendingCheckInterval = const Duration(seconds: 30); // Check pending count every 30s
+  static const int _maxSyncRetries = 3;
+  int _currentSyncRetry = 0;
+
+  // Sync status callbacks
+  final List<Function()> _syncStartCallbacks = [];
+  final List<Function(DateTime)> _syncCompleteCallbacks = [];
+  final List<Function(String, dynamic)> _syncErrorCallbacks = [];
 
   BackgroundSyncService({
-    required ClientApiService clientApi,
-    required TouchpointApiService touchpointApi,
     required ConnectivityService connectivityService,
-    required HiveService hiveService,
-  })  : _clientApi = clientApi,
-       _touchpointApi = touchpointApi,
-       _connectivityService = connectivityService,
-       _hiveService = hiveService;
+    required JwtAuthService authService,
+  })  : _connectivityService = connectivityService,
+        _authService = authService;
 
-  /// Start background sync
-  void startBackgroundSync() {
-    _syncTimer = Timer.periodic(
-      Duration(minutes: _syncIntervalMinutes),
-      (timer) => _performSync(),
-    );
-    debugPrint('BackgroundSyncService: Started with interval of $_syncIntervalMinutes minutes');
-  }
+  // Getters
+  bool get isSyncing => _isSyncing;
+  DateTime? get lastSyncTime => _lastSyncTime;
+  String? get lastSyncError => _lastSyncError;
+  int get pendingCount => _pendingCount;
+  bool get isInitialized => _isInitialized;
 
-  /// Stop background sync
-  void stopBackgroundSync() {
-    _syncTimer?.cancel();
-    _syncTimer = null;
-    debugPrint('BackgroundSyncService: Stopped');
-  }
-
-  /// Perform sync
-  Future<void> _performSync() async {
-    if (_isSyncing) return;
-
-    final isOnline = _connectivityService.isOnline;
-    if (!isOnline) {
-      debugPrint('BackgroundSyncService: Offline, skipping sync');
+  /// Initialize the background sync service
+  Future<void> initialize() async {
+    if (_isInitialized) {
+      logDebug('BackgroundSyncService: Already initialized');
       return;
     }
 
+    logDebug('BackgroundSyncService: Initializing...');
+
+    // Listen to connectivity changes
+    _connectivitySubscription = _connectivityService.statusStream.listen(
+      _onConnectivityChanged,
+    );
+
+    // Start periodic sync timer
+    _startPeriodicSync();
+
+    // Start pending count check timer
+    _startPendingCheckTimer();
+
+    // Get initial pending count
+    await _updatePendingCount();
+
+    _isInitialized = true;
+    logDebug('BackgroundSyncService: Initialized with $_syncInterval interval');
+  }
+
+  /// Handle app lifecycle changes (called from WidgetsBindingObserver)
+  void handleAppLifecycleChange(AppLifecycleState state) {
+    _lifecycleState = state;
+    logDebug('BackgroundSyncService: App lifecycle changed to $state');
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground - trigger sync
+        _onAppResumed();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // App went to background - just log
+        logDebug('BackgroundSyncService: App went to background');
+        break;
+    }
+  }
+
+  /// Start periodic sync timer
+  void _startPeriodicSync() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(_syncInterval, (_) {
+      if (_isOnlineAndAuthenticated()) {
+        logDebug('BackgroundSyncService: Periodic sync triggered');
+        performSync();
+      }
+    });
+    logDebug('BackgroundSyncService: Periodic sync timer started (${_syncInterval.inMinutes}min interval)');
+  }
+
+  /// Stop periodic sync timer
+  void _stopPeriodicSync() {
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    logDebug('BackgroundSyncService: Periodic sync timer stopped');
+  }
+
+  /// Start pending count check timer
+  void _startPendingCheckTimer() {
+    _pendingCheckTimer?.cancel();
+    _pendingCheckTimer = Timer.periodic(_pendingCheckInterval, (_) {
+      _updatePendingCount();
+    });
+  }
+
+  /// Stop pending count check timer
+  void _stopPendingCheckTimer() {
+    _pendingCheckTimer?.cancel();
+    _pendingCheckTimer = null;
+  }
+
+  /// Handle app resumed event
+  void _onAppResumed() {
+    if (!_isOnlineAndAuthenticated()) {
+      logDebug('BackgroundSyncService: Not online or authenticated, skipping sync on resume');
+      return;
+    }
+
+    // Check if it's been more than 1 minute since last sync
+    if (_lastSyncTime != null) {
+      final timeSinceLastSync = DateTime.now().difference(_lastSyncTime!);
+      if (timeSinceLastSync < const Duration(minutes: 1)) {
+        logDebug('BackgroundSyncService: Recent sync (${timeSinceLastSync.inSeconds}s ago), skipping');
+        return;
+      }
+    }
+
+    logDebug('BackgroundSyncService: App resumed, triggering sync');
+    performSync();
+  }
+
+  /// Handle connectivity changes
+  void _onConnectivityChanged(ConnectivityStatus status) {
+    logDebug('BackgroundSyncService: Connectivity changed to $status');
+
+    if (status == ConnectivityStatus.online) {
+      // Just came back online - trigger sync if authenticated
+      if (_authService.isAuthenticated) {
+        logDebug('BackgroundSyncService: Back online and authenticated, triggering sync');
+        performSync();
+      }
+    }
+  }
+
+  /// Perform immediate sync (triggered by user or automatic events)
+  Future<SyncResult> performSync() async {
+    if (!_isOnlineAndAuthenticated()) {
+      final result = SyncResult(
+        success: false,
+        errorMessage: _authService.isAuthenticated ? 'Offline' : 'Not authenticated',
+      );
+      return result;
+    }
+
+    if (_isSyncing) {
+      logDebug('BackgroundSyncService: Sync already in progress');
+      return SyncResult(
+        success: false,
+        errorMessage: 'Sync already in progress',
+      );
+    }
+
+    if (!PowerSyncService.isConnected) {
+      logDebug('BackgroundSyncService: PowerSync not connected, connecting...');
+      try {
+        await _connectPowerSync();
+      } catch (e) {
+        logError('BackgroundSyncService: Failed to connect PowerSync', e);
+        return SyncResult(
+          success: false,
+          errorMessage: 'Failed to connect to sync service',
+        );
+      }
+    }
+
     _isSyncing = true;
-    _syncAttempts++;
+    _currentSyncRetry = 0;
     notifyListeners();
 
-    try {
-      // Sync clients
-      await _syncClients();
+    // Notify sync start
+    for (final callback in _syncStartCallbacks) {
+      try {
+        callback();
+      } catch (e) {
+        logError('BackgroundSyncService: Error in sync start callback', e);
+      }
+    }
 
-      // Sync touchpoints
-      await _syncTouchpoints();
+    logDebug('BackgroundSyncService: Starting sync...');
+
+    try {
+      // PowerSync automatically handles both upload and download
+      // We just need to wait for pending uploads to complete
+      await _waitForPendingUploads();
 
       _lastSyncTime = DateTime.now();
-      debugPrint('BackgroundSyncService: Sync completed successfully');
-    } catch (e) {
-      debugPrint('BackgroundSyncService: Sync failed: $e');
-      if (_syncAttempts >= maxSyncAttempts) {
-        debugPrint('BackgroundSyncService: Max attempts reached');
+      _lastSyncError = null;
+      _currentSyncRetry = 0;
+
+      await _updatePendingCount();
+
+      logDebug('BackgroundSyncService: Sync completed successfully');
+
+      // Notify sync complete
+      for (final callback in _syncCompleteCallbacks) {
+        try {
+          callback(_lastSyncTime!);
+        } catch (e) {
+          logError('BackgroundSyncService: Error in sync complete callback', e);
+        }
       }
+
+      notifyListeners();
+
+      return SyncResult(
+        success: true,
+        syncedCount: _pendingCount,
+      );
+    } catch (e, stackTrace) {
+      _lastSyncError = e.toString();
+      _currentSyncRetry++;
+
+      logError('BackgroundSyncService: Sync failed (attempt $_currentSyncRetry/$_maxSyncRetries)', e, stackTrace);
+
+      // Retry if max retries not reached
+      if (_currentSyncRetry < _maxSyncRetries) {
+        logDebug('BackgroundSyncService: Retrying sync in 5 seconds...');
+        await Future.delayed(const Duration(seconds: 5));
+        return performSync();
+      }
+
+      // Notify sync error
+      for (final callback in _syncErrorCallbacks) {
+        try {
+          callback(e.toString(), e);
+        } catch (err) {
+          logError('BackgroundSyncService: Error in sync error callback', err);
+        }
+      }
+
+      notifyListeners();
+
+      return SyncResult(
+        success: false,
+        errorMessage: e.toString(),
+      );
     } finally {
-    _isSyncing = false;
-    notifyListeners();
-  }
+      _isSyncing = false;
+      notifyListeners();
+    }
   }
 
-  /// Sync clients with backend
-  Future<void> _syncClients() async {
+  /// Wait for pending uploads to complete (with timeout)
+  Future<void> _waitForPendingUploads() async {
+    const maxWaitTime = Duration(seconds: 60);
+    const pollInterval = Duration(milliseconds: 500);
+    final startTime = DateTime.now();
+
+    while (DateTime.now().difference(startTime) < maxWaitTime) {
+      final pending = await PowerSyncService.pendingUploadCount;
+      _pendingCount = pending;
+
+      if (pending == 0) {
+        logDebug('BackgroundSyncService: All pending uploads completed');
+        break;
+      }
+
+      logDebug('BackgroundSyncService: Waiting for $pending uploads to complete...');
+      await Future.delayed(pollInterval);
+    }
+
+    if (DateTime.now().difference(startTime) >= maxWaitTime) {
+      logWarning('BackgroundSyncService: Timeout waiting for uploads to complete');
+    }
+  }
+
+  /// Update pending count from PowerSync
+  Future<void> _updatePendingCount() async {
     try {
-    final clients = await _clientApi.fetchClients();
-    debugPrint('BackgroundSyncService: Synced ${clients.length} clients');
-  } catch (e) {
-    debugPrint('BackgroundSyncService: Error syncing clients: $e');
-    rethrow;
-  }
-  }
-
-  /// Sync touchpoints with backend
-  Future<void> _syncTouchpoints() async {
-    try {
-    // Note: This would need a method to fetch all touchpoints
-    // For now, just log that we would sync touchpoints
-    debugPrint('BackgroundSyncService: Touchpoints sync placeholder');
-  } catch (e) {
-    debugPrint('BackgroundSyncService: Error syncing touchpoints: $e');
-    rethrow;
-  }
+      _pendingCount = await PowerSyncService.pendingUploadCount;
+      if (_pendingCount > 0) {
+        logDebug('BackgroundSyncService: $_pendingCount pending uploads');
+      }
+      notifyListeners();
+    } catch (e) {
+      logError('BackgroundSyncService: Failed to update pending count', e);
+    }
   }
 
-  /// Get sync status
-  bool get isSyncing => _isSyncing;
-  DateTime? get lastSyncTime => _lastSyncTime;
-  int get syncAttempts => _syncAttempts;
+  /// Connect to PowerSync
+  Future<void> _connectPowerSync() async {
+    final connector = IMUPowerSyncConnector(
+      authService: _authService,
+      powersyncUrl: AppConfig.powerSyncUrl,
+      apiUrl: AppConfig.postgresApiUrl,
+    );
+
+    await PowerSyncService.connect(connector);
+    logDebug('BackgroundSyncService: Connected to PowerSync');
+  }
+
+  /// Check if online and authenticated
+  bool _isOnlineAndAuthenticated() {
+    return _connectivityService.isOnline && _authService.isAuthenticated;
+  }
+
+  /// Trigger sync after a data mutation (create/update)
+  ///
+  /// This should be called after any local data changes to ensure
+  /// they are synced to the server promptly.
+  void triggerSyncAfterMutation() {
+    if (!_isOnlineAndAuthenticated()) {
+      logDebug('BackgroundSyncService: Not online/authenticated, mutation sync pending');
+      return;
+    }
+
+    if (_isSyncing) {
+      logDebug('BackgroundSyncService: Already syncing, mutation will be included');
+      return;
+    }
+
+    // Trigger sync after a short delay to batch multiple mutations
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_isOnlineAndAuthenticated() && !_isSyncing) {
+        logDebug('BackgroundSyncService: Triggering sync after mutation');
+        performSync();
+      }
+    });
+  }
+
+  /// Set sync interval
+  void setSyncInterval(Duration interval) {
+    if (_syncInterval != interval) {
+      _syncInterval = interval;
+      if (_isInitialized) {
+        _startPeriodicSync(); // Restart with new interval
+      }
+      logDebug('BackgroundSyncService: Sync interval set to ${interval.inMinutes}min');
+    }
+  }
+
+  /// Register callback for sync start
+  void onSyncStart(Function() callback) {
+    _syncStartCallbacks.add(callback);
+  }
+
+  /// Register callback for sync complete
+  void onSyncComplete(Function(DateTime) callback) {
+    _syncCompleteCallbacks.add(callback);
+  }
+
+  /// Register callback for sync error
+  void onSyncError(Function(String, dynamic) callback) {
+    _syncErrorCallbacks.add(callback);
+  }
+
+  /// Unregister all callbacks
+  void clearCallbacks() {
+    _syncStartCallbacks.clear();
+    _syncCompleteCallbacks.clear();
+    _syncErrorCallbacks.clear();
+  }
+
+  /// Dispose resources
+  @override
+  void dispose() {
+    logDebug('BackgroundSyncService: Disposing...');
+    _stopPeriodicSync();
+    _stopPendingCheckTimer();
+    _connectivitySubscription?.cancel();
+    clearCallbacks();
+    super.dispose();
+  }
+}
+
+/// Sync result model
+class SyncResult {
+  final bool success;
+  final int syncedCount;
+  final String? errorMessage;
+
+  SyncResult({
+    required this.success,
+    this.syncedCount = 0,
+    this.errorMessage,
+  });
 }
 
 /// Provider for BackgroundSyncService
 final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
-  return BackgroundSyncService(
-    clientApi: ref.watch(clientApiServiceProvider),
-    touchpointApi: ref.watch(touchpointApiServiceProvider),
-    connectivityService: ref.watch(connectivityServiceProvider),
-    hiveService: ref.watch(hiveServiceProvider),
+  final connectivityService = ref.watch(connectivityServiceProvider);
+  final jwtAuth = ref.watch(jwtAuthProvider);
+
+  final service = BackgroundSyncService(
+    connectivityService: connectivityService,
+    authService: jwtAuth,
+  );
+
+  ref.onDispose(() => service.dispose());
+
+  return service;
+});
+
+/// Provider for background sync status
+final backgroundSyncStatusProvider = Provider<BackgroundSyncStatus>((ref) {
+  final service = ref.watch(backgroundSyncServiceProvider);
+  return BackgroundSyncStatus(
+    isSyncing: service.isSyncing,
+    lastSyncTime: service.lastSyncTime,
+    lastSyncError: service.lastSyncError,
+    pendingCount: service.pendingCount,
+    isInitialized: service.isInitialized,
   );
 });
+
+/// Background sync status model
+class BackgroundSyncStatus {
+  final bool isSyncing;
+  final DateTime? lastSyncTime;
+  final String? lastSyncError;
+  final int pendingCount;
+  final bool isInitialized;
+
+  BackgroundSyncStatus({
+    required this.isSyncing,
+    this.lastSyncTime,
+    this.lastSyncError,
+    this.pendingCount = 0,
+    this.isInitialized = false,
+  });
+
+  /// Get formatted last sync time
+  String get lastSyncFormatted {
+    if (lastSyncTime == null) return 'Never';
+
+    final now = DateTime.now();
+    final diff = now.difference(lastSyncTime!);
+
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  /// Get status message
+  String get statusMessage {
+    if (isSyncing) return 'Syncing...';
+    if (lastSyncError != null) return 'Sync failed: ${lastSyncError}';
+    if (pendingCount > 0) return '$pendingCount pending';
+    if (lastSyncTime != null) return 'Synced ${lastSyncFormatted}';
+    return 'Ready to sync';
+  }
+}

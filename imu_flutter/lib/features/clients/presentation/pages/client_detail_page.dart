@@ -8,8 +8,14 @@ import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/sync_service.dart';
 import '../../../../services/api/client_api_service.dart';
 import '../../../../services/api/touchpoint_api_service.dart';
+import '../../../../services/api/approvals_api_service.dart';
+import '../../../../services/auth/auth_service.dart';
+import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../services/connectivity_service.dart';
+import '../../../../services/maps/map_service.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/utils/loading_helper.dart';
+import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../data/models/client_model.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
@@ -50,7 +56,7 @@ final clientTouchpointsProvider = FutureProvider.family<List<Touchpoint>, String
 
   if (isOnline) {
     try {
-      return await touchpointApi.fetchTouchpoints(clientId);
+      return await touchpointApi.fetchTouchpoints(clientId: clientId);
     } catch (e) {
       // Fall back to local cache
       final hiveService = HiveService();
@@ -92,21 +98,27 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   }
 
   Future<void> _loadClient() async {
-    if (!_hiveService.isInitialized) {
-      await _hiveService.init();
-    }
+    await LoadingHelper.withLoading(
+      ref: ref,
+      message: 'Loading client...',
+      operation: () async {
+        if (!_hiveService.isInitialized) {
+          await _hiveService.init();
+        }
 
-    final clientData = _hiveService.getClient(widget.clientId);
-    if (clientData != null && mounted) {
-      setState(() {
-        _client = Client.fromJson(clientData);
-        _isLoading = false;
-      });
-    } else {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+        final clientData = _hiveService.getClient(widget.clientId);
+        if (clientData != null && mounted) {
+          setState(() {
+            _client = Client.fromJson(clientData);
+            _isLoading = false;
+          });
+        } else {
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        }
+      },
+    );
   }
 
   Future<void> _handleDelete() async {
@@ -132,10 +144,22 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (confirmed == true && mounted) {
       HapticUtils.delete();
 
-      await _hiveService.deleteClient(widget.clientId);
-      // PowerSync handles sync automatically via the repository
-
-      ref.invalidate(clientsProvider);
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Deleting client...',
+        operation: () async {
+          await _hiveService.deleteClient(widget.clientId);
+          // PowerSync handles sync automatically via the repository
+          ref.invalidate(clientsProvider);
+        },
+        onError: (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to delete client: $e')),
+            );
+          }
+        },
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -155,6 +179,63 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     });
   }
 
+  Future<void> _handleLoanRelease() async {
+    HapticUtils.lightImpact();
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Release Loan'),
+        content: Text('Submit loan release request for ${_client?.fullName ?? 'this client'}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await LoadingHelper.withLoading(
+          ref: ref,
+          message: 'Submitting loan release...',
+          operation: () async {
+            final approvalsApi = ref.read(approvalsApiServiceProvider);
+            await approvalsApi.submitLoanRelease(
+              clientId: widget.clientId,
+              notes: 'Loan release requested via mobile app',
+            );
+          },
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Loan release submitted for approval'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to submit loan release: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   void _callClient(String? phone) {
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -163,8 +244,18 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Calling $phone...')),
+    // Stub implementation - TODO: Integrate with actual phone call functionality
+    LoadingHelper.withLoading(
+      ref: ref,
+      message: 'Initiating call...',
+      operation: () async {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Calling $phone...')),
+          );
+        }
+      },
     );
   }
 
@@ -176,8 +267,110 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigating to $address...')),
+
+    // Show navigation options
+    final primaryAddress = _client!.addresses.isNotEmpty
+        ? _client!.addresses.first
+        : null;
+
+    if (primaryAddress?.latitude != null && primaryAddress?.longitude != null) {
+      // Use map service for navigation
+      showModalBottomSheet(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Wrap(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Choose Navigation App',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.map),
+                title: const Text('Google Maps'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openNavigation(primaryAddress!);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Navigating to $address...')),
+      );
+    }
+  }
+
+  void _showMapForAddress(Address address) {
+    if (address.latitude == null || address.longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location coordinates not available')),
+      );
+      return;
+    }
+
+    HapticUtils.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            AppBar(
+              title: Text(address.fullAddress),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: ClientMapView(
+                clients: [_client!],
+                showControls: true,
+                showSearch: false,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openNavigation(Address address) async {
+    await LoadingHelper.withLoading(
+      ref: ref,
+      message: 'Opening navigation...',
+      operation: () async {
+        // Import and use MapService
+        final mapService = MapService();
+        await mapService.openGoogleMapsNavigation(
+          latitude: address.latitude!,
+          longitude: address.longitude!,
+          label: _client!.fullName,
+        );
+      },
+      onError: (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to open navigation: $e')),
+          );
+        }
+      },
     );
   }
 
@@ -190,14 +383,25 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     final nextNumber = _client!.completedTouchpoints + 1;
 
     if (nextType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All 7 touchpoints completed!')),
-      );
+      // Show completion dialog
+      await _showTouchpointCompletionDialog();
+      return;
+    }
+
+    // Validate the sequence before opening the form
+    final validation = TouchpointValidationService.validateTouchpointSequence(
+      touchpointNumber: nextNumber,
+      touchpointType: nextType,
+    );
+
+    if (!validation.isValid) {
+      _showValidationError(validation);
       return;
     }
 
     final result = await showTouchpointForm(
       context: context,
+      clientId: widget.clientId,
       touchpointNumber: nextNumber,
       touchpointType: nextType == TouchpointType.visit ? 'Visit' : 'Call',
       clientName: _client!.fullName,
@@ -205,25 +409,136 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result != null) {
-      // Save touchpoint
-      final touchpointId = DateTime.now().millisecondsSinceEpoch.toString();
-      final touchpointData = {
-        'id': touchpointId,
-        'clientId': widget.clientId,
-        'touchpointNumber': nextNumber,
-        'type': nextType.name,
-        'date': DateTime.now().toIso8601String(),
-        ...result,
-        'createdAt': DateTime.now().toIso8601String(),
-      };
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Saving touchpoint...',
+        operation: () async {
+          // Save touchpoint
+          final touchpointId = DateTime.now().millisecondsSinceEpoch.toString();
+          final touchpointData = Map<String, dynamic>.from({
+            'id': touchpointId,
+            'clientId': widget.clientId,
+            'touchpointNumber': nextNumber,
+            'type': nextType.name,
+            'date': DateTime.now().toIso8601String(),
+            ...result,
+            'createdAt': DateTime.now().toIso8601String(),
+          });
 
-      await _hiveService.saveTouchpoint(touchpointId, touchpointData);
-      // PowerSync handles sync automatically via the repository
+          await _hiveService.saveTouchpoint(touchpointId, touchpointData);
+          // PowerSync handles sync automatically via the repository
 
-      // Reload client
-      await _loadClient();
-      ref.invalidate(clientTouchpointsProvider);
+          // Reload client
+          await _loadClient();
+          ref.invalidate(clientTouchpointsProvider);
+
+          // Check if this was the last touchpoint
+          if (nextNumber == 7) {
+            await _showTouchpointCompletionDialog();
+          }
+        },
+        onError: (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to save touchpoint: $e')),
+            );
+          }
+        },
+      );
     }
+  }
+
+  /// Show dialog when all 7 touchpoints are completed
+  Future<void> _showTouchpointCompletionDialog() async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(
+          LucideIcons.checkCircle,
+          color: Colors.green[600],
+          size: 48,
+        ),
+        title: const Text('All Touchpoints Completed!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Congratulations! ${_client?.fullName ?? 'This client'} has completed all 7 touchpoints.',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Touchpoint Sequence Completed:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...TouchpointValidationService.getSequenceDisplay().map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.check,
+                      size: 14,
+                      color: Colors.green[600],
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(item)),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show validation error dialog
+  void _showValidationError(validation) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(
+          LucideIcons.alertCircle,
+          color: Colors.orange,
+          size: 48,
+        ),
+        title: const Text('Invalid Touchpoint Sequence'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(validation.error ?? 'Invalid touchpoint sequence'),
+            const SizedBox(height: 16),
+            const Text(
+              'Expected Sequence:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...TouchpointValidationService.getSequenceDisplay().map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 4),
+                child: Text('• $item'),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -271,6 +586,24 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           onPressed: () => context.pop(),
         ),
         actions: [
+          // Loan release button - only for Caravan and Tele users
+          Consumer(
+            builder: (context, ref, _) {
+              final authState = ref.watch(authNotifierProvider);
+              final userRole = authState.user?.role?.toLowerCase();
+
+              // Show loan release button for Admin, Caravan and Tele
+              if (userRole == 'admin' || userRole == 'caravan' || userRole == 'tele') {
+                return IconButton(
+                  icon: const Icon(LucideIcons.dollarSign),
+                  tooltip: 'Release Loan',
+                  onPressed: _handleLoanRelease,
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
           IconButton(
             icon: const Icon(LucideIcons.pencil),
             onPressed: _editClient,
@@ -299,12 +632,38 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _client!.fullName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _client!.fullName,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (_client!.loanReleased) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green[200]!),
+                                ),
+                                child: Text(
+                                  'RELEASED',
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -360,7 +719,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                   Expanded(
                     child: _QuickActionButton(
                       icon: LucideIcons.plusCircle,
-                      label: 'Add Touchpoint',
+                      label: 'New Visit',
                       onTap: _startTouchpoint,
                       isPrimary: true,
                     ),
@@ -450,13 +809,37 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                         icon: LucideIcons.mapPin,
                         label: address.isPrimary ? 'Primary' : 'Address',
                         value: address.fullAddress,
-                        trailing: IconButton(
-                          icon: const Icon(LucideIcons.navigation, size: 18),
-                          onPressed: () => _navigateToAddress(address.fullAddress),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (address.latitude != null && address.longitude != null)
+                              IconButton(
+                                icon: const Icon(LucideIcons.map, size: 18),
+                                onPressed: () => _showMapForAddress(address),
+                              ),
+                            IconButton(
+                              icon: const Icon(LucideIcons.navigation, size: 18),
+                              onPressed: () => _navigateToAddress(address.fullAddress),
+                            ),
+                          ],
                         ),
                       )).toList(),
                 ),
               ),
+
+              // Map view for client location
+              if (_client!.addresses.any((a) => a.latitude != null && a.longitude != null))
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: SizedBox(
+                    height: 200,
+                    child: ClientMapView(
+                      clients: [_client!],
+                      showControls: false,
+                      showSearch: false,
+                    ),
+                  ),
+                ),
             ],
 
             // Pension Info Section
@@ -491,8 +874,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Touchpoint History Section
-            _Section(title: 'Touchpoint History'),
+            // Visit History Section
+            _Section(title: 'Visit History'),
             if (_client!.touchpoints.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -527,19 +910,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             const SizedBox(height: 100), // Bottom padding
           ],
         ),
-      ),
-      // Floating action button for quick touchpoint
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _startTouchpoint,
-        icon: const Icon(LucideIcons.plus),
-        label: Text(_client!.nextTouchpointType == TouchpointType.visit
-            ? 'Record Visit'
-            : _client!.nextTouchpointType == TouchpointType.call
-                ? 'Record Call'
-                : 'Completed'),
-        backgroundColor: _client!.nextTouchpointType != null
-            ? Theme.of(context).colorScheme.primary
-            : Colors.grey,
       ),
     );
   }

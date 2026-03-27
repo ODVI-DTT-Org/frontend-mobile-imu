@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../services/sync/powersync_service.dart';
+import 'package:powersync/powersync.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import '../models/user_municipalities_simple.dart';
 
 /// Repository for managing user municipality assignments
@@ -41,7 +42,7 @@ class UserMunicipalitiesSimpleRepository {
   Stream<List<UserMunicipalitiesSimple>> watchAssignedMunicipalities(String userId) {
     return _db.watch(
       'SELECT * FROM user_municipalities_simple WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
-      [userId],
+      parameters: [userId],
     ).map((results) => results.map((row) => UserMunicipalitiesSimple.fromRow(row)).toList());
   }
 

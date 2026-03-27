@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
+import 'secure_storage_service.dart';
 
 /// User model parsed from JWT token
 class JwtUser {
@@ -67,13 +68,30 @@ class JwtAuthService {
   String? _refreshToken;
   JwtUser? _currentUser;
 
-  JwtAuthService({Dio? dio, FlutterSecureStorage? storage})
-      : _dio = dio ?? Dio(BaseOptions(
+  // Singleton instance
+  static JwtAuthService? _instance;
+
+  /// Get the singleton instance
+  static JwtAuthService get instance {
+    _instance ??= JwtAuthService._internal();
+    return _instance!;
+  }
+
+  /// Private constructor for singleton
+  JwtAuthService._internal()
+      : _dio = Dio(BaseOptions(
           baseUrl: AppConfig.postgresApiUrl,
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
-        ),),
-        _storage = storage ?? const FlutterSecureStorage();
+        )),
+        _storage = const FlutterSecureStorage();
+
+  /// Public constructor (for backwards compatibility, returns singleton)
+  factory JwtAuthService({Dio? dio, FlutterSecureStorage? storage}) {
+    // Ignore dio and storage parameters for singleton pattern
+    // This ensures all instances share the same token state
+    return instance;
+  }
 
   /// Get current access token
   String? get accessToken => _accessToken;
@@ -127,6 +145,11 @@ class JwtAuthService {
       await _storage.write(key: 'access_token', value: _accessToken);
       await _storage.write(key: 'refresh_token', value: _refreshToken);
 
+      // Save login time for offline grace period
+      final secureStorage = SecureStorageService();
+      await secureStorage.saveLastOnlineLoginTime();
+      await secureStorage.saveLastLoginTime();
+
       logDebug('Login successful for ${_currentUser!.id}');
       return _currentUser!;
     } on DioException catch (e) {
@@ -154,7 +177,15 @@ class JwtAuthService {
   /// Refresh access token using refresh token
   Future<void> refreshTokens() async {
     if (_refreshToken == null) {
+      logError('Cannot refresh: No refresh token available');
       throw Exception('No refresh token available');
+    }
+
+    // Check if current token is still valid (not expired yet)
+    // If it's still valid, we might not need to refresh yet
+    if (_currentUser != null && !_currentUser!.isExpired) {
+      logDebug('Current token is still valid, skipping unnecessary refresh');
+      return;
     }
 
     try {
@@ -165,20 +196,57 @@ class JwtAuthService {
         data: {
           'refresh_token': _refreshToken,
         },
+        options: Options(
+          // Add longer timeout for refresh endpoint
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
+        ),
       );
 
-      _accessToken = response.data['access_token'];
-      _refreshToken = response.data['refresh_token'];
-      _currentUser = JwtUser.fromToken(_accessToken!);
+      if (response.statusCode == 200 && response.data != null) {
+        _accessToken = response.data['access_token'];
+        // Update refresh token if provided (some APIs rotate refresh tokens)
+        if (response.data['refresh_token'] != null) {
+          _refreshToken = response.data['refresh_token'];
+        }
+        _currentUser = JwtUser.fromToken(_accessToken!);
 
-      await _storage.write(key: 'access_token', value: _accessToken);
-      await _storage.write(key: 'refresh_token', value: _refreshToken);
+        await _storage.write(key: 'access_token', value: _accessToken);
+        if (response.data['refresh_token'] != null) {
+          await _storage.write(key: 'refresh_token', value: _refreshToken);
+        }
 
-      logDebug('Token refresh successful');
+        logDebug('Token refresh successful');
+      } else {
+        throw Exception('Invalid response from refresh endpoint');
+      }
+    } on DioException catch (e) {
+      logError('Token refresh failed with DioException', e);
+
+      // Check if it's a network error vs auth error
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        logError('Network error during token refresh - will retry later', e);
+        throw Exception('Network error - please check your connection');
+      }
+
+      // For auth errors (401, 403), clear tokens
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        logError('Authentication failed during refresh - clearing tokens', e);
+        await logout();
+        throw Exception('Session expired - please login again');
+      }
+
+      // For other errors, don't clear tokens - might be temporary
+      logError('Unexpected error during token refresh', e);
+      throw Exception('Token refresh failed: ${e.message ?? 'Unknown error'}');
     } catch (e) {
-      logError('Token refresh failed', e);
-      // Clear tokens on refresh failure
-      await logout();
+      logError('Token refresh failed with unexpected error', e);
+      // Only clear tokens on explicit auth failures, not on network errors
+      if (e is! Exception || !e.toString().contains('Network error')) {
+        await logout();
+      }
       rethrow;
     }
   }
@@ -220,10 +288,55 @@ class JwtAuthService {
   /// Get authorization header for API requests
   String? get authHeader => _accessToken != null ? 'Bearer $_accessToken' : null;
 
-  /// Check if token needs refresh (within 1 hour of expiry)
+  /// Check if token needs refresh (within 30 minutes of expiry)
+  /// Reduced from 1 hour to 30 minutes to be more proactive
   bool get needsRefresh {
     if (_currentUser?.expiresAt == null) return false;
-    const oneHour = Duration(hours: 1);
-    return DateTime.now().add(oneHour).isAfter(_currentUser!.expiresAt!);
+    const thirtyMinutes = Duration(minutes: 30);
+    return DateTime.now().add(thirtyMinutes).isAfter(_currentUser!.expiresAt!);
+  }
+
+  /// Check if token is expired or will expire very soon (5 minutes)
+  /// Used to determine if we should attempt a refresh before operations
+  bool get shouldAttemptRefresh {
+    if (_currentUser?.expiresAt == null) return false;
+    const fiveMinutes = Duration(minutes: 5);
+    return DateTime.now().add(fiveMinutes).isAfter(_currentUser!.expiresAt!);
+  }
+
+  /// Get time until token expires
+  Duration? get timeUntilExpiry {
+    if (_currentUser?.expiresAt == null) return null;
+    final now = DateTime.now();
+    if (now.isAfter(_currentUser!.expiresAt!)) return Duration.zero;
+    return _currentUser!.expiresAt!.difference(now);
+  }
+
+  // ===== OFFLINE AUTHENTICATION SUPPORT =====
+
+  /// Set access token and user from offline authentication
+  /// This is used by offline auth service to restore session
+  Future<void> setOfflineAuth({required String token, required JwtUser user}) async {
+    _accessToken = token;
+    _currentUser = user;
+
+    // Also restore refresh token from storage to maintain full session
+    _refreshToken = await _storage.read(key: 'refresh_token');
+
+    logDebug('Offline auth restored for ${user.id}');
+    logDebug('Refresh token restored: ${_refreshToken != null}');
+  }
+
+  /// Update cached tokens (for offline auth service)
+  Future<void> updateCachedTokens({String? accessToken, String? refreshToken}) async {
+    if (accessToken != null) {
+      _accessToken = accessToken;
+      await _storage.write(key: 'access_token', value: accessToken);
+    }
+    if (refreshToken != null) {
+      _refreshToken = refreshToken;
+      await _storage.write(key: 'refresh_token', value: refreshToken);
+    }
+    logDebug('Cached tokens updated');
   }
 }

@@ -1,30 +1,18 @@
-import 'package:hive/hive.dart';
-
-part 'user_municipalities_simple.dart';
-
 import 'package:uuid/uuid.dart';
-
-part 'user_municipalities_simple.g.dart';
 
 /// User Municipality assignment model for location-based filtering
 /// Uses PSGC municipality IDs
-class UserMunicipalitiesSimple extends HiveObject {
-  @HiveField(0)
+class UserMunicipalitiesSimple {
   final String? id;
 
-  @HiveField(1)
   final String userId;
 
-  @HiveField(2)
   final String municipalityId;
 
-  @HiveField(3)
   final DateTime? assignedAt;
 
-  @HiveField(4)
   final String? assignedBy;
 
-  @HiveField(5)
   final DateTime? deletedAt;
 
   UserMunicipalitiesSimple({
@@ -56,15 +44,13 @@ class UserMunicipalitiesSimple extends HiveObject {
   }
 
   Map<String, dynamic> toJson() => {
-    return {
-      'id': id,
-      'user_id': userId,
-      'municipality_id': municipalityId,
-      'assigned_at': assignedAt?.toIso8601String(),
-      'assigned_by': assignedBy,
-      'deleted_at': deletedAt?.toIso8601String(),
-    };
-  }
+        'id': id,
+        'user_id': userId,
+        'municipality_id': municipalityId,
+        'assigned_at': assignedAt?.toIso8601String(),
+        'assigned_by': assignedBy,
+        'deleted_at': deletedAt?.toIso8601String(),
+      };
 
   @override
   String toString() {

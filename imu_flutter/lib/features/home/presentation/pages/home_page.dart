@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/auth/session_service.dart';
+import '../../../../services/sync/powersync_service.dart';
+import '../../../../services/sync/powersync_connector.dart' show powerSyncConnectorProvider;
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/providers/filter_providers.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -21,6 +24,25 @@ class _HomePageState extends ConsumerState<HomePage> {
     super.initState();
     // Record activity on page load
     _sessionService.recordActivity();
+    // Load user's assigned municipalities
+    _loadAssignedMunicipalities();
+  }
+
+  Future<void> _loadAssignedMunicipalities() async {
+    try {
+      final currentUserId = ref.read(currentUserIdProvider);
+      if (currentUserId == null) return;
+
+      final userLocations = await PowerSyncService.query(
+        "SELECT municipality_id FROM user_locations WHERE user_id = ? AND deleted_at IS NULL",
+        [currentUserId]
+      );
+
+      final municipalities = userLocations.map((row) => row['municipality_id'] as String).toList();
+      ref.read(assignedMunicipalitiesProvider.notifier).state = municipalities;
+    } catch (e) {
+      // Handle error silently
+    }
   }
 
   @override
@@ -55,6 +77,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
               // Menu Grid - 2 columns per Figma design
               _buildMenuGrid(isTablet),
+
+              SizedBox(height: isTablet ? 72 : 55),
+
+              // Developer Options - Debug info
+              _buildDeveloperOptions(context),
             ],
           ),
         ),
@@ -93,8 +120,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   List<_MenuItem> _getMenuItems() {
-    // Per Figma: 6 items in 2 columns (3 rows of 2)
+    // Updated: 7 items in 2 columns - My Day added as first item
     return [
+      _MenuItem(icon: LucideIcons.sun, label: 'My Day', id: 'my-day'),
       _MenuItem(icon: LucideIcons.users, label: 'My Clients', id: 'clients'),
       _MenuItem(icon: LucideIcons.target, label: 'My Targets', id: 'targets'),
       _MenuItem(icon: LucideIcons.mapPin, label: 'Missed Visits', id: 'visits'),
@@ -120,6 +148,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     _sessionService.recordActivity();
 
     switch (id) {
+      case 'my-day':
+        context.push('/my-day');
+        break;
       case 'clients':
         context.push('/clients');
         break;
@@ -144,6 +175,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       case 'debug':
         context.push('/debug');
         break;
+      case 'developer':
+        _showDeveloperOptions(context);
+        break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -151,6 +185,349 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         );
     }
+  }
+
+  void _showDeveloperOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _DeveloperOptionsSheet(),
+    );
+  }
+
+  Widget _buildDeveloperOptions(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showDeveloperOptions(context),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.bug,
+              size: 16,
+              color: Colors.grey.shade600,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Developer Options',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeveloperOptionsSheet extends ConsumerStatefulWidget {
+  const _DeveloperOptionsSheet({super.key});
+
+  @override
+  ConsumerState<_DeveloperOptionsSheet> createState() => _DeveloperOptionsSheetState();
+}
+
+class _DeveloperOptionsSheetState extends ConsumerState<_DeveloperOptionsSheet> {
+  Map<String, int> _tableCounts = {};
+  bool _isLoading = true;
+  int? _assignedClientsCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTableCounts();
+  }
+
+  Future<void> _loadTableCounts() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final counts = <String, int>{};
+
+      // Get counts from PowerSync
+      final tables = [
+        'clients',
+        'user_locations',
+        'user_profiles',
+        'psgc',
+        'touchpoint_reasons',
+        'addresses',
+        'phone_numbers',
+        'touchpoints',
+      ];
+
+      // Get assigned clients count (for current user's municipalities)
+      final assignedMunicipalities = ref.watch(assignedMunicipalitiesProvider);
+      int? assignedClientsCount;
+
+      if (assignedMunicipalities.isNotEmpty) {
+        try {
+          final placeholders = List.filled(assignedMunicipalities.length, '?').join(',');
+          final assignedResult = await PowerSyncService.query(
+            "SELECT COUNT(*) as count FROM clients WHERE municipality IN ($placeholders)",
+            assignedMunicipalities
+          );
+          if (assignedResult.isNotEmpty) {
+            assignedClientsCount = assignedResult.first['count'] as int;
+          }
+        } catch (e) {
+          assignedClientsCount = -1;
+        }
+      }
+
+      // Store assigned clients count
+      setState(() {
+        _tableCounts = counts;
+        _assignedClientsCount = assignedClientsCount;
+      });
+
+      for (final table in tables) {
+        try {
+          final result = await PowerSyncService.query('SELECT COUNT(*) as count FROM $table');
+          if (result.isNotEmpty) {
+            counts[table] = result.first['count'] as int;
+          } else {
+            counts[table] = 0;
+          }
+        } catch (e) {
+          counts[table] = -1; // Error
+        }
+      }
+
+      setState(() {
+        _tableCounts = counts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isConnected = PowerSyncService.isConnected;
+    final currentUser = ref.watch(currentUserIdProvider);
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: Row(
+              children: [
+                Icon(LucideIcons.bug, color: Colors.grey.shade700),
+                const SizedBox(width: 12),
+                const Text(
+                  'Developer Options',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // PowerSync Status
+                  _buildSectionHeader('PowerSync Status'),
+                  _buildInfoRow('Connected', isConnected ? 'Yes' : 'No', isConnected ? Colors.green : Colors.red),
+                  _buildInfoRow('Current User ID', currentUser ?? 'Not logged in', null),
+                  const SizedBox(height: 20),
+
+                  // Table Counts
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildSectionHeader('Database Tables'),
+                      IconButton(
+                        icon: const Icon(LucideIcons.refreshCw, size: 18),
+                        onPressed: _loadTableCounts,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    Column(
+                      children: [
+                        // Clients Section
+                        _buildSectionHeader('Clients'),
+                        _buildInfoRow(
+                          'All Clients',
+                          (_tableCounts['clients'] ?? 0).toString(),
+                          (_tableCounts['clients'] ?? 0) == 0 ? Colors.orange : Colors.green,
+                        ),
+                        if (_assignedClientsCount != null)
+                          _buildInfoRow(
+                            'Assigned to Me',
+                            _assignedClientsCount! >= 0 ? _assignedClientsCount.toString() : 'Error',
+                            _assignedClientsCount! == 0 ? Colors.orange : Colors.green,
+                          ),
+                        const SizedBox(height: 16),
+
+                        // Other Tables
+                        _buildSectionHeader('Other Tables'),
+                        ..._tableCounts.entries.where((e) => e.key != 'clients').map((entry) {
+                          final count = entry.value;
+                          final isError = count == -1;
+                          final countText = isError ? 'Error' : count.toString();
+                          final countColor = isError ? Colors.red : (count == 0 ? Colors.orange : Colors.green);
+
+                          return _buildInfoRow(entry.key, countText, countColor);
+                        }).toList(),
+                      ],
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  // Actions
+                  _buildSectionHeader('Actions'),
+                  const SizedBox(height: 12),
+                  _buildActionButton(
+                    icon: LucideIcons.refreshCw,
+                    label: 'Refresh Data',
+                    color: Colors.blue,
+                    onTap: () async {
+                      // Trigger a sync by connecting again
+                      final connector = ref.read(powerSyncConnectorProvider);
+                      if (connector != null) {
+                        await PowerSyncService.connect(connector);
+                      }
+                      _loadTableCounts();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildActionButton(
+                    icon: LucideIcons.alertTriangle,
+                    label: 'Check Sync Errors',
+                    color: Colors.orange,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Check console for sync errors')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, Color? valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: valueColor ?? Colors.grey.shade900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

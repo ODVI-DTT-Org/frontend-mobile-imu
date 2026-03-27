@@ -56,7 +56,7 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
 
   Future<void> setTimeIn(String clientId, bool isTimeIn) async {
     try {
-      await _apiService.setTimeIn(clientId, isTimeIn);
+      await _apiService.setTimeIn(clientId);
       await loadClients();
     } catch (e) {
       state = state.copyWith(error: e.toString());

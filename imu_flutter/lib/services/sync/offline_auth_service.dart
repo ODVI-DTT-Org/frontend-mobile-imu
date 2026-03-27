@@ -45,17 +45,19 @@ class OfflineAuthService {
       if (results.isEmpty) return null;
 
       final row = results.first;
-      return UserProfile(
-        id: row['id'] as String? ?? row['user_id'] as String,
-        employeeId: row['employee_id'] as String? ?? '',
-        firstName: row['first_name'] as String? ?? (row['name'] as String?)?.split(' ').first ?? '',
-        lastName: row['last_name'] as String? ?? (row['name'] as String?)?.split(' ').last ?? '',
-        email: row['email'] as String,
-        phone: row['phone'] as String? ?? '',
-        role: row['role'] as String,
-        profilePhotoUrl: row['profile_photo_url'] as String? ?? row['avatar_url'] as String?,
-        createdAt: DateTime.now(),
-      );
+      // Convert the row to a Map<String, dynamic> for fromJson
+      final json = <String, dynamic>{
+        'id': row['id'] as String? ?? row['user_id'] as String,
+        'employeeId': row['employee_id'] as String? ?? '',
+        'firstName': row['first_name'] as String? ?? (row['name'] as String?)?.split(' ').first ?? '',
+        'lastName': row['last_name'] as String? ?? (row['name'] as String?)?.split(' ').last ?? '',
+        'email': row['email'] as String,
+        'phone': row['phone'] as String? ?? '',
+        'role': row['role'] as String?,
+        'profilePhotoUrl': row['profile_photo_url'] as String? ?? row['avatar_url'] as String?,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      return UserProfile.fromJson(json);
     } catch (e) {
       logError('Failed to get cached user profile', e);
       return null;

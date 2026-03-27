@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart' show userProfileProvider, currentUserIdProvider, isAuthenticatedProvider, currentUserNameProvider;
+import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/profile_api_service.dart' hide UserProfile, userProfileProvider;
 import '../../data/models/user_profile.dart';
 
@@ -58,50 +59,61 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!_formKey.currentState!.validate()) return;
 
     HapticUtils.success();
-    setState(() => _isLoading = true);
 
-    try {
-      final currentProfile = ref.read(userProfileProvider);
-      if (currentProfile == null) return;
+    await LoadingHelper.withLoading(
+      ref: ref,
+      message: 'Updating profile...',
+      operation: () async {
+        final currentProfile = ref.read(userProfileProvider);
+        if (currentProfile == null) return;
 
-      final updatedProfile = currentProfile.copyWith(
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-      );
-
-      // Try to update via API
-      final userId = ref.read(currentUserIdProvider);
-      if (userId != null) {
-        try {
-          final profileApi = ref.read(profileApiServiceProvider);
-          await profileApi.updateProfile(userId, {
-            'first_name': updatedProfile.firstName,
-            'last_name': updatedProfile.lastName,
-            'email': updatedProfile.email,
-            'phone': updatedProfile.phone,
-          });
-        } catch (e) {
-          debugPrint('Failed to update profile via API: $e');
-        }
-      }
-
-      // Update local state
-      await ref.read(userProfileProvider.notifier).updateProfile(updatedProfile);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: Color(0xFF22C55E),
-          ),
+        final updatedProfile = currentProfile.copyWith(
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
         );
-      }
 
+        // Try to update via API
+        final userId = ref.read(currentUserIdProvider);
+        if (userId != null) {
+          try {
+            final profileApi = ref.read(profileApiServiceProvider);
+            await profileApi.updateProfile(userId, {
+              'first_name': updatedProfile.firstName,
+              'last_name': updatedProfile.lastName,
+              'email': updatedProfile.email,
+              'phone': updatedProfile.phone,
+            });
+          } catch (e) {
+            debugPrint('Failed to update profile via API: $e');
+          }
+        }
+
+        // Update local state
+        await ref.read(userProfileProvider.notifier).updateProfile(updatedProfile);
+      },
+      onError: (e) {
+        HapticUtils.error();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update profile: $e'),
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+          );
+        }
+      },
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile updated successfully'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
       setState(() => _isEditing = false);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 

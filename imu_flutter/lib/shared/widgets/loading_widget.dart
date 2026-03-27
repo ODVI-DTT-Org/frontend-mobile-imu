@@ -2,41 +2,71 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 /// Loading overlay widget
+/// Displays a full-screen overlay that blocks user interaction while loading
 class LoadingOverlay extends StatelessWidget {
   final String? message;
   final bool showProgress;
+  final bool dismissible;
 
   const LoadingOverlay({
     super.key,
     this.message,
-    this.showProgress = false,
+    this.showProgress = true,
+    this.dismissible = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black54,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (showProgress)
-              const CircularProgressIndicator()
-            else
-              const SizedBox(
-                width: 24,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            const SizedBox(height: 16),
-            Text(
-              message ?? 'Loading...',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
+    return AbsorbPointer(
+      absorbing: !dismissible, // Block all interaction when not dismissible
+      child: Container(
+        color: Colors.black54,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showProgress)
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  )
+                else
+                  const SizedBox(
+                    width: 24,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                const SizedBox(height: 16),
+                Text(
+                  message ?? 'Loading...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

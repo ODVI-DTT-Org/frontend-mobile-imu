@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 
-/// Header buttons for My Day: Multiple Time In and Add New Visit
+/// Header buttons for My Day: Multiple Time In and Add Client
 class HeaderButtons extends StatelessWidget {
   final VoidCallback onMultipleTimeIn;
-  final VoidCallback onAddNewVisit;
+  final VoidCallback onAddClient;
 
   const HeaderButtons({
     super.key,
     required this.onMultipleTimeIn,
-    required this.onAddNewVisit,
+    required this.onAddClient,
   });
 
   @override
@@ -26,12 +26,12 @@ class HeaderButtons extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        // Add new visit button
+        // Add client button
         Expanded(
           child: _PillButton(
-            icon: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF0F172A)),
-            label: 'Add new visit',
-            onTap: onAddNewVisit,
+            icon: const Icon(LucideIcons.userPlus, size: 16, color: Color(0xFF0F172A)),
+            label: 'Add Client',
+            onTap: onAddClient,
           ),
         ),
       ],

@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
+import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
+import 'package:imu_flutter/core/config/app_config.dart';
 import 'package:imu_flutter/features/my_day/data/models/my_day_client.dart';
 
 /// Task status for My Day
@@ -53,31 +56,207 @@ class MyDayTask {
 }
 
 /// My Day API service
-/// Uses PowerSync/Supabase backend for data
+/// Uses REST API backend for data
 class MyDayApiService {
+  final Dio _dio;
+  final JwtAuthService _authService;
+
+  MyDayApiService({Dio? dio, JwtAuthService? authService})
+      : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
+        _authService = authService ?? JwtAuthService();
+
+  /// Add client to today's itinerary
+  Future<bool> addToMyDay(String clientId, {
+    String? scheduledTime,
+    int priority = 5,
+    String? notes,
+  }) async {
+    try {
+      final token = _authService.accessToken;
+      if (token == null) {
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/add-client',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: {
+          'client_id': clientId,
+          if (scheduledTime != null) 'scheduled_time': scheduledTime,
+          'priority': priority,
+          if (notes != null) 'notes': notes,
+        },
+      );
+
+      return response.data['message'] == 'Client added to My Day';
+    } on DioException catch (e) {
+      debugPrint('Error adding to my day: ${e.message}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('Error adding to my day: $e');
+      throw ApiException.fromError(e);
+    }
+  }
+
+  /// Remove client from today's itinerary
+  Future<bool> removeFromMyDay(String clientId) async {
+    try {
+      final token = _authService.accessToken;
+      if (token == null) {
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.delete(
+        '${AppConfig.postgresApiUrl}/my-day/remove-client/$clientId',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      return response.data['message'] == 'Client removed from My Day';
+    } on DioException catch (e) {
+      debugPrint('Error removing from my day: ${e.message}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('Error removing from my day: $e');
+      throw ApiException.fromError(e);
+    }
+  }
+
+  /// Check if client is in today's itinerary
+  Future<bool> isInMyDay(String clientId) async {
+    try {
+      final token = _authService.accessToken;
+      if (token == null) {
+        return false;
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/my-day/status/$clientId',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      return response.data['in_my_day'] ?? false;
+    } catch (e) {
+      debugPrint('Error checking my day status: $e');
+      return false;
+    }
+  }
+
   /// Fetch today's tasks from backend
-  /// TODO: Phase 1 - Implement PowerSync/Supabase fetch
   Future<List<MyDayTask>> fetchTodayTasks() async {
     try {
-      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
-      debugPrint('MyDayApiService: fetchTodayTasks (PowerSync integration pending)');
-      return [];
+      debugPrint('MyDayApiService: Fetching today tasks from REST API...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/my-day/tasks',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final tasksData = data['tasks'] as List<dynamic>? ?? [];
+        debugPrint('MyDayApiService: Got ${tasksData.length} tasks from API');
+
+        return tasksData.map((item) {
+          final taskData = item as Map<String, dynamic>;
+          return MyDayTask.fromJson(taskData);
+        }).toList();
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch tasks: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
-      debugPrint('Error fetching today tasks: $e');
-      return [];
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch today tasks',
+        originalError: e,
+      );
     }
   }
 
   /// Complete task
-  /// TODO: Phase 1 - Implement PowerSync/Supabase update
   Future<MyDayTask?> completeTask(String taskId, {String? notes}) async {
     try {
-      // TODO: Phase 1 - Implement PowerSync/Supabase update
-      debugPrint('MyDayApiService: completeTask (PowerSync integration pending)');
-      return null;
+      debugPrint('MyDayApiService: Completing task $taskId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/tasks/$taskId/complete',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: {
+          if (notes != null) 'notes': notes,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final taskData = response.data['task'] as Map<String, dynamic>?;
+        debugPrint('MyDayApiService: Task completed successfully');
+        return taskData != null ? MyDayTask.fromJson(taskData) : null;
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to complete task: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
-      debugPrint('Error completing task: $e');
-      throw ApiException.fromError(e);
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to complete task',
+        originalError: e,
+      );
     }
   }
 
@@ -99,44 +278,168 @@ class MyDayApiService {
   }
 
   /// Fetch clients for My Day list
-  /// TODO: Phase 1 - Implement PowerSync/Supabase fetch
   Future<List<MyDayClient>> fetchMyDayClients(DateTime date) async {
     try {
-      // TODO: Phase 1 - Implement PowerSync/Supabase fetch
-      debugPrint('MyDayApiService: fetchMyDayClients (PowerSync integration pending)');
-      return [];
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      debugPrint('MyDayApiService: Fetching my day clients for $dateStr...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/my-day/tasks',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final tasksData = data['tasks'] as List<dynamic>? ?? [];
+        debugPrint('MyDayApiService: Got ${tasksData.length} tasks from API');
+
+        return tasksData.map((item) {
+          final taskData = item as Map<String, dynamic>;
+          final clientData = taskData['client'] as Map<String, dynamic>? ?? {};
+          return MyDayClient(
+            id: taskData['id'] ?? '',
+            fullName: '${clientData['first_name'] ?? ''} ${clientData['last_name'] ?? ''}'.trim(),
+            agencyName: clientData['agency']?['name'],
+            location: clientData['addresses'] != null && (clientData['addresses'] as List).isNotEmpty
+                ? (clientData['addresses'] as List).first['street']
+                : null,
+            touchpointNumber: taskData['touchpoint_number'] ?? 0,
+            touchpointType: taskData['touchpoint_type'] ?? 'visit',
+            isTimeIn: taskData['time_in'] != null,
+          );
+        }).toList();
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch my day clients: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
-      debugPrint('Error fetching my day clients: $e');
-      return [];
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch my day clients',
+        originalError: e,
+      );
     }
   }
 
   /// Set time in for a client
-  Future<bool> setTimeIn(String clientId, bool isTimeIn) async {
+  Future<bool> setTimeIn(String clientId, {double? latitude, double? longitude}) async {
     try {
-      debugPrint('MyDayApiService: setTimeIn(clientId, isTimeIn)');
-      return true;
+      debugPrint('MyDayApiService: Setting time in for client $clientId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/clients/$clientId/time-in',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: {
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('MyDayApiService: Time in recorded successfully');
+        return true;
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to set time in: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
-      debugPrint('Error setting time in: $e');
-      throw ApiException.fromError(e);
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to set time in',
+        originalError: e,
+      );
     }
   }
 
   /// Set timeOut for a client
-  Future<bool> setTimeOut(String clientId, bool isTimeOut) async {
+  Future<bool> setTimeOut(String clientId, {double? latitude, double? longitude}) async {
     try {
-      debugPrint('MyDayApiService: setTimeOut(clientId, isTimeOut)');
-      return true;
+      debugPrint('MyDayApiService: Setting time out for client $clientId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/clients/$clientId/time-out',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: {
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('MyDayApiService: Time out recorded successfully');
+        return true;
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to set time out: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
-      debugPrint('Error setting time out: $e');
-      throw ApiException.fromError(e);
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to set time out',
+        originalError: e,
+      );
     }
   }
 
   /// Upload selfie for time in
   Future<String?> uploadSelfie(String clientId, String photoPath) async {
     try {
-      debugPrint('MyDayApiService: uploadSelfie (PowerSync integration pending)');
+      debugPrint('MyDayApiService: Uploading selfie for client $clientId...');
+      // TODO: Implement photo upload to S3 or similar
       return null;
     } catch (e) {
       debugPrint('Error uploading selfie: $e');
@@ -147,11 +450,45 @@ class MyDayApiService {
   /// Submit visit form
   Future<Map<String, dynamic>?> submitVisitForm(String clientId, Map<String, dynamic> formData) async {
     try {
-      debugPrint('MyDayApiService: submitVisitForm($clientId, formData)');
-      return {};
+      debugPrint('MyDayApiService: Submitting visit form for client $clientId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/visits',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: formData,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('MyDayApiService: Visit form submitted successfully');
+        return response.data as Map<String, dynamic>;
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to submit visit form: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
     } catch (e) {
-      debugPrint('Error submitting visit form: $e');
-      return null;
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to submit visit form',
+        originalError: e,
+      );
     }
   }
 }

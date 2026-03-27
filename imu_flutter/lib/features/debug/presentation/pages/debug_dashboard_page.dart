@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
+import '../../../../services/sync/powersync_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart';
 
@@ -423,18 +424,74 @@ class _GpsTrackerTabState extends State<_GpsTrackerTab> {
 }
 
 // System Info Tab
-class _SystemInfoTab extends StatelessWidget {
+class _SystemInfoTab extends ConsumerStatefulWidget {
   final HiveService hiveService;
 
   const _SystemInfoTab({required this.hiveService});
 
   @override
+  ConsumerState<_SystemInfoTab> createState() => _SystemInfoTabState();
+}
+
+class _SystemInfoTabState extends ConsumerState<_SystemInfoTab> {
+  Map<String, int> _tableCounts = {};
+  bool _isLoadingCounts = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTableCounts();
+  }
+
+  Future<void> _loadTableCounts() async {
+    if (!PowerSyncService.isConnected) {
+      return;
+    }
+
+    setState(() => _isLoadingCounts = true);
+
+    try {
+      final tables = ['clients', 'addresses', 'phone_numbers', 'touchpoints', 'user_municipalities_simple', 'psgc'];
+      final counts = <String, int>{};
+
+      for (final table in tables) {
+        try {
+          final result = await PowerSyncService.query('SELECT COUNT(*) as count FROM $table');
+          counts[table] = result.first['count'] as int? ?? 0;
+        } catch (e) {
+          counts[table] = -1; // Error indicator
+        }
+      }
+
+      setState(() {
+        _tableCounts = counts;
+        _isLoadingCounts = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingCounts = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isConnected = PowerSyncService.isConnected;
+    final hiveService = widget.hiveService;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // PowerSync Status Card
+          _buildPowerSyncStatusCard(isConnected),
+          const SizedBox(height: 16),
+
+          // PowerSync Table Counts
+          if (isConnected) ...[
+            _buildTableCountsCard(),
+            const SizedBox(height: 16),
+          ],
+
           // App Info
           _buildInfoCard(
             title: 'App Information',
@@ -452,7 +509,7 @@ class _SystemInfoTab extends StatelessWidget {
             title: 'Storage',
             items: [
               {'Database': 'Hive (NoSQL)'},
-              {'Initialized': hiveService.isInitialized ? 'Yes' : 'No'},
+              {'Initialized': widget.hiveService.isInitialized ? 'Yes' : 'No'},
               {'Encryption': 'Enabled'},
             ],
           ),
@@ -462,7 +519,7 @@ class _SystemInfoTab extends StatelessWidget {
           _buildInfoCard(
             title: 'Sync Configuration',
             items: [
-              {'Sync Endpoint': 'Not configured'},
+              {'Sync Endpoint': isConnected ? 'PowerSync Cloud' : 'Not connected'},
               {'Offline Mode': 'Enabled'},
               {'Auto Sync': 'On network restore'},
               {'Conflict Resolution': 'Last-write-wins'},
@@ -525,6 +582,126 @@ class _SystemInfoTab extends StatelessWidget {
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPowerSyncStatusCard(bool isConnected) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isConnected ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isConnected ? LucideIcons.cloud : LucideIcons.cloudOff,
+                color: isConnected ? Colors.green[700] : Colors.red[700],
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'PowerSync Status',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isConnected ? Colors.green[700] : Colors.red[700],
+                ),
+              ),
+              const Spacer(),
+              if (_isLoadingCounts)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton.icon(
+                  onPressed: _loadTableCounts,
+                  icon: const Icon(LucideIcons.refreshCw, size: 14),
+                  label: const Text('Refresh'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildInfoRow('Connection', isConnected ? 'Connected' : 'Not Connected'),
+          _buildInfoRow('Database', 'imu_powersync.db'),
+          if (isConnected)
+            _buildInfoRow('Sync Status', 'Active'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableCountsCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PowerSync Table Counts',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._tableCounts.entries.map((entry) => _buildInfoRow(
+                entry.key,
+                entry.value == -1 ? 'Error' : '${entry.value} rows',
+                valueColor: entry.value == -1 ? Colors.red : null,
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: Colors.grey[700], fontSize: 14),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? Colors.grey[900],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

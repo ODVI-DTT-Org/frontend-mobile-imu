@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/sync/sync_service.dart';
+import '../utils/loading_helper.dart';
 
 /// Sync status indicator widget
 class SyncStatusWidget extends ConsumerWidget {
@@ -18,7 +19,7 @@ class SyncStatusWidget extends ConsumerWidget {
     final syncService = ref.watch(syncServiceProvider);
 
     return GestureDetector(
-      onTap: onTap ?? () => _handleTap(context, syncService),
+      onTap: onTap ?? () => _handleTap(context, ref, syncService),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -117,7 +118,7 @@ class SyncStatusWidget extends ConsumerWidget {
     return syncService.statusMessage;
   }
 
-  void _handleTap(BuildContext context, SyncService syncService) {
+  void _handleTap(BuildContext context, WidgetRef ref, SyncService syncService) async {
     if (syncService.status == SyncStatusEnum.offline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -125,7 +126,21 @@ class SyncStatusWidget extends ConsumerWidget {
         ),
       );
     } else if (syncService.pendingCount > 0) {
-      syncService.syncNow();
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Syncing data...',
+        operation: () => syncService.syncNow(),
+        onError: (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Sync failed: ${e.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
     }
   }
 }
@@ -166,11 +181,16 @@ class ConnectivityBanner extends ConsumerWidget {
 }
 
 /// Sync status bottom sheet
-class SyncStatusSheet extends ConsumerWidget {
+class SyncStatusSheet extends ConsumerStatefulWidget {
   const SyncStatusSheet({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SyncStatusSheet> createState() => _SyncStatusSheetState();
+}
+
+class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
+  @override
+  Widget build(BuildContext context) {
     final syncService = ref.watch(syncServiceProvider);
 
     return Container(
@@ -237,20 +257,25 @@ class SyncStatusSheet extends ConsumerWidget {
               child: ElevatedButton.icon(
                 onPressed: syncService.isSyncing
                     ? null
-                    : () {
-                        syncService.syncNow();
+                    : () async {
+                        await LoadingHelper.withLoading(
+                          ref: ref,
+                          message: 'Syncing ${syncService.pendingCount} items...',
+                          operation: () => syncService.syncNow(),
+                          onError: (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Sync failed: ${e.toString()}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                        );
                       },
-                icon: syncService.isSyncing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.sync),
-                label: Text(syncService.isSyncing ? 'Syncing...' : 'Sync Now'),
+                icon: const Icon(Icons.sync),
+                label: const Text('Sync Now'),
               ),
             ),
         ],

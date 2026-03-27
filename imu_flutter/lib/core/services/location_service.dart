@@ -44,21 +44,30 @@ class LocationService extends ChangeNotifier {
   /// Get current position once
   Future<Position?> getCurrentPosition() async {
     try {
+      debugPrint('LocationService: Getting current position...');
       final hasPermission = await _checkAndRequestPermission();
-      if (!hasPermission) return null;
+      if (!hasPermission) {
+        debugPrint('LocationService: No location permission');
+        return null;
+      }
 
       final serviceEnabled = await isLocationServiceEnabled();
-      if (!serviceEnabled) return null;
+      if (!serviceEnabled) {
+        debugPrint('LocationService: Location service disabled');
+        return null;
+      }
 
+      debugPrint('LocationService: Fetching GPS location...');
       _currentPosition = await Geolocator.getCurrentPosition(
         desiredAccuracy: _currentAccuracy,
         timeLimit: const Duration(seconds: 15),
       );
 
+      debugPrint('LocationService: Got position - Lat: ${_currentPosition!.latitude}, Lng: ${_currentPosition!.longitude}');
       notifyListeners();
       return _currentPosition;
     } catch (e) {
-      debugPrint('Error getting current position: $e');
+      debugPrint('LocationService: Error getting current position: $e');
       return null;
     }
   }
@@ -69,14 +78,24 @@ class LocationService extends ChangeNotifier {
     int distanceFilter = 10, // meters
     int intervalSeconds = 5,
   }) async {
-    if (_isTracking) return true;
+    if (_isTracking) {
+      debugPrint('LocationService: Already tracking');
+      return true;
+    }
 
     try {
+      debugPrint('LocationService: Starting location tracking...');
       final hasPermission = await _checkAndRequestPermission();
-      if (!hasPermission) return false;
+      if (!hasPermission) {
+        debugPrint('LocationService: No location permission for tracking');
+        return false;
+      }
 
       final serviceEnabled = await isLocationServiceEnabled();
-      if (!serviceEnabled) return false;
+      if (!serviceEnabled) {
+        debugPrint('LocationService: Location service disabled for tracking');
+        return false;
+      }
 
       _currentAccuracy = accuracy;
       _isTracking = true;
@@ -85,6 +104,7 @@ class LocationService extends ChangeNotifier {
       _totalDistanceTracked = 0;
       _lastPosition = null;
 
+      debugPrint('LocationService: Getting initial position...');
       // Get initial position
       _currentPosition = await Geolocator.getCurrentPosition(
         desiredAccuracy: accuracy,
@@ -93,6 +113,7 @@ class LocationService extends ChangeNotifier {
       if (_currentPosition != null) {
         _lastPosition = _currentPosition;
         _addLocationRecord(_currentPosition!, 'Initial');
+        debugPrint('LocationService: Initial position - Lat: ${_currentPosition!.latitude}, Lng: ${_currentPosition!.longitude}');
       }
 
       // Start position stream
@@ -101,6 +122,7 @@ class LocationService extends ChangeNotifier {
         distanceFilter: 10,
       );
 
+      debugPrint('LocationService: Starting position stream...');
       _positionStreamSubscription = Geolocator.getPositionStream(
         locationSettings: locationSettings,
       ).listen(
@@ -108,16 +130,17 @@ class LocationService extends ChangeNotifier {
           _handlePositionUpdate(position);
         },
         onError: (error) {
-          debugPrint('Position stream error: $error');
+          debugPrint('LocationService: Position stream error: $error');
           _isTracking = false;
           notifyListeners();
         },
       );
 
+      debugPrint('LocationService: Location tracking started');
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Error starting tracking: $e');
+      debugPrint('LocationService: Error starting tracking: $e');
       _isTracking = false;
       notifyListeners();
       return false;

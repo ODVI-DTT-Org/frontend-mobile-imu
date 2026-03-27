@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../services/sync/powersync_service.dart';
+import 'package:powersync/powersync.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import '../models/psgc_models.dart';
 
 /// Repository for PSGC geographic data

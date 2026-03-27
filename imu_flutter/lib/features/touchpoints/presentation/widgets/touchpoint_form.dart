@@ -11,6 +11,7 @@ import '../../../clients/data/models/client_model.dart';
 import './time_capture_section.dart';
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
+  final String clientId;
   final int touchpointNumber;
   final String touchpointType; // 'Visit' or 'Call'
   final String clientName;
@@ -18,6 +19,7 @@ class TouchpointFormModal extends ConsumerStatefulWidget {
 
   const TouchpointFormModal({
     super.key,
+    required this.clientId,
     required this.touchpointNumber,
     required this.touchpointType,
     required this.clientName,
@@ -599,6 +601,11 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
       // Return the form data
       Navigator.pop(context, {
+        // Required fields for API
+        'client_id': widget.clientId,
+        'touchpoint_number': widget.touchpointNumber,
+        'type': widget.touchpointType,
+        // Form fields
         'reason': _selectedReason,
         'status': _selectedStatus?.apiValue ?? 'Interested', // NEW: status field
         // Time In/Out from provider (for Visit type)
@@ -896,6 +903,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 // Helper function to show the modal
 Future<Map<String, dynamic>?> showTouchpointForm({
   required BuildContext context,
+  required String clientId,
   required int touchpointNumber,
   required String touchpointType,
   required String clientName,
@@ -906,6 +914,7 @@ Future<Map<String, dynamic>?> showTouchpointForm({
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) => TouchpointFormModal(
+      clientId: clientId,
       touchpointNumber: touchpointNumber,
       touchpointType: touchpointType,
       clientName: clientName,

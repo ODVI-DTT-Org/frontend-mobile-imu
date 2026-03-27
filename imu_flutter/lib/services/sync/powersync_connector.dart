@@ -42,21 +42,41 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         return null;
       }
 
-      // Check if token needs refresh
-      if (_authService.needsRefresh) {
+      logDebug('JWT token available, length: ${token.length}');
+
+      // Check if token needs refresh (only if not already expired)
+      if (_authService.needsRefresh && _authService.currentUser?.isValid == true) {
         logDebug('Token needs refresh, refreshing...');
-        await _authService.refreshTokens();
+        try {
+          await _authService.refreshTokens();
+          logDebug('Token refreshed successfully for PowerSync');
+        } catch (e) {
+          logWarning('Failed to refresh token for PowerSync, using existing token: $e');
+          // Continue with existing token if it's still valid
+          if (!_authService.isAuthenticated) {
+            logError('Cannot fetch credentials - no valid token');
+            return null;
+          }
+        }
+      }
+
+      // Check if we have a valid token after refresh attempt
+      if (!_authService.isAuthenticated) {
+        logError('Cannot fetch credentials - token is invalid');
+        return null;
       }
 
       // Return the credentials for PowerSync authentication
       logDebug('PowerSync credentials fetched successfully');
       final endpoint = _powersyncUrl.isNotEmpty ? _powersyncUrl : '';
-      final accessToken = _authService.accessToken;
+      final accessToken = _authService.accessToken!;
 
-      if (endpoint.isEmpty || accessToken == null) {
+      if (endpoint.isEmpty) {
+        logError('PowerSync URL is empty');
         return null;
       }
 
+      logDebug('Creating PowerSyncCredentials with endpoint: $endpoint');
       return PowerSyncCredentials(
         endpoint: endpoint,
         token: accessToken,
@@ -128,8 +148,18 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
   /// Invalidate stored credentials
   @override
   Future<void> invalidateCredentials() async {
-    await _authService.logout();
-    logDebug('Credentials invalidated');
+    // DON'T logout the user - PowerSync auth failures shouldn't affect app authentication
+    // Just log the error and disconnect PowerSync
+    logWarning('PowerSync credentials invalidated - disconnecting PowerSync only (user session preserved)');
+
+    // Note: We don't call _authService.logout() here because:
+    // 1. PowerSync auth failures are non-critical for app functionality
+    // 2. User should remain logged in even if sync fails
+    // 3. App can still function with REST API even if PowerSync fails
+    // 4. Automatic logout creates a bad user experience
+
+    // The PowerSyncService will handle disconnection when credentials fail
+    // This just prevents the automatic logout that was causing the loop
   }
 }
 
