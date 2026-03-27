@@ -182,56 +182,60 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _handleLoanRelease() async {
     HapticUtils.lightImpact();
 
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
+    // Show UDI input dialog
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Release Loan'),
-        content: Text('Submit loan release request for ${_client?.fullName ?? 'this client'}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
+      builder: (context) => _ReleaseLoanDialog(clientName: _client?.fullName ?? 'this client'),
     );
 
-    if (confirmed == true && mounted) {
-      try {
-        await LoadingHelper.withLoading(
-          ref: ref,
-          message: 'Submitting loan release...',
-          operation: () async {
-            final approvalsApi = ref.read(approvalsApiServiceProvider);
-            await approvalsApi.submitLoanRelease(
-              clientId: widget.clientId,
-              notes: 'Loan release requested via mobile app',
-            );
-          },
-        );
+    if (result == null || !result['confirmed']) return;
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Loan release submitted for approval'),
-              backgroundColor: Colors.green,
-            ),
+    final udiNumber = result['udi_number'] as String?;
+
+    if (udiNumber == null || udiNumber.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('UDI number is required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Submitting loan release...',
+        operation: () async {
+          final approvalsApi = ref.read(approvalsApiServiceProvider);
+          await approvalsApi.submitLoanRelease(
+            clientId: widget.clientId,
+            udiNumber: udiNumber.trim(),
+            notes: 'Loan release requested via mobile app',
           );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to submit loan release: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        },
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Loan release submitted for approval (UDI: ${udiNumber.trim()})'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Reload client to show updated loan status
+        _loadClient();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit loan release: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -1169,5 +1173,95 @@ class _TouchpointHistoryItem extends StatelessWidget {
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+}
+
+/// Dialog for Release Loan with UDI number input
+class _ReleaseLoanDialog extends StatefulWidget {
+  final String clientName;
+
+  const _ReleaseLoanDialog({required this.clientName});
+
+  @override
+  State<_ReleaseLoanDialog> createState() => _ReleaseLoanDialogState();
+}
+
+class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
+  final _udiController = TextEditingController();
+
+  @override
+  void dispose() {
+    _udiController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: Icon(
+        LucideIcons.dollarSign,
+        color: Colors.green[600],
+        size: 48,
+      ),
+      title: const Text('Release Loan'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Submit loan release request for ${widget.clientName}?',
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _udiController,
+            decoration: const InputDecoration(
+              labelText: 'UDI Number *',
+              hintText: 'Enter UDI number...',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This will submit a request for approval. The loan will be marked as released and all touchpoints will be completed.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final udiNumber = _udiController.text.trim();
+            if (udiNumber.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('UDI number is required'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+            Navigator.pop(context, {
+              'confirmed': true,
+              'udi_number': udiNumber,
+            });
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green[600],
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Submit Request'),
+        ),
+      ],
+    );
   }
 }
