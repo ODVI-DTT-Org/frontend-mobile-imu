@@ -11,11 +11,12 @@ region: jp
 
 # -------------------------------------------------------------------------
 # Replication: PostgreSQL database connection for sync
+# IMPORTANT: Use environment variable for production URI
 # -------------------------------------------------------------------------
 replication:
   connections:
     - type: postgresql
-      uri: postgresql://doadmin:AVNS_70HyRhviU4jC0NA6b16@imu-production-do-user-21438450-0.l.db.ondigitalocean.com:25060/imu_db?sslmode=require
+      uri: !env POWERSYNC_POSTGRES_URI
       name: imu-production
       sslmode: verify-ca
       cacert: |
@@ -41,9 +42,8 @@ replication:
         lTL7djHsPB9hzP8TtKAA2VPXtFkDta62tnZFpJaZhnvZO8NMCtZOnrH2jouEzHSp
         /uR5eE1jC/WK6GBx7gUW1aP9eplnd2CzSJ9JnSyG/DEkhz8eTeM5jZZQHvK1sPD+
         mvqgXt39wUa1KqIujYXplhC/TYGnyAinuTLpwLnISKHDp8Nx/L6tYkmoZaYjYX4u
-        Qo6s0l456K1+J3m+xnwZ57Ws0EQZxd+FDfHOW3v6G64G/eWtJK0tL5L7mZM6YJZs
-        XKVzq28CqKya4ClSY5rvCI3EQYd2r6nAsyjLq5GIzS/DsStQGC+9UrIVY3RWkVoC
-        WybZZA==
+        Qo6s0l456K1+J3m+xnwZ57WsEeqCyaClSY5rvCI3EQYd2r6nAsyjLq5GIzS/DsSt
+        QGC+9UrIVY3RWkVoCWybZZA==
         -----END CERTIFICATE-----
 
 # -----------------------------------------------------------------------------

@@ -178,3 +178,8 @@ scripts/output/
 # Playwright (for web testing)
 playwright-report/
 playwright/.cache/
+
+# PowerSync configuration (contains sensitive database credentials)
+powersync/service.yaml
+powersync/service.yaml.leaked
+*.service.yaml.leaked
