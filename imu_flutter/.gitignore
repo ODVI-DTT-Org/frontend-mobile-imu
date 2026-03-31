@@ -16,6 +16,9 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# VS Code
+.vscode/
+
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
@@ -41,3 +44,137 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Android generated files
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
+android/key.properties
+android/*.keystore
+android/*.jks
+
+# iOS build artifacts
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vagrant/
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+**/ios/**/.symlinks/
+**/ios/**/profile
+**/ios/**/xcuserdata
+**/ios/.generated/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# iOS Provisioning
+**/ios/**/*.mobileprovision
+**/ios/**/*.p12
+**/ios/**/project.xcworkspace
+
+# Web build artifacts
+**/web/**/.dart_tool/
+**/web/**/.packages
+**/web/**/build/
+
+# Firebase / Google Services
+google-services.json
+GoogleService-Info.plist
+google-services.json.example
+GoogleService-Info.plist.example
+firebase_app_id_file.json
+firebase_debug_latest.*
+
+# API Keys and secrets
+api_keys.dart
+secrets.dart
+*.env
+.env.*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Local configuration files (can contain sensitive data)
+local.properties
+*.iml
+
+# Test coverage
+coverage/
+
+# Hive local database (for development)
+*.hive
+*.hive.*
+
+# Mapbox
+mapbox_access_token.dart
+.mapbox/
+
+# Audio/Photo test data
+test_assets/
+demo_assets/
+
+# Scripts and tools output
+scripts/*.log
+scripts/output/
+
+# Playwright (for web testing)
+playwright-report/
+playwright/.cache/
