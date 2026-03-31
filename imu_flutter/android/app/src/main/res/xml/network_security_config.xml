@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Development configuration: Allow HTTP for local testing -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow HTTP for local development server -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.131.23</domain>
+        <domain includeSubdomains="true">192.168.0.104</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+
+    <!-- Production configuration: HTTPS only for production domains -->
+    <domain-config>
+        <domain includeSubdomains="true">api.imu-app.com</domain>
+        <domain includeSubdomains="true">imu.odvi.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- Add certificate pinning here for production -->
+            <!-- <certificates src="@raw/cert" /> -->
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

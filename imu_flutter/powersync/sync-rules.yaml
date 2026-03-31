@@ -1,0 +1,55 @@
+# PowerSync Sync Rules for IMU
+# This file defines which data to sync and how
+
+bucket_definitions:
+  # Sync clients assigned to the user
+  user_clients:
+    # Users see clients in their assigned areas
+    parameters: select user_id
+    data:
+      - SELECT * FROM clients WHERE id = $user_id OR created_by = $user_id
+
+  # Sync touchpoints for user's clients
+  client_touchpoints:
+    parameters: select user_id
+    data:
+      - SELECT t.* FROM touchpoints t
+        JOIN clients c ON t.client_id = c.id
+        WHERE c.created_by = $user_id
+
+  # Sync itineraries for the user
+  user_itineraries:
+    parameters: select user_id
+    data:
+      - SELECT * FROM itineraries WHERE user_id = $user_id
+
+# Indexes for local queries
+indexes:
+  - index: clients_by_name
+    on: clients
+    columns: [last_name, first_name]
+
+  - index: touchpoints_by_client
+    on: touchpoints
+    columns: [client_id]
+
+  - index: itineraries_by_date
+    on: itineraries
+    columns: [date]
+
+# Table permissions (optional, for additional security)
+permissions:
+  - table: clients
+    permissions:
+      - read: SELECT * FROM clients WHERE id = user_id() OR created_by = user_id()
+
+  - table: touchpoints
+    permissions:
+      - read: |
+          SELECT t.* FROM touchpoints t
+          JOIN clients c ON t.client_id = c.id
+          WHERE c.created_by = user_id()
+
+  - table: itineraries
+    permissions:
+      - read: SELECT * FROM itineraries WHERE user_id = user_id()
