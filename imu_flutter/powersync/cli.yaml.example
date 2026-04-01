@@ -1,0 +1,21 @@
+# Adds YAML Schema support for VSCode users with the YAML extension installed. This enables features like validation and autocompletion based on the provided schema.
+# yaml-language-server: $schema=https://unpkg.com/@powersync/cli-schemas@latest/json-schema/cli-config.json
+
+# This file is managed by the PowerSync CLI.
+# Run `powersync link --help` for more information.
+
+# PowerSync instance type (cloud or self-hosted)
+type: cloud
+
+# PowerSync API URL - Get this from your PowerSync dashboard
+# Example: https://your-instance.powersync.journeyapps.com
+api_url: https://your-instance-id.powersync.journeyapps.com
+
+# PowerSync Admin API Key - Set via environment variable
+# The CLI will read this from the PS_ADMIN_TOKEN environment variable
+api_key: "!env PS_ADMIN_TOKEN"
+
+# PowerSync instance identifiers (get from your dashboard)
+instance_id: your-instance-id-here
+org_id: your-org-id-here
+project_id: your-project-id-here
