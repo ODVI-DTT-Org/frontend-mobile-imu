@@ -1,1 +1,5 @@
+# PowerSync Admin Token (never commit this)
 PS_ADMIN_TOKEN
+
+# PowerSync CLI configuration (contains instance identifiers)
+cli.yaml
