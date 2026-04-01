@@ -87,6 +87,7 @@ const Schema _powerSyncSchema = Schema([
     Column.real('time_out_gps_lat'),
     Column.real('time_out_gps_lng'),
     Column.text('time_out_gps_address'),
+    Column.text('rejection_reason'),
   ]),
   Table('itineraries', [
     Column.text('user_id'),
@@ -110,45 +111,57 @@ const Schema _powerSyncSchema = Schema([
     Column.text('assistant_area_manager_id'),
     Column.text('avatar_url'),
   ]),
-  // User location assignments - normalized with province and municipality
+  // User location assignments - municipality_id format: "province-municipality"
   Table('user_locations', [
     Column.text('user_id'),
-    Column.text('province'),
-    Column.text('municipality'),
+    Column.text('municipality_id'),
     Column.text('assigned_at'),
     Column.text('assigned_by'),
     Column.text('deleted_at'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
   ]),
   // Approvals (for caravan/tele approval workflow)
   Table('approvals', [
     Column.text('type'),
     Column.text('status'),
     Column.text('client_id'),
+    Column.text('user_id'),
     Column.integer('touchpoint_number'),
     Column.text('role'),
     Column.text('reason'),
     Column.text('notes'),
+    Column.text('updated_client_information'),
+    Column.text('updated_udi'),
+    Column.text('udi_number'),
     Column.text('approved_by'),
     Column.text('approved_at'),
+    Column.text('rejected_by'),
+    Column.text('rejected_at'),
+    Column.text('rejection_reason'),
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
   // PSGC geographic data (single table with all locations)
   // Note: PowerSync automatically adds an 'id' column, so we don't define it here
   Table('psgc', [
+    Column.integer('id'),
     Column.text('region'),
     Column.text('province'),
     Column.text('mun_city_kind'),
     Column.text('mun_city'),
     Column.text('barangay'),
+    Column.text('pin_location'),
     Column.text('zip_code'),
   ]),
   // Touchpoint reasons (global data)
   // Note: PowerSync automatically adds an 'id' column, so we don't define it here
   Table('touchpoint_reasons', [
-    Column.text('code'),
+    Column.text('reason_code'),
     Column.text('label'),
-    Column.text('color'),
+    Column.text('touchpoint_type'),
+    Column.text('role'),
+    Column.text('category'),
     Column.integer('sort_order'),
     Column.integer('is_active'),
   ]),
