@@ -15,7 +15,9 @@ region: jp
 replication:
   connections:
     - type: postgresql
-      uri: postgresql://doadmin:AVNS_9pWP_jsbnj7OnOd8KAw@imu-do-user-21438450-0.e.db.ondigitalocean.com:25060/defaultdb?sslmode=require&sslrootcert=ca.crt
+      # IMPORTANT: Set URI via environment variable
+      # Format: postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+      uri: ${POSTGRES_URI}
       name: imu-production
 
 # -----------------------------------------------------------------------------
@@ -25,9 +27,20 @@ client_auth:
   issuer: imu-backend
   jwks:
     keys:
+      # IMPORTANT: Replace with your actual RSA public key
+      # This is a placeholder - use your actual public key from production
       - kty: RSA
         alg: RS256
         kid: imu-production-key-20260401
         use: sig
-        n: wktpbLKZu8yH-BJWuE_SmEdVc_euFmfQeIRoJAG9_buW8nVYyo5VVa_l76QU7Sx72G0PV-nBPnvxpezmm_F4ceIRkRxWQQumQ2CPvixTtyYFz6QNUJ-OvygNcpnFvMm5epf9dErI4ldhSaqwAQbyeGQhXkvpaOfBljkBg0oXqzIy_J3b-y-cwLGxyNsFvw5UnuHUlTuh8L4pB86PuERdwZdyY9PzKkcHjo7mHaXR-D2oTK_ywyxZlmrdWDCHjmKGEaPSIM7EaETP9KGpS1Izz40PeLlwPfADRJBvYMiLPPfA8GdXWazkv6P185PGHrujurZaNuj53R0VQ2_G3nUx1_CikddPso0j6HLidunzMYy7kcnxSR5rdPmLFDNB08tWTU5MZF6HDxZezU27xk1_e_VJ4pcIyraKlXcV0mlNYYQCZzJ0PPeYyEzmqgdQP0yO-smIh2YsemFyt0NRVnuitW198BZo-kMC0zlz8LK2kPcUNRceIDMlcRlJykCc4ZV1rK9toyK4AdaDRlg_2W28PYnxX3dm5NsvvWFnC2qxetVwT7lSfv6JBUCf-51Znws73jmJhK8nbk9fz2oIhTyDKfF640ECci3MbxCQtdyvJDOCMS0R9jHbGbjTgu84LlihICjOsSIZMBcvX8DFsRgJHShCHC73mujJDlHUFpC8f40
+        n: YOUR_RSA_PUBLIC_KEY_MODULUS_HERE
         e: AQAB
+
+# -----------------------------------------------------------------------------
+# IMPORTANT SECURITY NOTES:
+# -----------------------------------------------------------------------------
+# 1. Never commit actual credentials or private keys to git
+# 2. Use environment variables for sensitive data
+# 3. Generate proper RSA keys using: openssl genrsa -out private.pem 2048
+# 4. Extract public key using: openssl rsa -in private.pem -pubout -out public.pem
+# 5. Set POSTGRES_URI environment variable before deployment
