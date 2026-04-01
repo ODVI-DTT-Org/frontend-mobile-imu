@@ -5,7 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
-import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider;
+import '../../../../shared/providers/app_providers.dart' show
+    currentUserIdProvider,
+    clientsProvider,
+    onlineClientsProvider,
+    onlineClientSearchQueryProvider,
+    onlineClientPageProvider,
+    isOnlineProvider;
 import '../../../../shared/providers/filter_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
@@ -28,13 +34,34 @@ class ClientsPage extends ConsumerStatefulWidget {
 class _ClientsPageState extends ConsumerState<ClientsPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _showMyClientsOnly = true; // true = My Clients, false = All Clients
+  bool _showMyClientsOnly = true; // true = My Clients (PowerSync), false = All Clients (Online)
 
   // Pagination
   final int _itemsPerPage = 20;
   int _currentPage = 1;
   List<Client> _allClients = [];
   List<Client> _filteredClients = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text;
+      _currentPage = 1; // Reset to first page on search
+    });
+
+    // Update the appropriate search query provider based on mode
+    if (_showMyClientsOnly) {
+      // My Clients: filter locally (PowerSync already has territory-filtered data)
+    } else {
+      // All Clients: update online search query provider
+      ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
+    }
+  }
 
   @override
   void initState() {
@@ -58,6 +85,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   List<Client> _getPaginatedClients() {
     if (_filteredClients.isEmpty) return [];
 
+    // For online mode, the server already paginated, so return all items
+    // For offline mode (My Clients), paginate locally
+    if (!_showMyClientsOnly) {
+      return _filteredClients;
+    }
+
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = startIndex + _itemsPerPage;
 
@@ -68,19 +101,45 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     return _filteredClients.sublist(startIndex, endIndex);
   }
 
-  int get _totalPages => (_filteredClients.length / _itemsPerPage).ceil();
+  int _totalPages([ClientsResponse? onlineMeta]) {
+    // For online mode, use server's total pages
+    if (!_showMyClientsOnly && onlineMeta != null) {
+      return onlineMeta.totalPages;
+    }
+    // For offline mode, calculate locally
+    return (_filteredClients.length / _itemsPerPage).ceil();
+  }
+
+  int _totalItems([ClientsResponse? onlineMeta]) {
+    // For online mode, use server's total items
+    if (!_showMyClientsOnly && onlineMeta != null) {
+      return onlineMeta.totalItems;
+    }
+    // For offline mode, use filtered count
+    return _filteredClients.length;
+  }
 
   void _goToPage(int page) {
     HapticUtils.lightImpact();
     setState(() {
       _currentPage = page;
     });
+
+    // For online mode, update the provider's page state and invalidate to trigger refetch
+    if (!_showMyClientsOnly) {
+      ref.read(onlineClientPageProvider.notifier).state = page;
+      ref.invalidate(onlineClientsProvider);
+    }
   }
 
   void _handleRefresh() async {
     HapticUtils.lightImpact();
-    // Refresh clients
-    ref.invalidate(clientsProvider);
+    // Refresh the appropriate provider based on current mode
+    if (_showMyClientsOnly) {
+      ref.invalidate(clientsProvider);
+    } else {
+      ref.invalidate(onlineClientsProvider);
+    }
   }
 
   void _showAddClientModal() {
@@ -131,32 +190,54 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final clientsAsync = ref.watch(clientsProvider);
     final assignedMunicipalities = ref.watch(assignedMunicipalitiesProvider);
+    final isOnline = ref.watch(isOnlineProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
+    // Choose provider based on mode
+    // My Clients = PowerSync (offline, territory-filtered)
+    // All Clients = Online API (search all clients in database)
+    final clientsAsync = _showMyClientsOnly
+        ? ref.watch(clientsProvider)
+        : ref.watch(onlineClientsProvider);
+
     return clientsAsync.when(
-      data: (clients) {
+      data: (data) {
+        // Handle different return types: List<Client> vs ClientsResponse
+        final clients = _showMyClientsOnly ? data as List<Client> : (data as ClientsResponse).items;
+
+        // For online mode, get pagination metadata from response
+        final onlineMeta = _showMyClientsOnly ? null : (data as ClientsResponse);
+
         // Filter clients based on selected mode
         _allClients = clients;
         final query = _searchQuery.toLowerCase();
 
+        // My Clients: filter by territory and search locally
+        // All Clients: already filtered by search query in provider, just paginate
         _filteredClients = clients.where((client) {
-          // Filter by view mode
-          final matchesViewMode = !_showMyClientsOnly ||
-              (client.municipality != null && assignedMunicipalities.contains(client.municipality));
+          if (_showMyClientsOnly) {
+            // My Clients: filter by assigned municipalities
+            final matchesViewMode = client.municipality != null &&
+                assignedMunicipalities.contains(client.municipality);
 
-          // Filter by search
-          final matchesSearch = query.isEmpty ||
-              client.fullName.toLowerCase().contains(query) ||
-              (client.addresses.isNotEmpty &&
-               client.addresses.first.city.toLowerCase().contains(query));
+            // Filter by search (local)
+            final matchesSearch = query.isEmpty ||
+                client.fullName.toLowerCase().contains(query) ||
+                (client.addresses.isNotEmpty &&
+                 client.addresses.first.city.toLowerCase().contains(query));
 
-          return matchesViewMode && matchesSearch;
+            return matchesViewMode && matchesSearch;
+          } else {
+            // All Clients: already searched on server, just return as-is
+            return true;
+          }
         }).toList();
 
         final paginatedClients = _getPaginatedClients();
+        final totalPages = _totalPages(onlineMeta);
+        final totalItems = _totalItems(onlineMeta);
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -228,18 +309,62 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             setState(() {
                               _showMyClientsOnly = true;
                               _currentPage = 1;
+                              _searchQuery = '';
+                              _searchController.clear();
                             });
+                            // Invalidate online provider when switching back to My Clients
+                            ref.invalidate(onlineClientsProvider);
                           }),
                           const SizedBox(width: 8),
                           _buildFilterToggle('All Clients', !_showMyClientsOnly, () {
                             HapticUtils.lightImpact();
+                            // Check if online before switching to All Clients
+                            final isOnlineNow = ref.read(isOnlineProvider);
+                            if (!isOnlineNow) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cannot search all clients while offline'),
+                                  backgroundColor: Color(0xFFEF4444),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
                             setState(() {
                               _showMyClientsOnly = false;
                               _currentPage = 1;
+                              _searchQuery = '';
+                              _searchController.clear();
                             });
+                            // Reset online search and page to first page when switching
+                            ref.read(onlineClientSearchQueryProvider.notifier).state = '';
+                            ref.read(onlineClientPageProvider.notifier).state = 1;
                           }),
                         ],
                       ),
+                      // Show online indicator when in All Clients mode
+                      if (!_showMyClientsOnly)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                LucideIcons.globe,
+                                size: 12,
+                                color: Colors.green.shade600,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Searching all clients in database',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -281,7 +406,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 if (_filteredClients.isNotEmpty)
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-                    child: _buildTopPagination(),
+                    child: _buildTopPagination(totalItems, totalPages),
                   ),
 
                 const SizedBox(height: 8),
@@ -307,7 +432,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 if (_filteredClients.isNotEmpty)
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17, vertical: 16),
-                    child: _buildBottomPagination(),
+                    child: _buildBottomPagination(totalPages),
                   ),
               ],
             ),
@@ -402,18 +527,26 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: _showMyClientsOnly
+                      ? Colors.red.shade50
+                      : Colors.orange.shade50,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  LucideIcons.alertCircle,
+                  _showMyClientsOnly
+                      ? LucideIcons.alertCircle
+                      : LucideIcons.wifiOff,
                   size: 40,
-                  color: Colors.red.shade400,
+                  color: _showMyClientsOnly
+                      ? Colors.red.shade400
+                      : Colors.orange.shade400,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Failed to load clients',
+                _showMyClientsOnly
+                    ? 'Failed to load clients'
+                    : 'Cannot search all clients',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -428,9 +561,27 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => ref.invalidate(clientsProvider),
-                child: const Text('Retry'),
+                onPressed: () {
+                  if (_showMyClientsOnly) {
+                    ref.invalidate(clientsProvider);
+                  } else {
+                    ref.invalidate(onlineClientsProvider);
+                  }
+                },
+                child: Text(_showMyClientsOnly ? 'Retry' : 'Check Connection'),
               ),
+              if (!_showMyClientsOnly) ...[
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _showMyClientsOnly = true;
+                      _currentPage = 1;
+                    });
+                  },
+                  child: const Text('Switch to My Clients (Offline)'),
+                ),
+              ],
             ],
           ),
         ),
@@ -467,14 +618,20 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     );
   }
 
-  Widget _buildTopPagination() {
-    final startIndex = (_currentPage - 1) * _itemsPerPage + 1;
-    final endIndex = (_currentPage * _itemsPerPage).clamp(1, _filteredClients.length);
+  Widget _buildTopPagination(int totalItems, int totalPages) {
+    // For online mode, show actual counts from server
+    // For offline mode, calculate local pagination
+    final startIndex = _showMyClientsOnly
+        ? (_currentPage - 1) * _itemsPerPage + 1
+        : (_currentPage - 1) * 50 + 1; // Server uses perPage=50
+    final endIndex = _showMyClientsOnly
+        ? (_currentPage * _itemsPerPage).clamp(1, _filteredClients.length)
+        : (_currentPage * 50).clamp(1, totalItems);
 
     return Row(
       children: [
         Text(
-          'Showing $startIndex-$endIndex of ${_filteredClients.length} clients',
+          'Showing $startIndex-$endIndex of $totalItems clients',
           style: TextStyle(
             fontSize: 13,
             color: Colors.grey.shade600,
@@ -482,9 +639,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           ),
         ),
         const Spacer(),
-        if (_totalPages > 1)
+        if (totalPages > 1)
           Text(
-            'Page $_currentPage of $_totalPages',
+            'Page $_currentPage of $totalPages',
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade600,
@@ -495,8 +652,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     );
   }
 
-  Widget _buildBottomPagination() {
-    if (_totalPages <= 1) return const SizedBox.shrink();
+  Widget _buildBottomPagination(int totalPages) {
+    if (totalPages <= 1) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -521,7 +678,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: _buildPageNumbers(),
+                children: _buildPageNumbers(totalPages),
               ),
             ),
           ),
@@ -530,18 +687,18 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           // Next button
           _buildPageButton(
             icon: LucideIcons.chevronRight,
-            enabled: _currentPage < _totalPages,
-            onTap: _currentPage < _totalPages ? () => _goToPage(_currentPage + 1) : null,
+            enabled: _currentPage < totalPages,
+            onTap: _currentPage < totalPages ? () => _goToPage(_currentPage + 1) : null,
           ),
         ],
       ),
     );
   }
 
-  List<Widget> _buildPageNumbers() {
+  List<Widget> _buildPageNumbers(int totalPages) {
     // Show max 5 page numbers
-    final startPage = (_currentPage - 2).clamp(1, _totalPages);
-    final endPage = (_currentPage + 2).clamp(1, _totalPages);
+    final startPage = (_currentPage - 2).clamp(1, totalPages);
+    final endPage = (_currentPage + 2).clamp(1, totalPages);
 
     final pages = List.generate(endPage - startPage + 1, (index) => startPage + index);
 
@@ -612,7 +769,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              LucideIcons.users,
+              _showMyClientsOnly ? LucideIcons.users : LucideIcons.search,
               size: 40,
               color: Colors.grey.shade400,
             ),
@@ -620,7 +777,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty
-                ? (_showMyClientsOnly ? 'No assigned clients' : 'No clients yet')
+                ? (_showMyClientsOnly ? 'No assigned clients' : 'No clients found')
                 : 'No clients found',
             style: TextStyle(
               fontSize: 18,
@@ -631,11 +788,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           const SizedBox(height: 8),
           Text(
             _searchQuery.isEmpty
-                ? 'Add your first client to get started'
+                ? (_showMyClientsOnly
+                    ? 'Add your first client to get started'
+                    : 'Try searching for clients by name')
                 : 'Try a different search term',
             style: TextStyle(color: Colors.grey.shade500),
           ),
-          if (_searchQuery.isEmpty) ...[
+          if (_searchQuery.isEmpty && _showMyClientsOnly) ...[
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _showAddClientModal,

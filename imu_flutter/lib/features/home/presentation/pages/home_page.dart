@@ -33,12 +33,39 @@ class _HomePageState extends ConsumerState<HomePage> {
       final currentUserId = ref.read(currentUserIdProvider);
       if (currentUserId == null) return;
 
-      final userLocations = await PowerSyncService.query(
-        "SELECT municipality_id FROM user_locations WHERE user_id = ? AND deleted_at IS NULL",
+      // First, check if the new columns exist
+      final schemaCheck = await PowerSyncService.query(
+        "SELECT * FROM user_locations WHERE user_id = ? LIMIT 1",
         [currentUserId]
       );
 
-      final municipalities = userLocations.map((row) => row['municipality_id'] as String).toList();
+      if (schemaCheck.isEmpty) {
+        ref.read(assignedMunicipalitiesProvider.notifier).state = [];
+        return;
+      }
+
+      // Check if we have the new province/municipality columns
+      final firstRow = schemaCheck.first;
+      final hasNewColumns = firstRow.containsKey('province') && firstRow.containsKey('municipality');
+
+      final userLocations = await PowerSyncService.query(
+        hasNewColumns
+            ? "SELECT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL"
+            : "SELECT municipality_id FROM user_locations WHERE user_id = ? AND deleted_at IS NULL",
+        [currentUserId]
+      );
+
+      final municipalities = userLocations.map((row) {
+        if (hasNewColumns) {
+          final province = row['province'] as String?;
+          final municipality = row['municipality'] as String?;
+          if (province != null && municipality != null) {
+            return '$province-$municipality';
+          }
+        }
+        return row['municipality_id'] as String?;
+      }).whereType<String>().toList();
+
       ref.read(assignedMunicipalitiesProvider.notifier).state = municipalities;
     } catch (e) {
       // Handle error silently

@@ -44,7 +44,11 @@ class AppConfig {
   /// Initialize configuration from environment file
   static Future<void> initialize({String environment = 'dev'}) async {
     _environment = environment;
-    final envFile = environment == 'prod' ? '.env.prod' : '.env.dev';
+    final envFile = switch (environment) {
+      'prod' => '.env.prod',
+      'qa' => '.env.qa',
+      _ => '.env.dev',
+    };
 
     try {
       await dotenv.load(fileName: envFile);
