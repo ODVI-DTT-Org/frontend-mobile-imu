@@ -15,7 +15,7 @@ region: jp
 replication:
   connections:
     - type: postgresql
-      uri: postgresql://doadmin:AVNS_9pWP_jsbnj7OnOd8KAw@imu-do-user-21438450-0.e.db.ondigitalocean.com:25060/defaultdb?sslmode=no-verify
+      uri: postgresql://doadmin:AVNS_9pWP_jsbnj7OnOd8KAw@imu-do-user-21438450-0.e.db.ondigitalocean.com:25060/defaultdb?sslmode=require&sslrootcert=ca.crt
       name: imu-production
 
 # -----------------------------------------------------------------------------
