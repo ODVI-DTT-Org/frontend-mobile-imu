@@ -15,13 +15,14 @@ region: jp
 replication:
   connections:
     - type: postgresql
-      uri: postgresql://doadmin:AVNS_9pWP_jsbnj7OnOd8KAw@imu-do-user-21438450-0.e.db.ondigitalocean.com:25060/defaultdb
+      uri: postgresql://doadmin:AVNS_9pWP_jsbnj7OnOd8KAw@imu-do-user-21438450-0.e.db.ondigitalocean.com:25060/defaultdb?sslmode=no-verify
       name: imu-production
 
 # -----------------------------------------------------------------------------
 # CLIENT AUTH – JWT authentication from backend (RS256)
 # -----------------------------------------------------------------------------
 client_auth:
+  issuer: imu-backend
   jwks:
     keys:
       - kty: RSA

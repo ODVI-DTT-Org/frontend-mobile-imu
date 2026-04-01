@@ -1,0 +1,9 @@
+client_auth:
+  jwks:
+    keys:
+      - kty: RSA
+        alg: RS256
+        kid: imu-production-key-20260326
+        use: sig
+        n: ygBzhoizpWxEEn4ZXDPqNVBlTneRv3dIK-9WZ7gd1gRmMf7aNsawcjZwnUU03a8m4lVEnf4_oFkv72ryDR9YHdJkjXe-rrg7yky071jN_DgePg_dReYqssCCNEmJRDquQ5mzvALJUQqicTZFmqdSueszhKZCwYAOLdbmLsygEgYa9lXlD7XSqSde2ToHrWnDqrSy0oJqnTaKk7Yg7qn7ydIBa9DMc_dy66FKHvDx36eVWFgQPR2SDY5zD1v9tG0acoKmCitKaLvg3IPmZJ8Ha_hML6bnH55YC9cMZgYpFsobimmvJRvnxrqauGjCystihgaBdpYeTJhvfu656OeqyQ
+        e: AQAB

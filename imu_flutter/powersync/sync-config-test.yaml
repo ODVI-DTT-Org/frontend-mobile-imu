@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://unpkg.com/@powersync/service-sync-rules@latest/schema/sync_rules.json
+
+# PowerSync Sync Rules for IMU - Test Version
+# Edition 3: Each sync stream queries from ONE table only
+
+config:
+  edition: 3
+
+streams:
+  # Global data - PSGC geographic codes (no auth needed)
+  global_psgc:
+    auto_subscribe: true
+    queries:
+      - SELECT id, region, province, mun_city_kind, mun_city, barangay, pin_location, zip_code
+        FROM psgc
+
+  # Global data - Touchpoint reasons (no auth needed)
+  global_touchpoint_reasons:
+    auto_subscribe: true
+    queries:
+      - SELECT id, code, label, category, description, color, sort_order, is_active
+        FROM touchpoint_reasons
+
+  # User profiles - TEST without auth.user_id()
+  # This will test if PowerSync can connect to the database
+  user_profiles_test:
+    auto_subscribe: false
+    queries:
+      - SELECT up.id, up.user_id, up.name, up.email, up.role
+        FROM user_profiles up
+        LIMIT 10
