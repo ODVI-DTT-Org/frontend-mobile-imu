@@ -16,16 +16,16 @@ class ClientApiService {
       : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
         _authService = authService ?? JwtAuthService();
 
-  /// Fetch clients from the REST API
-  Future<List<Client>> fetchClients({
+  /// Fetch clients from the REST API with pagination
+  Future<ClientsResponse> fetchClients({
     int page = 1,
-    int perPage = 200,
-    String? filter,
-    String? sort,
-    String? expand,
+    int perPage = 20,
+    String? search,
+    String? clientType,
   }) async {
     try {
       debugPrint('ClientApiService: Fetching clients from REST API...');
+      debugPrint('ClientApiService: page=$page, perPage=$perPage, search=$search');
 
       // Get the access token
       final token = _authService.accessToken;
@@ -46,23 +46,32 @@ class ClientApiService {
         queryParameters: {
           'page': page,
           'perPage': perPage,
-          if (filter != null) 'filter': filter,
-          if (sort != null) 'sort': sort,
-          if (expand != null) 'expand': expand,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (clientType != null && clientType.isNotEmpty) 'client_type': clientType,
         },
       );
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
         final items = data['items'] as List<dynamic>? ?? [];
-        debugPrint('ClientApiService: Got ${items.length} clients from API');
+        final totalItems = data['totalItems'] as int? ?? 0;
+        final totalPages = data['totalPages'] as int? ?? 0;
 
-        return items.map((item) {
+        debugPrint('ClientApiService: Got ${items.length} clients from API (page $page of $totalPages, total: $totalItems)');
+
+        final clients = items.map((item) {
           final clientData = item as Map<String, dynamic>;
-          debugPrint('ClientApiService: Processing client: ${clientData['first_name']} ${clientData['last_name']}');
           // Use fromRow to handle snake_case from API
           return Client.fromRow(clientData);
         }).toList();
+
+        return ClientsResponse(
+          items: clients,
+          page: page,
+          perPage: perPage,
+          totalItems: totalItems,
+          totalPages: totalPages,
+        );
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to fetch clients: ${response.statusCode}');
@@ -517,6 +526,28 @@ class ClientApiService {
       case ProductType.private:
         return 'CASH_LOAN';
     }
+  }
+}
+
+/// Response model for paginated clients list
+class ClientsResponse {
+  final List<Client> items;
+  final int page;
+  final int perPage;
+  final int totalItems;
+  final int totalPages;
+
+  ClientsResponse({
+    required this.items,
+    required this.page,
+    required this.perPage,
+    required this.totalItems,
+    required this.totalPages,
+  });
+
+  @override
+  String toString() {
+    return 'ClientsResponse(items: ${items.length}, page: $page, perPage: $perPage, totalItems: $totalItems, totalPages: $totalPages)';
   }
 }
 

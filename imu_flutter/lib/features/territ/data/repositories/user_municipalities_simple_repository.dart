@@ -3,111 +3,195 @@ import 'package:powersync/powersync.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import '../models/user_municipalities_simple.dart';
 
-/// Repository for managing user municipality assignments
+/// Repository for managing user location assignments
 /// Uses PowerSync for data access
-class UserMunicipalitiesSimpleRepository {
+class UserLocationRepository {
   final PowerSyncDatabase _db;
 
-  UserMunicipalitiesSimpleRepository(this._db);
+  UserLocationRepository(this._db);
 
-  /// Get all active municipality assignments for a user
-  Future<List<UserMunicipalitiesSimple>> getAssignedMunicipalities(String userId) async {
+  /// Get all active location assignments for a user
+  Future<List<UserLocation>> getAssignedLocations(String userId) async {
+    // Try new format first (province, municipality columns)
     final results = await _db.getAll(
-      'SELECT * FROM user_municipalities_simple WHERE user_id = ? AND deleted_at IS NULL',
+      'SELECT * FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
       [userId],
     );
-    return results.map((row) => UserMunicipalitiesSimple.fromRow(row)).toList();
+
+    // If we have results with province/municipality, use those
+    if (results.isNotEmpty && results.first.containsKey('province')) {
+      return results.map((row) => UserLocation.fromRow(row)).toList();
+    }
+
+    // Fall back to legacy format (municipality_id)
+    return results.map((row) => UserLocation.fromLegacyRow(row)).toList();
   }
 
-  /// Get specific municipality IDs from assignments
+  /// Get specific municipality IDs from assignments (legacy format for backward compatibility)
   Future<List<String>> getAssignedMunicipalityIds(String userId) async {
-    final assignments = await getAssignedMunicipalities(userId);
+    final assignments = await getAssignedLocations(userId);
     if (assignments.isEmpty) {
       return [];
     }
     return assignments.map((a) => a.municipalityId).toList();
   }
 
-  /// Check if user has any municipality assignments
+  /// Get assigned provinces and municipalities as a set for efficient lookup
+  Future<Set<String>> getAssignedLocationKeys(String userId) async {
+    final assignments = await getAssignedLocations(userId);
+    if (assignments.isEmpty) {
+      return {};
+    }
+    // Return set of "province-municipality" keys for easy matching
+    return assignments.map((a) => '${a.province}-${a.municipality}').toSet();
+  }
+
+  /// Check if a client is in the user's assigned territories
+  Future<bool> isClientInAssignedTerritories(
+    String userId,
+    String? clientProvince,
+    String? clientMunicipality,
+  ) async {
+    if (clientProvince == null || clientMunicipality == null) {
+      return false;
+    }
+
+    final assignments = await getAssignedLocations(userId);
+    return assignments.any((assignment) =>
+      assignment.province == clientProvince &&
+      assignment.municipality == clientMunicipality
+    );
+  }
+
+  /// Check if user has any location assignments
   Future<bool> hasAssignments(String userId) async {
     final results = await _db.getAll(
-      'SELECT COUNT(*) as count FROM user_municipalities_simple WHERE user_id = ? AND deleted_at IS NULL',
+      'SELECT COUNT(*) as count FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
       [userId],
     );
     if (results.isEmpty) return false;
     return (results.first['count'] as int? ?? 0) > 0;
   }
 
-  /// Watch municipality assignments for a user (reactive)
-  Stream<List<UserMunicipalitiesSimple>> watchAssignedMunicipalities(String userId) {
+  /// Watch location assignments for a user (reactive)
+  Stream<List<UserLocation>> watchAssignedLocations(String userId) {
     return _db.watch(
-      'SELECT * FROM user_municipalities_simple WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
+      'SELECT * FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
       parameters: [userId],
-    ).map((results) => results.map((row) => UserMunicipalitiesSimple.fromRow(row)).toList());
+    ).map((results) {
+      // Check if results have new format columns
+      if (results.isNotEmpty && results.first.containsKey('province')) {
+        return results.map((row) => UserLocation.fromRow(row)).toList();
+      }
+      // Fall back to legacy format
+      return results.map((row) => UserLocation.fromLegacyRow(row)).toList();
+    });
   }
 
-  /// Create a new municipality assignment for a user
+  /// Create a new location assignment for a user
   Future<void> createAssignment({
+    required String userId,
+    required String province,
+    required String municipality,
+    String? assignedBy,
+  }) async {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    await _db.execute(
+      '''INSERT INTO user_locations (id, user_id, province, municipality, assigned_at, assigned_by)
+         VALUES (?, ?, ?, ?, ?, ?)''',
+      [id, userId, province, municipality, DateTime.now().toIso8601String(), assignedBy],
+    );
+  }
+
+  /// Create a new location assignment using legacy format
+  Future<void> createAssignmentLegacy({
     required String userId,
     required String municipalityId,
     String? assignedBy,
   }) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     await _db.execute(
-      '''INSERT INTO user_municipalities_simple (id, user_id, municipality_id, assigned_at, assigned_by)
+      '''INSERT INTO user_locations (id, user_id, municipality_id, assigned_at, assigned_by)
          VALUES (?, ?, ?, ?, ?)''',
       [id, userId, municipalityId, DateTime.now().toIso8601String(), assignedBy],
     );
   }
 
-  /// Soft delete a municipality assignment for a user
-  Future<void> softDeleteMunicipality(String userId, String municipalityId) async {
+  /// Soft delete a location assignment for a user (by province and municipality)
+  Future<void> softDeleteLocation(String userId, String province, String municipality) async {
     await _db.execute(
-      'UPDATE user_municipalities_simple SET deleted_at = ? WHERE user_id = ? AND municipality_id = ? AND deleted_at IS NULL',
+      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND province = ? AND municipality = ? AND deleted_at IS NULL',
+      [DateTime.now().toIso8601String(), userId, province, municipality],
+    );
+  }
+
+  /// Soft delete a location assignment using legacy municipality ID
+  Future<void> softDeleteLocationLegacy(String userId, String municipalityId) async {
+    await _db.execute(
+      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND municipality_id = ? AND deleted_at IS NULL',
       [DateTime.now().toIso8601String(), userId, municipalityId],
     );
   }
 
-  /// Restore a soft-deleted municipality assignment
-  Future<void> restoreMunicipality(String userId, String municipalityId) async {
+  /// Restore a soft-deleted location assignment
+  Future<void> restoreLocation(String userId, String province, String municipality) async {
     await _db.execute(
-      'UPDATE user_municipalities_simple SET deleted_at = NULL WHERE user_id = ? AND municipality_id = ?',
+      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND province = ? AND municipality = ?',
+      [userId, province, municipality],
+    );
+  }
+
+  /// Restore a soft-deleted location assignment using legacy format
+  Future<void> restoreLocationLegacy(String userId, String municipalityId) async {
+    await _db.execute(
+      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND municipality_id = ?',
       [userId, municipalityId],
     );
   }
 
-  /// Clear all municipality assignments for a given user (soft delete)
+  /// Clear all location assignments for a given user (soft delete)
   Future<void> clearAllForUser(String userId) async {
     await _db.execute(
-      'UPDATE user_municipalities_simple SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL',
+      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL',
       [DateTime.now().toIso8601String(), userId],
     );
   }
 }
 
-/// Provider for UserMunicipalitiesSimpleRepository
-final userMunicipalitiesRepositoryProvider = FutureProvider<UserMunicipalitiesSimpleRepository>((ref) async {
+/// Provider for UserLocationRepository
+final userLocationRepositoryProvider = FutureProvider<UserLocationRepository>((ref) async {
   final db = await ref.watch(powerSyncDatabaseProvider.future);
-  return UserMunicipalitiesSimpleRepository(db);
+  return UserLocationRepository(db);
 });
 
-/// Provider for current user's assigned municipalities
-final userAssignedMunicipalitiesProvider = FutureProvider<List<UserMunicipalitiesSimple>>((ref) async {
+/// Provider for current user's assigned locations
+final userAssignedLocationsProvider = FutureProvider<List<UserLocation>>((ref) async {
   // Get current user ID from auth
   final userProfile = ref.watch(userProfileProvider);
   if (userProfile == null || userProfile.value == null) {
     return [];
   }
 
-  final repository = await ref.watch(userMunicipalitiesRepositoryProvider.future);
-  return repository.getAssignedMunicipalities(userProfile.value!.userId);
+  final repository = await ref.watch(userLocationRepositoryProvider.future);
+  return repository.getAssignedLocations(userProfile.value!.userId);
 });
 
-/// Provider for current user's assigned municipality IDs (for filtering)
-final userAssignedMunicipalityIdsProvider = FutureProvider<List<String>>((ref) async {
-  final assignments = await ref.watch(userAssignedMunicipalitiesProvider.future);
-  return assignments.map((a) => a.municipalityId).toList();
+/// Provider for current user's assigned location keys (for filtering)
+final userAssignedLocationKeysProvider = FutureProvider<Set<String>>((ref) async {
+  // Get current user ID from auth
+  final userProfile = ref.watch(userProfileProvider);
+  if (userProfile == null || userProfile.value == null) {
+    return {};
+  }
+
+  final repository = await ref.watch(userLocationRepositoryProvider.future);
+  return repository.getAssignedLocationKeys(userProfile.value!.userId);
 });
+
+/// Legacy provider aliases for backward compatibility
+final userMunicipalitiesRepositoryProvider = userLocationRepositoryProvider;
+final userAssignedMunicipalitiesProvider = userAssignedLocationsProvider;
+final userAssignedMunicipalityIdsProvider = userAssignedLocationKeysProvider;
 
 /// Placeholder for userProfileProvider - should be defined in auth module
 final userProfileProvider = StateProvider<dynamic>((ref) {

@@ -1,13 +1,15 @@
-import 'package:uuid/uuid.dart';
+import 'package:imu_flutter/features/psgc/data/models/psgc_models.dart';
 
 /// User Municipality assignment model for location-based filtering
-/// Uses PSGC municipality IDs
-class UserMunicipalitiesSimple {
+/// Uses separate province and municipality columns for efficient querying
+class UserLocation {
   final String? id;
 
   final String userId;
 
-  final String municipalityId;
+  final String province;
+
+  final String municipality;
 
   final DateTime? assignedAt;
 
@@ -15,10 +17,11 @@ class UserMunicipalitiesSimple {
 
   final DateTime? deletedAt;
 
-  UserMunicipalitiesSimple({
+  UserLocation({
     this.id,
     required this.userId,
-    required this.municipalityId,
+    required this.province,
+    required this.municipality,
     this.assignedAt,
     this.assignedBy,
     this.deletedAt,
@@ -27,12 +30,48 @@ class UserMunicipalitiesSimple {
   /// Check if this assignment is active (not soft-deleted)
   bool get isActive => deletedAt == null;
 
-  /// Create from PowerSync/PostgreSQL row
-  factory UserMunicipalitiesSimple.fromRow(Map<String, dynamic> row) {
-    return UserMunicipalitiesSimple(
+  /// Get legacy municipality ID format for backward compatibility
+  String get municipalityId => '$province-$municipality';
+
+  /// Check if a client matches this location assignment
+  bool matchesClient(String? clientProvince, String? clientMunicipality) {
+    return clientProvince == province && clientMunicipality == municipality;
+  }
+
+  /// Check if a PSGC municipality matches this location assignment
+  bool matchesPsgcMunicipality(PsgcMunicipality mun) {
+    return mun.province == province && mun.municipality == municipality;
+  }
+
+  /// Create from PowerSync/PostgreSQL row (new format with province and municipality)
+  factory UserLocation.fromRow(Map<String, dynamic> row) {
+    return UserLocation(
       id: row['id'] as String?,
       userId: row['user_id'] as String,
-      municipalityId: row['municipality_id'] as String,
+      province: row['province'] as String? ?? '',
+      municipality: row['municipality'] as String? ?? '',
+      assignedAt: row['assigned_at'] != null
+          ? DateTime.parse(row['assigned_at'] as String)
+          : null,
+      assignedBy: row['assigned_by'] as String?,
+      deletedAt: row['deleted_at'] != null
+          ? DateTime.parse(row['deleted_at'] as String)
+          : null,
+    );
+  }
+
+  /// Create from legacy format (municipality_id as combined string)
+  factory UserLocation.fromLegacyRow(Map<String, dynamic> row) {
+    final municipalityId = row['municipality_id'] as String;
+    final parts = municipalityId.split('-');
+    final province = parts.isNotEmpty ? parts[0] : '';
+    final municipality = parts.length > 1 ? parts.sublist(1).join('-') : '';
+
+    return UserLocation(
+      id: row['id'] as String?,
+      userId: row['user_id'] as String,
+      province: province,
+      municipality: municipality,
       assignedAt: row['assigned_at'] != null
           ? DateTime.parse(row['assigned_at'] as String)
           : null,
@@ -46,7 +85,8 @@ class UserMunicipalitiesSimple {
   Map<String, dynamic> toJson() => {
         'id': id,
         'user_id': userId,
-        'municipality_id': municipalityId,
+        'province': province,
+        'municipality': municipality,
         'assigned_at': assignedAt?.toIso8601String(),
         'assigned_by': assignedBy,
         'deleted_at': deletedAt?.toIso8601String(),
@@ -54,6 +94,34 @@ class UserMunicipalitiesSimple {
 
   @override
   String toString() {
-    return 'UserMunicipalitiesSimple(id: $id, userId: $userId, municipalityId: $municipalityId, isActive: $isActive)';
+    return 'UserLocation(id: $id, userId: $userId, province: $province, municipality: $municipality, isActive: $isActive)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is UserLocation &&
+        other.id == id &&
+        other.userId == userId &&
+        other.province == province &&
+        other.municipality == municipality &&
+        other.assignedAt == assignedAt &&
+        other.assignedBy == assignedBy &&
+        other.deletedAt == deletedAt;
+  }
+
+  @override
+  int get hashCode {
+    return id.hashCode ^
+        userId.hashCode ^
+        province.hashCode ^
+        municipality.hashCode ^
+        assignedAt.hashCode ^
+        assignedBy.hashCode ^
+        deletedAt.hashCode;
   }
 }
+
+/// Legacy alias for backward compatibility
+typedef UserMunicipalitiesSimple = UserLocation;

@@ -217,6 +217,57 @@ final filteredClientsProvider = Provider<List<Client>>((ref) {
   );
 });
 
+// ==================== Online-Only Client Providers ====================
+
+/// Online clients search query state
+final onlineClientSearchQueryProvider = StateProvider<String>((ref) => '');
+
+/// Online clients pagination state
+final onlineClientPageProvider = StateProvider<int>((ref) => 1);
+
+/// Online clients response metadata (totalItems, totalPages)
+final onlineClientsMetaProvider = Provider<ClientsResponse?>((ref) {
+  final asyncValue = ref.watch(onlineClientsProvider);
+  return asyncValue.when(
+    data: (response) => response,
+    loading: () => null,
+    error: (_, __) => null,
+  );
+});
+
+/// Online clients - fetches ALL clients from REST API (not PowerSync)
+/// This is used for "All Clients" mode to search beyond territory-filtered PowerSync data
+final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
+  final isOnline = ref.watch(isOnlineProvider);
+  final searchQuery = ref.watch(onlineClientSearchQueryProvider);
+  final page = ref.watch(onlineClientPageProvider);
+
+  // Must be online to fetch all clients
+  if (!isOnline) {
+    debugPrint('onlineClientsProvider: Device is offline, cannot fetch online clients');
+    throw Exception('Device is offline. Please connect to the internet to search all clients.');
+  }
+
+  try {
+    debugPrint('onlineClientsProvider: Fetching clients from online API...');
+    debugPrint('onlineClientsProvider: Search query: "$searchQuery", Page: $page');
+
+    final clientApi = ref.watch(clientApiServiceProvider);
+
+    final response = await clientApi.fetchClients(
+      page: page,
+      perPage: 50,
+      search: searchQuery.isNotEmpty ? searchQuery : null,
+    );
+
+    debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
+    return response;
+  } catch (e) {
+    debugPrint('onlineClientsProvider: Failed to fetch clients - $e');
+    rethrow;
+  }
+});
+
 /// Selected client ID
 final selectedClientIdProvider = StateProvider<String?>((ref) => null);
 

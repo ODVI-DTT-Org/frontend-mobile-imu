@@ -31,15 +31,16 @@ final currentUserIdProvider = Provider<String?>((ref) {
   return authService.currentUserId;
 });
 
-/// Provider that watches user's assigned municipalities from PowerSync
-/// Connects to the user_municipalities_simple table and returns municipality IDs
-final userAssignedMunicipalitiesWatchProvider = StreamProvider<Set<String>>((ref) {
+/// Provider that watches user's assigned locations from PowerSync
+/// Connects to the user_locations table and returns location keys (province-municipality)
+/// Supports both new format (province, municipality columns) and legacy format (municipality_id)
+final userAssignedLocationsWatchProvider = StreamProvider<Set<String>>((ref) {
   // Get the current user's ID from auth service
   final authService = ref.watch(authServiceProvider);
   final userId = authService.currentUserId;
 
   if (userId == null || userId.isEmpty) {
-    logDebug('User ID is null, returning empty municipality set');
+    logDebug('User ID is null, returning empty location set');
     return Stream.value({});
   }
 
@@ -51,31 +52,72 @@ final userAssignedMunicipalitiesWatchProvider = StreamProvider<Set<String>>((ref
     try {
       final db = await PowerSyncService.database;
 
-      // Use PowerSync's watch method to get real-time updates
-      final stream = db.watch(
-        'SELECT DISTINCT municipality_id FROM user_municipalities_simple WHERE user_id = ? AND deleted_at IS NULL',
-        parameters: [userId],
+      // First, check if the new columns exist
+      final schemaCheck = await db.getAll(
+        "SELECT COUNT(*) as count FROM user_locations WHERE user_id = ? LIMIT 1",
+        [userId],
       );
 
-      // Listen to the stream and emit municipality ID sets
+      if (schemaCheck.isEmpty) {
+        controller.add(<String>{});
+        return;
+      }
+
+      // Check if we have the new province/municipality columns
+      final firstRow = schemaCheck.first;
+      final hasNewColumns = firstRow.containsKey('province') && firstRow.containsKey('municipality');
+
+      // Use PowerSync's watch method to get real-time updates
+      late Stream<List<Map<String, dynamic>>> stream;
+
+      if (hasNewColumns) {
+        // New format: query province and municipality columns
+        stream = db.watch(
+          'SELECT DISTINCT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+          parameters: [userId],
+        );
+      } else {
+        // Legacy format: query municipality_id column
+        stream = db.watch(
+          'SELECT DISTINCT municipality_id FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+          parameters: [userId],
+        );
+      }
+
+      // Listen to the stream and emit location key sets
       stream.listen(
         (results) {
-          final municipalityIds = results
-              .map((row) => row['municipality_id'] as String?)
-              .where((id) => id != null && id.isNotEmpty)
-              .cast<String>()
-              .toSet();
+          final locationKeys = <String>{};
 
-          logDebug('Found ${municipalityIds.length} assigned municipalities for user $userId: $municipalityIds');
-          controller.add(municipalityIds);
+          if (hasNewColumns) {
+            // New format: construct "province-municipality" keys
+            for (final row in results) {
+              final province = row['province'] as String?;
+              final municipality = row['municipality'] as String?;
+              if (province != null && municipality != null) {
+                locationKeys.add('$province-$municipality');
+              }
+            }
+          } else {
+            // Legacy format: use municipality_id directly
+            for (final row in results) {
+              final municipalityId = row['municipality_id'] as String?;
+              if (municipalityId != null && municipalityId.isNotEmpty) {
+                locationKeys.add(municipalityId);
+              }
+            }
+          }
+
+          logDebug('Found ${locationKeys.length} assigned locations for user $userId: $locationKeys');
+          controller.add(locationKeys);
         },
         onError: (e) {
-          logError('Error watching user municipalities', e);
+          logError('Error watching user locations', e);
           controller.add(<String>{});
         },
       );
     } catch (e) {
-      logError('Error initializing municipality watch', e);
+      logError('Error initializing location watch', e);
       controller.add(<String>{});
     }
   }
@@ -87,8 +129,12 @@ final userAssignedMunicipalitiesWatchProvider = StreamProvider<Set<String>>((ref
   return controller.stream;
 });
 
-/// Provider for the current set of assigned municipality IDs (convenience wrapper)
-final currentAssignedMunicipalityIdsProvider = Provider<Set<String>>((ref) {
-  final asyncValue = ref.watch(userAssignedMunicipalitiesWatchProvider);
+/// Provider for the current set of assigned location keys (convenience wrapper)
+final currentAssignedLocationKeysProvider = Provider<Set<String>>((ref) {
+  final asyncValue = ref.watch(userAssignedLocationsWatchProvider);
   return asyncValue.value ?? {};
 });
+
+/// Legacy provider aliases for backward compatibility
+final userAssignedMunicipalitiesWatchProvider = userAssignedLocationsWatchProvider;
+final currentAssignedMunicipalityIdsProvider = currentAssignedLocationKeysProvider;

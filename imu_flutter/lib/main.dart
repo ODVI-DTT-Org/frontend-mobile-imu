@@ -58,8 +58,11 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
       });
 
       // Initialize configuration
-      await AppConfig.initialize(environment: 'dev');
-      await MapConfig.initialize(environment: 'dev');
+      // Environment can be set via --dart-define=ENV=qa|prod at build time
+      // Defaults to 'dev' for local development
+      final env = String.fromEnvironment('ENV', defaultValue: 'dev');
+      await AppConfig.initialize(environment: env);
+      await MapConfig.initialize(environment: env);
       await Future.delayed(const Duration(milliseconds: 300)); // Smooth transition
 
       setState(() {

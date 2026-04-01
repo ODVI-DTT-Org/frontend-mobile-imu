@@ -31,8 +31,15 @@ const Schema _powerSyncSchema = Schema([
     Column.text('facebook_link'),
     Column.text('remarks'),
     Column.text('agency_id'),
+    Column.text('psgc_id'),
+    Column.text('province'),
     Column.text('municipality'),
+    Column.text('region'),
+    Column.text('barangay'),
     Column.integer('is_starred'),
+    Column.integer('loan_released'),
+    Column.text('udi'),
+    Column.text('full_address'),
   ]),
   Table('addresses', [
     Column.text('client_id'),
@@ -89,6 +96,9 @@ const Schema _powerSyncSchema = Schema([
     Column.text('status'),
     Column.text('priority'),
     Column.text('notes'),
+    Column.text('created_by'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
   ]),
   // User profile data
   Table('user_profiles', [
@@ -100,13 +110,28 @@ const Schema _powerSyncSchema = Schema([
     Column.text('assistant_area_manager_id'),
     Column.text('avatar_url'),
   ]),
-  // User municipality assignments
+  // User location assignments - normalized with province and municipality
   Table('user_locations', [
     Column.text('user_id'),
-    Column.text('municipality_id'),
+    Column.text('province'),
+    Column.text('municipality'),
     Column.text('assigned_at'),
     Column.text('assigned_by'),
     Column.text('deleted_at'),
+  ]),
+  // Approvals (for caravan/tele approval workflow)
+  Table('approvals', [
+    Column.text('type'),
+    Column.text('status'),
+    Column.text('client_id'),
+    Column.integer('touchpoint_number'),
+    Column.text('role'),
+    Column.text('reason'),
+    Column.text('notes'),
+    Column.text('approved_by'),
+    Column.text('approved_at'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
   ]),
   // PSGC geographic data (single table with all locations)
   // Note: PowerSync automatically adds an 'id' column, so we don't define it here
