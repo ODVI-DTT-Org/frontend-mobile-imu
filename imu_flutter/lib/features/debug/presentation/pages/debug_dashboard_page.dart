@@ -451,7 +451,7 @@ class _SystemInfoTabState extends ConsumerState<_SystemInfoTab> {
     setState(() => _isLoadingCounts = true);
 
     try {
-      final tables = ['clients', 'addresses', 'phone_numbers', 'touchpoints', 'user_municipalities_simple', 'psgc'];
+      final tables = ['clients', 'addresses', 'phone_numbers', 'touchpoints', 'user_locations', 'psgc', 'touchpoint_reasons', 'approvals'];
       final counts = <String, int>{};
 
       for (final table in tables) {

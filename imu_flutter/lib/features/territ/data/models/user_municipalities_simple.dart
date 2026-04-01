@@ -43,29 +43,17 @@ class UserLocation {
     return mun.province == province && mun.municipality == municipality;
   }
 
-  /// Create from PowerSync/PostgreSQL row (new format with province and municipality)
+  /// Create from PowerSync/PostgreSQL row (format: municipality_id as "province-municipality")
   factory UserLocation.fromRow(Map<String, dynamic> row) {
-    return UserLocation(
-      id: row['id'] as String?,
-      userId: row['user_id'] as String,
-      province: row['province'] as String? ?? '',
-      municipality: row['municipality'] as String? ?? '',
-      assignedAt: row['assigned_at'] != null
-          ? DateTime.parse(row['assigned_at'] as String)
-          : null,
-      assignedBy: row['assigned_by'] as String?,
-      deletedAt: row['deleted_at'] != null
-          ? DateTime.parse(row['deleted_at'] as String)
-          : null,
-    );
-  }
+    final municipalityId = row['municipality_id'] as String?;
+    String province = '';
+    String municipality = '';
 
-  /// Create from legacy format (municipality_id as combined string)
-  factory UserLocation.fromLegacyRow(Map<String, dynamic> row) {
-    final municipalityId = row['municipality_id'] as String;
-    final parts = municipalityId.split('-');
-    final province = parts.isNotEmpty ? parts[0] : '';
-    final municipality = parts.length > 1 ? parts.sublist(1).join('-') : '';
+    if (municipalityId != null && municipalityId.contains('-')) {
+      final parts = municipalityId.split('-');
+      province = parts.isNotEmpty ? parts[0] : '';
+      municipality = parts.length > 1 ? parts.sublist(1).join('-') : '';
+    }
 
     return UserLocation(
       id: row['id'] as String?,
@@ -82,11 +70,27 @@ class UserLocation {
     );
   }
 
+  /// Legacy: Create from old format with separate province and municipality columns
+  factory UserLocation.fromLegacyColumnsRow(Map<String, dynamic> row) {
+    return UserLocation(
+      id: row['id'] as String?,
+      userId: row['user_id'] as String,
+      province: row['province'] as String? ?? '',
+      municipality: row['municipality'] as String? ?? '',
+      assignedAt: row['assigned_at'] != null
+          ? DateTime.parse(row['assigned_at'] as String)
+          : null,
+      assignedBy: row['assigned_by'] as String?,
+      deletedAt: row['deleted_at'] != null
+          ? DateTime.parse(row['deleted_at'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'user_id': userId,
-        'province': province,
-        'municipality': municipality,
+        'municipality_id': municipalityId,
         'assigned_at': assignedAt?.toIso8601String(),
         'assigned_by': assignedBy,
         'deleted_at': deletedAt?.toIso8601String(),

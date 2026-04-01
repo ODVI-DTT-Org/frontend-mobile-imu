@@ -12,19 +12,14 @@ class UserLocationRepository {
 
   /// Get all active location assignments for a user
   Future<List<UserLocation>> getAssignedLocations(String userId) async {
-    // Try new format first (province, municipality columns)
+    // PostgreSQL schema format: municipality_id (format: "province-municipality")
     final results = await _db.getAll(
       'SELECT * FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
       [userId],
     );
 
-    // If we have results with province/municipality, use those
-    if (results.isNotEmpty && results.first.containsKey('province')) {
-      return results.map((row) => UserLocation.fromRow(row)).toList();
-    }
-
-    // Fall back to legacy format (municipality_id)
-    return results.map((row) => UserLocation.fromLegacyRow(row)).toList();
+    // Parse using the standard fromRow method which handles municipality_id format
+    return results.map((row) => UserLocation.fromRow(row)).toList();
   }
 
   /// Get specific municipality IDs from assignments (legacy format for backward compatibility)
@@ -79,12 +74,8 @@ class UserLocationRepository {
       'SELECT * FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
       parameters: [userId],
     ).map((results) {
-      // Check if results have new format columns
-      if (results.isNotEmpty && results.first.containsKey('province')) {
-        return results.map((row) => UserLocation.fromRow(row)).toList();
-      }
-      // Fall back to legacy format
-      return results.map((row) => UserLocation.fromLegacyRow(row)).toList();
+      // PostgreSQL schema format: municipality_id (format: "province-municipality")
+      return results.map((row) => UserLocation.fromRow(row)).toList();
     });
   }
 
@@ -96,15 +87,16 @@ class UserLocationRepository {
     String? assignedBy,
   }) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final municipalityId = '$province-$municipality';
     await _db.execute(
-      '''INSERT INTO user_locations (id, user_id, province, municipality, assigned_at, assigned_by)
-         VALUES (?, ?, ?, ?, ?, ?)''',
-      [id, userId, province, municipality, DateTime.now().toIso8601String(), assignedBy],
+      '''INSERT INTO user_locations (id, user_id, municipality_id, assigned_at, assigned_by)
+         VALUES (?, ?, ?, ?, ?)''',
+      [id, userId, municipalityId, DateTime.now().toIso8601String(), assignedBy],
     );
   }
 
-  /// Create a new location assignment using legacy format
-  Future<void> createAssignmentLegacy({
+  /// Create a new location assignment using municipality_id directly
+  Future<void> createAssignmentWithId({
     required String userId,
     required String municipalityId,
     String? assignedBy,
@@ -119,14 +111,15 @@ class UserLocationRepository {
 
   /// Soft delete a location assignment for a user (by province and municipality)
   Future<void> softDeleteLocation(String userId, String province, String municipality) async {
+    final municipalityId = '$province-$municipality';
     await _db.execute(
-      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND province = ? AND municipality = ? AND deleted_at IS NULL',
-      [DateTime.now().toIso8601String(), userId, province, municipality],
+      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND municipality_id = ? AND deleted_at IS NULL',
+      [DateTime.now().toIso8601String(), userId, municipalityId],
     );
   }
 
-  /// Soft delete a location assignment using legacy municipality ID
-  Future<void> softDeleteLocationLegacy(String userId, String municipalityId) async {
+  /// Soft delete a location assignment using municipality_id directly
+  Future<void> softDeleteLocationById(String userId, String municipalityId) async {
     await _db.execute(
       'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND municipality_id = ? AND deleted_at IS NULL',
       [DateTime.now().toIso8601String(), userId, municipalityId],
@@ -135,14 +128,15 @@ class UserLocationRepository {
 
   /// Restore a soft-deleted location assignment
   Future<void> restoreLocation(String userId, String province, String municipality) async {
+    final municipalityId = '$province-$municipality';
     await _db.execute(
-      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND province = ? AND municipality = ?',
-      [userId, province, municipality],
+      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND municipality_id = ?',
+      [userId, municipalityId],
     );
   }
 
-  /// Restore a soft-deleted location assignment using legacy format
-  Future<void> restoreLocationLegacy(String userId, String municipalityId) async {
+  /// Restore a soft-deleted location assignment using municipality_id
+  Future<void> restoreLocationById(String userId, String municipalityId) async {
     await _db.execute(
       'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND municipality_id = ?',
       [userId, municipalityId],
