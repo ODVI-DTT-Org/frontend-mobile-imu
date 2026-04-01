@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import '../../core/config/app_config.dart';
 
 // Models
 class PsgcRegion {
@@ -280,9 +281,8 @@ class PsgcApiService {
 
 // Provider
 final psgcApiServiceProvider = Provider<PsgcApiService>((ref) {
-  // Get base URL from environment or use default
-  const baseUrl = String.fromEnvironment('API_URL', defaultValue: 'http://localhost:3000');
-  // In production, get auth token from secure storage
+  // Use the same API URL as the main app (from AppConfig)
+  final baseUrl = AppConfig.postgresApiUrl.replaceAll('/api', '');
   return PsgcApiService(baseUrl: baseUrl);
 });
 
