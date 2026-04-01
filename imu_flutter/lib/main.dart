@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,8 +59,15 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
 
       // Initialize configuration
       // Environment can be set via --dart-define=ENV=qa|prod at build time
+      // In release mode, automatically use 'prod' environment
       // Defaults to 'dev' for local development
-      final env = String.fromEnvironment('ENV', defaultValue: 'dev');
+      String env = String.fromEnvironment('ENV', defaultValue: 'dev');
+
+      // Automatically use production environment in release mode if not explicitly set
+      if (kReleaseMode && env == 'dev') {
+        env = 'prod';
+      }
+
       await AppConfig.initialize(environment: env);
       await MapConfig.initialize(environment: env);
       await Future.delayed(const Duration(milliseconds: 300)); // Smooth transition
