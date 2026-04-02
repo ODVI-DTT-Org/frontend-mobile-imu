@@ -11,6 +11,15 @@ export '../../services/api/background_sync_service.dart' show backgroundSyncServ
 // Re-export auth providers
 export '../../services/auth/jwt_auth_service.dart' show jwtAuthProvider;
 export '../../services/auth/offline_auth_service.dart' show offlineAuthProvider;
+// Re-export permission providers
+export 'permission_providers.dart' show
+  permissionServiceProvider,
+  cachedPermissionsProvider,
+  hasPermissionProvider,
+  canCreateProvider,
+  canReadProvider,
+  canUpdateProvider,
+  canDeleteProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';

@@ -4,6 +4,8 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/user_role.dart' as core_models;
 import '../../core/utils/logger.dart';
+import '../area/area_filter_service.dart';
+import '../permissions/remote_permission_service.dart';
 import 'secure_storage_service.dart';
 
 /// User model parsed from JWT token
@@ -151,6 +153,26 @@ class JwtAuthService {
       await secureStorage.saveLastOnlineLoginTime();
       await secureStorage.saveLastLoginTime();
 
+      // Fetch and cache user permissions from backend
+      try {
+        final permissionService = RemotePermissionService();
+        await permissionService.fetchPermissions(_accessToken!);
+        logDebug('Permissions fetched and cached successfully');
+      } catch (e) {
+        logError('Failed to fetch permissions (non-critical)', e);
+        // Continue login even if permission fetch fails
+      }
+
+      // Fetch and cache user's assigned areas (municipalities)
+      try {
+        final areaService = AreaFilterService();
+        await areaService.fetchUserLocations(_accessToken!, _currentUser!.id);
+        logDebug('User locations fetched and cached successfully');
+      } catch (e) {
+        logError('Failed to fetch user locations (non-critical)', e);
+        // Continue login even if area fetch fails
+      }
+
       logDebug('Login successful for ${_currentUser!.id}');
       return _currentUser!;
     } on DioException catch (e) {
@@ -171,6 +193,24 @@ class JwtAuthService {
 
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
+
+    // Clear permissions cache on logout
+    try {
+      final permissionService = RemotePermissionService();
+      await permissionService.clearCache();
+      logDebug('Permissions cache cleared');
+    } catch (e) {
+      logError('Failed to clear permissions cache', e);
+    }
+
+    // Clear area locations cache on logout
+    try {
+      final areaService = AreaFilterService();
+      await areaService.clearCache();
+      logDebug('User locations cache cleared');
+    } catch (e) {
+      logError('Failed to clear user locations cache', e);
+    }
 
     logDebug('Logout successful');
   }
@@ -215,6 +255,16 @@ class JwtAuthService {
         await _storage.write(key: 'access_token', value: _accessToken);
         if (response.data['refresh_token'] != null) {
           await _storage.write(key: 'refresh_token', value: _refreshToken);
+        }
+
+        // Refresh permissions cache when tokens are refreshed
+        try {
+          final permissionService = RemotePermissionService();
+          await permissionService.fetchPermissions(_accessToken!);
+          logDebug('Permissions refreshed successfully');
+        } catch (e) {
+          logError('Failed to refresh permissions (non-critical)', e);
+          // Continue even if permission refresh fails
         }
 
         logDebug('Token refresh successful');

@@ -14,6 +14,7 @@ class PermissionService {
   ///
   /// Managers can create any touchpoint type.
   /// Caravan can only create Visit touchpoints (1, 4, 7).
+  /// Tele can only create Call touchpoints (2, 3, 5, 6).
   ///
   /// Returns true if the role can create this touchpoint, false otherwise.
   static bool canCreateTouchpoint({
@@ -22,7 +23,7 @@ class PermissionService {
     required TouchpointType type,
   }) {
     // Managers can create any type
-    if (role.canCreateAnyTouchpoint) {
+    if (role.isManager) {
       return true;
     }
 
@@ -30,6 +31,12 @@ class PermissionService {
     if (role == UserRole.caravan) {
       const visitNumbers = [1, 4, 7];
       return visitNumbers.contains(touchpointNumber) && type == TouchpointType.visit;
+    }
+
+    // Tele can only create calls for specific touchpoint numbers
+    if (role == UserRole.tele) {
+      const callNumbers = [2, 3, 5, 6];
+      return callNumbers.contains(touchpointNumber) && type == TouchpointType.call;
     }
 
     return false;

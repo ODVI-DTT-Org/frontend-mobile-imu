@@ -110,6 +110,91 @@ void main() {
         );
         expect(tp4, false);
       });
+
+      test('tele can create call touchpoints (2, 3, 5, 6)', () {
+        final tp2 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 2,
+          type: TouchpointType.call,
+        );
+        expect(tp2, true);
+
+        final tp3 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 3,
+          type: TouchpointType.call,
+        );
+        expect(tp3, true);
+
+        final tp5 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 5,
+          type: TouchpointType.call,
+        );
+        expect(tp5, true);
+
+        final tp6 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 6,
+          type: TouchpointType.call,
+        );
+        expect(tp6, true);
+      });
+
+      test('tele cannot create visit touchpoints', () {
+        final tp1 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 1,
+          type: TouchpointType.visit,
+        );
+        expect(tp1, false);
+
+        final tp4 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 4,
+          type: TouchpointType.visit,
+        );
+        expect(tp4, false);
+
+        final tp7 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 7,
+          type: TouchpointType.visit,
+        );
+        expect(tp7, false);
+      });
+
+      test('tele cannot create call for visit touchpoints (1, 4, 7)', () {
+        final tp1 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 1,
+          type: TouchpointType.call,
+        );
+        expect(tp1, false);
+
+        final tp4 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 4,
+          type: TouchpointType.call,
+        );
+        expect(tp4, false);
+      });
+
+      test('tele cannot create visit for call touchpoints (2, 3, 5, 6)', () {
+        final tp2 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 2,
+          type: TouchpointType.visit,
+        );
+        expect(tp2, false);
+
+        final tp5 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 5,
+          type: TouchpointType.visit,
+        );
+        expect(tp5, false);
+      });
     });
 
     group('canManageArea', () {
@@ -119,8 +204,9 @@ void main() {
         expect(PermissionService.canManageArea(UserRole.assistantAreaManager), true);
       });
 
-      test('returns false for caravan', () {
+      test('returns false for caravan and tele', () {
         expect(PermissionService.canManageArea(UserRole.caravan), false);
+        expect(PermissionService.canManageArea(UserRole.tele), false);
       });
     });
 
@@ -129,6 +215,7 @@ void main() {
         expect(PermissionService.canAccessAdmin(UserRole.admin), true);
         expect(PermissionService.canAccessAdmin(UserRole.areaManager), false);
         expect(PermissionService.canAccessAdmin(UserRole.caravan), false);
+        expect(PermissionService.canAccessAdmin(UserRole.tele), false);
       });
     });
   });

@@ -1,7 +1,11 @@
 /// User roles for the IMU mobile app.
 ///
-/// Mobile app supports: Admin, Area Manager, Assistant Area Manager, Caravan.
-/// Tele users use the web admin dashboard.
+/// Mobile app supports: Admin, Area Manager, Assistant Area Manager, Caravan, Tele.
+/// - Admin: Full system access
+/// - Area Manager: Can manage assigned area and create all touchpoint types
+/// - Assistant Area Manager: Can manage assigned area and create all touchpoint types
+/// - Caravan: Field agent - can only create Visit touchpoints (1, 4, 7)
+/// - Tele: Telemarketer - can only create Call touchpoints (2, 3, 5, 6)
 enum UserRole {
   /// Full system access
   admin('admin'),
@@ -13,7 +17,10 @@ enum UserRole {
   assistantAreaManager('assistant_area_manager'),
 
   /// Field agent - can only create Visit touchpoints (1, 4, 7)
-  caravan('caravan');
+  caravan('caravan'),
+
+  /// Telemarketer - can only create Call touchpoints (2, 3, 5, 6)
+  tele('tele');
 
   final String _apiValue;
   const UserRole(this._apiValue);
@@ -32,6 +39,8 @@ enum UserRole {
         return 'Assistant Area Manager';
       case UserRole.caravan:
         return 'Caravan';
+      case UserRole.tele:
+        return 'Tele';
     }
   }
 
@@ -41,12 +50,32 @@ enum UserRole {
   }
 
   /// Can this role create Visit touchpoints?
-  /// All mobile roles can create visits.
-  bool get canCreateVisitTouchpoints => true;
+  /// Admin, managers, and caravan can create visits.
+  bool get canCreateVisitTouchpoints {
+    switch (this) {
+      case UserRole.admin:
+      case UserRole.areaManager:
+      case UserRole.assistantAreaManager:
+      case UserRole.caravan:
+        return true;
+      case UserRole.tele:
+        return false;
+    }
+  }
 
   /// Can this role create Call touchpoints?
-  /// Only managers can create calls.
-  bool get canCreateCallTouchpoints => canCreateAnyTouchpoint;
+  /// Admin, managers, and tele can create calls.
+  bool get canCreateCallTouchpoints {
+    switch (this) {
+      case UserRole.admin:
+      case UserRole.areaManager:
+      case UserRole.assistantAreaManager:
+      case UserRole.tele:
+        return true;
+      case UserRole.caravan:
+        return false;
+    }
+  }
 
   /// Is this a manager role with elevated permissions?
   bool get isManager {
@@ -56,6 +85,7 @@ enum UserRole {
       case UserRole.assistantAreaManager:
         return true;
       case UserRole.caravan:
+      case UserRole.tele:
         return false;
     }
   }

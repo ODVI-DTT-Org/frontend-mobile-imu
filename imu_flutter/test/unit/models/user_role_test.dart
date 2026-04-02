@@ -9,6 +9,7 @@ void main() {
         expect(UserRole.areaManager.apiValue, 'area_manager');
         expect(UserRole.assistantAreaManager.apiValue, 'assistant_area_manager');
         expect(UserRole.caravan.apiValue, 'caravan');
+        expect(UserRole.tele.apiValue, 'tele');
       });
     });
 
@@ -18,6 +19,7 @@ void main() {
         expect(UserRole.areaManager.displayName, 'Area Manager');
         expect(UserRole.assistantAreaManager.displayName, 'Assistant Area Manager');
         expect(UserRole.caravan.displayName, 'Caravan');
+        expect(UserRole.tele.displayName, 'Tele');
       });
     });
 
@@ -28,25 +30,34 @@ void main() {
         expect(UserRole.assistantAreaManager.canCreateAnyTouchpoint, true);
       });
 
-      test('returns false for caravan', () {
+      test('returns false for caravan and tele', () {
         expect(UserRole.caravan.canCreateAnyTouchpoint, false);
+        expect(UserRole.tele.canCreateAnyTouchpoint, false);
       });
     });
 
     group('canCreateVisitTouchpoints', () {
-      test('returns true for all mobile roles', () {
+      test('returns true for admin, managers, and caravan', () {
         expect(UserRole.admin.canCreateVisitTouchpoints, true);
         expect(UserRole.areaManager.canCreateVisitTouchpoints, true);
         expect(UserRole.assistantAreaManager.canCreateVisitTouchpoints, true);
         expect(UserRole.caravan.canCreateVisitTouchpoints, true);
       });
+
+      test('returns false for tele', () {
+        expect(UserRole.tele.canCreateVisitTouchpoints, false);
+      });
     });
 
     group('canCreateCallTouchpoints', () {
-      test('returns true only for managers', () {
+      test('returns true for admin, managers, and tele', () {
         expect(UserRole.admin.canCreateCallTouchpoints, true);
         expect(UserRole.areaManager.canCreateCallTouchpoints, true);
         expect(UserRole.assistantAreaManager.canCreateCallTouchpoints, true);
+        expect(UserRole.tele.canCreateCallTouchpoints, true);
+      });
+
+      test('returns false for caravan', () {
         expect(UserRole.caravan.canCreateCallTouchpoints, false);
       });
     });
@@ -58,8 +69,9 @@ void main() {
         expect(UserRole.assistantAreaManager.isManager, true);
       });
 
-      test('returns false for caravan', () {
+      test('returns false for caravan and tele', () {
         expect(UserRole.caravan.isManager, false);
+        expect(UserRole.tele.isManager, false);
       });
     });
 
@@ -69,6 +81,7 @@ void main() {
         expect(UserRole.fromApi('area_manager'), UserRole.areaManager);
         expect(UserRole.fromApi('assistant_area_manager'), UserRole.assistantAreaManager);
         expect(UserRole.fromApi('caravan'), UserRole.caravan);
+        expect(UserRole.fromApi('tele'), UserRole.tele);
       });
 
       test('maps legacy roles to caravan', () {
@@ -85,7 +98,6 @@ void main() {
 
       test('handles unknown roles with safe default', () {
         expect(UserRole.fromApi('unknown_role'), UserRole.caravan);
-        expect(UserRole.fromApi('tele'), UserRole.caravan);
       });
     });
 
@@ -96,6 +108,9 @@ void main() {
 
         final jwt2 = {'role': 'caravan'};
         expect(UserRole.fromJwt(jwt2), UserRole.caravan);
+
+        final jwt3 = {'role': 'tele'};
+        expect(UserRole.fromJwt(jwt3), UserRole.tele);
       });
 
       test('maps legacy roles in JWT', () {
