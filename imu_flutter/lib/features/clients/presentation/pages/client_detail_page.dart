@@ -13,6 +13,7 @@ import '../../../../services/auth/auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../services/connectivity_service.dart';
 import '../../../../services/maps/map_service.dart';
+import '../../../../services/error_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
@@ -443,9 +444,16 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         },
         onError: (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to save touchpoint: $e')),
-            );
+            // Parse error and show using ErrorService
+            final appError = ErrorService.parseError(e);
+            if (appError != null) {
+              ErrorService.showError(context, appError);
+            } else {
+              // Fallback to legacy error display
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to save touchpoint: $e')),
+              );
+            }
           }
         },
       );
