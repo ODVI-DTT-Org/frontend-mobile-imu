@@ -36,6 +36,9 @@ class AppConfig {
   static const int _apiReceiveTimeout = 15000; // 15 seconds
   static const int _apiTimeout = 30000; // 30 seconds
 
+  // SSL Certificate Pinning
+  static const bool _enableSslPinning = false; // Disabled by default
+
   // JWT Auth
   static late String _jwtSecret;
   static late int _jwtExpiryHours;
@@ -102,14 +105,26 @@ class AppConfig {
   /// API connect timeout in milliseconds
   static int get apiConnectTimeout => _apiConnectTimeout;
 
+  /// API connect timeout as Duration
+  static Duration get apiConnectTimeoutDuration => Duration(milliseconds: _apiConnectTimeout);
+
   /// API receive timeout in milliseconds
   static int get apiReceiveTimeout => _apiReceiveTimeout;
+
+  /// API receive timeout as Duration
+  static Duration get apiReceiveTimeoutDuration => Duration(milliseconds: _apiReceiveTimeout);
 
   /// API timeout in milliseconds
   static int get apiTimeout => _apiTimeout;
 
+  /// API timeout as Duration
+  static Duration get apiTimeoutDuration => Duration(milliseconds: _apiTimeout);
+
   /// Whether detailed logging is enabled
   static bool get enableLogging => _debugMode;
+
+  /// Whether SSL certificate pinning is enabled
+  static bool get enableSslPinning => _enableSslPinning;
 
   /// JWT secret key for authentication
   static String get jwtSecret => _jwtSecret;

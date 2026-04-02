@@ -21,6 +21,7 @@ class Client {
   final String? email;
   final String? facebookLink;
   final String? agencyId;
+  final String? userId; // The user (caravan/tele) who owns this client
   final String? municipality;
   final String? psgcId; // Foreign key to PSGC table
   final String? region; // Region from PSGC (e.g., NCR, Region I)
@@ -56,6 +57,8 @@ class Client {
     this.pan,
     this.email,
     this.facebookLink,
+    this.agencyId,
+    this.userId,
     this.addresses = const [],
     this.phoneNumbers = const [],
     this.touchpoints = const [],
@@ -64,7 +67,6 @@ class Client {
     this.isStarred = false,
     this.loanReleased = false,
     this.loanReleasedAt,
-    this.agencyId,
     this.municipality,
     this.psgcId,
     this.region,
@@ -128,6 +130,8 @@ class Client {
     String? pan,
     String? email,
     String? facebookLink,
+    String? agencyId,
+    String? userId,
     List<Address>? addresses,
     List<PhoneNumber>? phoneNumbers,
     List<Touchpoint>? touchpoints,
@@ -162,6 +166,8 @@ class Client {
       pan: pan ?? this.pan,
       email: email ?? this.email,
       facebookLink: facebookLink ?? this.facebookLink,
+      agencyId: agencyId ?? this.agencyId,
+      userId: userId ?? this.userId,
       addresses: addresses ?? this.addresses,
       phoneNumbers: phoneNumbers ?? this.phoneNumbers,
       touchpoints: touchpoints ?? this.touchpoints,
@@ -199,6 +205,8 @@ class Client {
       'pan': pan,
       'email': email,
       'facebookLink': facebookLink,
+      'agencyId': agencyId,
+      'userId': userId,
       'addresses': addresses.map((a) => a.toJson()).toList(),
       'phoneNumbers': phoneNumbers.map((p) => p.toJson()).toList(),
       'touchpoints': touchpoints.map((t) => t.toJson()).toList(),
@@ -250,6 +258,8 @@ class Client {
       pan: json['pan'],
       email: json['email'],
       facebookLink: json['facebookLink'],
+      agencyId: json['agencyId'],
+      userId: json['userId'] ?? json['user_id'] ?? json['caravanId'] ?? json['caravan_id'],
       addresses: (json['addresses'] as List?)?.map((a) => Address.fromJson(a)).toList() ?? [],
       phoneNumbers: (json['phoneNumbers'] as List?)?.map((p) => PhoneNumber.fromJson(p)).toList() ?? [],
       touchpoints: (json['touchpoints'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
@@ -316,6 +326,7 @@ class Client {
       facebookLink: row['facebook_link'] as String?,
       remarks: row['remarks'] as String?,
       agencyId: row['agency_id'] as String?,
+      userId: row['user_id'] as String? ?? row['caravan_id'] as String?,
       municipality: row['municipality'] as String?,
       psgcId: row['psgc_id']?.toString(),
       region: row['region'] as String?,

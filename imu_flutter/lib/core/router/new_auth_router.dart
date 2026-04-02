@@ -57,12 +57,22 @@ String? newAuthStateRedirect(
       // Stay on current page (loading overlay handles it)
       break;
 
+    case AuthStateType.refreshingToken:
+      // Stay on current page (silent refresh in background)
+      break;
+
     // TEMPORARILY DISABLED: PIN setup/entry functionality
-    // case AuthStateType.checkPinSetup:
-    //   // Internal state, no route
-    //   break;
+    case AuthStateType.checkPinSetup:
+      // Internal state, no route
+      break;
     //
     // case AuthStateType.pinSetup:
+    //   if (currentLocation != '/pin-setup') {
+    //     return '/pin-setup';
+    //   }
+    //   break;
+    //
+    case AuthStateType.pinSetup:
     //   if (currentLocation != '/pin-setup') {
     //     return '/pin-setup';
     //   }
@@ -81,6 +91,16 @@ String? newAuthStateRedirect(
     //     return '/pin-entry';
     //   }
     //   break;
+
+    case AuthStateType.pinEntry:
+    //   if (currentLocation != '/pin-entry') {
+    //     return '/pin-entry';
+    //   }
+    //   break;
+
+    case AuthStateType.tokenRefreshFailed:
+      // Stay on current page, show error snackbar
+      break;
 
     case AuthStateType.tokenExpired:
       if (currentLocation != '/token-expired') {

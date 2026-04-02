@@ -40,7 +40,7 @@ class UserLocation {
 
   /// Check if a PSGC municipality matches this location assignment
   bool matchesPsgcMunicipality(PsgcMunicipality mun) {
-    return mun.province == province && mun.municipality == municipality;
+    return mun.province == province && mun.name == municipality;
   }
 
   /// Create from PowerSync/PostgreSQL row (uses province and municipality columns)

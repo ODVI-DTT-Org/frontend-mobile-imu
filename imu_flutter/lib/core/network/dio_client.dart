@@ -26,9 +26,9 @@ class DioClient {
 
     // Base configuration
     dio.options.baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
-    dio.options.connectTimeout = AppConfig.apiConnectTimeout;
-    dio.options.receiveTimeout = AppConfig.apiReceiveTimeout;
-    dio.options.sendTimeout = AppConfig.apiTimeout;
+    dio.options.connectTimeout = AppConfig.apiConnectTimeoutDuration;
+    dio.options.receiveTimeout = AppConfig.apiReceiveTimeoutDuration;
+    dio.options.sendTimeout = AppConfig.apiTimeoutDuration;
     dio.options.headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

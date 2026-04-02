@@ -107,7 +107,7 @@ class UserLocationRepository {
       throw ArgumentError('Invalid municipality_id format. Expected "province-municipality"');
     }
     final province = parts[0];
-    final municipality = parts.slice(1).join('-');
+    final municipality = parts.sublist(1).join('-');
 
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     await _db.execute(
@@ -133,7 +133,7 @@ class UserLocationRepository {
       throw ArgumentError('Invalid municipality_id format. Expected "province-municipality"');
     }
     final province = parts[0];
-    final municipality = parts.slice(1).join('-');
+    final municipality = parts.sublist(1).join('-');
 
     await _db.execute(
       'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND province = ? AND municipality = ? AND deleted_at IS NULL',
@@ -157,7 +157,7 @@ class UserLocationRepository {
       throw ArgumentError('Invalid municipality_id format. Expected "province-municipality"');
     }
     final province = parts[0];
-    final municipality = parts.slice(1).join('-');
+    final municipality = parts.sublist(1).join('-');
 
     await _db.execute(
       'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND province = ? AND municipality = ?',

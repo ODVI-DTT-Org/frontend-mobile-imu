@@ -25,6 +25,14 @@ class UserActivityTracker extends StatefulWidget {
 }
 
 class _UserActivityTrackerState extends State<UserActivityTracker> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -41,13 +49,12 @@ class _UserActivityTrackerState extends State<UserActivityTracker> {
           return false;
         },
         child: KeyboardListener(
-          focusOn: true,
-          onKeyEvent: (event, _) {
+          focusNode: _focusNode,
+          onKeyEvent: (event) {
             if (event is! KeyUpEvent) {
               // Track key down events (ignore key up)
               _handleActivity();
             }
-            return KeyEventResult.ignored;
           },
           child: widget.child,
         ),

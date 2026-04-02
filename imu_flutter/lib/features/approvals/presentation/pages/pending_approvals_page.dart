@@ -5,7 +5,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:imu_flutter/features/approvals/data/models/approval_model.dart';
 import 'package:imu_flutter/features/approvals/presentation/providers/approvals_provider.dart';
 import 'package:imu_flutter/core/theme/app_theme.dart';
-import 'package:lucentium/lucide_icons.dart';
+import 'package:imu_flutter/core/constants/app_colors.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 /// Pending Approvals Page
 /// Shows all pending approvals for the current field agent

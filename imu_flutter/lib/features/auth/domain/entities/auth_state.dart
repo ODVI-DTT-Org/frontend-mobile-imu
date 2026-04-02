@@ -576,6 +576,7 @@ class AuthenticatingWithPinState extends AuthState {
     DateTime? enteredAt,
     Duration? timeout,
     Map<String, dynamic>? metadata,
+    AuthStateType? type,
   }) {
     return AuthenticatingWithPinState(
       pin: pin ?? this.pin,
@@ -670,6 +671,7 @@ class RefreshingTokenState extends AuthState {
     DateTime? enteredAt,
     Duration? timeout,
     Map<String, dynamic>? metadata,
+    AuthStateType? type,
   }) {
     return RefreshingTokenState(
       attempt: attempt ?? this.attempt,
@@ -723,6 +725,7 @@ class TokenRefreshFailedState extends AuthState {
     DateTime? enteredAt,
     Duration? timeout,
     Map<String, dynamic>? metadata,
+    AuthStateType? type,
   }) {
     return TokenRefreshFailedState(
       error: error ?? this.error,

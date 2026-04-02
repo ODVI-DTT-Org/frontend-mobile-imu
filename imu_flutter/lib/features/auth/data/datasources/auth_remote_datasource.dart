@@ -1,36 +1,62 @@
 import 'package:dio/dio.dart';
-import 'package:retrofit/retrofit.dart';
+// import 'package:retrofit/retrofit.dart'; // DISABLED: Package not available
 import '../../domain/services/token_manager.dart';
 import '../../../../core/config/app_config.dart';
 
-part 'auth_remote_datasource.g.dart';
+// part 'auth_remote_datasource.g.dart'; // DISABLED: Code generation not available
 
 /// Remote data source for authentication API calls.
 ///
 /// Handles all authentication-related network operations including
 /// login, token refresh, and logout.
-@RestApi(baseUrl: '')
+///
+/// NOTE: Retrofit temporarily disabled - package not installed.
+/// TODO: Install retrofit package or migrate to pure Dio implementation.
 abstract class AuthRemoteDataSource {
-  factory AuthRemoteDataSource(Dio dio, {String baseUrl}) = _AuthRemoteDataSource;
-
   /// Authenticate user with email and password.
   ///
   /// Returns token data on success.
   /// Throws [DioException] on network or server errors.
-  @POST('/auth/login')
-  Future<LoginResponse> login(
-    @Body() LoginRequest request,
-  );
+  Future<LoginResponse> login(LoginRequest request);
 
   /// Refresh access token using refresh token.
   ///
   /// Returns new token data on success.
-  @POST('/auth/refresh')
-  Future<LoginResponse> refreshToken(@Body() RefreshTokenRequest request);
+  Future<LoginResponse> refreshToken(RefreshTokenRequest request);
 
   /// Logout current user (invalidate refresh token).
-  @POST('/auth/logout')
   Future<void> logout();
+}
+
+/// Temporary implementation using Dio directly
+class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
+  final Dio dio;
+  final String baseUrl;
+
+  AuthRemoteDataSourceImpl(this.dio, {this.baseUrl = ''});
+
+  /// Authenticate user with email and password.
+  Future<LoginResponse> login(LoginRequest request) async {
+    final response = await dio.post(
+      '$baseUrl/auth/login',
+      data: request.toJson(),
+    );
+    return LoginResponse.fromJson(response.data);
+  }
+
+  /// Refresh access token using refresh token.
+  Future<LoginResponse> refreshToken(RefreshTokenRequest request) async {
+    final response = await dio.post(
+      '$baseUrl/auth/refresh',
+      data: request.toJson(),
+    );
+    return LoginResponse.fromJson(response.data);
+  }
+
+  /// Logout current user.
+  Future<void> logout() async {
+    await dio.post('$baseUrl/auth/logout');
+  }
 }
 
 /// Request body for login endpoint.
@@ -112,7 +138,7 @@ class LoginResponse {
 /// Factory for creating AuthRemoteDataSource instances.
 class AuthRemoteDataSourceFactory {
   /// Create an AuthRemoteDataSource instance with the configured base URL.
-  static AuthRemoteDataSource create(Dio dio) {
-    return AuthRemoteDataSource(dio, baseUrl: AppConfig.apiBaseUrl);
+  static AuthRemoteDataSourceImpl create(Dio dio) {
+    return AuthRemoteDataSourceImpl(dio, baseUrl: AppConfig.apiBaseUrl);
   }
 }
