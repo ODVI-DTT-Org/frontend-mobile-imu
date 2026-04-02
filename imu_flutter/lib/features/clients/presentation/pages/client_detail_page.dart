@@ -16,6 +16,8 @@ import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
+import '../../../../shared/widgets/permission_widgets.dart';
+import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../data/models/client_model.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
@@ -620,9 +622,18 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             icon: const Icon(LucideIcons.pencil),
             onPressed: _editClient,
           ),
-          IconButton(
-            icon: const Icon(LucideIcons.trash2, color: Colors.red),
-            onPressed: _handleDelete,
+          PermissionDeleter(
+            resource: 'clients',
+            child: IconButton(
+              icon: const Icon(LucideIcons.trash2, color: Colors.red),
+              onPressed: _handleDelete,
+            ),
+            fallback: IconButton(
+              icon: const Icon(LucideIcons.trash2, color: Colors.red),
+              onPressed: () {
+                PermissionDeniedDialog.show(context);
+              },
+            ),
           ),
         ],
       ),
