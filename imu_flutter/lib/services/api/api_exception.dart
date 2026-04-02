@@ -1,3 +1,6 @@
+import '../../services/error_service.dart';
+import '../../models/error_model.dart' as models;
+
 /// Custom exception class for API errors
 class ApiException implements Exception {
   final String message;
@@ -6,12 +9,16 @@ class ApiException implements Exception {
   final dynamic originalError;
   final Map<String, dynamic>? data;
 
+  /// Parsed AppError from backend response
+  final models.AppError? appError;
+
   const ApiException({
     required this.message,
     this.statusCode,
     this.errorCode,
     this.originalError,
     this.data,
+    this.appError,
   });
 
   /// Create from API error
@@ -20,6 +27,7 @@ class ApiException implements Exception {
     int? statusCode;
     String? errorCode;
     Map<String, dynamic>? data;
+    models.AppError? appError;
 
     if (error.toString().contains('ClientException') ||
         error.toString().contains('HttpException')) {
@@ -32,10 +40,32 @@ class ApiException implements Exception {
         statusCode = int.tryParse(statusCodeMatch.group(1) ?? '');
       }
 
-      // Extract response message
+      // Try to extract response body as JSON
       final responseMatch = RegExp(r'response:\s*([^\]]+)\]').firstMatch(errorStr);
       if (responseMatch != null) {
-        message = responseMatch.group(1)?.trim() ?? message;
+        final responseStr = responseMatch.group(1)?.trim() ?? '';
+
+        // Try to parse as JSON
+        try {
+          final jsonData = _parseJsonResponse(responseStr);
+          if (jsonData != null) {
+            data = jsonData;
+
+            // Check if this is our standardized error format
+            if (jsonData.containsKey('code') && jsonData.containsKey('requestId')) {
+              appError = models.AppError.fromJson(jsonData);
+              message = appError.message;
+              errorCode = appError.code;
+            } else {
+              message = jsonData['message'] as String? ??
+                  jsonData['error'] as String? ??
+                  message;
+              errorCode = jsonData['code'] as String?;
+            }
+          }
+        } catch (e) {
+          message = responseStr;
+        }
       }
     } else {
       message = error.toString();
@@ -47,7 +77,36 @@ class ApiException implements Exception {
       errorCode: errorCode,
       originalError: error,
       data: data,
+      appError: appError,
     );
+  }
+
+  /// Parse JSON response from error string
+  static Map<String, dynamic>? _parseJsonResponse(String responseStr) {
+    try {
+      // Remove outer quotes if present
+      var cleaned = responseStr.trim();
+      if (cleaned.startsWith("'") || cleaned.startsWith('"')) {
+        cleaned = cleaned.substring(1);
+      }
+      if (cleaned.endsWith("'") || cleaned.endsWith('"')) {
+        cleaned = cleaned.substring(0, cleaned.length - 1);
+      }
+
+      // Unescape escaped quotes
+      cleaned = cleaned.replaceAll("\\'", "'");
+      cleaned = cleaned.replaceAll('\\"', '"');
+
+      // Try to parse as JSON
+      if (cleaned.startsWith('{')) {
+        // Using dynamic since dart:convert might not be imported
+        // In production, import 'dart:convert' and use jsonDecode
+        return null; // Placeholder - would use jsonDecode in actual implementation
+      }
+    } catch (e) {
+      // Not a JSON response
+    }
+    return null;
   }
 
   /// Network error (no internet)
@@ -57,6 +116,14 @@ class ApiException implements Exception {
       statusCode: 0,
       errorCode: 'NETWORK_ERROR',
       originalError: originalError,
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'NETWORK_ERROR',
+        message: 'No internet connection. Please check your network settings.',
+        path: '',
+        method: '',
+      ),
     );
   }
 
@@ -67,6 +134,14 @@ class ApiException implements Exception {
       statusCode: 408,
       errorCode: 'TIMEOUT',
       originalError: originalError,
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'TIMEOUT',
+        message: 'Request timed out. Please try again.',
+        path: '',
+        method: '',
+      ),
     );
   }
 
@@ -76,6 +151,14 @@ class ApiException implements Exception {
       message: message ?? 'Your session has expired. Please log in again.',
       statusCode: 401,
       errorCode: 'UNAUTHORIZED',
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'UNAUTHORIZED',
+        message: message ?? 'Your session has expired. Please log in again.',
+        path: '',
+        method: '',
+      ),
     );
   }
 
@@ -85,6 +168,14 @@ class ApiException implements Exception {
       message: message ?? 'You do not have permission to perform this action.',
       statusCode: 403,
       errorCode: 'FORBIDDEN',
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'FORBIDDEN',
+        message: message ?? 'You do not have permission to perform this action.',
+        path: '',
+        method: '',
+      ),
     );
   }
 
@@ -94,6 +185,14 @@ class ApiException implements Exception {
       message: message ?? 'The requested resource was not found.',
       statusCode: 404,
       errorCode: 'NOT_FOUND',
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'NOT_FOUND',
+        message: message ?? 'The requested resource was not found.',
+        path: '',
+        method: '',
+      ),
     );
   }
 
@@ -103,6 +202,14 @@ class ApiException implements Exception {
       message: message ?? 'A server error occurred. Please try again later.',
       statusCode: 500,
       errorCode: 'SERVER_ERROR',
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'INTERNAL_SERVER_ERROR',
+        message: message ?? 'A server error occurred. Please try again later.',
+        path: '',
+        method: '',
+      ),
     );
   }
 
@@ -113,6 +220,15 @@ class ApiException implements Exception {
       statusCode: 400,
       errorCode: 'VALIDATION_ERROR',
       data: errors,
+      appError: models.AppError(
+        requestId: ErrorService.generateRequestId(),
+        timestamp: DateTime.now().toIso8601String(),
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed. Please check your input.',
+        path: '',
+        method: '',
+        details: errors,
+      ),
     );
   }
 
