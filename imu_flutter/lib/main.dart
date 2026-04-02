@@ -61,12 +61,10 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
       // Environment can be set via --dart-define=ENV=qa|prod at build time
       // In release mode, automatically use 'prod' environment
       // Defaults to 'dev' for local development
-      String env = String.fromEnvironment('ENV', defaultValue: 'dev');
+      const String envFromEnv = String.fromEnvironment('ENV', defaultValue: 'dev');
 
       // Automatically use production environment in release mode if not explicitly set
-      if (kReleaseMode && env == 'dev') {
-        env = 'prod';
-      }
+      final String env = (kReleaseMode && envFromEnv == 'dev') ? 'prod' : envFromEnv;
 
       await AppConfig.initialize(environment: env);
       await MapConfig.initialize(environment: env);

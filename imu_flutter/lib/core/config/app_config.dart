@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// AWS S3 configuration loaded from environment variables
@@ -61,16 +61,29 @@ class AppConfig {
       debugPrint('Warning: Could not load $envFile: $e');
     }
 
-    _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
-    _postgresApiUrl = dotenv.env['POSTGRES_API_URL'] ?? 'http://localhost:3000/api';
-    _jwtSecret = dotenv.env['JWT_SECRET'] ?? 'dev-secret';
-    _jwtExpiryHours = int.tryParse(dotenv.env['JWT_EXPIRY_HOURS'] ?? '24') ?? 24;
-    _appName = dotenv.env['APP_NAME'] ?? 'IMU';
-    _debugMode = dotenv.env['DEBUG_MODE'] == 'true';
-    _logLevel = dotenv.env['LOG_LEVEL'] ?? 'info';
+    // On web, use production API directly since .env files don't work
+    // On mobile, try to load from .env file
+    if (kIsWeb) {
+      _postgresApiUrl = 'https://imu-api.cfbtools.app/api';
+      _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
+      _jwtSecret = dotenv.env['JWT_SECRET'] ?? 'dev-secret';
+      _jwtExpiryHours = 24;
+      _appName = 'IMU Web';
+      _debugMode = false;
+      _logLevel = 'info';
+    } else {
+      _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
+      _postgresApiUrl = dotenv.env['POSTGRES_API_URL'] ?? 'https://imu-api.cfbtools.app/api';
+      _jwtSecret = dotenv.env['JWT_SECRET'] ?? 'dev-secret';
+      _jwtExpiryHours = int.tryParse(dotenv.env['JWT_EXPIRY_HOURS'] ?? '24') ?? 24;
+      _appName = dotenv.env['APP_NAME'] ?? 'IMU';
+      _debugMode = dotenv.env['DEBUG_MODE'] == 'true';
+      _logLevel = dotenv.env['LOG_LEVEL'] ?? 'info';
+    }
 
     debugPrint('AppConfig initialized:');
     debugPrint('  Environment: $environment');
+    debugPrint('  Platform: ${kIsWeb ? 'web' : 'mobile'}');
     debugPrint('  PowerSync URL: $_powerSyncUrl');
     debugPrint('  PostgreSQL API: $_postgresApiUrl');
   }
