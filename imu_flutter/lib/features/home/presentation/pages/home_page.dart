@@ -8,6 +8,8 @@ import '../../../../services/sync/powersync_connector.dart' show powerSyncConnec
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/providers/filter_providers.dart';
+import '../../../../shared/widgets/permission_widgets.dart';
+import '../../../../shared/widgets/permission_dialog.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -136,6 +138,27 @@ class _HomePageState extends ConsumerState<HomePage> {
       itemCount: menuItems.length,
       itemBuilder: (context, index) {
         final item = menuItems[index];
+
+        // Wrap Reports icon in PermissionWidget
+        if (item.id == 'reports') {
+          return PermissionWidget(
+            resource: 'reports',
+            action: 'read',
+            child: _MenuButton(
+              icon: item.icon,
+              label: item.label,
+              size: itemSize,
+              onTap: () => _handleNavigation(context, item.id),
+            ),
+            fallback: _MenuButton(
+              icon: item.icon,
+              label: item.label,
+              size: itemSize,
+              onTap: () => PermissionDeniedDialog.show(context),
+            ),
+          );
+        }
+
         return _MenuButton(
           icon: item.icon,
           label: item.label,
@@ -147,7 +170,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   List<_MenuItem> _getMenuItems() {
-    // Updated: 7 items in 2 columns - My Day added as first item
+    // Updated: 8 items in 2 columns - Reports added for managers
     return [
       _MenuItem(icon: LucideIcons.sun, label: 'My Day', id: 'my-day'),
       _MenuItem(icon: LucideIcons.users, label: 'My Clients', id: 'clients'),
@@ -155,6 +178,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _MenuItem(icon: LucideIcons.mapPin, label: 'Missed Visits', id: 'visits'),
       _MenuItem(icon: LucideIcons.calculator, label: 'Loan Calculator', id: 'calculator'),
       _MenuItem(icon: LucideIcons.clipboardList, label: 'Attendance', id: 'attendance'),
+      _MenuItem(icon: LucideIcons.barChart3, label: 'Reports', id: 'reports'),
       _MenuItem(icon: LucideIcons.userCog, label: 'My Profile', id: 'profile'),
     ];
   }
@@ -196,6 +220,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       case 'profile':
         context.push('/profile');
         break;
+      case 'reports':
+        // Only accessible by managers - will be filtered by PermissionWidget
+        context.push('/reports');
+        break;
       case 'settings':
         context.push('/settings');
         break;
@@ -224,41 +252,47 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildDeveloperOptions(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _showDeveloperOptions(context),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              LucideIcons.bug,
-              size: 16,
-              color: Colors.grey.shade600,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Developer Options',
-              style: TextStyle(
-                fontSize: 12,
+    // Wrap developer options in PermissionWidget - admin only
+    return PermissionWidget(
+      resource: 'system',
+      action: 'read',
+      child: GestureDetector(
+        onTap: () => _showDeveloperOptions(context),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                LucideIcons.bug,
+                size: 16,
                 color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
               ),
-            ),
-            const Spacer(),
-            Icon(
-              LucideIcons.chevronRight,
-              size: 16,
-              color: Colors.grey.shade400,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                'Developer Options',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                LucideIcons.chevronRight,
+                size: 16,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
         ),
       ),
+      fallback: const SizedBox.shrink(), // Hide completely for non-admin users
     );
   }
 }
