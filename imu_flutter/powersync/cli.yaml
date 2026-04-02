@@ -3,9 +3,10 @@
 
 # This file is managed by the PowerSync CLI.
 # Run \`powersync link --help\` for more information.
+# Updated: 2026-04-02 - Using backend PowerSync instance
 type: cloud
-api_url: https://69cb46b4f69619e9d4830ea1.powersync.journeyapps.com
+api_url: https://69cd6b238fa42c16d7f725a9.powersync.journeyapps.com
 api_key: "!env PS_ADMIN_TOKEN"
-instance_id: 69cb46b4f69619e9d4830ea1
+instance_id: 69cd6b238fa42c16d7f725a9
 org_id: 69ba25e053fc4000071fb490
-project_id: 69cb46b381fc830006d01b50
+project_id: 69cd6b22aaa9a3000762ff0b

@@ -11,15 +11,16 @@ streams:
   global_psgc:
     auto_subscribe: true
     queries:
-      - SELECT id, region, province, mun_city_kind, mun_city, barangay, pin_location, zip_code
+      - SELECT id, region, province, mun_city_kind, mun_city, barangay, zip_code
         FROM psgc
 
-  # Global data - Touchpoint reasons
+  # Global data - Touchpoint reasons (matches Flutter schema)
   global_touchpoint_reasons:
     auto_subscribe: true
     queries:
-      - SELECT id, code, label, category, description, color, sort_order, is_active
+      - SELECT id, reason_code, label, touchpoint_type, role, category, sort_order, is_active
         FROM touchpoint_reasons
+        WHERE is_active = true
 
   # User profile data
   user_profiles:
@@ -81,7 +82,7 @@ streams:
   phone_numbers:
     auto_subscribe: true
     queries:
-      - SELECT p.id, p.client_id, p.phone_type, p.phone_number, p.is_primary
+      - SELECT p.id, p.client_id, p.type, p.number, p.label, p.is_primary
         FROM phone_numbers p
         WHERE p.is_primary = true
           AND EXISTS (
