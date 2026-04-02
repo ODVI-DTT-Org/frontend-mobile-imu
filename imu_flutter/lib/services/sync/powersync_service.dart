@@ -111,10 +111,11 @@ const Schema _powerSyncSchema = Schema([
     Column.text('assistant_area_manager_id'),
     Column.text('avatar_url'),
   ]),
-  // User location assignments - municipality_id format: "province-municipality"
+  // User location assignments - province and municipality columns
   Table('user_locations', [
     Column.text('user_id'),
-    Column.text('municipality_id'),
+    Column.text('province'),
+    Column.text('municipality'),
     Column.text('assigned_at'),
     Column.text('assigned_by'),
     Column.text('deleted_at'),

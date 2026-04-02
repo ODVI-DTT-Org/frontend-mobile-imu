@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../core/models/user_role.dart' as core_models;
 import '../../../../services/auth/secure_storage_service.dart';
 import '../../../../services/auth/session_service.dart';
 import '../../../../services/auth/auth_service.dart';
@@ -143,7 +144,7 @@ class _PinEntryPageState extends ConsumerState<PinEntryPage> {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role,
+      role: core_models.UserRole.fromApi(user.role),
       expiresAt: null, // Will be validated when needed
     );
   }

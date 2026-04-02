@@ -61,7 +61,7 @@ class AuthService {
   String? get currentUserName => _jwtAuth.currentUser?.fullName;
 
   /// Get current user role
-  String? get currentUserRole => _jwtAuth.currentUser?.role;
+  String? get currentUserRole => _jwtAuth.currentUser?.role.apiValue;
 
   /// Get authorization header
   String? get authHeader => _jwtAuth.authHeader;
