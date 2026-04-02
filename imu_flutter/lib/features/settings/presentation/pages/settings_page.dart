@@ -9,6 +9,7 @@ import '../../../../services/sync/sync_preferences_service.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
+import '../../../../shared/widgets/permission_widgets.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -274,15 +275,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       },
               ),
               _buildDivider(),
-              _buildSettingsTile(
-                icon: LucideIcons.activity,
-                title: 'Test PowerSync',
-                subtitle: 'Run diagnostics and view sync logs',
-                onTap: () {
-                  HapticUtils.lightImpact();
-                  _showPowerSyncTestDialog();
-                },
+              // RBAC: Test PowerSync is admin-only
+              PermissionWidget(
+                resource: 'system',
+                action: 'read',
+                child: _buildSettingsTile(
+                  icon: LucideIcons.activity,
+                  title: 'Test PowerSync',
+                  subtitle: 'Run diagnostics and view sync logs',
+                  onTap: () {
+                    HapticUtils.lightImpact();
+                    _showPowerSyncTestDialog();
+                  },
+                ),
+                fallback: const SizedBox.shrink(), // Hide for non-admin users
               ),
+              _buildDivider(),
             ]),
             const SizedBox(height: 24),
 
