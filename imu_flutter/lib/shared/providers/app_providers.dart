@@ -154,7 +154,8 @@ final clientsProvider = FutureProvider<List<Client>>((ref) async {
     try {
       debugPrint('Fetching clients from REST API...');
       final clientApi = ref.watch(clientApiServiceProvider);
-      final clients = await clientApi.fetchClients();
+      final response = await clientApi.fetchClients();
+      final clients = response.items;
       debugPrint('REST API returned ${clients.length} clients');
 
       if (clients.isNotEmpty) {

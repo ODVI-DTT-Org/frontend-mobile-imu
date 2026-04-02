@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
+import '../../../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../../../shared/providers/app_providers.dart' show
     currentUserIdProvider,
     clientsProvider,
@@ -61,19 +62,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       // All Clients: update online search query provider
       ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(_onSearchChanged);
-  }
-
-  void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text;
-      _currentPage = 1; // Reset to first page on search
-    });
   }
 
   @override
