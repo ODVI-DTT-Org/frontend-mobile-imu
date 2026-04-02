@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../core/config/app_config.dart';
+import '../../core/models/user_role.dart' as core_models;
 import '../../core/utils/logger.dart';
 import 'secure_storage_service.dart';
 
@@ -11,7 +12,7 @@ class JwtUser {
   final String email;
   final String firstName;
   final String lastName;
-  final String role;
+  final core_models.UserRole role;
   final DateTime? expiresAt;
 
   JwtUser({
@@ -31,7 +32,7 @@ class JwtUser {
       email: decoded['email'] ?? '',
       firstName: decoded['first_name'] ?? '',
       lastName: decoded['last_name'] ?? '',
-      role: decoded['role'] ?? 'field_agent',
+      role: core_models.UserRole.fromJwt(decoded),
       expiresAt: decoded['exp'] != null
           ? DateTime.fromMillisecondsSinceEpoch(decoded['exp'] * 1000)
           : null,
@@ -52,11 +53,11 @@ class JwtUser {
     'email': email,
     'first_name': firstName,
     'last_name': lastName,
-    'role': role,
+    'role': role.apiValue,
   };
 
   @override
-  String toString() => 'JwtUser(id: $id, email: $email, role: $role)';
+  String toString() => 'JwtUser(id: $id, email: $email, role: ${role.apiValue})';
 }
 
 /// JWT-based authentication service
@@ -257,7 +258,7 @@ class JwtAuthService {
     required String password,
     required String firstName,
     required String lastName,
-    String role = 'field_agent',
+    String role = 'caravan',
   }) async {
     try {
       logDebug('Attempting registration for: $email');
