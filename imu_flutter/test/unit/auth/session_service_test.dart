@@ -7,10 +7,13 @@ void main() {
 
     setUp(() {
       sessionService = SessionService();
+      // Reset session state for each test
+      sessionService.endSession();
     });
 
     tearDown(() {
-      sessionService.dispose();
+      // Don't dispose singleton - just reset state
+      sessionService.endSession();
     });
 
     group('Session Lifecycle', () {

@@ -41,6 +41,11 @@ class HapticUtils {
     await HapticFeedback.heavyImpact();
   }
 
+  /// Error notification - alias for backward compatibility
+  static Future<void> errorNotification() async {
+    await error();
+  }
+
   /// Double tap feedback
   static Future<void> doubleTap() async {
     await HapticFeedback.lightImpact();

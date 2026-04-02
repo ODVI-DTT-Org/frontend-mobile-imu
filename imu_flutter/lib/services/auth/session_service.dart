@@ -17,6 +17,9 @@ class SessionService extends ChangeNotifier {
   static const Duration inactivityTimeout = Duration(minutes: 15);
   static const Duration sessionTimeout = Duration(hours: 8);
 
+  // Public constant for backward compatibility
+  static Duration get maxSessionDuration => sessionTimeout;
+
   // State
   bool _isLocked = false;
   bool _isSessionValid = true;
@@ -24,8 +27,10 @@ class SessionService extends ChangeNotifier {
   // Getters
   bool get isLocked => _isLocked;
   bool get isSessionValid => _isSessionValid;
+  bool get isSessionActive => _isSessionValid; // Alias for backward compatibility
   DateTime? get lastActivityTime => _lastActivityTime;
   DateTime? get sessionStartTime => _sessionStartTime;
+  Duration? get sessionAge => sessionElapsed; // Alias for backward compatibility
   Duration get remainingTime {
     if (_lastActivityTime == null) return Duration.zero;
     final elapsed = DateTime.now().difference(_lastActivityTime!);
@@ -129,6 +134,11 @@ class SessionService extends ChangeNotifier {
     return _isLocked || !_isSessionValid;
   }
 
+  /// Check if session is expired (for backward compatibility)
+  bool isSessionExpired() {
+    return !_isSessionValid;
+  }
+
   /// Get session elapsed time since start
   Duration? get sessionElapsed {
     if (_sessionStartTime == null) return null;
@@ -141,6 +151,11 @@ class SessionService extends ChangeNotifier {
     final elapsed = DateTime.now().difference(_sessionStartTime!);
     final remaining = sessionTimeout - elapsed;
     return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  /// Get remaining session time (for backward compatibility)
+  Duration? getRemainingSessionTime() {
+    return sessionRemaining;
   }
 
   /// Reset session start time (e.g., after successful token refresh)
