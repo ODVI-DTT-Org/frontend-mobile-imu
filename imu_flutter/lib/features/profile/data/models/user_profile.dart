@@ -1,40 +1,4 @@
-/// Valid roles in the new role system
-/// Note: 'staff' and 'field_agent' kept for migration compatibility
-enum UserRole {
-  admin,
-  areaManager,
-  assistantAreaManager,
-  caravan,
-  staff, // Internal use only
-  fieldAgent, // Legacy - maps to 'caravan'
-}
-
-/// Extension to convert legacy role names to new role names
-extension UserRoleExtension on UserRole {
-  String get roleName {
-    switch (this) {
-      case UserRole.admin:
-        return 'Admin';
-      case UserRole.areaManager:
-        return 'Area Manager';
-      case UserRole.assistantAreaManager:
-        return 'Assistant Area Manager';
-      case UserRole.caravan:
-      case UserRole.fieldAgent:
-        return 'Caravan';
-      case UserRole.staff:
-        return 'Staff';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  /// Display name for UI (alias for roleName)
-  String get displayName => roleName;
-
-  bool get isManagerRole => this == UserRole.areaManager || this == UserRole.assistantAreaManager;
-  bool get isAdmin => this == UserRole.admin;
-}
+import '../../../../core/models/user_role.dart';
 
 /// User profile model
 class UserProfile {
@@ -113,7 +77,7 @@ class UserProfile {
     'lastName': lastName,
     'email': email,
     'phone': phone,
-    'role': role,
+    'role': role.apiValue,
     'profilePhotoUrl': profilePhotoUrl,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
@@ -127,7 +91,7 @@ class UserProfile {
       lastName: json['lastName'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
-      role: _parseUserRole(json['role']),
+      role: UserRole.fromApi(json['role'] as String?),
       profilePhotoUrl: json['profilePhotoUrl'],
       areaManagerId: json['areaManagerId'],
       assistantAreaManagerId: json['assistantAreaManagerId'],
@@ -139,32 +103,4 @@ class UserProfile {
           : null,
     );
   }
-
-  static UserRole _parseUserRole(dynamic role) {
-    if (role == null) return UserRole.caravan;
-    if (role is UserRole) return role;
-    if (role is String) {
-      switch (role.toLowerCase()) {
-        case 'admin':
-          return UserRole.admin;
-        case 'area_manager':
-        case 'area manager':
-          return UserRole.areaManager;
-        case 'assistant_area_manager':
-        case 'assistant area manager':
-          return UserRole.assistantAreaManager;
-        case 'caravan':
-        case 'field_agent':
-        case 'field agent':
-        case 'field agent - caravan':
-          return UserRole.caravan;
-        case 'staff':
-          return UserRole.staff;
-        default:
-          return UserRole.caravan;
-      }
-    }
-    return UserRole.caravan;
-  }
-
 }
