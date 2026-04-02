@@ -31,6 +31,11 @@ class AppConfig {
   // PostgreSQL API
   static late String _postgresApiUrl;
 
+  // API Timeouts
+  static const int _apiConnectTimeout = 15000; // 15 seconds
+  static const int _apiReceiveTimeout = 15000; // 15 seconds
+  static const int _apiTimeout = 30000; // 30 seconds
+
   // JWT Auth
   static late String _jwtSecret;
   static late int _jwtExpiryHours;
@@ -77,6 +82,21 @@ class AppConfig {
 
   /// PostgreSQL API endpoint URL
   static String get postgresApiUrl => _postgresApiUrl;
+
+  /// API base URL (alias for postgresApiUrl)
+  static String get apiBaseUrl => _postgresApiUrl;
+
+  /// API connect timeout in milliseconds
+  static int get apiConnectTimeout => _apiConnectTimeout;
+
+  /// API receive timeout in milliseconds
+  static int get apiReceiveTimeout => _apiReceiveTimeout;
+
+  /// API timeout in milliseconds
+  static int get apiTimeout => _apiTimeout;
+
+  /// Whether detailed logging is enabled
+  static bool get enableLogging => _debugMode;
 
   /// JWT secret key for authentication
   static String get jwtSecret => _jwtSecret;

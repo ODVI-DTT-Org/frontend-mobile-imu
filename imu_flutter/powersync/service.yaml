@@ -27,13 +27,13 @@ client_auth:
   issuer: imu-backend
   jwks:
     keys:
-      # IMPORTANT: Replace with your actual RSA public key
-      # This is a placeholder - use your actual public key from production
+      # RSA public key for IMU JWT authentication (RS256)
+      # Updated: 2026-04-02 - New key pair after security incident
       - kty: RSA
         alg: RS256
-        kid: imu-production-key-20260401
+        kid: imu-production-key-20260402
         use: sig
-        n: YOUR_RSA_PUBLIC_KEY_MODULUS_HERE
+        n: omX5GoYmUBEMENMHB5Ds2Q9iX5E2oKXG03pio4FB40gJTLNP3D0XVQfNfFdJTFMFbHnx5OkfVqT71sdTPmLv9V-64hPkKDoMPb98F62biVz079TGP7AQ4iU9OjoJXc337CgDjAjuykOmWPzCIjJRtqMUKpTrB2vil2VmzBIG6YsWrKt2fSZvlq6NthsFWkiWOGG9K5lGyJIUi6QJR8urkCYiAlUvvxE3jag4dwb_BZfmtIS1rn0zNjgbrwIEHZiI9hlk_ykOvTu8Ujccnuebu3m4EydOYkvSOvYjOQl98W0ffbVvSA6wR0VCHNaZvnZ21bvz71etWX_mG4vgmSObFQ
         e: AQAB
 
 # -----------------------------------------------------------------------------
