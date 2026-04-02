@@ -1,6 +1,17 @@
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/features/clients/data/models/touchpoint_validation_model.dart';
 
+/// DEPRECATED: Use [PermissionService] instead.
+///
+/// This service is replaced by the centralized permission system.
+/// Import 'package:imu_flutter/services/permissions/permission_service.dart'
+///
+/// @deprecated Use PermissionService.canCreateTouchpoint() instead.
+/// This will be removed in v2.0.0.
+///
+/// Note: Sequence validation methods (getExpectedTouchpointType, validateTouchpointSequence,
+/// getSequenceDisplay) are still valid. Only role-based validation methods are deprecated.
+
 /// User roles for touchpoint creation
 enum UserRole {
   caravan('caravan'),
@@ -85,6 +96,7 @@ class TouchpointValidationService {
   /// Validate touchpoint based on user role
   /// Caravan users can only create Visit touchpoints (1, 4, 7)
   /// Tele users can only create Call touchpoints (2, 3, 5, 6)
+  @Deprecated('Use PermissionService.canCreateTouchpoint() instead')
   static TouchpointValidationResult validateTouchpointForRole({
     required int touchpointNumber,
     required TouchpointType touchpointType,
@@ -165,6 +177,7 @@ class TouchpointValidationService {
   }
 
   /// Check if a user role can create a specific touchpoint
+  @Deprecated('Use PermissionService.canCreateTouchpoint() instead')
   static bool canRoleCreateTouchpoint({
     required int touchpointNumber,
     required UserRole userRole,
