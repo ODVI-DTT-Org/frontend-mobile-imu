@@ -602,7 +602,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           Consumer(
             builder: (context, ref, _) {
               final authState = ref.watch(authNotifierProvider);
-              final userRole = authState.user?.role?.toLowerCase();
+              final userRole = authState.user?.role?.apiValue;
 
               // Show loan release button for Admin, Caravan and Tele
               if (userRole == 'admin' || userRole == 'caravan' || userRole == 'tele') {

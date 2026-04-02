@@ -12,13 +12,13 @@ class UserLocationRepository {
 
   /// Get all active location assignments for a user
   Future<List<UserLocation>> getAssignedLocations(String userId) async {
-    // PostgreSQL schema format: municipality_id (format: "province-municipality")
+    // PostgreSQL schema format: province and municipality columns
     final results = await _db.getAll(
       'SELECT * FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
       [userId],
     );
 
-    // Parse using the standard fromRow method which handles municipality_id format
+    // Parse using the standard fromRow method which uses province and municipality columns
     return results.map((row) => UserLocation.fromRow(row)).toList();
   }
 
@@ -28,7 +28,8 @@ class UserLocationRepository {
     if (assignments.isEmpty) {
       return [];
     }
-    return assignments.map((a) => a.municipalityId).toList();
+    // Generate legacy format: "province-municipality"
+    return assignments.map((a) => '${a.province}-${a.municipality}').toList();
   }
 
   /// Get assigned provinces and municipalities as a set for efficient lookup
@@ -74,7 +75,7 @@ class UserLocationRepository {
       'SELECT * FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY assigned_at DESC',
       parameters: [userId],
     ).map((results) {
-      // PostgreSQL schema format: municipality_id (format: "province-municipality")
+      // PostgreSQL schema format: province and municipality columns
       return results.map((row) => UserLocation.fromRow(row)).toList();
     });
   }
@@ -87,59 +88,80 @@ class UserLocationRepository {
     String? assignedBy,
   }) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final municipalityId = '$province-$municipality';
     await _db.execute(
-      '''INSERT INTO user_locations (id, user_id, municipality_id, assigned_at, assigned_by)
-         VALUES (?, ?, ?, ?, ?)''',
-      [id, userId, municipalityId, DateTime.now().toIso8601String(), assignedBy],
+      '''INSERT INTO user_locations (id, user_id, province, municipality, assigned_at, assigned_by)
+         VALUES (?, ?, ?, ?, ?, ?)''',
+      [id, userId, province, municipality, DateTime.now().toIso8601String(), assignedBy],
     );
   }
 
-  /// Create a new location assignment using municipality_id directly
+  /// Create a new location assignment using province and municipality
   Future<void> createAssignmentWithId({
     required String userId,
     required String municipalityId,
     String? assignedBy,
   }) async {
+    // Parse municipality_id to get province and municipality
+    final parts = municipalityId.split('-');
+    if (parts.length < 2) {
+      throw ArgumentError('Invalid municipality_id format. Expected "province-municipality"');
+    }
+    final province = parts[0];
+    final municipality = parts.slice(1).join('-');
+
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     await _db.execute(
-      '''INSERT INTO user_locations (id, user_id, municipality_id, assigned_at, assigned_by)
-         VALUES (?, ?, ?, ?, ?)''',
-      [id, userId, municipalityId, DateTime.now().toIso8601String(), assignedBy],
+      '''INSERT INTO user_locations (id, user_id, province, municipality, assigned_at, assigned_by)
+         VALUES (?, ?, ?, ?, ?, ?)''',
+      [id, userId, province, municipality, DateTime.now().toIso8601String(), assignedBy],
     );
   }
 
   /// Soft delete a location assignment for a user (by province and municipality)
   Future<void> softDeleteLocation(String userId, String province, String municipality) async {
-    final municipalityId = '$province-$municipality';
     await _db.execute(
-      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND municipality_id = ? AND deleted_at IS NULL',
-      [DateTime.now().toIso8601String(), userId, municipalityId],
+      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND province = ? AND municipality = ? AND deleted_at IS NULL',
+      [DateTime.now().toIso8601String(), userId, province, municipality],
     );
   }
 
   /// Soft delete a location assignment using municipality_id directly
   Future<void> softDeleteLocationById(String userId, String municipalityId) async {
+    // Parse municipality_id to get province and municipality
+    final parts = municipalityId.split('-');
+    if (parts.length < 2) {
+      throw ArgumentError('Invalid municipality_id format. Expected "province-municipality"');
+    }
+    final province = parts[0];
+    final municipality = parts.slice(1).join('-');
+
     await _db.execute(
-      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND municipality_id = ? AND deleted_at IS NULL',
-      [DateTime.now().toIso8601String(), userId, municipalityId],
+      'UPDATE user_locations SET deleted_at = ? WHERE user_id = ? AND province = ? AND municipality = ? AND deleted_at IS NULL',
+      [DateTime.now().toIso8601String(), userId, province, municipality],
     );
   }
 
   /// Restore a soft-deleted location assignment
   Future<void> restoreLocation(String userId, String province, String municipality) async {
-    final municipalityId = '$province-$municipality';
     await _db.execute(
-      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND municipality_id = ?',
-      [userId, municipalityId],
+      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND province = ? AND municipality = ?',
+      [userId, province, municipality],
     );
   }
 
   /// Restore a soft-deleted location assignment using municipality_id
   Future<void> restoreLocationById(String userId, String municipalityId) async {
+    // Parse municipality_id to get province and municipality
+    final parts = municipalityId.split('-');
+    if (parts.length < 2) {
+      throw ArgumentError('Invalid municipality_id format. Expected "province-municipality"');
+    }
+    final province = parts[0];
+    final municipality = parts.slice(1).join('-');
+
     await _db.execute(
-      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND municipality_id = ?',
-      [userId, municipalityId],
+      'UPDATE user_locations SET deleted_at = NULL WHERE user_id = ? AND province = ? AND municipality = ?',
+      [userId, province, municipality],
     );
   }
 

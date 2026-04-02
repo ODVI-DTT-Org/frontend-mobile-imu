@@ -43,35 +43,8 @@ class UserLocation {
     return mun.province == province && mun.municipality == municipality;
   }
 
-  /// Create from PowerSync/PostgreSQL row (format: municipality_id as "province-municipality")
+  /// Create from PowerSync/PostgreSQL row (uses province and municipality columns)
   factory UserLocation.fromRow(Map<String, dynamic> row) {
-    final municipalityId = row['municipality_id'] as String?;
-    String province = '';
-    String municipality = '';
-
-    if (municipalityId != null && municipalityId.contains('-')) {
-      final parts = municipalityId.split('-');
-      province = parts.isNotEmpty ? parts[0] : '';
-      municipality = parts.length > 1 ? parts.sublist(1).join('-') : '';
-    }
-
-    return UserLocation(
-      id: row['id'] as String?,
-      userId: row['user_id'] as String,
-      province: province,
-      municipality: municipality,
-      assignedAt: row['assigned_at'] != null
-          ? DateTime.parse(row['assigned_at'] as String)
-          : null,
-      assignedBy: row['assigned_by'] as String?,
-      deletedAt: row['deleted_at'] != null
-          ? DateTime.parse(row['deleted_at'] as String)
-          : null,
-    );
-  }
-
-  /// Legacy: Create from old format with separate province and municipality columns
-  factory UserLocation.fromLegacyColumnsRow(Map<String, dynamic> row) {
     return UserLocation(
       id: row['id'] as String?,
       userId: row['user_id'] as String,
