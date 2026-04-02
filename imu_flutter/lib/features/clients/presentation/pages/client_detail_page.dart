@@ -19,7 +19,9 @@ import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
-import '../../data/models/client_model.dart';
+import '../../../../shared/utils/permission_helpers.dart';
+import '../../../clients/data/models/client_model.dart';
+import '../../../../core/models/user_role.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
 // Client detail provider
@@ -403,6 +405,18 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     if (!validation.isValid) {
       _showValidationError(validation);
+      return;
+    }
+
+    // RBAC: Check if user can create this touchpoint number based on their role
+    final authState = ref.watch(authNotifierProvider);
+    final userRole = authState.user?.role;
+
+    if (userRole == null || !isValidTouchpointNumberForRole(nextNumber, userRole)) {
+      // User's role doesn't allow this touchpoint number
+      if (mounted) {
+        PermissionDeniedDialog.show(context);
+      }
       return;
     }
 
