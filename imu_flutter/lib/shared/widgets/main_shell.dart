@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/haptic_utils.dart';
-import '../../core/models/user_role.dart';
-import '../../services/auth/auth_service.dart' show authNotifierProvider;
 import 'background_sync_indicator.dart';
 
 class MainShell extends StatelessWidget {
@@ -18,11 +16,47 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(child: child),
-          const BottomNavBar(),
+          // Main content
+          Column(
+            children: [
+              Expanded(child: child),
+              const BottomNavBar(),
+            ],
+          ),
+          // Sync status overlay (top-right)
+          const Positioned(
+            top: 16,
+            right: 16,
+            child: _SyncStatusOverlay(),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Sync status overlay positioned in top-right corner
+class _SyncStatusOverlay extends ConsumerWidget {
+  const _SyncStatusOverlay();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () {
+        // Show sync status sheet
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (context) => const BackgroundSyncSheet(),
+        );
+      },
+      child: const BackgroundSyncIndicator(
+        showLabel: false,
+        showPendingCount: true,
       ),
     );
   }
@@ -41,8 +75,6 @@ class BottomNavBar extends ConsumerWidget {
       return 2;
     } else if (location == '/clients') {
       return 3;
-    } else if (location == '/reports') {
-      return 4;
     }
     return 0;
   }
@@ -62,20 +94,12 @@ class BottomNavBar extends ConsumerWidget {
       case 3:
         context.go('/clients');
         break;
-      case 4:
-        context.go('/reports');
-        break;
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = _getCurrentIndex(context);
-
-    // Get user role to conditionally show Reports tab
-    final authState = ref.watch(authNotifierProvider);
-    final userRole = authState.user?.role;
-    final showReportsTab = userRole?.isManager ?? false;
 
     return Container(
       decoration: BoxDecoration(
@@ -118,47 +142,9 @@ class BottomNavBar extends ConsumerWidget {
                 isSelected: currentIndex == 3,
                 onTap: () => _onItemTapped(context, 3),
               ),
-              // Reports tab - only for managers
-              if (showReportsTab)
-                _NavItem(
-                  icon: LucideIcons.barChart3,
-                  label: 'Reports',
-                  isSelected: currentIndex == 4,
-                  onTap: () => _onItemTapped(context, 4),
-                ),
-              // Add sync indicator
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: _SyncIndicatorWrapper(),
-              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Wrapper widget for sync indicator to provide ConsumerWidget context
-class _SyncIndicatorWrapper extends ConsumerWidget {
-  const _SyncIndicatorWrapper();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return GestureDetector(
-      onTap: () {
-        // Show sync status sheet
-        showModalBottomSheet(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          builder: (context) => const BackgroundSyncSheet(),
-        );
-      },
-      child: const BackgroundSyncIndicator(
-        showLabel: false,
-        showPendingCount: true,
       ),
     );
   }
