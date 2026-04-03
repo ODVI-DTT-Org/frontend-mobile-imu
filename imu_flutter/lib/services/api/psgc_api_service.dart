@@ -155,7 +155,7 @@ class PsgcApiService {
   /// Get all regions
   Future<List<PsgcRegion>> getRegions() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/psgc/regions'),
+      Uri.parse('$baseUrl/psgc/regions'),
       headers: _headers,
     );
 
@@ -169,7 +169,7 @@ class PsgcApiService {
 
   /// Get provinces (optionally filtered by region)
   Future<List<PsgcProvince>> getProvinces({String? region}) async {
-    var url = '$baseUrl/api/psgc/provinces';
+    var url = '$baseUrl/psgc/provinces';
     if (region != null) {
       url += '?region=${Uri.encodeQueryComponent(region)}';
     }
@@ -193,7 +193,7 @@ class PsgcApiService {
     if (region != null) params['region'] = region;
     if (province != null) params['province'] = province;
 
-    var url = '$baseUrl/api/psgc/municipalities';
+    var url = '$baseUrl/psgc/municipalities';
     if (params.isNotEmpty) {
       url += '?' + params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
     }
@@ -226,7 +226,7 @@ class PsgcApiService {
     if (municipality != null) params['municipality'] = municipality;
     if (search != null) params['search'] = search;
 
-    final url = '$baseUrl/api/psgc/barangays?' +
+    final url = '$baseUrl/psgc/barangays?' +
         params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
 
     final response = await http.get(Uri.parse(url), headers: _headers);
@@ -253,7 +253,7 @@ class PsgcApiService {
   }) async {
     if (query.length < 2) return [];
 
-    final url = '$baseUrl/api/psgc/search?q=${Uri.encodeQueryComponent(query)}&level=$level&limit=$limit';
+    final url = '$baseUrl/psgc/search?q=${Uri.encodeQueryComponent(query)}&level=$level&limit=$limit';
 
     final response = await http.get(Uri.parse(url), headers: _headers);
 
@@ -268,7 +268,7 @@ class PsgcApiService {
   /// Get single barangay by ID
   Future<PsgcBarangay> getBarangayById(int id) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/psgc/barangays/$id'),
+      Uri.parse('$baseUrl/psgc/barangays/$id'),
       headers: _headers,
     );
 
