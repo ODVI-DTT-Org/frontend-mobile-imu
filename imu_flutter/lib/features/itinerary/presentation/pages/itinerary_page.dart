@@ -6,20 +6,17 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/swipeable_list_tile.dart';
-import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
+import '../../../../shared/widgets/action_bottom_sheet.dart';
+import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/itinerary_api_service.dart';
-import '../../../../services/api/client_api_service.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
-import '../../../../services/connectivity_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../features/clients/data/models/client_model.dart';
-import '../../../../shared/providers/app_providers.dart' show clientsProvider;
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
-import '../../../clients/presentation/pages/edit_client_page.dart';
 
 class ItineraryPage extends ConsumerStatefulWidget {
   const ItineraryPage({super.key});
@@ -33,6 +30,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   DateTime? _selectedCalendarDate;
   ItineraryItem? _recentlyDeletedVisit;
   int? _recentlyDeletedIndex;
+
+  // Multi-select state
+  final Set<String> _selectedVisitIds = {};
+  bool _isMultiSelectMode = false;
 
   @override
   void initState() {
@@ -59,60 +60,166 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
+  // Multi-select helper methods
+  void _exitMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = false;
+      _selectedVisitIds.clear();
+    });
+    HapticUtils.lightImpact();
+  }
+
+  void _toggleVisitSelection(String visitId) {
+    setState(() {
+      if (_selectedVisitIds.contains(visitId)) {
+        _selectedVisitIds.remove(visitId);
+        if (_selectedVisitIds.isEmpty) {
+          _isMultiSelectMode = false;
+        }
+      } else {
+        _selectedVisitIds.add(visitId);
+        if (!_isMultiSelectMode) {
+          _isMultiSelectMode = true;
+        }
+      }
+    });
+    HapticUtils.lightImpact();
+  }
+
+  bool _isVisitSelected(String visitId) {
+    return _selectedVisitIds.contains(visitId);
+  }
+
+  void _onVisitLongPress(ItineraryItem visit) {
+    // Enter multi-select mode and select this visit
+    if (!_isMultiSelectMode) {
+      setState(() {
+        _isMultiSelectMode = true;
+      });
+    }
+    _toggleVisitSelection(visit.id);
+  }
+
+  Future<void> _onBulkSubmitVisit() async {
+    if (_selectedVisitIds.isEmpty) return;
+
+    final state = ref.watch(todayItineraryProvider);
+    final selectedVisits = state.valueOrNull ?? [];
+    final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
+
+    if (filteredVisits.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No visits selected'),
+          backgroundColor: Color(0xFF64748B),
+        ),
+      );
+      return;
+    }
+
+    HapticUtils.lightImpact();
+
+    // Process each selected visit
+    for (final visit in filteredVisits) {
+      await _recordVisit(visit);
+    }
+
+    // Exit multi-select mode after processing
+    _exitMultiSelectMode();
+  }
+
+  Future<void> _onBulkRemove() async {
+    if (_selectedVisitIds.isEmpty) return;
+
+    final state = ref.watch(todayItineraryProvider);
+    final selectedVisits = state.valueOrNull ?? [];
+    final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
+
+    if (filteredVisits.isEmpty) return;
+
+    HapticUtils.lightImpact();
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Selected Visits'),
+        content: Text('Remove ${filteredVisits.length} visit(s) from itinerary?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              HapticUtils.lightImpact();
+              Navigator.pop(context, false);
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              HapticUtils.mediumImpact();
+              Navigator.pop(context, true);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (final visit in filteredVisits) {
+        _deleteVisit(visit.id);
+      }
+      // Exit multi-select mode after processing
+      _exitMultiSelectMode();
+    } else {
+      _exitMultiSelectMode();
+    }
+  }
+
   Future<void> _onVisitTap(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
-    // Show action dialog with options
+    // In multi-select mode, toggle selection instead of showing bottom sheet
+    if (_isMultiSelectMode) {
+      _toggleVisitSelection(visit.id);
+      return;
+    }
+
+    // Show action bottom sheet with options
     if (mounted) {
-      final action = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(visit.clientName),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (visit.address != null) ...[
-                Text(
-                  visit.address!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              const Text(
-                'What would you like to do?',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+      final action = await ActionBottomSheet.show(
+        context,
+        title: visit.clientName,
+        subtitle: visit.address,
+        options: [
+          ActionOption(
+            icon: LucideIcons.edit,
+            title: 'Edit Client',
+            description: 'View and update client information',
+            value: 'edit',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'edit'),
-              child: const Text('Edit Client'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'release'),
-              child: const Text('Release Loan'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, 'visit'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Record Visit'),
-            ),
-          ],
-        ),
+          ActionOption(
+            icon: LucideIcons.dollarSign,
+            title: 'Release Loan',
+            description: 'Mark loan as released',
+            value: 'release',
+          ),
+          ActionOption(
+            icon: LucideIcons.mapPin,
+            title: 'Record Visit',
+            description: 'Create a new touchpoint',
+            value: 'visit',
+          ),
+          ActionOption(
+            icon: LucideIcons.x,
+            title: 'Cancel',
+            value: 'cancel',
+            isDestructive: true,
+          ),
+        ],
       );
 
-      if (action == null) return;
+      if (action == null || action == 'cancel') return;
 
       switch (action) {
         case 'visit':
@@ -450,18 +557,15 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   }
 
   void _showClientSelector() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ClientSelectorModal(
-        selectedDate: _selectedDate,
-        ref: ref,
-        onClientAdded: () {
-          HapticUtils.success();
-          ref.invalidate(todayItineraryProvider);
-        },
-      ),
+    ClientSelectorModal.show(
+      context,
+      selectedDate: _selectedDate,
+      onClientAdded: () {
+        HapticUtils.success();
+        ref.invalidate(todayItineraryProvider);
+      },
+      title: 'Add to Itinerary',
+      showAssignedFilter: true,
     );
   }
 
@@ -503,16 +607,31 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final itineraryAsync = ref.watch(todayItineraryProvider);
     final targetDate = _selectedCalendarDate ?? _selectedDate;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addVisit,
-        backgroundColor: const Color(0xFF0F172A),
-        foregroundColor: Colors.white,
-        child: const Icon(LucideIcons.plus),
-      ),
-      body: SafeArea(
-        child: Column(
+    return PopScope(
+      canPop: !_isMultiSelectMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (_isMultiSelectMode && !didPop) {
+          _exitMultiSelectMode();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        floatingActionButton: FloatingActionButton(
+          onPressed: _addVisit,
+          backgroundColor: const Color(0xFF0F172A),
+          foregroundColor: Colors.white,
+          child: const Icon(LucideIcons.plus),
+        ),
+        body: GestureDetector(
+          // Handle tap outside to exit multi-select mode
+          onTap: () {
+            if (_isMultiSelectMode) {
+              _exitMultiSelectMode();
+            }
+          },
+          behavior: HitTestBehavior.opaque,
+          child: SafeArea(
+            child: Column(
           children: [
             // Header - centered title (per Figma)
             Container(
@@ -613,6 +732,18 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
             const SizedBox(height: 12),
 
+            // Multi-select header buttons (shown only in multi-select mode)
+            if (_isMultiSelectMode)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+                child: _MultiSelectHeaderButtons(
+                  selectedCount: _selectedVisitIds.length,
+                  onSubmitVisit: _onBulkSubmitVisit,
+                  onRemove: _onBulkRemove,
+                  onCancel: _exitMultiSelectMode,
+                ),
+              ),
+
             // Visits list
             Expanded(
               child: itineraryAsync.when(
@@ -703,6 +834,20 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                       itemCount: filteredItems.length,
                       itemBuilder: (context, index) {
                         final visit = filteredItems[index];
+
+                        // In multi-select mode, don't use SwipeableListTile
+                        if (_isMultiSelectMode) {
+                          return GestureDetector(
+                            onLongPress: () => _onVisitLongPress(visit),
+                            onTap: () => _onVisitTap(visit),
+                            child: _VisitCard(
+                              visit: visit,
+                              isSelected: _isVisitSelected(visit.id),
+                              isMultiSelectMode: true,
+                            ),
+                          );
+                        }
+
                         return SwipeableListTile(
                           leftActions: [
                             SwipeAction.call(() => _callClient('+63 912 345 6789')),
@@ -715,7 +860,12 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                           onTap: () async {
                             await _onVisitTap(visit);
                           },
-                          child: _VisitCard(visit: visit),
+                          onLongPress: () => _onVisitLongPress(visit),
+                          child: _VisitCard(
+                            visit: visit,
+                            isSelected: _isVisitSelected(visit.id),
+                            isMultiSelectMode: false,
+                          ),
                         );
                       },
                     ),
@@ -751,6 +901,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );
@@ -795,8 +947,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
 class _VisitCard extends StatelessWidget {
   final ItineraryItem visit;
+  final bool isSelected;
+  final bool isMultiSelectMode;
 
-  const _VisitCard({required this.visit});
+  const _VisitCard({
+    required this.visit,
+    this.isSelected = false,
+    this.isMultiSelectMode = false,
+  });
 
   String _getOrdinal(int number) {
     if (number >= 11 && number <= 13) return '${number}th';
@@ -821,23 +979,65 @@ class _VisitCard extends StatelessWidget {
     }
   }
 
+  Color _getPriorityColor(String? priority) {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+        return const Color(0xFFEF4444); // Red
+      case 'normal':
+        return const Color(0xFF3B82F6); // Blue
+      case 'low':
+        return const Color(0xFF64748B); // Slate
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatPriority(String? priority) {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+        return 'HIGH';
+      case 'normal':
+        return 'NORMAL';
+      case 'low':
+        return 'LOW';
+      default:
+        return 'NORMAL';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 17, vertical: 6),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
         border: Border(
           bottom: BorderSide(
-            color: Colors.grey.shade200,
-            width: 1,
+            color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade200,
+            width: isSelected ? 2 : 1,
           ),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Selection checkmark indicator (shown in multi-select mode)
+          if (isMultiSelectMode)
+            Container(
+              width: 24,
+              height: 24,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade300,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                LucideIcons.check,
+                size: 14,
+                color: isSelected ? Colors.white : Colors.grey.shade600,
+              ),
+            ),
           // Left side: Touchpoint + Client info
           Expanded(
             child: Row(
@@ -896,12 +1096,35 @@ class _VisitCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Right side: Status and notes
+          // Right side: Priority, Status and notes
           SizedBox(
             width: 133,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Priority badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getPriorityColor(visit.priority).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _getPriorityColor(visit.priority).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    _formatPriority(visit.priority),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: _getPriorityColor(visit.priority),
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -920,7 +1143,7 @@ class _VisitCard extends StatelessWidget {
                   ),
                 ),
                 if (visit.notes != null && visit.notes!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     visit.notes!,
                     style: TextStyle(
@@ -1410,620 +1633,6 @@ class _VisitFormModalState extends State<_VisitFormModal> {
   }
 }
 
-/// Client selector modal for adding clients to itinerary
-class _ClientSelectorModal extends StatefulWidget {
-  final DateTime selectedDate;
-  final Function() onClientAdded;
-  final WidgetRef ref;
-
-  const _ClientSelectorModal({
-    required this.selectedDate,
-    required this.onClientAdded,
-    required this.ref,
-  });
-
-  @override
-  State<_ClientSelectorModal> createState() => _ClientSelectorModalState();
-}
-
-class _ClientSelectorModalState extends State<_ClientSelectorModal> {
-  final _searchController = TextEditingController();
-  List<Client> _allClients = [];
-  List<Client> _clients = [];
-  List<Client> _filteredClients = [];
-  Set<String> _addingClientIds = {};
-  bool _isLoading = true;
-  String? _error;
-  String _clientFilter = 'assigned'; // 'assigned' or 'all'
-
-  @override
-  void initState() {
-    super.initState();
-    _loadClients();
-    _searchController.addListener(_filterClients);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadClients() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      // Wait for clients to be loaded
-      List<Client> clients = [];
-      int retries = 0;
-
-      while (clients.isEmpty && retries < 10) {
-        // Use ref.read to get current state
-        final clientsAsync = widget.ref.read(clientsProvider);
-
-        clientsAsync.when(
-          data: (data) {
-            clients = data;
-          },
-          loading: () {
-            // Still loading, wait a bit
-          },
-          error: (error, _) {
-            if (mounted) {
-              setState(() {
-                _error = error.toString();
-                _isLoading = false;
-              });
-            }
-            return;
-          },
-        );
-
-        if (clients.isEmpty) {
-          await Future.delayed(const Duration(milliseconds: 200));
-          retries++;
-        } else {
-          break;
-        }
-      }
-
-      // Get today's itinerary to filter out already added clients
-      final itineraryAsync = widget.ref.read(todayItineraryProvider);
-      final today = DateTime.now();
-
-      Set<String> existingClientIds = {};
-      itineraryAsync.when(
-        data: (items) {
-          existingClientIds = items
-              .where((item) => item.scheduledDate.year == today.year &&
-                             item.scheduledDate.month == today.month &&
-                             item.scheduledDate.day == today.day)
-              .map((item) => item.clientId)
-              .toSet();
-        },
-        loading: () {},
-        error: (_, __) {},
-      );
-
-      // Filter out clients already in today's itinerary
-      _allClients = clients.where((client) => !existingClientIds.contains(client.id)).toList();
-
-      // Apply filter (assigned vs all)
-      _applyClientFilter();
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  void _applyClientFilter() {
-    if (_clientFilter == 'all') {
-      _clients = _allClients;
-    } else {
-      // For 'assigned', show all clients (no municipality filtering in this context)
-      // The user can select any client to add to their itinerary
-      _clients = _allClients;
-    }
-    _filterClients(); // Apply search filter
-  }
-
-  void _filterClients() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredClients = _clients;
-      } else {
-        _filteredClients = _clients.where((client) {
-          final fullName = '${client.firstName} ${client.lastName} ${client.middleName ?? ''}'.toLowerCase();
-          final email = (client.email ?? '').toLowerCase();
-          return fullName.contains(query) || email.contains(query);
-        }).toList();
-      }
-    });
-  }
-
-  Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
-    if (client.id == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid client: missing ID'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    // Validate UUID format
-    final uuidRegex = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false);
-    if (!uuidRegex.hasMatch(client.id!)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Invalid client ID format: ${client.id}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    setState(() {
-      _addingClientIds.add(client.id!);
-    });
-
-    try {
-      final itineraryApi = ItineraryApiService();
-      final targetDate = customDate ?? widget.selectedDate;
-
-      // Always use createItinerary to add to the itinerary system
-      await itineraryApi.createItinerary(
-        clientId: client.id!,
-        scheduledDate: targetDate,
-        status: 'pending',
-        priority: 'normal',
-      );
-
-      if (mounted) {
-        HapticUtils.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(customDate == null
-                ? '${client.firstName} ${client.lastName} added to Today'
-                : '${client.firstName} ${client.lastName} added to ${_formatDateShort(customDate)}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
-        // Remove client from list
-        setState(() {
-          _clients.remove(client);
-          _filterClients();
-        });
-
-        // Close modal immediately
-        if (mounted) Navigator.pop(context);
-
-        // Trigger parent refresh after modal closes
-        Future.delayed(const Duration(milliseconds: 100), () {
-          widget.onClientAdded();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        HapticUtils.error();
-        debugPrint('Error adding client to itinerary: $e');
-
-        // Check if it's the specific "already in itinerary" error
-        String errorMessage = e.toString();
-        if (errorMessage.contains('Client already in today\'s itinerary') ||
-            errorMessage.contains('already in today\'s itinerary') ||
-            errorMessage.contains('already has an itinerary for this date') ||
-            errorMessage.contains('already in My Day')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${client.firstName} ${client.lastName} is already in the itinerary for this date'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to add client: ${errorMessage}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } finally {
-      setState(() {
-        _addingClientIds.remove(client.id!);
-      });
-    }
-  }
-
-  String _formatDateShort(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}';
-  }
-
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _clientFilter == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _clientFilter = value;
-        });
-        _applyClientFilter();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0F172A) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey[700],
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey[200]!),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add to Itinerary',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('EEEE, MMMM d').format(widget.selectedDate),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.x),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            // Search bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search clients...',
-                  prefixIcon: const Icon(LucideIcons.search, size: 20),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(LucideIcons.x, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            _filterClients();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-              ),
-            ),
-            // Filter toggle
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  _buildFilterChip('Assigned', 'assigned'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('All Clients', 'all'),
-                ],
-              ),
-            ),
-            // Client list
-            Expanded(
-              child: _buildClientList(scrollController),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClientList(ScrollController? scrollController) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.alertCircle, size: 48, color: Colors.red.shade400),
-            const SizedBox(height: 16),
-            Text('Failed to load clients', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadClients,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_filteredClients.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.users, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              _searchController.text.isEmpty ? 'No clients available' : 'No clients found',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _searchController.text.isEmpty
-                  ? 'All clients have been added to today\'s itinerary'
-                  : 'Try a different search term',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _filteredClients.length,
-      itemBuilder: (context, index) {
-        final client = _filteredClients[index];
-        final isAdding = _addingClientIds.contains(client.id);
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Client info row
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: client.clientType == ClientType.existing
-                          ? Colors.green.shade100
-                          : Colors.blue.shade100,
-                      child: Text(
-                        '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
-                        style: TextStyle(
-                          color: client.clientType == ClientType.existing ? Colors.green.shade700 : Colors.blue.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${client.firstName} ${client.lastName}',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                          ),
-                          if (client.email != null && client.email!.isNotEmpty)
-                            Text(
-                              client.email!,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                          if (client.phone != null && client.phone!.isNotEmpty)
-                            Text(
-                              client.phone!,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (client.clientType != null)
-                      Chip(
-                        label: Text(
-                          client.clientType!.name.toUpperCase(),
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-                        ),
-                        backgroundColor: client.clientType == ClientType.existing
-                            ? Colors.green.shade50
-                            : Colors.blue.shade50,
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Action buttons row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: LucideIcons.calendar,
-                        label: 'Add to Today',
-                        isPrimary: true,
-                        isLoading: isAdding,
-                        onTap: () => _addClientToItinerary(client),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: LucideIcons.calendarClock,
-                        label: 'Add with Date',
-                        isPrimary: false,
-                        isLoading: isAdding,
-                        onTap: () => _showDatePicker(client),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required bool isPrimary,
-    required bool isLoading,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: isLoading ? null : onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isLoading
-              ? Colors.grey.shade200
-              : isPrimary
-                  ? const Color(0xFF0F172A)
-                  : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isPrimary ? const Color(0xFF0F172A) : Colors.grey.shade300,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isLoading)
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    isPrimary ? Colors.white : Colors.grey.shade600,
-                  ),
-                ),
-              )
-            else
-              Icon(
-                icon,
-                size: 14,
-                color: isPrimary ? Colors.white : const Color(0xFF0F172A),
-              ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isLoading
-                    ? Colors.grey.shade500
-                    : isPrimary
-                        ? Colors.white
-                        : const Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showDatePicker(Client client) async {
-    HapticUtils.lightImpact();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-
-    if (picked != null) {
-      // Normalize the picked date to midnight to avoid timezone issues
-      final normalizedDate = DateTime(picked.year, picked.month, picked.day);
-      await _addClientToItinerary(client, customDate: normalizedDate);
-    }
-  }
-}
-
 /// Dialog for Release Loan with UDI number input
 class _ReleaseLoanDialog extends StatefulWidget {
   final String clientName;
@@ -2133,6 +1742,142 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
           child: const Text('Submit Request'),
         ),
       ],
+    );
+  }
+}
+
+/// Multi-select header buttons: Submit Visit, Remove, Cancel
+class _MultiSelectHeaderButtons extends StatelessWidget {
+  final int selectedCount;
+  final VoidCallback onSubmitVisit;
+  final VoidCallback onRemove;
+  final VoidCallback onCancel;
+
+  const _MultiSelectHeaderButtons({
+    required this.selectedCount,
+    required this.onSubmitVisit,
+    required this.onRemove,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Selection count text
+        Text(
+          '$selectedCount visit${selectedCount == 1 ? '' : 's'} selected',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF3B82F6),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Action buttons
+        Row(
+          children: [
+            // Submit Visit button
+            Expanded(
+              child: _PillButton(
+                icon: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF0F172A)),
+                label: 'Submit Visit',
+                onTap: onSubmitVisit,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Remove button
+            Expanded(
+              child: _PillButton(
+                icon: const Icon(LucideIcons.trash2, size: 16, color: Color(0xFFEF4444)),
+                label: 'Remove',
+                onTap: onRemove,
+                isDestructive: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Cancel button
+            GestureDetector(
+              onTap: () {
+                HapticUtils.lightImpact();
+                onCancel();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Icon(
+                  LucideIcons.x,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  final Widget icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _PillButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticUtils.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDestructive
+              ? const Color(0xFFFEF2F2)
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDestructive
+                ? const Color(0xFFEF4444).withOpacity(0.3)
+                : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            icon,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isDestructive
+                      ? const Color(0xFFEF4444)
+                      : const Color(0xFF0F172A),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

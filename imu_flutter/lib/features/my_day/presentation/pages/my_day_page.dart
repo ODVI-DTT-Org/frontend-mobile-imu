@@ -6,13 +6,13 @@ import 'package:intl/intl.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
+import '../../../../shared/widgets/action_bottom_sheet.dart';
+import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
-import '../../../../services/api/client_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../features/clients/data/models/client_model.dart';
-import '../../../../features/clients/presentation/pages/edit_client_page.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';
 import '../widgets/client_card.dart';
@@ -28,6 +28,10 @@ class MyDayPage extends ConsumerStatefulWidget {
 }
 
 class _MyDayPageState extends ConsumerState<MyDayPage> {
+  // Multi-select state
+  final Set<String> _selectedClientIds = {};
+  bool _isMultiSelectMode = false;
+
   Future<void> _handleRefresh() async {
     HapticUtils.pullToRefresh();
     await LoadingHelper.withLoading(
@@ -35,6 +39,133 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       message: 'Refreshing...',
       operation: () => ref.read(myDayStateProvider.notifier).refresh(),
     );
+  }
+
+  // Multi-select helper methods
+  void _toggleMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = !_isMultiSelectMode;
+      if (!_isMultiSelectMode) {
+        _selectedClientIds.clear();
+      }
+    });
+  }
+
+  void _exitMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = false;
+      _selectedClientIds.clear();
+    });
+    HapticUtils.lightImpact();
+  }
+
+  void _toggleClientSelection(String clientId) {
+    setState(() {
+      if (_selectedClientIds.contains(clientId)) {
+        _selectedClientIds.remove(clientId);
+        if (_selectedClientIds.isEmpty) {
+          _isMultiSelectMode = false;
+        }
+      } else {
+        _selectedClientIds.add(clientId);
+        if (!_isMultiSelectMode) {
+          _isMultiSelectMode = true;
+        }
+      }
+    });
+    HapticUtils.lightImpact();
+  }
+
+  bool _isClientSelected(String clientId) {
+    return _selectedClientIds.contains(clientId);
+  }
+
+  Future<void> _onBulkSubmitVisit() async {
+    if (_selectedClientIds.isEmpty) return;
+
+    final selectedClients = ref.read(myDayStateProvider).clients.where((c) => _selectedClientIds.contains(c.id)).toList();
+
+    if (selectedClients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No clients selected'),
+          backgroundColor: Color(0xFF64748B),
+        ),
+      );
+      return;
+    }
+
+    HapticUtils.lightImpact();
+
+    // Process each selected client
+    for (final client in selectedClients) {
+      await _recordVisit(client);
+    }
+
+    // Exit multi-select mode after processing
+    _exitMultiSelectMode();
+  }
+
+  Future<void> _onBulkRemove() async {
+    if (_selectedClientIds.isEmpty) return;
+
+    final selectedClients = ref.read(myDayStateProvider).clients.where((c) => _selectedClientIds.contains(c.id)).toList();
+
+    if (selectedClients.isEmpty) return;
+
+    HapticUtils.lightImpact();
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Selected Clients'),
+        content: Text('Remove ${selectedClients.length} client(s) from today\'s list?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              HapticUtils.lightImpact();
+              Navigator.pop(context, false);
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              HapticUtils.mediumImpact();
+              Navigator.pop(context, true);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Removing clients...',
+        operation: () async {
+          final myDayApiService = ref.read(myDayApiServiceProvider);
+          for (final client in selectedClients) {
+            await myDayApiService.removeFromMyDay(client.id);
+          }
+          if (mounted) {
+            HapticUtils.success();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${selectedClients.length} client(s) removed from My Day'),
+                backgroundColor: const Color(0xFF22C55E),
+              ),
+            );
+            await ref.read(myDayStateProvider.notifier).refresh();
+          }
+        },
+      );
+    }
+
+    // Exit multi-select mode after processing
+    _exitMultiSelectMode();
   }
 
   void _onMultipleTimeIn() {
@@ -80,67 +211,17 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
   void _showRecordVisitOptions(BuildContext context) {
     HapticUtils.lightImpact();
-    final state = ref.read(myDayStateProvider);
 
-    if (state.clients.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No clients available for recording'),
-          backgroundColor: Color(0xFF64748B),
-        ),
-      );
-      return;
-    }
-
-    // Show bottom sheet with client list
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Record Visit',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(LucideIcons.x),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Select a client to record a visit:',
-              style: TextStyle(color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 16),
-            ...state.clients.map((client) => ListTile(
-                  leading: const Icon(LucideIcons.user, color: Color(0xFF0F172A)),
-                  title: Text(client.fullName),
-                  subtitle: client.location != null
-                      ? Text(client.location!)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onClientTap(client);
-                  },
-                )),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+    // Show client selector modal to add clients to today's itinerary
+    ClientSelectorModal.show(
+      context,
+      selectedDate: DateTime.now(),
+      onClientAdded: () async {
+        // Refresh My Day after client is added
+        await ref.read(myDayStateProvider.notifier).refresh();
+      },
+      title: 'Add to My Day',
+      showAssignedFilter: true,
     );
   }
 
@@ -195,57 +276,47 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   void _onClientTap(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    // Show action dialog with options
+    // In multi-select mode, toggle selection instead of showing bottom sheet
+    if (_isMultiSelectMode) {
+      _toggleClientSelection(client.id);
+      return;
+    }
+
+    // Show action bottom sheet with options
     if (mounted) {
-      final action = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(client.fullName),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (client.location != null && client.location!.isNotEmpty) ...[
-                Text(
-                  client.location!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              const Text(
-                'What would you like to do?',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+      final action = await ActionBottomSheet.show(
+        context,
+        title: client.fullName,
+        subtitle: client.location,
+        options: [
+          ActionOption(
+            icon: LucideIcons.edit,
+            title: 'Edit Client',
+            description: 'View and update client information',
+            value: 'edit',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'edit'),
-              child: const Text('Edit Client'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'release'),
-              child: const Text('Release Loan'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, 'visit'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Record Visit'),
-            ),
-          ],
-        ),
+          ActionOption(
+            icon: LucideIcons.dollarSign,
+            title: 'Release Loan',
+            description: 'Mark loan as released',
+            value: 'release',
+          ),
+          ActionOption(
+            icon: LucideIcons.mapPin,
+            title: 'Record Visit',
+            description: 'Create a new touchpoint',
+            value: 'visit',
+          ),
+          ActionOption(
+            icon: LucideIcons.x,
+            title: 'Cancel',
+            value: 'cancel',
+            isDestructive: true,
+          ),
+        ],
       );
 
-      if (action == null) return;
+      if (action == null || action == 'cancel') return;
 
       switch (action) {
         case 'visit':
@@ -380,6 +451,16 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     context.push('/clients/${client.id}/edit');
   }
 
+  void _onClientLongPress(MyDayClient client) {
+    // Enter multi-select mode and select this client
+    if (!_isMultiSelectMode) {
+      setState(() {
+        _isMultiSelectMode = true;
+      });
+    }
+    _toggleClientSelection(client.id);
+  }
+
   /// Show dialog when all 7 touchpoints are completed
   void _showTouchpointCompletionDialog(String clientName) {
     showDialog(
@@ -477,26 +558,41 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(myDayStateProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: PullToRefresh(
-          onRefresh: _handleRefresh,
-          child: state.isLoading
-              ? const MyDaySkeleton()
-              : state.error != null
-                  ? _buildErrorState(state.error!)
-                  : _buildContent(state.clients),
+    return PopScope(
+      canPop: !_isMultiSelectMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (_isMultiSelectMode && !didPop) {
+          _exitMultiSelectMode();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: GestureDetector(
+          // Handle tap outside to exit multi-select mode
+          onTap: () {
+            if (_isMultiSelectMode) {
+              _exitMultiSelectMode();
+            }
+          },
+          behavior: HitTestBehavior.opaque,
+          child: SafeArea(
+            child: PullToRefresh(
+              onRefresh: _handleRefresh,
+              child: state.isLoading
+                  ? const MyDaySkeleton()
+                  : state.error != null
+                      ? _buildErrorState(state.error!)
+                      : _buildContent(state.clients),
+            ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _showRecordVisitOptions(context),
+          backgroundColor: const Color(0xFF0F172A),
+          foregroundColor: Colors.white,
+          child: const Icon(LucideIcons.plus),
         ),
       ),
-      floatingActionButton: state.clients.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () => _showRecordVisitOptions(context),
-              icon: const Icon(LucideIcons.mapPin),
-              label: const Text('Record Visit'),
-              backgroundColor: const Color(0xFF0F172A),
-            )
-          : null,
     );
   }
 
@@ -651,11 +747,19 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
                 const SizedBox(height: 16),
 
-                // Header buttons
-                HeaderButtons(
-                  onMultipleTimeIn: _onMultipleTimeIn,
-                  onAddClient: _onAddNewVisit,
-                ),
+                // Header buttons - change based on multi-select mode
+                if (!_isMultiSelectMode)
+                  HeaderButtons(
+                    onMultipleTimeIn: _onMultipleTimeIn,
+                    onAddClient: _onAddNewVisit,
+                  )
+                else
+                  _MultiSelectHeaderButtons(
+                    selectedCount: _selectedClientIds.length,
+                    onSubmitVisit: _onBulkSubmitVisit,
+                    onRemove: _onBulkRemove,
+                    onCancel: _exitMultiSelectMode,
+                  ),
               ],
             ),
           ),
@@ -733,6 +837,9 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                   client: client,
                   onTap: () => _onClientTap(client),
                   onRemove: () => _confirmRemoveClient(client),
+                  onLongPress: () => _onClientLongPress(client),
+                  isSelected: _isClientSelected(client.id),
+                  isMultiSelectMode: _isMultiSelectMode,
                 ),
               ),
             ),
@@ -853,6 +960,142 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
           child: const Text('Submit Request'),
         ),
       ],
+    );
+  }
+}
+
+/// Multi-select header buttons: Submit Visit, Remove, Cancel
+class _MultiSelectHeaderButtons extends StatelessWidget {
+  final int selectedCount;
+  final VoidCallback onSubmitVisit;
+  final VoidCallback onRemove;
+  final VoidCallback onCancel;
+
+  const _MultiSelectHeaderButtons({
+    required this.selectedCount,
+    required this.onSubmitVisit,
+    required this.onRemove,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Selection count text
+        Text(
+          '$selectedCount client${selectedCount == 1 ? '' : 's'} selected',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF3B82F6),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Action buttons
+        Row(
+          children: [
+            // Submit Visit button
+            Expanded(
+              child: _PillButton(
+                icon: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF0F172A)),
+                label: 'Submit Visit',
+                onTap: onSubmitVisit,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Remove button
+            Expanded(
+              child: _PillButton(
+                icon: const Icon(LucideIcons.trash2, size: 16, color: Color(0xFFEF4444)),
+                label: 'Remove',
+                onTap: onRemove,
+                isDestructive: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Cancel button
+            GestureDetector(
+              onTap: () {
+                HapticUtils.lightImpact();
+                onCancel();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Icon(
+                  LucideIcons.x,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  final Widget icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _PillButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticUtils.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDestructive
+              ? const Color(0xFFFEF2F2)
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDestructive
+                ? const Color(0xFFEF4444).withOpacity(0.3)
+                : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            icon,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isDestructive
+                      ? const Color(0xFFEF4444)
+                      : const Color(0xFF0F172A),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

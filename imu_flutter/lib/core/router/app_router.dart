@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
-import '../../features/auth/presentation/pages/pin_setup_page.dart';
-import '../../features/auth/presentation/pages/pin_entry_page.dart';
+// PIN SETUP/ENTRY DISABLED - Commenting out to focus on core authentication
+// import '../../features/auth/presentation/pages/pin_setup_page.dart';
+// import '../../features/auth/presentation/pages/pin_entry_page.dart';
 import '../../features/auth/presentation/pages/permission_request_page.dart';
 import '../../features/sync/presentation/pages/sync_loading_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
@@ -27,7 +28,7 @@ import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../shared/widgets/main_shell.dart';
 import '../../services/auth/auth_service.dart';
-import '../../services/auth/secure_storage_service.dart';
+// import '../../services/auth/secure_storage_service.dart'; // PIN functionality disabled
 
 // Auth state provider - derives from AuthNotifier
 final authStateProvider = Provider<bool>((ref) {
@@ -35,54 +36,57 @@ final authStateProvider = Provider<bool>((ref) {
   return authState.isAuthenticated;
 });
 
-// PIN state notifier
-class PinStateNotifier extends StateNotifier<AsyncValue<bool>> {
-  final SecureStorageService _secureStorage;
-
-  PinStateNotifier(this._secureStorage) : super(const AsyncValue.loading()) {
-    // Check PIN status on initialization (independent of auth state)
-    checkPinStatus();
-  }
-
-  Future<void> checkPinStatus() async {
-    state = const AsyncValue.loading();
-    try {
-      final hasPin = await _secureStorage.hasPin();
-      state = AsyncValue.data(hasPin);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-
-  void setHasPin(bool value) {
-    state = AsyncValue.data(value);
-  }
-}
-
-// Has PIN provider - uses StateNotifier for refreshable state
-// Checks PIN status on initialization and when auth state changes
-final pinStateProvider = StateNotifierProvider<PinStateNotifier, AsyncValue<bool>>((ref) {
-  final notifier = PinStateNotifier(SecureStorageService());
-
-  // Refresh PIN status when auth state changes (for logout scenarios)
-  ref.listen(authStateProvider, (previous, next) {
-    if (previous != next) {
-      notifier.checkPinStatus();
-    }
-  });
-
-  return notifier;
-});
-
-// Legacy provider for backwards compatibility
-final hasPinProvider = Provider<AsyncValue<bool>>((ref) {
-  return ref.watch(pinStateProvider);
-});
+// PIN FUNCTIONALITY DISABLED - Commenting out to focus on core authentication
+// // PIN state notifier
+// class PinStateNotifier extends StateNotifier<AsyncValue<bool>> {
+//   final SecureStorageService _secureStorage;
+//
+//   PinStateNotifier(this._secureStorage) : super(const AsyncValue.loading()) {
+//     // Check PIN status on initialization (independent of auth state)
+//     checkPinStatus();
+//   }
+//
+//   Future<void> checkPinStatus() async {
+//     state = const AsyncValue.loading();
+//     try {
+//       final hasPin = await _secureStorage.hasPin();
+//       state = AsyncValue.data(hasPin);
+//     } catch (e, st) {
+//       state = AsyncValue.error(e, st);
+//     }
+//   }
+//
+//   void setHasPin(bool value) {
+//     state = AsyncValue.data(value);
+//   }
+// }
+//
+// // Has PIN provider - uses StateNotifier for refreshable state
+// // Checks PIN status on initialization and when auth state changes
+// final pinStateProvider = StateNotifierProvider<PinStateNotifier, AsyncValue<bool>>((ref) {
+//   final notifier = PinStateNotifier(SecureStorageService());
+//
+//   // Refresh PIN status when auth state changes (for logout scenarios)
+//   ref.listen(authStateProvider, (previous, next) {
+//     if (previous != next) {
+//       notifier.checkPinStatus();
+//     }
+//   });
+//
+//   return notifier;
+// });
+//
+// // Legacy provider for backwards compatibility
+// final hasPinProvider = Provider<AsyncValue<bool>>((ref) {
+//   return ref.watch(pinStateProvider);
+// });
 
 // Router provider
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuthenticated = ref.watch(authStateProvider);
-  final hasPin = ref.watch(hasPinProvider);
+
+  // PIN FUNCTIONALITY DISABLED - Focus on core JWT authentication
+  // final hasPin = ref.watch(hasPinProvider);
 
   return GoRouter(
     initialLocation: '/login',
@@ -90,35 +94,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuth = isAuthenticated;
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/forgot-password') ||
-          state.matchedLocation.startsWith('/pin-setup') ||
-          state.matchedLocation.startsWith('/pin-entry') ||
+          // PIN SETUP/ENTRY DISABLED
+          // state.matchedLocation.startsWith('/pin-setup') ||
+          // state.matchedLocation.startsWith('/pin-entry') ||
           state.matchedLocation.startsWith('/permissions');
 
-      // Wait for PIN status to load before making routing decisions
-      if (!hasPin.hasValue) {
-        return null; // Still loading PIN status
-      }
+      // PIN FUNCTIONALITY DISABLED - Skip PIN status check
+      // // Wait for PIN status to load before making routing decisions
+      // if (!hasPin.hasValue) {
+      //   return null; // Still loading PIN status
+      // }
 
       // NOT AUTHENTICATED FLOW
       if (!isAuth) {
-        // Trying to access protected route -> determine login method
+        // Trying to access protected route -> go to login
         if (!isAuthRoute) {
-          // If PIN exists, go to PIN entry for quick login
-          if (hasPin.value == true) {
-            return '/pin-entry';
-          }
-          // Otherwise go to email/password login
           return '/login';
         }
-
-        // On login page but PIN exists -> allow staying on login page if user chose "Use password instead"
-        // Check for query parameter that indicates user wants to use password
-        final usePassword = state.uri.queryParameters['use_password'] == 'true';
-        if (state.matchedLocation.startsWith('/login') && hasPin.value == true && !usePassword) {
-          return '/pin-entry';
-        }
-
-        // Let user stay on other auth routes (forgot-password, pin-entry, pin-setup)
+        // Let user stay on auth routes (forgot-password, login)
         return null;
       }
 
@@ -128,36 +121,31 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // Authenticated user without PIN needs to go through setup flow
-      if (hasPin.value == false) {
-        // User just logged in (on login page) -> go to permissions first
-        if (state.matchedLocation.startsWith('/login')) {
-          return '/permissions';
-        }
-        // User is on other auth routes, let them stay
-        if (state.matchedLocation.startsWith('/pin-setup') ||
-            state.matchedLocation.startsWith('/pin-entry') ||
-            state.matchedLocation.startsWith('/forgot-password')) {
-          return null;
-        }
-        // User trying to access protected route without PIN -> go to pin setup
-        return '/pin-setup';
-      }
+      // PIN SETUP DISABLED - Skip PIN setup flow, go directly to sync loading
+      // // Authenticated user without PIN needs to go through setup flow
+      // if (hasPin.value == false) {
+      //   // User just logged in (on login page) -> go to permissions first
+      //   if (state.matchedLocation.startsWith('/login')) {
+      //     return '/permissions';
+      //   }
+      //   // User is on other auth routes, let them stay
+      //   if (state.matchedLocation.startsWith('/pin-setup') ||
+      //       state.matchedLocation.startsWith('/pin-entry') ||
+      //       state.matchedLocation.startsWith('/forgot-password')) {
+      //     return null;
+      //   }
+      //   // User trying to access protected route without PIN -> go to pin setup
+      //   return '/pin-setup';
+      // }
 
-      // Authenticated and on auth route (with PIN) -> go to sync loading, PIN entry, or home
-      // Note: We don't redirect away from /pin-entry - user needs to verify their PIN
-      if (isAuthRoute && !state.matchedLocation.startsWith('/pin')) {
+      // Authenticated and on auth route -> go to sync loading or home
+      if (isAuthRoute) {
         // If user just successfully logged in on /login page, go to sync loading
-        // Otherwise (fresh app start), go to PIN entry for quick login
         if (state.matchedLocation.startsWith('/login')) {
           return '/sync-loading';
         }
-        return '/pin-entry';
-      }
-
-      // CRITICAL FIX: Authenticated user on PIN entry page -> redirect to sync-loading
-      // This prevents the redirect loop where user stays on PIN entry after successful PIN verification
-      if (state.matchedLocation.startsWith('/pin-entry') && isAuth) {
+        // PIN ENTRY DISABLED - Go directly to sync loading instead of PIN entry
+        // return '/pin-entry';
         return '/sync-loading';
       }
 
@@ -173,14 +161,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordPage(),
       ),
-      GoRoute(
-        path: '/pin-setup',
-        builder: (context, state) => const PinSetupPage(),
-      ),
-      GoRoute(
-        path: '/pin-entry',
-        builder: (context, state) => const PinEntryPage(),
-      ),
+      // PIN SETUP/ENTRY DISABLED - Commenting out to focus on core authentication
+      // GoRoute(
+      //   path: '/pin-setup',
+      //   builder: (context, state) => const PinSetupPage(),
+      // ),
+      // GoRoute(
+      //   path: '/pin-entry',
+      //   builder: (context, state) => const PinEntryPage(),
+      // ),
       GoRoute(
         path: '/permissions',
         builder: (context, state) => const PermissionRequestPage(),
@@ -190,7 +179,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SyncLoadingPage(),
       ),
 
-      // Main app shell with bottom navigation (4 tabs: Home, My Day, Itinerary, Clients)
+      // Main app shell with bottom navigation (5 tabs: Home, My Day, Itinerary, Clients, Profile)
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
@@ -209,6 +198,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/clients',
             builder: (context, state) => const ClientsPage(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfilePage(),
           ),
         ],
       ),
@@ -266,12 +259,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsPage(),
-      ),
-
-      // Profile route
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfilePage(),
       ),
 
       // Missed visits route
