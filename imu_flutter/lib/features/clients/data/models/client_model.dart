@@ -683,9 +683,10 @@ class Touchpoint {
 }
 
 /// Touchpoint type enum with API-compatible values
+/// Backend constraint: CHECK (touchpoint_type IN ('Visit', 'Call'))
 enum TouchpointType {
-  visit('VISIT'),
-  call('CALL');
+  visit('Visit'),
+  call('Call');
 
   final String _apiValue;
   const TouchpointType(this._apiValue);
@@ -693,8 +694,12 @@ enum TouchpointType {
   String get apiValue => _apiValue;
 
   static TouchpointType fromApi(String value) {
+    // Handle both title case ('Visit', 'Call') and uppercase ('VISIT', 'CALL')
+    // for backward compatibility with any existing uppercase data
+    final normalizedValue = value.toLowerCase();
     return TouchpointType.values.firstWhere(
-      (e) => e._apiValue == value.toUpperCase(),
+      (e) => e.name.toLowerCase() == normalizedValue ||
+              e._apiValue.toLowerCase() == normalizedValue,
       orElse: () => TouchpointType.visit,
     );
   }

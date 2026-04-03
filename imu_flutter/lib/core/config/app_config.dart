@@ -69,7 +69,18 @@ class AppConfig {
     if (kIsWeb) {
       _postgresApiUrl = 'https://imu-api.cfbtools.app/api';
       _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
-      _jwtSecret = dotenv.env['JWT_SECRET'] ?? 'dev-secret';
+      _jwtSecret = dotenv.env['JWT_SECRET'] ?? '';
+
+      // Web production requires JWT_SECRET to be configured
+      if (_jwtSecret.isEmpty) {
+        throw StateError(
+          'JWT_SECRET environment variable is required but not configured.\n'
+          'Please set JWT_SECRET in your environment variables or .env file.\n'
+          'For development, use a random string of at least 32 characters.\n'
+          'For production, use a cryptographically secure random secret.',
+        );
+      }
+
       _jwtExpiryHours = 24;
       _appName = 'IMU Web';
       _debugMode = false;
@@ -77,7 +88,25 @@ class AppConfig {
     } else {
       _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
       _postgresApiUrl = dotenv.env['POSTGRES_API_URL'] ?? 'https://imu-api.cfbtools.app/api';
-      _jwtSecret = dotenv.env['JWT_SECRET'] ?? 'dev-secret';
+      _jwtSecret = dotenv.env['JWT_SECRET'] ?? '';
+
+      // Mobile requires JWT_SECRET to be configured
+      if (_jwtSecret.isEmpty) {
+        throw StateError(
+          'JWT_SECRET environment variable is required but not configured.\n'
+          'Please add JWT_SECRET to your .env file.\n'
+          'For development (.env.dev), use a random string of at least 32 characters.\n'
+          'For production (.env.prod), use a cryptographically secure random secret.\n'
+          'Generate one with: openssl rand -base64 32',
+        );
+      }
+
+      // Warn if using a weak secret
+      if (_jwtSecret.length < 32) {
+        debugPrint('⚠️  WARNING: JWT_SECRET is less than 32 characters. '
+                   'This is not secure for production use.');
+      }
+
       _jwtExpiryHours = int.tryParse(dotenv.env['JWT_EXPIRY_HOURS'] ?? '24') ?? 24;
       _appName = dotenv.env['APP_NAME'] ?? 'IMU';
       _debugMode = dotenv.env['DEBUG_MODE'] == 'true';
@@ -149,4 +178,7 @@ class AppConfig {
 
   /// Whether running in development environment
   static bool get isDevelopment => _debugMode;
+
+  /// Check if JWT secret is properly configured
+  static bool get isJwtSecretConfigured => _jwtSecret.isNotEmpty && _jwtSecret.length >= 32;
 }

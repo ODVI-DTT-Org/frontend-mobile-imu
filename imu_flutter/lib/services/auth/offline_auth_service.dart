@@ -153,7 +153,7 @@ class OfflineAuthService {
       email: decoded['email']?.toString() ?? '',
       firstName: decoded['first_name']?.toString() ?? '',
       lastName: decoded['last_name']?.toString() ?? '',
-      role: decoded['role']?.toString() ?? 'field_agent',
+      role: decoded['role']?.toString() ?? 'caravan',
     );
   }
 }

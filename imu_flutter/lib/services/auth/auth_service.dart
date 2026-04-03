@@ -35,7 +35,7 @@ class AuthService {
     required String password,
     required String firstName,
     required String lastName,
-    String role = 'field_agent',
+    String role = 'caravan',
   }) =>
       _jwtAuth.register(
         email: email,

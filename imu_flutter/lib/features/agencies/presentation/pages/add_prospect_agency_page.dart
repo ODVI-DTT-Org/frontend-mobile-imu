@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import 'agencies_page.dart';
@@ -47,7 +48,8 @@ class _AddProspectAgencyPageState extends ConsumerState<AddProspectAgencyPage> {
     HapticUtils.mediumImpact();
 
     try {
-      final agencyId = DateTime.now().millisecondsSinceEpoch.toString();
+      // Generate UUID-based agency ID for uniqueness and collision resistance
+      final agencyId = 'agency_${const Uuid().v4()}';
 
       // Create agency data
       final agencyData = Agency(
