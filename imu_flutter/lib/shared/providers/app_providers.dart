@@ -20,6 +20,8 @@ export 'permission_providers.dart' show
   canReadProvider,
   canUpdateProvider,
   canDeleteProvider;
+// Re-export user providers
+export './app_providers.dart' show currentUserRoleProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -35,6 +37,7 @@ import '../../features/targets/data/models/target_model.dart';
 import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
 import '../../features/profile/data/models/user_profile.dart';
+import '../../core/models/user_role.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/auth/offline_auth_service.dart';
 import '../../services/connectivity_service.dart';
@@ -112,6 +115,12 @@ final currentUserNameProvider = Provider<String?>((ref) {
 final currentUserEmailProvider = Provider<String?>((ref) {
   final authState = ref.watch(authNotifierProvider);
   return authState.user?.email;
+});
+
+/// Current user role - derived from auth state
+final currentUserRoleProvider = Provider<UserRole>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  return authState.user?.role ?? UserRole.caravan;
 });
 
 /// Offline auth service provider
