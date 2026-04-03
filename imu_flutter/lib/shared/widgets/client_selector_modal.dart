@@ -166,21 +166,28 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
         assignedMunicipalitiesAsync.when(
           data: (municipalityIds) {
-            _clients = _allClients.where((client) {
-              // Construct municipality ID from client's province and municipality
-              final clientMunicipalityId = client.province != null && client.municipality != null
-                  ? '${client.province}-${client.municipality}'
-                  : null;
-              return clientMunicipalityId != null && municipalityIds.contains(clientMunicipalityId);
-            }).toList();
+            if (municipalityIds.isEmpty) {
+              // User has no assigned municipalities - show no clients
+              _clients = [];
+            } else {
+              _clients = _allClients.where((client) {
+                // Construct municipality ID from client's province and municipality
+                final clientMunicipalityId = client.province != null && client.municipality != null
+                    ? '${client.province}-${client.municipality}'
+                    : null;
+                return clientMunicipalityId != null && municipalityIds.contains(clientMunicipalityId);
+              }).toList();
+            }
             _filterClients();
           },
           loading: () {
-            _clients = _allClients; // Show all while loading
+            // While loading assigned areas, show no clients (not all clients)
+            _clients = [];
             _filterClients();
           },
           error: (_, __) {
-            _clients = _allClients; // Show all on error
+            // On error loading assigned areas, show no clients (not all clients)
+            _clients = [];
             _filterClients();
           },
         );
@@ -493,23 +500,53 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     }
 
     if (_filteredClients.isEmpty) {
+      // Check if user has no assigned municipalities
+      final userRole = ref.read(currentUserRoleProvider);
+      final shouldFilterByArea = switch (userRole) {
+        UserRole.admin || UserRole.assistantAreaManager => false,
+        UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
+      };
+
+      final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
+      final hasNoAssignedLocations = shouldFilterByArea &&
+          assignedMunicipalitiesAsync.valueOrNull?.isEmpty == true &&
+          _clientFilter == 'assigned';
+
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(LucideIcons.users, size: 48, color: Colors.grey.shade400),
+            Icon(
+              hasNoAssignedLocations
+                  ? LucideIcons.mapPinOff
+                  : LucideIcons.users,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
             Text(
-              _searchController.text.isEmpty ? 'No clients available' : 'No clients found',
+              hasNoAssignedLocations
+                  ? 'No Assigned Locations'
+                  : (_searchController.text.isEmpty ? 'No clients available' : 'No clients found'),
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey[700]),
             ),
             const SizedBox(height: 8),
             Text(
-              _searchController.text.isEmpty
-                  ? 'All clients have been added to today\'s itinerary'
-                  : 'Try a different search term',
+              hasNoAssignedLocations
+                  ? 'You have no assigned locations. Please contact your administrator to assign areas to you.'
+                  : (_searchController.text.isEmpty
+                      ? 'All clients have been added to today\'s itinerary'
+                      : 'Try a different search term'),
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
             ),
+            if (hasNoAssignedLocations) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Switch to "All Clients" to see all available clients',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              ),
+            ],
           ],
         ),
       );
