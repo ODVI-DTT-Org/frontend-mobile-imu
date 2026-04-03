@@ -6,7 +6,6 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'services/quick_actions/quick_actions_service.dart';
 import 'services/auth/session_service.dart';
-import 'services/api/background_sync_service.dart';
 import 'shared/widgets/loading_widget.dart';
 import 'shared/providers/app_providers.dart';
 import 'shared/utils/loading_helper.dart';

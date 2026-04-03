@@ -13,6 +13,7 @@ import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/powersync_connector.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/utils/logger.dart';
 
 /// Exception thrown when an invalid state transition is attempted.
 ///
@@ -386,7 +387,7 @@ class AuthCoordinator extends ChangeNotifier {
         });
       } catch (e) {
         // ConnectivityService may fail in tests without platform plugins
-        debugPrint('[AuthCoordinator] Failed to initialize connectivity service: $e');
+        logError('Failed to initialize connectivity service', e);
       }
     }
 
@@ -465,7 +466,7 @@ class AuthCoordinator extends ChangeNotifier {
         debugPrint('[AuthCoordinator] No valid session found, staying in NotAuthenticatedState');
       }
     } catch (e) {
-      debugPrint('[AuthCoordinator] ❌ Error checking existing session: $e');
+      logError('Error checking existing session', e);
       // Stay in NotAuthenticatedState on error
     } finally {
       _isCheckingSession = false;
@@ -521,7 +522,7 @@ class AuthCoordinator extends ChangeNotifier {
 
     // Check for session lock (15 minutes of inactivity)
     if (_sessionService.isLocked) {
-      debugPrint('[AuthCoordinator] ⚠️ Session locked due to inactivity');
+      logWarning('Session locked due to inactivity');
       _stopSessionMonitoring();
 
       // Get current user ID from repository if available
@@ -579,7 +580,7 @@ class AuthCoordinator extends ChangeNotifier {
   /// Transitions to appropriate state based on result.
   void _handleTokenRefreshResult(TokenRefreshResult result) {
     if (result.success) {
-      debugPrint('[AuthCoordinator] ✅ Token refresh successful');
+      logInfo('Token refresh successful');
       // If we were in RefreshingTokenState, transition back to AuthenticatedState
       if (_currentState.type == AuthStateType.refreshingToken) {
         // Get current user ID
@@ -589,7 +590,7 @@ class AuthCoordinator extends ChangeNotifier {
         }
       }
     } else {
-      debugPrint('[AuthCoordinator] ❌ Token refresh failed: ${result.error} (attempt ${result.attempt})');
+      logError('Token refresh failed: ${result.error} (attempt ${result.attempt})');
 
       // If max retries reached, transition to TokenRefreshFailedState
       if (result.attempt >= TokenRefreshService.maxRetryAttempts) {

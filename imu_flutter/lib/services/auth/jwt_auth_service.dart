@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
@@ -70,6 +72,10 @@ class JwtAuthService {
   String? _accessToken;
   String? _refreshToken;
   JwtUser? _currentUser;
+
+  // Refresh lock to prevent concurrent refresh attempts
+  bool _isRefreshing = false;
+  Completer<void>? _refreshCompleter;
 
   // Singleton instance
   static JwtAuthService? _instance;
@@ -217,6 +223,13 @@ class JwtAuthService {
 
   /// Refresh access token using refresh token
   Future<void> refreshTokens() async {
+    // Prevent concurrent refresh attempts
+    if (_isRefreshing) {
+      logDebug('Refresh already in progress, waiting...');
+      await _refreshCompleter?.future;
+      return;
+    }
+
     if (_refreshToken == null) {
       logError('Cannot refresh: No refresh token available');
       throw Exception('No refresh token available');
@@ -228,6 +241,10 @@ class JwtAuthService {
       logDebug('Current token is still valid, skipping unnecessary refresh');
       return;
     }
+
+    // Set refresh lock
+    _isRefreshing = true;
+    _refreshCompleter = Completer<void>();
 
     try {
       logDebug('Refreshing tokens...');
@@ -299,6 +316,33 @@ class JwtAuthService {
         await logout();
       }
       rethrow;
+    } finally {
+      // Always release the refresh lock
+      _isRefreshing = false;
+      _refreshCompleter?.complete();
+      _refreshCompleter = null;
+    }
+  }
+
+  /// Ensure token is valid before making API requests
+  /// Automatically refreshes if token is near expiry (within 5 minutes)
+  Future<void> ensureValidToken() async {
+    // If not authenticated, nothing to do
+    if (!isAuthenticated) {
+      return;
+    }
+
+    // If refresh is already in progress, wait for it
+    if (_isRefreshing) {
+      logDebug('Refresh in progress, waiting for completion...');
+      await _refreshCompleter?.future;
+      return;
+    }
+
+    // Check if token needs refresh (within 5 minutes of expiry)
+    if (shouldAttemptRefresh) {
+      logDebug('Token near expiry, refreshing before API call...');
+      await refreshTokens();
     }
   }
 

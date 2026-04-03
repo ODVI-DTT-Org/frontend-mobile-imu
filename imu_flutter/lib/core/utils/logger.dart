@@ -1,19 +1,25 @@
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
 
 /// Simple logging utility for the IMU app
-/// This can be extended to use a proper logging package if needed
+/// In production, debug and info logs are suppressed to reduce noise
+/// Warnings and errors are always logged
 
-/// Log a debug message
+/// Log a debug message (only in debug mode)
 void logDebug(String message) {
-  debugPrint('[DEBUG] $message');
+  if (AppConfig.debugMode) {
+    debugPrint('[DEBUG] $message');
+  }
 }
 
-/// Log an info message
+/// Log an info message (only in debug mode)
 void logInfo(String message) {
-  debugPrint('[INFO] $message');
+  if (AppConfig.debugMode) {
+    debugPrint('[INFO] $message');
+  }
 }
 
-/// Log a warning message with optional error object
+/// Log a warning message with optional error object (always logged)
 void logWarning(String message, [Object? error, StackTrace? stackTrace]) {
   debugPrint('[WARN] $message');
   if (error != null) {
@@ -24,7 +30,7 @@ void logWarning(String message, [Object? error, StackTrace? stackTrace]) {
   }
 }
 
-/// Log an error message with optional error object
+/// Log an error message with optional error object (always logged)
 void logError(String message, [Object? error, StackTrace? stackTrace]) {
   debugPrint('[ERROR] $message');
   if (error != null) {
