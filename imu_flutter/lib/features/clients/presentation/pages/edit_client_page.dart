@@ -51,39 +51,89 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
   }
 
   Future<void> _loadClient() async {
-    if (!_hiveService.isInitialized) {
-      await _hiveService.init();
-    }
+    try {
+      if (!_hiveService.isInitialized) {
+        await _hiveService.init();
+      }
 
-    final clientData = _hiveService.getClient(widget.clientId);
-    if (clientData != null && mounted) {
-      try {
-        // Try fromRow first for API data (snake_case), fallback to fromJson for camelCase
+      final clientData = _hiveService.getClient(widget.clientId);
+      if (clientData != null && mounted) {
         try {
-          _client = Client.fromRow(clientData);
-        } catch (e) {
-          // If fromRow fails, try fromJson
-          _client = Client.fromJson(clientData);
+          // Try fromRow first for API data (snake_case), fallback to fromJson for camelCase
+          try {
+            _client = Client.fromRow(clientData);
+          } catch (e) {
+            debugPrint('fromRow failed, trying fromJson: $e');
+            // If fromRow fails, try fromJson
+            _client = Client.fromJson(clientData);
+          }
+          _populateForm();
+          setState(() => _isLoading = false);
+        } catch (e, stack) {
+          debugPrint('Error parsing client data: $e\n$stack');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showErrorDialog('Failed to load client', e);
+          }
         }
-        _populateForm();
-        setState(() => _isLoading = false);
-      } catch (e) {
-        debugPrint('Error loading client: $e');
+      } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error loading client: $e')),
-          );
-          context.pop();
+          setState(() => _isLoading = false);
+          _showNotFoundError();
         }
       }
-    } else {
+    } catch (e, stack) {
+      debugPrint('Error in _loadClient: $e\n$stack');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Client not found')),
-        );
-        context.pop();
+        setState(() => _isLoading = false);
+        _showErrorDialog('Failed to load client', e);
       }
     }
+  }
+
+  void _showNotFoundError() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Client Not Found'),
+        content: const Text('The requested client could not be found.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.pop();
+            },
+            child: const Text('Go Back'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message, Object error) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(message),
+        content: Text('Error: ${error.toString()}'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.pop();
+            },
+            child: const Text('Go Back'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _loadClient(); // Retry
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _populateForm() {
@@ -195,7 +245,19 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
   }
 
   Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      // Validation failed - scroll to first error and show message
+      HapticUtils.error();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fix the errors before saving'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
 
     HapticUtils.mediumImpact();
 
@@ -232,11 +294,15 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         };
 
         // Save to local storage (saveClient updates if exists)
+        debugPrint('[EDIT_CLIENT] Saving client ${widget.clientId}');
+        debugPrint('[EDIT_CLIENT] Remarks value: "${updatedData['remarks']}"');
+
         await _hiveService.saveClient(widget.clientId, {
           ..._client!.toJson(),
           ...updatedData,
         });
 
+        debugPrint('[EDIT_CLIENT] Client saved successfully');
         // PowerSync handles sync automatically
       },
       onError: (e) {
