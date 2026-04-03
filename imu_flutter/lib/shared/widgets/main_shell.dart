@@ -75,6 +75,8 @@ class BottomNavBar extends ConsumerWidget {
       return 2;
     } else if (location == '/clients') {
       return 3;
+    } else if (location == '/profile') {
+      return 4;
     }
     return 0;
   }
@@ -93,6 +95,9 @@ class BottomNavBar extends ConsumerWidget {
         break;
       case 3:
         context.go('/clients');
+        break;
+      case 4:
+        context.go('/profile');
         break;
     }
   }
@@ -141,6 +146,12 @@ class BottomNavBar extends ConsumerWidget {
                 label: 'Clients',
                 isSelected: currentIndex == 3,
                 onTap: () => _onItemTapped(context, 3),
+              ),
+              _NavItem(
+                icon: LucideIcons.user,
+                label: 'Profile',
+                isSelected: currentIndex == 4,
+                onTap: () => _onItemTapped(context, 4),
               ),
             ],
           ),
