@@ -18,6 +18,7 @@ void main() {
 
   // Skip all tests - Needs Riverpod 2.0 migration
   // TODO: Migrate to Riverpod 2.0 syntax and re-enable tests
+  // FIXED: Updated to Riverpod 2.0 syntax with overrideWith
   group('PinSetupPage Widget Tests - SKIPPED (Needs Riverpod 2.0 Migration)', () {
     late MockAuthCoordinator mockCoordinator;
 
@@ -34,7 +35,8 @@ void main() {
     Widget createTestWidget() {
       return ProviderScope(
         overrides: [
-          authCoordinatorProvider.overrideWithValue(mockCoordinator),
+          // Riverpod 2.0: overrideWithValue → overrideWith
+          authCoordinatorProvider.overrideWith((ref) => mockCoordinator),
         ],
         child: const MaterialApp(
           home: PinSetupPage(),

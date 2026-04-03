@@ -11,15 +11,15 @@ void main() {
 
   // Skip all tests - Needs Riverpod 2.0 migration
   // TODO: Migrate to Riverpod 2.0 syntax and re-enable tests
+  // FIXED: Updated to Riverpod 2.0 syntax with overrideWith
   group('LoginPage Widget Tests - SKIPPED (Needs Riverpod 2.0 Migration)', () {
     late ProviderContainer container;
 
     setUp(() {
       container = ProviderContainer(
         overrides: [
-          authCoordinatorProvider.overrideWithValue(
-            AuthCoordinator(),
-          ),
+          // Riverpod 2.0: overrideWithValue → overrideWith
+          authCoordinatorProvider.overrideWith((ref) => AuthCoordinator()),
         ],
       );
     });

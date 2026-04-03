@@ -224,7 +224,8 @@ void main() {
       expect(textField.obscureText, isTrue);
 
       // Tap visibility toggle
-      await tester.tap(find.byIcon(Icons.visibility_off_outlined));
+      // FIXED: LoginPage uses LucideIcons.eyeOff, not Icons.visibility_off_outlined
+      await tester.tap(find.byType(IconButton));
       await tester.pump();
 
       // Assert - Password should now be visible
