@@ -28,8 +28,8 @@ class AppConfig {
   // PowerSync
   static late String _powerSyncUrl;
 
-  // PostgreSQL API
-  static late String _postgresApiUrl;
+  // Backend API
+  static late String _backendApiUrl;
 
   // API Timeouts
   static const int _apiConnectTimeout = 15000; // 15 seconds
@@ -67,7 +67,7 @@ class AppConfig {
     // On web, use production API directly since .env files don't work
     // On mobile, try to load from .env file
     if (kIsWeb) {
-      _postgresApiUrl = 'https://imu-api.cfbtools.app/api';
+      _backendApiUrl = 'https://imu-api.cfbtools.app/api';
       _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
       _jwtSecret = dotenv.env['JWT_SECRET'] ?? '';
 
@@ -87,7 +87,9 @@ class AppConfig {
       _logLevel = 'info';
     } else {
       _powerSyncUrl = dotenv.env['POWERSYNC_URL'] ?? '';
-      _postgresApiUrl = dotenv.env['POSTGRES_API_URL'] ?? 'https://imu-api.cfbtools.app/api';
+      _backendApiUrl = dotenv.env['BACKEND_API_URL'] ??
+                      dotenv.env['POSTGRES_API_URL'] ??
+                      'https://imu-api.cfbtools.app/api';
       _jwtSecret = dotenv.env['JWT_SECRET'] ?? '';
 
       // Mobile requires JWT_SECRET to be configured
@@ -117,7 +119,7 @@ class AppConfig {
     debugPrint('  Environment: $environment');
     debugPrint('  Platform: ${kIsWeb ? 'web' : 'mobile'}');
     debugPrint('  PowerSync URL: $_powerSyncUrl');
-    debugPrint('  PostgreSQL API: $_postgresApiUrl');
+    debugPrint('  Backend API: $_backendApiUrl');
   }
 
   // Getters
@@ -125,11 +127,14 @@ class AppConfig {
   /// PowerSync instance URL
   static String get powerSyncUrl => _powerSyncUrl;
 
-  /// PostgreSQL API endpoint URL
-  static String get postgresApiUrl => _postgresApiUrl;
+  /// Backend API endpoint URL
+  static String get backendApiUrl => _backendApiUrl;
 
-  /// API base URL (alias for postgresApiUrl)
-  static String get apiBaseUrl => _postgresApiUrl;
+  /// API base URL (alias for backendApiUrl)
+  static String get apiBaseUrl => _backendApiUrl;
+
+  /// @deprecated Use backendApiUrl or apiBaseUrl instead. This will be removed in a future version.
+  static String get postgresApiUrl => _backendApiUrl;
 
   /// API connect timeout in milliseconds
   static int get apiConnectTimeout => _apiConnectTimeout;

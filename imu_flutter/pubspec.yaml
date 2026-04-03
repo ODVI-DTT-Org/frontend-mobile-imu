@@ -99,6 +99,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - .env.dev
+    - .env.qa
     - .env.prod
 
   fonts:
