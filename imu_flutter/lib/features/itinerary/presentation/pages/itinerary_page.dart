@@ -166,8 +166,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     );
 
     if (confirmed == true) {
+      // Delete each visit using the API
       for (final visit in filteredVisits) {
-        _deleteVisit(visit.id);
+        await _deleteVisit(visit.id);
       }
       // Exit multi-select mode after processing
       _exitMultiSelectMode();
@@ -484,44 +485,67 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     );
   }
 
-  void _deleteVisit(String visitId) {
-    final itineraryAsync = ref.read(todayItineraryProvider);
-    final targetDate = _selectedCalendarDate ?? _selectedDate;
+  Future<void> _deleteVisit(String visitId) async {
+    try {
+      final itineraryApi = ref.read(itineraryApiServiceProvider);
 
-    itineraryAsync.when(
-      data: (items) {
-        final filteredItems = items.where((item) {
-          final itemDate = item.scheduledDate;
-          return itemDate.year == targetDate.year &&
-                 itemDate.month == targetDate.month &&
-                 itemDate.day == targetDate.day;
-        }).toList();
+      // Call API to delete from database
+      await itineraryApi.deleteItinerary(visitId);
 
-        final index = filteredItems.indexWhere((v) => v.id == visitId);
-        if (index != -1) {
-          setState(() {
-            _recentlyDeletedVisit = filteredItems[index];
-            _recentlyDeletedIndex = index;
-          });
+      if (mounted) {
+        final itineraryAsync = ref.read(todayItineraryProvider);
+        final targetDate = _selectedCalendarDate ?? _selectedDate;
 
-          HapticUtils.delete();
+        itineraryAsync.when(
+          data: (items) {
+            final filteredItems = items.where((item) {
+              final itemDate = item.scheduledDate;
+              return itemDate.year == targetDate.year &&
+                     itemDate.month == targetDate.month &&
+                     itemDate.day == targetDate.day;
+            }).toList();
 
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Visit deleted'),
-              duration: const Duration(seconds: 5),
-              action: SnackBarAction(
-                label: 'UNDO',
-                onPressed: _undoDelete,
-              ),
-            ),
-          );
-        }
-      },
-      loading: () {},
-      error: (_, __) {},
-    );
+            final index = filteredItems.indexWhere((v) => v.id == visitId);
+            if (index != -1) {
+              setState(() {
+                _recentlyDeletedVisit = filteredItems[index];
+                _recentlyDeletedIndex = index;
+              });
+
+              HapticUtils.delete();
+
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Visit deleted'),
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'UNDO',
+                    onPressed: _undoDelete,
+                  ),
+                ),
+              );
+            }
+          },
+          loading: () {},
+          error: (_, __) {},
+        );
+
+        // Invalidate provider to refresh the list
+        ref.invalidate(todayItineraryProvider);
+      }
+    } catch (e) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete visit: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void _undoDelete() {
