@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:dio/dio.dart';
 import '../../../../services/media/camera_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/config/app_config.dart';
+import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../providers/touchpoint_form_provider.dart';
 import '../../../clients/data/models/client_model.dart';
@@ -822,75 +825,78 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   }
 
   bool _canSubmit() {
-    // Placeholder validation logic
-    // Will be implemented in Task 7
-    return false;
+    final state = ref.watch(touchpointFormProvider);
+
+    // Check required fields
+    if (state.timeIn.time == null) return false;
+    if (state.timeOut.time == null) return false;
+    if (state.reason == null) return false;
+    if (_selectedStatus == null) return false;
+    if (_remarksController.text.trim().isEmpty) return false;
+
+    // Check validation errors
+    if (state.timeIn.error != null) return false;
+    if (state.timeOut.error != null) return false;
+
+    // Check if not currently submitting
+    if (state.isSubmitting) return false;
+
+    return true;
   }
 
-  void _handleSubmit() {
-    // Validate photo evidence for Visit type
-    if (widget.touchpointType == 'Visit' && _capturedPhoto == null) {
-      setState(() => _hasPhotoError = true);
-      HapticUtils.error();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please capture a photo evidence'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+  Future<void> _handleSubmit() async {
+    if (!_canSubmit()) return;
 
-    if (_formKey.currentState!.validate()) {
-      HapticUtils.success();
+    final state = ref.read(touchpointFormProvider);
 
-      // Get Time In/Out data from provider
-      final formState = ref.read(touchpointFormProvider);
-      final timeIn = formState.timeIn;
-      final timeOut = formState.timeOut;
+    try {
+      // Set submitting state
+      ref.read(touchpointFormProvider.notifier).setIsSubmitting(true);
 
-      // Return the form data
-      Navigator.pop(context, {
-        // Required fields for API
+      // Prepare payload
+      final payload = {
         'client_id': widget.clientId,
         'touchpoint_number': widget.touchpointNumber,
-        'type': widget.touchpointType,
-        // Form fields
-        'reason': _selectedReason,
-        'status': _selectedStatus?.apiValue ?? 'Interested', // NEW: status field
-        // Time In/Out from provider (for Visit type)
-        'timeIn': timeIn.time?.toIso8601String(),
-        'timeInGpsLat': timeIn.gpsLat,
-        'timeInGpsLng': timeIn.gpsLng,
-        'timeInGpsAddress': timeIn.gpsAddress,
-        'timeOut': timeOut.time?.toIso8601String(),
-        'timeOutGpsLat': timeOut.gpsLat,
-        'timeOutGpsLng': timeOut.gpsLng,
-        'timeOutGpsAddress': timeOut.gpsAddress,
-        // Legacy fields for backwards compatibility
-        'timeArrival': timeIn.time != null ? _formatDateTime(timeIn.time!) : null,
-        'timeDeparture': timeOut.time != null ? _formatDateTime(timeOut.time!) : null,
-        'odometerArrival': _odometerArrivalController.text.isEmpty ? null : _odometerArrivalController.text,
-        'odometerDeparture': _odometerDepartureController.text.isEmpty ? null : _odometerDepartureController.text,
-        'nextVisitDate': _nextVisitDate?.toIso8601String(),
-        'photoPath': _capturedPhoto?.path,
-        // Use Time In GPS as primary location (for backwards compatibility)
-        'location': timeIn.gpsLat != null && timeIn.gpsLng != null
-            ? {
-                'latitude': timeIn.gpsLat,
-                'longitude': timeIn.gpsLng,
-                'address': timeIn.gpsAddress,
-                'accuracy': null,
-              }
-            : null,
-      });
+        'type': widget.touchpointType.toLowerCase(),
+        'reason': state.reason!,
+        'status': _selectedStatus!,
+        'remarks': _remarksController.text.trim(),
+        'time_arrival': state.timeIn.time!.toIso8601String(),
+        'time_departure': state.timeOut.time!.toIso8601String(),
+        if (_capturedPhoto != null) {
+          'photo': _capturedPhoto!.path,
+        },
+      };
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Touchpoint saved successfully'),
-          backgroundColor: Colors.green,
+      // Submit to API
+      final dio = Dio();
+      final response = await dio.post(
+        '${AppConfig.postgresApiUrl}/api/my-day/visits',
+        data: payload,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            if (JwtAuthService.instance.accessToken != null)
+              'Authorization': 'Bearer ${JwtAuthService.instance.accessToken}',
+          },
         ),
       );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Success
+        if (mounted) {
+          showToast('Touchpoint recorded successfully');
+          Navigator.pop(context);
+        }
+      } else {
+        throw Exception('Failed to submit touchpoint');
+      }
+    } catch (e) {
+      if (mounted) {
+        showToast('Failed to submit touchpoint: ${e.toString()}');
+      }
+    } finally {
+      ref.read(touchpointFormProvider.notifier).setIsSubmitting(false);
     }
   }
 
