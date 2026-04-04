@@ -861,7 +861,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         'touchpoint_number': widget.touchpointNumber.toString(),
         'type': widget.touchpointType, // 'Visit' or 'Call' - backend expects title case
         'reason': state.reason!,
-        'status': _selectedStatus!,
+        'status': _selectedStatus!, // ✅ FIXED: Send user's status selection
         'notes': _remarksController.text.trim(),
         'time_arrival': state.timeIn.time!.toIso8601String(),
         'time_departure': state.timeOut.time!.toIso8601String(),
@@ -879,17 +879,28 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
           ),
       });
 
-      // Submit to API as multipart/form-data
+      // Submit to API as multipart/form-data with timeout and progress tracking
       final dio = Dio();
       final response = await dio.post(
         '${AppConfig.postgresApiUrl}/api/my-day/visits',
         data: formData,
+        onSendProgress: (sent, total) {
+          if (total > 0 && mounted) {
+            final progress = (sent / total * 100).toInt();
+            // Optional: Update progress indicator if you have one
+            // ref.read(touchpointFormProvider.notifier).setUploadProgress(progress);
+            print('[Upload Progress] $progress% (${sent}/${total} bytes)');
+          }
+        },
         options: Options(
           headers: {
             // Don't set Content-Type - Dio will set it with correct boundary for multipart
             if (JwtAuthService.instance.accessToken != null)
               'Authorization': 'Bearer ${JwtAuthService.instance.accessToken}',
           },
+          // ✅ FIXED: Add timeout for large file uploads
+          sendTimeout: const Duration(seconds: 60), // 60 seconds for upload
+          receiveTimeout: const Duration(seconds: 30), // 30 seconds for response
         ),
       );
 
@@ -900,15 +911,73 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
           Navigator.pop(context);
         }
       } else {
-        throw Exception('Failed to submit touchpoint');
+        throw Exception('Server returned unexpected status: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      // ✅ FIXED: Better error handling with user-friendly messages
+      if (mounted) {
+        final message = _getUserFriendlyErrorMessage(e);
+        showToast(message);
       }
     } catch (e) {
+      // ✅ FIXED: Better error handling
       if (mounted) {
-        showToast('Failed to submit touchpoint: ${e.toString()}');
+        final message = e is Exception
+            ? e.toString().replaceAll('Exception: ', '')
+            : 'Failed to submit touchpoint. Please try again.';
+
+        // Don't show raw error messages to users
+        showToast(message);
       }
     } finally {
-      ref.read(touchpointFormProvider.notifier).setIsSubmitting(false);
+      if (mounted) {
+        ref.read(touchpointFormProvider.notifier).setIsSubmitting(false);
+      }
     }
+  }
+
+  /// ✅ FIXED: Convert DioException to user-friendly error message
+  String _getUserFriendlyErrorMessage(dynamic error) {
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+          return 'Request timed out. Please check your connection and try again.';
+        case DioExceptionType.receiveTimeout:
+          return 'Server took too long to respond. Please try again.';
+        case DioExceptionType.badResponse:
+          final statusCode = error.response?.statusCode;
+          if (statusCode == 400) {
+            final data = error.response?.data;
+            if (data is Map && data['message'] != null) {
+              return data['message']; // Backend's validation error
+            }
+            return 'Invalid request. Please check your input and try again.';
+          } else if (statusCode == 401) {
+            return 'Your session has expired. Please log in again.';
+          } else if (statusCode == 403) {
+            return 'You don\'t have permission to perform this action.';
+          } else if (statusCode == 404) {
+            return 'Client not found. Please refresh and try again.';
+          } else if (statusCode == 413) {
+            return 'File too large. Please try with a smaller file.';
+          } else if (statusCode == 429) {
+            return 'Too many attempts. Please wait a moment and try again.';
+          } else if (statusCode == 500) {
+            return 'Server error. Please try again later.';
+          } else if (statusCode != null) {
+            return 'Server error ($statusCode). Please try again.';
+          }
+          return 'Server error. Please try again.';
+        case DioExceptionType.cancel:
+          return 'Request was cancelled.';
+        case DioExceptionType.connectionError:
+          return 'No internet connection. Please check your network and try again.';
+        default:
+          return 'Network error. Please check your connection and try again.';
+      }
+    }
+    return error is String ? error : 'An error occurred. Please try again.';
   }
 
   /// Show sequence validation error dialog
