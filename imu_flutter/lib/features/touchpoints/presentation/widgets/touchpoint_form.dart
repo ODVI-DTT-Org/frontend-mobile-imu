@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
 import '../../../../services/media/camera_service.dart';
+import '../../../../services/location/geolocation_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
@@ -774,6 +775,19 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       // Set submitting state
       ref.read(touchpointFormProvider.notifier).setIsSubmitting(true);
 
+      // Capture GPS location automatically
+      final geoService = GeolocationService();
+      final position = await geoService.getCurrentPosition();
+      String? gpsAddress;
+
+      if (position != null) {
+        // Get address from coordinates (reverse geocoding)
+        gpsAddress = await geoService.getAddressFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+      }
+
       // Prepare payload
       final Map<String, dynamic> payload = {
         'client_id': widget.clientId,
@@ -784,6 +798,14 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         'remarks': _remarksController.text.trim(),
         'time_arrival': state.timeIn.time!.toIso8601String(),
         'time_departure': state.timeOut.time!.toIso8601String(),
+        // GPS location
+        if (position != null)
+          'gps_lat': position.latitude,
+        if (position != null)
+          'gps_lng': position.longitude,
+        if (gpsAddress != null && gpsAddress.isNotEmpty)
+          'gps_address': gpsAddress,
+        // Photo (optional)
         if (_capturedPhoto != null)
           'photo': _capturedPhoto!.path,
       };

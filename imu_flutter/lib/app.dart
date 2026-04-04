@@ -194,9 +194,10 @@ class _ToastOverlayState extends State<_ToastOverlay> {
         widget.child,
         if (_toastMessage != null)
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
+            top: 8,
+            right: 8,
+            left: null,
+            bottom: null,
             child: SafeArea(
               bottom: false,
               child: _ToastNotification(
@@ -261,9 +262,9 @@ class _ToastNotificationState extends State<_ToastNotification>
         return Opacity(
           opacity: _animation.value,
           child: Transform.translate(
-            offset: Offset(0, -_animation.value * 50),
+            offset: Offset(0, (1 - _animation.value) * -20),
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              margin: const EdgeInsets.only(left: 8, right: 8, top: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF0F172A),
@@ -277,6 +278,7 @@ class _ToastNotificationState extends State<_ToastNotification>
                 ],
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
                     Icons.info_outline,
@@ -284,7 +286,7 @@ class _ToastNotificationState extends State<_ToastNotification>
                     size: 20,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       widget.message,
                       style: const TextStyle(
