@@ -1,5 +1,6 @@
 import 'dart:io';
-import 'package:flutter/material.dart' as material show TimeOfDay;
+import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
@@ -411,7 +412,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
   Future<void> _selectTimeIn(BuildContext context) async {
     final now = DateTime.now();
-    final picked = await material.showTimePicker(
+    final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
     );
@@ -440,7 +441,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     final now = DateTime.now();
     final initialTime = state.timeOut.time ?? now;
 
-    final picked = await material.showTimePicker(
+    final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
     );
