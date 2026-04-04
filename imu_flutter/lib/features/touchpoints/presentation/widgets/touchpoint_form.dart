@@ -695,7 +695,130 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   }
 
   Widget _buildCameraSection(BuildContext context) {
-    return const Center(child: Text('Camera Section - TODO'));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Photo (Optional)',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        if (_capturedPhoto != null)
+          // Show thumbnail
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: Image.file(
+                    _capturedPhoto!,
+                    width: double.infinity,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                // Clear button
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _capturedPhoto = null;
+                      });
+                      ref.read(touchpointFormProvider.notifier).setPhotoPath(null);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          // Show camera button
+          InkWell(
+            onTap: () => _capturePhoto(context),
+            child: Container(
+              height: 48,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    LucideIcons.camera,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Take Photo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _capturePhoto(BuildContext context) async {
+    try {
+      setState(() {
+        _isCapturingPhoto = true;
+        _hasPhotoError = false;
+      });
+
+      final photo = await _cameraService.capturePhoto();
+
+      if (photo != null && mounted) {
+        setState(() {
+          _capturedPhoto = photo;
+        });
+        ref.read(touchpointFormProvider.notifier).setPhotoPath(photo.path);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasPhotoError = true;
+        });
+        showToast('Failed to capture photo');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCapturingPhoto = false;
+        });
+      }
+    }
   }
 
   bool _canSubmit() {
