@@ -365,14 +365,183 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     }
   }
 
-  // Placeholder methods for new simplified form widgets
-  // These will be implemented in Tasks 3-6
   Widget _buildTimeInField(BuildContext context) {
-    return const Center(child: Text('Time In Field - TODO'));
+    final state = ref.watch(touchpointFormProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Time In',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: () => _selectTimeIn(context),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  state.timeIn.time != null
+                      ? '${state.timeIn.time.hour}:${state.timeIn.time.minute.toString().padLeft(2, '0')}'
+                      : 'Select time',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: state.timeIn.time != null ? Colors.black : Colors.grey[600],
+                  ),
+                ),
+                Icon(
+                  LucideIcons.clock,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (state.timeIn.error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              state.timeIn.error!,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildTimeOutField(BuildContext context) {
-    return const Center(child: Text('Time Out Field - TODO'));
+    final state = ref.watch(touchpointFormProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Time Out',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: () => _selectTimeOut(context),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  state.timeOut.time != null
+                      ? '${state.timeOut.time.hour}:${state.timeOut.time.minute.toString().padLeft(2, '0')}'
+                      : 'Select time',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: state.timeOut.time != null ? Colors.black : Colors.grey[600],
+                  ),
+                ),
+                Icon(
+                  LucideIcons.clock,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (state.timeOut.error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              state.timeOut.error!,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _selectTimeIn(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
+    );
+
+    if (picked != null) {
+      final timeIn = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        picked.hour,
+        picked.minute,
+      );
+
+      ref.read(touchpointFormProvider.notifier).setTimeIn(timeIn, null, null, null);
+
+      // Auto-calculate Time Out = Time In + 5 minutes
+      if (ref.read(touchpointFormProvider).timeOut.time == null) {
+        final timeOut = timeIn.add(const Duration(minutes: 5));
+        ref.read(touchpointFormProvider.notifier).setTimeOut(timeOut, null, null, null);
+      }
+    }
+  }
+
+  Future<void> _selectTimeOut(BuildContext context) async {
+    final state = ref.watch(touchpointFormProvider);
+    final now = DateTime.now();
+    final initialTime = state.timeOut.time ?? now;
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
+    );
+
+    if (picked != null) {
+      final timeOut = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        picked.hour,
+        picked.minute,
+      );
+
+      // Validate time out is after time in
+      final timeInValue = state.timeIn.time;
+      if (timeInValue != null && timeOut.isBefore(timeInValue)) {
+        ref.read(touchpointFormProvider.notifier).setTimeOutError(
+          'Time out must be after time in',
+        );
+        return;
+      }
+
+      ref.read(touchpointFormProvider.notifier).setTimeOut(timeOut, null, null, null);
+      ref.read(touchpointFormProvider.notifier).clearTimeOutError();
+    }
   }
 
   Widget _buildReasonDropdown(BuildContext context) {
