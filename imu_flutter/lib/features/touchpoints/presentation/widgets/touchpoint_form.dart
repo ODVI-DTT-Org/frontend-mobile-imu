@@ -775,7 +775,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       ref.read(touchpointFormProvider.notifier).setIsSubmitting(true);
 
       // Prepare payload
-      final payload = {
+      final Map<String, dynamic> payload = {
         'client_id': widget.clientId,
         'touchpoint_number': widget.touchpointNumber,
         'type': widget.touchpointType.toLowerCase(),
@@ -784,9 +784,8 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         'remarks': _remarksController.text.trim(),
         'time_arrival': state.timeIn.time!.toIso8601String(),
         'time_departure': state.timeOut.time!.toIso8601String(),
-        if (_capturedPhoto != null) {
+        if (_capturedPhoto != null)
           'photo': _capturedPhoto!.path,
-        },
       };
 
       // Submit to API
