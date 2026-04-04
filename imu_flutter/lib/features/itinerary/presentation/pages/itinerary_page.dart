@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import '../../../../app.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/swipeable_list_tile.dart';
 import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
@@ -108,12 +109,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
 
     if (filteredVisits.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No visits selected'),
-          backgroundColor: Color(0xFF64748B),
-        ),
-      );
+      showToast('No visits selected');
       return;
     }
 
@@ -318,12 +314,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     if (udiNumber == null || udiNumber.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('UDI number is required'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showToast('UDI number is required');
       }
       return;
     }
@@ -345,13 +336,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     if (mounted) {
       HapticUtils.success();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Loan release submitted for approval (UDI: ${udiNumber.trim()})'),
-          backgroundColor: Colors.green[600],
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      showToast('Loan release submitted for approval (UDI: ${udiNumber.trim()})');
     }
   }
 
@@ -513,18 +498,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
               });
 
               HapticUtils.delete();
-
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Visit deleted'),
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'UNDO',
-                    onPressed: _undoDelete,
-                  ),
-                ),
-              );
+              showToast('Visit deleted');
             }
           },
           loading: () {},
@@ -537,13 +511,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     } catch (e) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete visit: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        showToast('Failed to delete visit: $e');
       }
     }
   }
@@ -556,9 +524,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       });
 
       HapticUtils.lightImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Visit restored')),
-      );
+      showToast('Visit restored');
       ref.invalidate(todayItineraryProvider);
     }
   }
@@ -595,17 +561,13 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
   void _navigateToVisit(String address) {
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigating to $address...')),
-    );
+    showToast('Navigating to $address...');
     // In production, open maps for navigation
   }
 
   void _callClient(String phone) {
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Calling $phone...')),
-    );
+    showToast('Calling $phone...');
     // In production, use url_launcher
   }
 
@@ -1625,9 +1587,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
         },
         onError: (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to save visit: $e')),
-            );
+            showToast('Failed to save visit: $e');
           }
         },
       );
@@ -1737,21 +1697,11 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
           onPressed: () {
             final udiNumber = _udiController.text.trim();
             if (udiNumber.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('UDI number is required'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showToast('UDI number is required');
               return;
             }
             if (udiNumber.length > 50) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('UDI number must be 50 characters or less'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showToast('UDI number must be 50 characters or less');
               return;
             }
             Navigator.pop(context, {
