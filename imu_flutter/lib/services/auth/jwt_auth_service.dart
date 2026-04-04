@@ -7,6 +7,7 @@ import '../../core/config/app_config.dart';
 import '../../core/models/user_role.dart' as core_models;
 import '../../core/utils/logger.dart';
 import '../area/area_filter_service.dart';
+import '../error_logging_helper.dart';
 import '../permissions/remote_permission_service.dart';
 import '../sync/powersync_service.dart';
 import 'secure_storage_service.dart';
@@ -98,7 +99,7 @@ class JwtAuthService {
           baseUrl: AppConfig.postgresApiUrl,
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
-        )),
+        ),),
         _storage = const FlutterSecureStorage();
 
   /// Public constructor (for backwards compatibility, returns singleton)
@@ -232,9 +233,21 @@ class JwtAuthService {
     } on DioException catch (e) {
       final message = e.response?.data['message'] ?? 'Login failed';
       logError('Login failed', e);
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'user login',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'email': email},
+      );
       throw Exception(message);
     } catch (e) {
       logError('Login failed', e);
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'user login',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'email': email},
+      );
       throw Exception('Login failed: $e');
     }
   }
@@ -386,6 +399,11 @@ class JwtAuthService {
       throw Exception('Token refresh failed: ${e.message ?? 'Unknown error'}');
     } catch (e) {
       logError('Token refresh failed with unexpected error', e);
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'token refresh',
+        error: e,
+        stackTrace: StackTrace.current,
+      );
       // Only clear tokens on explicit auth failures, not on network errors
       if (e is! Exception || !e.toString().contains('Network error')) {
         await logout();
