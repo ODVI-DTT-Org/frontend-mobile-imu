@@ -46,6 +46,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     {'value': 'Undecided', 'label': 'Undecided', 'color': Color(0xFFFF9800)},
     {'value': 'Not Interested', 'label': 'Not Interested', 'color': Color(0xFFF44336)},
     {'value': 'Completed', 'label': 'Completed', 'color': Color(0xFF2196F3)},
+    {'value': 'Follow-up Needed', 'label': 'Follow-up Needed', 'color': Color(0xFF9C27B0)}, // NEW
   ];
 
   // Photo capture
