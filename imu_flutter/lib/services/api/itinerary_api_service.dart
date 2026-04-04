@@ -6,6 +6,7 @@ import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
+import 'package:imu_flutter/services/error_logging_helper.dart';
 
 /// Itinerary item model for scheduled visits
 class ItineraryItem {
@@ -417,12 +418,25 @@ class ItineraryApiService {
         errorMessage = responseData['message'] ?? errorMessage;
       }
 
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'add client to itinerary',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'clientId': clientId, 'date': scheduledDate.toIso8601String()},
+      );
+
       throw ApiException(
         message: errorMessage,
         originalError: e,
       );
     } catch (e) {
       debugPrint('ItineraryApiService: Unexpected error - $e');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'add client to itinerary',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'clientId': clientId, 'date': scheduledDate.toIso8601String()},
+      );
       throw ApiException(
         message: 'Failed to create itinerary item',
         originalError: e,
