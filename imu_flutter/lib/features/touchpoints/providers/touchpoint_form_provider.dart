@@ -55,6 +55,7 @@ class TouchpointFormState {
 
   // Form field values
   final String? reason;
+  final String? status;  // NEW: status dropdown value
   final String? remarks;
   final String? photoPath;
   final String? audioPath;
@@ -65,6 +66,7 @@ class TouchpointFormState {
     this.timeOut = const TimeCaptureState(),
     this.isSubmitting = false,
     this.reason,
+    this.status,  // NEW
     this.remarks,
     this.photoPath,
     this.audioPath,
@@ -142,10 +144,12 @@ class TouchpointFormState {
     TimeCaptureState? timeOut,
     bool? isSubmitting,
     String? reason,
+    String? status,  // NEW
     String? remarks,
     String? photoPath,
     String? audioPath,
     bool clearReason = false,
+    bool clearStatus = false,  // NEW
     bool clearRemarks = false,
     bool clearPhotoPath = false,
     bool clearAudioPath = false,
@@ -156,6 +160,7 @@ class TouchpointFormState {
       timeOut: timeOut ?? this.timeOut,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       reason: clearReason ? null : (reason ?? this.reason),
+      status: clearStatus ? null : (status ?? this.status),  // NEW
       remarks: clearRemarks ? null : (remarks ?? this.remarks),
       photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
       audioPath: clearAudioPath ? null : (audioPath ?? this.audioPath),
@@ -239,6 +244,10 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
     state = state.copyWith(reason: reason);
   }
 
+  void setStatus(String? status) {
+    state = state.copyWith(status: status);
+  }
+
   void setRemarks(String? remarks) {
     state = state.copyWith(remarks: remarks);
   }
@@ -249,6 +258,10 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
 
   void setAudioPath(String? audioPath) {
     state = state.copyWith(audioPath: audioPath);
+  }
+
+  void setIsSubmitting(bool isSubmitting) {
+    state = state.copyWith(isSubmitting: isSubmitting);
   }
 
   void reset() {
