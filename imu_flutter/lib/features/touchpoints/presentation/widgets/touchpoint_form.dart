@@ -891,22 +891,22 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       final Map<String, dynamic> payload = {
         'client_id': widget.clientId,
         'touchpoint_number': widget.touchpointNumber,
-        'type': widget.touchpointType.toLowerCase(),
+        'type': widget.touchpointType.toLowerCase(), // Backend expects 'Visit' or 'Call'
         'reason': state.reason!,
         'status': _selectedStatus!,
-        'remarks': _remarksController.text.trim(),
+        'notes': _remarksController.text.trim(), // Backend expects 'notes' not 'remarks'
         'time_arrival': state.timeIn.time!.toIso8601String(),
         'time_departure': state.timeOut.time!.toIso8601String(),
-        // GPS location
+        // GPS location - backend expects 'latitude' and 'longitude'
         if (position != null)
-          'gps_lat': position.latitude,
+          'latitude': position.latitude,
         if (position != null)
-          'gps_lng': position.longitude,
+          'longitude': position.longitude,
         if (gpsAddress != null && gpsAddress.isNotEmpty)
-          'gps_address': gpsAddress,
-        // Photo URL (uploaded)
+          'address': gpsAddress,
+        // Photo URL (uploaded) - backend expects 'photo_url'
         if (photoUrl != null)
-          'photo': photoUrl,
+          'photo_url': photoUrl,
       };
 
       // Submit to API

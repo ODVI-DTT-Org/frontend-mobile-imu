@@ -35,14 +35,14 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
   Future<PowerSyncCredentials?> fetchCredentials() async {
     try {
       // Get the current access token from JWT auth service
-      final token = _authService.accessToken;
+      final accessToken = _authService.accessToken;
 
-      if (token == null) {
+      if (accessToken == null) {
         logDebug('No access token - user needs to login');
         return null;
       }
 
-      logDebug('JWT token available, length: ${token.length}');
+      logDebug('JWT token available, length: ${accessToken.length}');
 
       // Check if token needs refresh (only if not already expired)
       if (_authService.needsRefresh && _authService.currentUser?.isValid == true) {
@@ -66,20 +66,42 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         return null;
       }
 
-      // Return the credentials for PowerSync authentication
-      logDebug('PowerSync credentials fetched successfully');
-      final endpoint = _powersyncUrl.isNotEmpty ? _powersyncUrl : '';
-      final accessToken = _authService.accessToken!;
+      // Fetch PowerSync-specific token from backend
+      // PowerSync requires a token with 'user_id' claim that the SDK extracts
+      logDebug('Fetching PowerSync token from backend...');
 
-      if (endpoint.isEmpty) {
-        logError('PowerSync URL is empty');
+      final response = await _httpClient.get(
+        '$_apiUrl/powersync/token',
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        logError('Failed to fetch PowerSync token: ${response.statusCode}');
         return null;
       }
 
-      logDebug('Creating PowerSyncCredentials with endpoint: $endpoint');
+      final data = response.data as Map<String, dynamic>;
+      final powerSyncToken = data['token'] as String?;
+      final endpoint = data['endpoint'] as String?;
+      final userId = data['userId'] as String?;
+      final expiresAt = data['expiresAt'] as int?;
+
+      if (powerSyncToken == null || endpoint == null || userId == null) {
+        logError('Invalid PowerSync token response: missing required fields');
+        return null;
+      }
+
+      logDebug('PowerSync credentials fetched successfully');
+      logDebug('Creating PowerSyncCredentials with endpoint: $endpoint, userId: $userId');
+
+      // Return credentials with proper userId and expiresAt
       return PowerSyncCredentials(
         endpoint: endpoint,
-        token: accessToken,
+        token: powerSyncToken,
+        userId: userId,
+        expiresAt: expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : null,
       );
     } catch (e) {
       logError('Failed to fetch PowerSync credentials', e);

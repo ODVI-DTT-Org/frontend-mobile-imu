@@ -99,7 +99,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   @override
   void initState() {
     super.initState();
-    _loadClient();
+    // Defer loading until after the first frame to avoid modifying providers during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadClient();
+    });
   }
 
   Future<void> _loadClient() async {

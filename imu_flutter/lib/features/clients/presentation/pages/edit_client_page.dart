@@ -7,6 +7,7 @@ import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/client_api_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../services/connectivity_service.dart';
 import '../../data/models/client_model.dart';
 
 class EditClientPage extends ConsumerStatefulWidget {
@@ -48,7 +49,10 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
   @override
   void initState() {
     super.initState();
-    _loadClient();
+    // Defer loading until after the first frame to avoid modifying providers during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadClient();
+    });
   }
 
   Future<void> _loadClient() async {
@@ -288,54 +292,93 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
     await LoadingHelper.withLoading(
       ref: ref,
-      message: 'Updating client...',
+      message: 'Submitting client edit...',
       operation: () async {
-        final updatedData = {
-          'id': widget.clientId,
-          'firstName': _firstNameController.text.trim(),
-          'middleName': _middleNameController.text.trim().isEmpty
+        // Build updated client object
+        final updatedClient = Client(
+          id: widget.clientId,
+          firstName: _firstNameController.text.trim(),
+          middleName: _middleNameController.text.trim().isEmpty
               ? null
               : _middleNameController.text.trim(),
-          'lastName': _lastNameController.text.trim(),
-          'contactNumber': _contactNumberController.text.trim().isEmpty
-              ? null
-              : _contactNumberController.text.trim(),
-          'email': _emailController.text.trim().isEmpty
+          lastName: _lastNameController.text.trim(),
+          email: _emailController.text.trim().isEmpty
               ? null
               : _emailController.text.trim(),
-          'facebookLink': _facebookController.text.trim().isEmpty
+          phone: _contactNumberController.text.trim().isEmpty
+              ? null
+              : _contactNumberController.text.trim(),
+          facebookLink: _facebookController.text.trim().isEmpty
               ? null
               : _facebookController.text.trim(),
-          'remarks': _remarksController.text.trim().isEmpty
+          remarks: _remarksController.text.trim().isEmpty
               ? null
               : _remarksController.text.trim(),
-          'productType': _productType.toLowerCase().replaceAll(' ', ''),
-          'pensionType': _pensionType.toLowerCase(),
-          'marketType': _marketType.toLowerCase(),
-          'clientType': _clientType.toLowerCase(),
-          'addresses': _addresses,
-          'phoneNumbers': _phoneNumbers,
-          'updatedAt': DateTime.now().toIso8601String(),
-        };
+          productType: _parseProductType(_productType),
+          pensionType: _parsePensionType(_pensionType),
+          marketType: _parseMarketType(_marketType),
+          clientType: _parseClientType(_clientType),
+          addresses: _addresses.map((a) => Address(
+            id: a['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            street: a['street']?.toString() ?? '',
+            barangay: a['barangay']?.toString(),
+            city: a['city']?.toString() ?? '',
+            province: a['province']?.toString(),
+            isPrimary: a['isPrimary'] == true,
+          )).toList(),
+          phoneNumbers: _phoneNumbers.map((p) => PhoneNumber(
+            id: p['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            number: p['number']?.toString() ?? '',
+            label: p['label']?.toString() ?? 'Mobile',
+            isPrimary: p['isPrimary'] == true,
+          )).toList(),
+          createdAt: _client?.createdAt,
+          updatedAt: DateTime.now(),
+        );
 
-        // Save to local storage (saveClient updates if exists)
-        debugPrint('[EDIT_CLIENT] Saving client ${widget.clientId}');
-        debugPrint('[EDIT_CLIENT] Remarks value: "${updatedData['remarks']}"');
+        debugPrint('[EDIT_CLIENT] Submitting client edit for approval: ${widget.clientId}');
+        debugPrint('[EDIT_CLIENT] Remarks value: "${updatedClient.remarks}"');
 
-        await _hiveService.saveClient(widget.clientId, {
-          ..._client!.toJson(),
-          ...updatedData,
-        });
+        // Check connectivity
+        final isOnline = ref.read(isOnlineProvider);
 
-        debugPrint('[EDIT_CLIENT] Client saved successfully');
-        // PowerSync handles sync automatically
+        if (isOnline) {
+          // Send to backend for approval
+          debugPrint('[EDIT_CLIENT] Online - submitting to backend API');
+          final clientApi = ref.read(clientApiServiceProvider);
+          final result = await clientApi.updateClient(updatedClient);
+
+          if (result != null) {
+            debugPrint('[EDIT_CLIENT] Client edit submitted successfully');
+            // Update local storage with the response
+            await _hiveService.saveClient(widget.clientId, result.toJson());
+          } else {
+            throw Exception('Failed to submit client edit - client not found');
+          }
+        } else {
+          // Offline - save to local storage only
+          debugPrint('[EDIT_CLIENT] Offline - saving to local storage only');
+          await _hiveService.saveClient(widget.clientId, updatedClient.toJson());
+
+          // Show warning that changes will sync when online
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Offline: Changes will sync when connected'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
       },
       onError: (e) {
         HapticUtils.error();
+        debugPrint('[EDIT_CLIENT] Error: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to update client: $e'),
+              content: Text('Failed to submit client edit: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -347,11 +390,63 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Client updated successfully'),
+          content: Text('Client edit submitted for approval'),
           backgroundColor: Colors.green,
         ),
       );
       context.pop(true); // Return true to indicate success
+    }
+  }
+
+  ProductType _parseProductType(String value) {
+    switch (value) {
+      case 'SSS Pensioner':
+        return ProductType.sssPensioner;
+      case 'GSIS Pensioner':
+        return ProductType.gsisPensioner;
+      case 'Private':
+        return ProductType.private;
+      default:
+        return ProductType.sssPensioner;
+    }
+  }
+
+  PensionType _parsePensionType(String value) {
+    switch (value) {
+      case 'SSS':
+        return PensionType.sss;
+      case 'GSIS':
+        return PensionType.gsis;
+      case 'Private':
+        return PensionType.private;
+      case 'None':
+        return PensionType.none;
+      default:
+        return PensionType.sss;
+    }
+  }
+
+  MarketType _parseMarketType(String value) {
+    switch (value) {
+      case 'Residential':
+        return MarketType.residential;
+      case 'Commercial':
+        return MarketType.commercial;
+      case 'Industrial':
+        return MarketType.industrial;
+      default:
+        return MarketType.residential;
+    }
+  }
+
+  ClientType _parseClientType(String value) {
+    switch (value.toLowerCase()) {
+      case 'potential':
+        return ClientType.potential;
+      case 'existing':
+        return ClientType.existing;
+      default:
+        return ClientType.potential;
     }
   }
 
