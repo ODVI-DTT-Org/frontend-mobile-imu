@@ -4,7 +4,8 @@ import 'package:powersync/powersync.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../core/utils/logger.dart';
-// import '../../core/config/app_config.dart';
+import '../../core/config/app_config.dart';
+import '../error_logging_helper.dart';
 import 'powersync_connector.dart';
 
 /// PowerSync database schema matching PostgreSQL tables
@@ -253,6 +254,12 @@ class PowerSyncService {
     } catch (e) {
       _isConnecting = false;
       logError('Failed to connect to PowerSync', e);
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'PowerSync connect',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'powersyncUrl': AppConfig.powerSyncUrl},
+      );
       rethrow;
     }
   }
