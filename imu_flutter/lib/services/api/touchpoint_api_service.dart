@@ -6,6 +6,7 @@ import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
+import 'package:imu_flutter/services/error_logging_helper.dart';
 
 /// Touchpoint API service
 class TouchpointApiService {
@@ -198,12 +199,30 @@ class TouchpointApiService {
     } on DioException catch (e) {
       debugPrint('TouchpointApiService: DioException - ${e.message}');
       debugPrint('TouchpointApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'save touchpoint',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'clientId': touchpoint.clientId,
+          'touchpointNumber': touchpoint.touchpointNumber,
+        },
+      );
       throw ApiException(
         message: 'Network error: ${e.message}',
         originalError: e,
       );
     } catch (e) {
       debugPrint('TouchpointApiService: Unexpected error - $e');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'save touchpoint',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'clientId': touchpoint.clientId,
+          'touchpointNumber': touchpoint.touchpointNumber,
+        },
+      );
       throw ApiException(
         message: 'Failed to create touchpoint',
         originalError: e,
@@ -276,6 +295,16 @@ class TouchpointApiService {
     } on DioException catch (e) {
       debugPrint('TouchpointApiService: DioException - ${e.message}');
       debugPrint('TouchpointApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'update touchpoint',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'touchpointId': touchpoint.id,
+          'clientId': touchpoint.clientId,
+          'touchpointNumber': touchpoint.touchpointNumber,
+        },
+      );
       if (e.response?.statusCode == 404) {
         return null; // Touchpoint not found
       }
@@ -285,6 +314,16 @@ class TouchpointApiService {
       );
     } catch (e) {
       debugPrint('TouchpointApiService: Unexpected error - $e');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'update touchpoint',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'touchpointId': touchpoint.id,
+          'clientId': touchpoint.clientId,
+          'touchpointNumber': touchpoint.touchpointNumber,
+        },
+      );
       throw ApiException(
         message: 'Failed to update touchpoint',
         originalError: e,
