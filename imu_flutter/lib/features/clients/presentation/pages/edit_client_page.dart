@@ -87,7 +87,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         _client = client;
         // Store in Hive for future use
         try {
-          await _hiveService.addClient(client);
+          await _hiveService.addClient(client.toJson());
           debugPrint('Client stored in Hive successfully');
         } catch (e) {
           debugPrint('Warning: Failed to store client in Hive: $e');
