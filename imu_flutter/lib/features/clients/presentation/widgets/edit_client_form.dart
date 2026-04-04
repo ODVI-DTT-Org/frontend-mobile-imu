@@ -465,169 +465,156 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar:
-            widget.isModal ? null : AppBar(title: const Text('Edit Client')),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading client...'),
-            ],
-          ),
+      final loadingWidget = Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading client...'),
+          ],
         ),
       );
+      return widget.isModal
+          ? Scaffold(body: loadingWidget)
+          : loadingWidget;
     }
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: widget.isModal
-          ? null
-          : AppBar(
-              title: const Text('Edit Client'),
-              actions: [
-                if (_client?.createdAt != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Center(
-                      child: Chip(
-                        label: Text(
-                          'ID: ${widget.clientId.substring(0, 8)}...',
-                          style: TextStyle(fontSize: 11),
-                        ),
-                        backgroundColor: Colors.grey[200],
+    final formContent = Form(
+      key: _formKey,
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Basic Information Section
+          _buildSectionHeader(
+            title: 'Basic Information',
+            icon: LucideIcons.user,
+            sectionKey: 'basic',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildBasicInfoSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Contact Details Section
+          _buildSectionHeader(
+            title: 'Contact Details',
+            icon: LucideIcons.phone,
+            sectionKey: 'contact',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildContactDetailsSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Product Information Section
+          _buildSectionHeader(
+            title: 'Product Information',
+            icon: LucideIcons.creditCard,
+            sectionKey: 'product',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildProductInfoSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Address Section
+          _buildSectionHeader(
+            title: 'Address',
+            icon: LucideIcons.mapPin,
+            sectionKey: 'address',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildAddressSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Phone Numbers Section
+          _buildSectionHeader(
+            title: 'Phone Numbers',
+            icon: LucideIcons.phone,
+            sectionKey: 'phone',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildPhoneNumbersSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Remarks Section
+          _buildSectionHeader(
+            title: 'Remarks',
+            icon: LucideIcons.messageSquare,
+            sectionKey: 'remarks',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildRemarksSection(colorScheme),
+
+          const SizedBox(height: 32),
+
+          // Save Button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _handleSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'SAVE CHANGES',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-              ],
             ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Basic Information Section
-            _buildSectionHeader(
-              title: 'Basic Information',
-              icon: LucideIcons.user,
-              sectionKey: 'basic',
-              color: colorScheme.primary,
-            ),
+          ),
+
+          if (widget.isModal) ...[
             const SizedBox(height: 12),
-            _buildBasicInfoSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Contact Details Section
-            _buildSectionHeader(
-              title: 'Contact Details',
-              icon: LucideIcons.phone,
-              sectionKey: 'contact',
-              color: colorScheme.primary,
+            TextButton(
+              onPressed: widget.onCancel ?? () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 12),
-            _buildContactDetailsSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Product Information Section
-            _buildSectionHeader(
-              title: 'Product Information',
-              icon: LucideIcons.creditCard,
-              sectionKey: 'product',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildProductInfoSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Address Section
-            _buildSectionHeader(
-              title: 'Address',
-              icon: LucideIcons.mapPin,
-              sectionKey: 'address',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildAddressSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Phone Numbers Section
-            _buildSectionHeader(
-              title: 'Phone Numbers',
-              icon: LucideIcons.phone,
-              sectionKey: 'phone',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildPhoneNumbersSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Remarks Section
-            _buildSectionHeader(
-              title: 'Remarks',
-              icon: LucideIcons.messageSquare,
-              sectionKey: 'remarks',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildRemarksSection(colorScheme),
-
-            const SizedBox(height: 32),
-
-            // Save Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'SAVE CHANGES',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-              ),
-            ),
-
-            if (widget.isModal) ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: widget.onCancel ?? () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
+
+    // Only wrap in Scaffold for modal mode
+    if (widget.isModal) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: formContent,
+      );
+    }
+
+    // For page mode, return just the body content
+    return formContent;
   }
 
   Widget _buildSectionHeader({

@@ -5,7 +5,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
 import '../../../../services/media/camera_service.dart';
 import '../../../../services/location/geolocation_service.dart';
-import '../../../../services/api/upload_api_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
@@ -837,42 +836,10 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     if (!_canSubmit()) return;
 
     final state = ref.read(touchpointFormProvider);
-    final uploadService = ref.read(uploadApiServiceProvider);
 
     try {
       // Set submitting state
       ref.read(touchpointFormProvider.notifier).setIsSubmitting(true);
-
-      // Upload photo first if captured
-      String? photoUrl;
-      if (_capturedPhoto != null) {
-        try {
-          ref.read(touchpointFormProvider.notifier).setIsUploadingPhoto(true);
-          showToast('Uploading photo...');
-
-          final result = await uploadService.uploadPhoto(
-            _capturedPhoto!,
-          );
-
-          if (result != null) {
-            photoUrl = result.url;
-            ref.read(touchpointFormProvider.notifier).setPhotoUrl(photoUrl);
-            showToast('Photo uploaded successfully');
-          } else {
-            throw Exception('Photo upload failed - no result returned');
-          }
-        } catch (photoError) {
-          if (mounted) {
-            showToast('Failed to upload photo: ${photoError.toString()}');
-            // Don't proceed if photo upload fails
-            ref.read(touchpointFormProvider.notifier).setIsUploadingPhoto(false);
-            ref.read(touchpointFormProvider.notifier).setIsSubmitting(false);
-            return;
-          }
-        } finally {
-          ref.read(touchpointFormProvider.notifier).setIsUploadingPhoto(false);
-        }
-      }
 
       // Capture GPS location automatically
       final geoService = GeolocationService();
@@ -887,36 +854,39 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         );
       }
 
-      // Prepare payload
-      final Map<String, dynamic> payload = {
+      // Prepare multipart form data
+      final formData = FormData.fromMap({
+        // Form fields
         'client_id': widget.clientId,
-        'touchpoint_number': widget.touchpointNumber,
+        'touchpoint_number': widget.touchpointNumber.toString(),
         'type': widget.touchpointType, // 'Visit' or 'Call' - backend expects title case
         'reason': state.reason!,
         'status': _selectedStatus!,
-        'notes': _remarksController.text.trim(), // Backend expects 'notes' not 'remarks'
+        'notes': _remarksController.text.trim(),
         'time_arrival': state.timeIn.time!.toIso8601String(),
         'time_departure': state.timeOut.time!.toIso8601String(),
-        // GPS location - backend expects 'latitude' and 'longitude'
         if (position != null)
-          'latitude': position.latitude,
+          'latitude': position.latitude.toString(),
         if (position != null)
-          'longitude': position.longitude,
+          'longitude': position.longitude.toString(),
         if (gpsAddress != null && gpsAddress.isNotEmpty)
           'address': gpsAddress,
-        // Photo URL (uploaded) - backend expects 'photo_url'
-        if (photoUrl != null)
-          'photo_url': photoUrl,
-      };
+        // Photo file (if captured) - read bytes from File
+        if (_capturedPhoto != null)
+          'photo': MultipartFile.fromBytes(
+            await _capturedPhoto!.readAsBytes(),
+            filename: 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          ),
+      });
 
-      // Submit to API
+      // Submit to API as multipart/form-data
       final dio = Dio();
       final response = await dio.post(
         '${AppConfig.postgresApiUrl}/api/my-day/visits',
-        data: payload,
+        data: formData,
         options: Options(
           headers: {
-            'Content-Type': 'application/json',
+            // Don't set Content-Type - Dio will set it with correct boundary for multipart
             if (JwtAuthService.instance.accessToken != null)
               'Authorization': 'Bearer ${JwtAuthService.instance.accessToken}',
           },
