@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 's3_service.dart';
 import '../../core/utils/logger.dart';
+import '../error_logging_helper.dart';
 
 /// Upload queue item
 class UploadQueueItem {
@@ -91,6 +92,15 @@ class FileUploadService {
       }
     } catch (e) {
       logError('FileUploadService: Error uploading photo', e);
+      ErrorLoggingHelper.logNonCriticalError(
+        operation: 'image upload',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'fileName': photo.path,
+          'willRetry': 'true'
+        },
+      );
       return null;
     }
   }
@@ -123,6 +133,15 @@ class FileUploadService {
       }
     } catch (e) {
       logError('FileUploadService: Error uploading audio', e);
+      ErrorLoggingHelper.logNonCriticalError(
+        operation: 'audio upload',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'fileName': audio.path,
+          'willRetry': 'true'
+        },
+      );
       return null;
     }
   }
