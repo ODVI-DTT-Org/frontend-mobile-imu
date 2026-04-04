@@ -255,6 +255,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (result == null || !result['confirmed']) return;
 
     final udiNumber = result['udi_number'] as String?;
+    final notes = result['notes'] as String?;
 
     if (udiNumber == null || udiNumber.trim().isEmpty) {
       if (mounted) {
@@ -277,7 +278,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           await approvalsApi.submitLoanRelease(
             clientId: widget.clientId,
             udiNumber: udiNumber.trim(),
-            notes: 'Loan release requested via mobile app',
+            notes: (notes?.trim().isNotEmpty ?? false) ? notes!.trim() : 'Loan release requested via mobile app',
           );
         },
       );
@@ -1280,10 +1281,12 @@ class _ReleaseLoanDialog extends StatefulWidget {
 
 class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
   final _udiController = TextEditingController();
+  final _notesController = TextEditingController();
 
   @override
   void dispose() {
     _udiController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -1315,6 +1318,17 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
           ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _notesController,
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+              hintText: 'Enter notes (optional)...',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+          ),
           const SizedBox(height: 12),
           Text(
             'This will submit a request for approval. The loan will be marked as released and all touchpoints will be completed.',
@@ -1345,6 +1359,7 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
             Navigator.pop(context, {
               'confirmed': true,
               'udi_number': udiNumber,
+              'notes': _notesController.text.trim(),
             });
           },
           style: ElevatedButton.styleFrom(

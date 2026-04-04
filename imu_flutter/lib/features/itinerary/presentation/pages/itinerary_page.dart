@@ -311,6 +311,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     if (result == null || !result['confirmed']) return;
 
     final udiNumber = result['udi_number'] as String?;
+    final notes = result['notes'] as String?;
 
     if (udiNumber == null || udiNumber.trim().isEmpty) {
       if (mounted) {
@@ -327,7 +328,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         await approvalsApi.submitLoanRelease(
           clientId: visit.clientId,
           udiNumber: udiNumber.trim(),
-          notes: 'Loan release requested via mobile app',
+          notes: (notes?.trim().isNotEmpty ?? false) ? notes!.trim() : 'Loan release requested via mobile app',
         );
         // Refresh itinerary to show updated status
         ref.invalidate(todayItineraryProvider);
@@ -1629,11 +1630,13 @@ class _ReleaseLoanDialog extends StatefulWidget {
 
 class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
   final _udiController = TextEditingController();
+  final _notesController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
   void dispose() {
     _udiController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -1668,6 +1671,21 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
             ),
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _notesController,
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+              hintText: 'Enter notes (optional)...',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            ),
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 12),
           Text(
@@ -1707,6 +1725,7 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
             Navigator.pop(context, {
               'confirmed': true,
               'udi_number': udiNumber,
+              'notes': _notesController.text.trim(),
             });
           },
           style: ElevatedButton.styleFrom(
