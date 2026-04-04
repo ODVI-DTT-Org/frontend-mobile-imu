@@ -891,7 +891,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       final Map<String, dynamic> payload = {
         'client_id': widget.clientId,
         'touchpoint_number': widget.touchpointNumber,
-        'type': widget.touchpointType.toLowerCase(), // Backend expects 'Visit' or 'Call'
+        'type': widget.touchpointType, // 'Visit' or 'Call' - backend expects title case
         'reason': state.reason!,
         'status': _selectedStatus!,
         'notes': _remarksController.text.trim(), // Backend expects 'notes' not 'remarks'
