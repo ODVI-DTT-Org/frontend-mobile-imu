@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import '../../../../app.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
@@ -86,12 +87,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     final selectedClients = ref.read(myDayStateProvider).clients.where((c) => _selectedClientIds.contains(c.id)).toList();
 
     if (selectedClients.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No clients selected'),
-          backgroundColor: Color(0xFF64748B),
-        ),
-      );
+      showToast('No clients selected');
       return;
     }
 
@@ -148,16 +144,11 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         operation: () async {
           final myDayApiService = ref.read(myDayApiServiceProvider);
           for (final client in selectedClients) {
-            await myDayApiService.removeFromMyDay(client.id);
+            await myDayApiService.removeFromMyDay(client.clientId);
           }
           if (mounted) {
             HapticUtils.success();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${selectedClients.length} client(s) removed from My Day'),
-                backgroundColor: const Color(0xFF22C55E),
-              ),
-            );
+            showToast('${selectedClients.length} client(s) removed from My Day');
             await ref.read(myDayStateProvider.notifier).refresh();
           }
         },
@@ -173,12 +164,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     final state = ref.read(myDayStateProvider);
 
     if (state.clients.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No clients available for time-in'),
-          backgroundColor: Color(0xFF64748B),
-        ),
-      );
+      showToast('No clients available for time-in');
       return;
     }
 
@@ -192,12 +178,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Time-in recorded for ${clientIds.length} clients'),
-              backgroundColor: const Color(0xFF22C55E),
-            ),
-          );
+          showToast('Time-in recorded for ${clientIds.length} clients');
         }
       },
     );
@@ -257,15 +238,10 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         message: 'Removing ${client.fullName}...',
         operation: () async {
           final myDayApiService = ref.read(myDayApiServiceProvider);
-          await myDayApiService.removeFromMyDay(client.id);
+          await myDayApiService.removeFromMyDay(client.clientId);
           if (mounted) {
             HapticUtils.success();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${client.fullName} removed from My Day'),
-                backgroundColor: const Color(0xFF22C55E),
-              ),
-            );
+            showToast('${client.fullName} removed from My Day');
             await ref.read(myDayStateProvider.notifier).refresh();
           }
         },
@@ -365,7 +341,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     // Open the TouchpointForm which handles Time In/Out internally
     final result = await showTouchpointForm(
       context: context,
-      clientId: client.id,
+      clientId: client.clientId,
       touchpointNumber: touchpointNumber,
       touchpointType: touchpointType == TouchpointType.visit ? 'Visit' : 'Call',
       clientName: client.fullName,
@@ -378,11 +354,11 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         ref: ref,
         message: 'Saving touchpoint...',
         operation: () async {
-          await ref.read(myDayStateProvider.notifier).submitVisitForm(client.id, result);
+          await ref.read(myDayStateProvider.notifier).submitVisitForm(client.clientId, result);
 
           // Upload selfie if photo was captured
           if (result['photoPath'] != null) {
-            await ref.read(myDayApiServiceProvider).uploadSelfie(client.id, result['photoPath']);
+            await ref.read(myDayApiServiceProvider).uploadSelfie(client.clientId, result['photoPath']);
           }
         },
       );
@@ -409,12 +385,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
     if (udiNumber == null || udiNumber.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('UDI number is required'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showToast('UDI number is required');
       }
       return;
     }
@@ -425,7 +396,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       operation: () async {
         final approvalsApi = ref.read(approvalsApiServiceProvider);
         await approvalsApi.submitLoanRelease(
-          clientId: client.id,
+          clientId: client.clientId,
           udiNumber: udiNumber.trim(),
           notes: 'Loan release requested via mobile app',
         );
@@ -436,19 +407,13 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
     if (mounted) {
       HapticUtils.success();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Loan release submitted for approval (UDI: ${udiNumber.trim()})'),
-          backgroundColor: Colors.green[600],
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      showToast('Loan release submitted for approval (UDI: ${udiNumber.trim()})');
     }
   }
 
   Future<void> _editClient(MyDayClient client) async {
     HapticUtils.lightImpact();
-    context.push('/clients/${client.id}/edit');
+    context.push('/clients/${client.clientId}/edit');
   }
 
   void _onClientLongPress(MyDayClient client) {
@@ -931,21 +896,11 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
           onPressed: () {
             final udiNumber = _udiController.text.trim();
             if (udiNumber.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('UDI number is required'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showToast('UDI number is required');
               return;
             }
             if (udiNumber.length > 50) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('UDI number must be 50 characters or less'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              showToast('UDI number must be 50 characters or less');
               return;
             }
             Navigator.pop(context, {
