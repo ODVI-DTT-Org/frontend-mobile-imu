@@ -69,8 +69,11 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
             // If fromRow fails, try fromJson
             _client = Client.fromJson(clientData);
           }
-          _populateForm();
-          setState(() => _isLoading = false);
+          // Populate form and update state atomically
+          setState(() {
+            _populateForm();
+            _isLoading = false;
+          });
           return;
         } catch (e, stack) {
           debugPrint('Error parsing client data from Hive: $e\n$stack');
@@ -93,8 +96,11 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
           debugPrint('Warning: Failed to store client in Hive: $e');
           // Continue anyway - we have the client data
         }
-        _populateForm();
-        setState(() => _isLoading = false);
+        // Populate form and update state atomically
+        setState(() {
+          _populateForm();
+          _isLoading = false;
+        });
       } else {
         if (mounted) {
           setState(() => _isLoading = false);
