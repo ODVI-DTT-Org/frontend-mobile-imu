@@ -1,6 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter/material.dart' show TimeOfDay;
+import 'package:flutter/material.dart' hide TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
@@ -9,7 +8,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../providers/touchpoint_form_provider.dart';
-import '../../../clients/data/models/client_model.dart';
+import '../../../clients/data/models/client_model.dart' hide TimeOfDay;
 import '../../../../app.dart' show showToast;
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
