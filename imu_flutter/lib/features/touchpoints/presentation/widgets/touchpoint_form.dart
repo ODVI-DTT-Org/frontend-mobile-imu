@@ -34,11 +34,9 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   final _formKey = GlobalKey<FormState>();
   final _cameraService = CameraService();
 
-  final _odometerArrivalController = TextEditingController();
-  final _odometerDepartureController = TextEditingController();
-  DateTime? _nextVisitDate;
+  final _remarksController = TextEditingController(); // NEW: remarks field
   String? _selectedReason;
-  TouchpointStatus? _selectedStatus; // New: status field
+  String? _selectedStatus; // Changed from TouchpointStatus? to String? for simplified form
 
   // Status options for touchpoints
   static const List<Map<String, dynamic>> _statusOptions = [
@@ -116,8 +114,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
   @override
   void dispose() {
-    _odometerArrivalController.dispose();
-    _odometerDepartureController.dispose();
+    _remarksController.dispose(); // NEW
     super.dispose();
   }
 
@@ -196,301 +193,91 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Date and Address
-                      Text(
-                        'Date: ${_formatDate(DateTime.now())}',
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      // Row 1: Time In / Time Out (two columns)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildTimeInField(context),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildTimeOutField(context),
+                            ),
+                          ],
+                        ),
                       ),
-                      if (widget.address != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.address!,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+
+                      // Row 2: Reason / Status (two columns)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildReasonDropdown(context),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildStatusDropdown(context),
+                            ),
+                          ],
                         ),
-                      ],
-                      const SizedBox(height: 16),
+                      ),
 
-                      // Touchpoint Sequence Info Card
-                      _buildSequenceInfoCard(),
-                      const SizedBox(height: 16),
+                      // Row 3: Remarks (full width)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: _buildRemarksField(context),
+                      ),
 
-                      // Time In section for Visit type
-                      if (widget.touchpointType == 'Visit') ...[
-                        TimeCaptureSection(
-                          label: 'TIME IN',
-                          buttonLabel: 'CAPTURE TIME IN',
-                          status: ref.watch(touchpointFormProvider).timeIn.isCapturing
-                              ? TimeCaptureStatus.capturing
-                              : ref.watch(touchpointFormProvider).timeIn.isCaptured
-                                  ? TimeCaptureStatus.captured
-                                  : TimeCaptureStatus.notCaptured,
-                          capturedTime: ref.watch(touchpointFormProvider).timeIn.time,
-                          gpsLat: ref.watch(touchpointFormProvider).timeIn.gpsLat,
-                          gpsLng: ref.watch(touchpointFormProvider).timeIn.gpsLng,
-                          gpsAddress: ref.watch(touchpointFormProvider).timeIn.gpsAddress,
-                          isEnabled: true,
-                          showGps: true,
-                          onCapture: (time, lat, lng, address) {
-                            ref.read(touchpointFormProvider.notifier).setTimeIn(time, lat, lng, address);
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                      ],
+                      // Row 4: Camera (full width)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: _buildCameraSection(context),
+                      ),
 
-                      // Form fields wrapped in IgnorePointer for Visit type
-                      IgnorePointer(
-                        ignoring: !ref.watch(touchpointFormProvider).canFillForm,
-                        child: Opacity(
-                          opacity: ref.watch(touchpointFormProvider).canFillForm ? 1.0 : 0.5,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Reason dropdown
-                              _buildFieldLabel('Reason', isRequired: true),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: _selectedReason,
-                                decoration: InputDecoration(
-                                  hintText: 'Select reason',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                                  ),
-                                ),
-                                items: _reasons
-                                    .map((reason) => DropdownMenuItem<String>(
-                                          value: reason['value'] as String,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: reason['color'],
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Text(reason['label']),
-                                            ],
-                                          ),
-                                        ),)
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(() => _selectedReason = value);
-                                },
-                                validator: (value) {
-                                  if (value == null) return 'Required';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Status dropdown (NEW)
-                              _buildFieldLabel('Status', isRequired: true),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: _selectedStatus?.apiValue,
-                                decoration: InputDecoration(
-                                  hintText: 'Select status',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                                  ),
-                                ),
-                                items: _statusOptions
-                                    .map((status) => DropdownMenuItem<String>(
-                                          value: status['value'] as String,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: status['color'],
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Text(status['label']),
-                                            ],
-                                          ),
-                                        ),)
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedStatus = TouchpointStatus.fromApi(value!);
-                                  });
-                                },
-                                validator: (value) {
-                                  if (value == null) return 'Required';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Visit-specific fields
-                              if (widget.touchpointType == 'Visit') ...[
-                                // Photo Capture Section
-                                _buildFieldLabel('Photo Evidence', isRequired: true),
-                                const SizedBox(height: 8),
-                                _buildPhotoCapture(),
-                                if (_hasPhotoError)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4, left: 12),
-                                    child: Text(
-                                      'Photo is required',
-                                      style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-                                    ),
-                                  ),
-                                const SizedBox(height: 16),
-
-                                // Odometer Arrival
-                                _buildFieldLabel('Odometer Arrival', isOptional: true),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: _odometerArrivalController,
-                                  decoration: InputDecoration(
-                                    hintText: 'e.g., 12,345',
-                                    suffixText: 'km',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
-                                    ),
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Odometer Departure
-                                _buildFieldLabel('Odometer Departure', isOptional: true),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: _odometerDepartureController,
-                                  decoration: InputDecoration(
-                                    hintText: 'e.g., 12,350',
-                                    suffixText: 'km',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
-                                    ),
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-
-                              // Next Visit Date
-                              _buildDateField(
-                                label: 'Next Visit Date',
-                                value: _nextVisitDate,
-                                onTap: _selectNextVisitDate,
-                                isOptional: true,
-                              ),
-                              const SizedBox(height: 16),
-                            ],
+                      // Fixed bottom submit buttons
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border(
+                            top: BorderSide(color: Colors.grey[200]!),
                           ),
                         ),
-                      ),
-
-                      // Time Out section for Visit type (before submit button)
-                      if (widget.touchpointType == 'Visit') ...[
-                        const SizedBox(height: 16),
-                        TimeCaptureSection(
-                          label: 'TIME OUT',
-                          buttonLabel: 'CAPTURE TIME OUT',
-                          status: ref.watch(touchpointFormProvider).timeOut.isCapturing
-                              ? TimeCaptureStatus.capturing
-                              : ref.watch(touchpointFormProvider).timeOut.isCaptured
-                                  ? TimeCaptureStatus.captured
-                                  : TimeCaptureStatus.notCaptured,
-                          capturedTime: ref.watch(touchpointFormProvider).timeOut.time,
-                          gpsLat: ref.watch(touchpointFormProvider).timeOut.gpsLat,
-                          gpsLng: ref.watch(touchpointFormProvider).timeOut.gpsLng,
-                          gpsAddress: ref.watch(touchpointFormProvider).timeOut.gpsAddress,
-                          isEnabled: ref.watch(touchpointFormProvider).timeIn.isCaptured,
-                          showGps: true,
-                          minTime: ref.watch(touchpointFormProvider).timeIn.time,
-                          onCapture: (time, lat, lng, address) {
-                            final timeIn = ref.read(touchpointFormProvider).timeIn.time;
-                            if (timeIn != null && !time.isAfter(timeIn)) {
-                              _showTimeOutValidationError(timeIn, time);
-                              return;
-                            }
-                            ref.read(touchpointFormProvider.notifier).setTimeOut(time, lat, lng, address);
-                          },
-                        ),
-                      ],
-                      const SizedBox(height: 32),
-
-                      // Submit button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: ref.watch(touchpointFormProvider).canSubmit
-                              ? _handleSubmit
-                              : null,
-                          child: const Text('SAVE TOUCHPOINT'),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(44),
+                                ),
+                                child: const Text('CANCEL'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _canSubmit() ? _handleSubmit : null,
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(44),
+                                ),
+                                child: ref.watch(touchpointFormProvider).isSubmitting
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Text('SUBMIT'),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -576,6 +363,38 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     if (date != null) {
       setState(() => _nextVisitDate = date);
     }
+  }
+
+  // Placeholder methods for new simplified form widgets
+  // These will be implemented in Tasks 3-6
+  Widget _buildTimeInField(BuildContext context) {
+    return const Center(child: Text('Time In Field - TODO'));
+  }
+
+  Widget _buildTimeOutField(BuildContext context) {
+    return const Center(child: Text('Time Out Field - TODO'));
+  }
+
+  Widget _buildReasonDropdown(BuildContext context) {
+    return const Center(child: Text('Reason Dropdown - TODO'));
+  }
+
+  Widget _buildStatusDropdown(BuildContext context) {
+    return const Center(child: Text('Status Dropdown - TODO'));
+  }
+
+  Widget _buildRemarksField(BuildContext context) {
+    return const Center(child: Text('Remarks Field - TODO'));
+  }
+
+  Widget _buildCameraSection(BuildContext context) {
+    return const Center(child: Text('Camera Section - TODO'));
+  }
+
+  bool _canSubmit() {
+    // Placeholder validation logic
+    // Will be implemented in Task 7
+    return false;
   }
 
   void _handleSubmit() {
