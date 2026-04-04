@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart' hide TimeOfDay;
+import 'package:flutter/material.dart' as material show TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
@@ -9,6 +9,7 @@ import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../providers/touchpoint_form_provider.dart';
 import '../../../clients/data/models/client_model.dart';
+import '../../../../app.dart' show showToast;
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
   final String clientId;
@@ -410,7 +411,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
   Future<void> _selectTimeIn(BuildContext context) async {
     final now = DateTime.now();
-    final picked = await showTimePicker(
+    final picked = await material.showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
     );
@@ -439,7 +440,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     final now = DateTime.now();
     final initialTime = state.timeOut.time ?? now;
 
-    final picked = await showTimePicker(
+    final picked = await material.showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
     );
