@@ -56,13 +56,18 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       _currentPage = 1; // Reset to first page on search
     });
 
-    // Update the appropriate search query provider based on mode
-    if (_showMyClientsOnly) {
-      // My Clients: filter locally (PowerSync already has territory-filtered data)
-    } else {
-      // All Clients: update online search query provider
-      ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
-    }
+    // Defer provider updates until after build cycle
+    Future.microtask(() {
+      if (!mounted) return;
+
+      // Update the appropriate search query provider based on mode
+      if (_showMyClientsOnly) {
+        // My Clients: filter locally (PowerSync already has territory-filtered data)
+      } else {
+        // All Clients: update online search query provider
+        ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
+      }
+    });
   }
 
   @override
@@ -114,11 +119,16 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       _currentPage = page;
     });
 
-    // For online mode, update the provider's page state and invalidate to trigger refetch
-    if (!_showMyClientsOnly) {
-      ref.read(onlineClientPageProvider.notifier).state = page;
-      ref.invalidate(onlineClientsProvider);
-    }
+    // Defer provider updates until after build cycle
+    Future.microtask(() {
+      if (!mounted) return;
+
+      // For online mode, update the provider's page state and invalidate to trigger refetch
+      if (!_showMyClientsOnly) {
+        ref.read(onlineClientPageProvider.notifier).state = page;
+        ref.invalidate(onlineClientsProvider);
+      }
+    });
   }
 
   void _handleRefresh() async {
@@ -281,8 +291,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               _searchQuery = '';
                               _searchController.clear();
                             });
-                            // Invalidate online provider when switching back to My Clients
-                            ref.invalidate(onlineClientsProvider);
+                            // Defer provider updates until after build cycle
+                            Future.microtask(() {
+                              if (!mounted) return;
+                              // Invalidate online provider when switching back to My Clients
+                              ref.invalidate(onlineClientsProvider);
+                            });
                           }),
                           const SizedBox(width: 8),
                           _buildFilterToggle('All Clients', !_showMyClientsOnly, () {
@@ -299,9 +313,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               _searchQuery = '';
                               _searchController.clear();
                             });
-                            // Reset online search and page to first page when switching
-                            ref.read(onlineClientSearchQueryProvider.notifier).state = '';
-                            ref.read(onlineClientPageProvider.notifier).state = 1;
+                            // Defer provider updates until after build cycle
+                            Future.microtask(() {
+                              if (!mounted) return;
+                              // Reset online search and page to first page when switching
+                              ref.read(onlineClientSearchQueryProvider.notifier).state = '';
+                              ref.read(onlineClientPageProvider.notifier).state = 1;
+                            });
                           }),
                         ],
                       ),
