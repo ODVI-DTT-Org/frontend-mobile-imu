@@ -658,7 +658,40 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   }
 
   Widget _buildRemarksField(BuildContext context) {
-    return const Center(child: Text('Remarks Field - TODO'));
+    final state = ref.watch(touchpointFormProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Remarks',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextFormField(
+          controller: _remarksController,
+          maxLines: 3,
+          maxLength: 500,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            contentPadding: const EdgeInsets.all(12),
+            hintText: 'Add remarks...',
+            hintStyle: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            counterText: '${state.remarks?.length ?? 0}/500',
+          ),
+          onChanged: (value) {
+            ref.read(touchpointFormProvider.notifier).setRemarks(value);
+          },
+        ),
+      ],
+    );
   }
 
   Widget _buildCameraSection(BuildContext context) {
