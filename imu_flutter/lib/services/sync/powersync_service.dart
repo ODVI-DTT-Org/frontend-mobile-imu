@@ -165,6 +165,22 @@ const Schema _powerSyncSchema = Schema([
     Column.integer('sort_order'),
     Column.integer('is_active'),
   ]),
+  // Error logs for non-critical error queuing
+  Table('error_logs', [
+    Column.text('code'),
+    Column.text('message'),
+    Column.text('platform'),
+    Column.text('stack_trace'),
+    Column.text('user_id'),
+    Column.text('request_id'),
+    Column.text('fingerprint'),
+    Column.text('app_version'),
+    Column.text('os_version'),
+    Column.text('device_info'),
+    Column.text('details'),
+    Column.integer('is_synced'),
+    Column.text('created_at'),
+  ]),
 ]);
 
 /// PowerSync service managing the local SQLite database
@@ -294,7 +310,7 @@ class PowerSyncService {
       downloading: status.downloading,
       lastSyncAt: DateTime.now(),
       pendingUploads: 0,
-    ));
+    ),);
   }
 
   /// Wait for initial sync to complete (with timeout)
