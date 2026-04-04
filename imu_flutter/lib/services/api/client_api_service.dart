@@ -6,6 +6,7 @@ import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
+import 'package:imu_flutter/services/error_logging_helper.dart';
 
 /// Client API service
 class ClientApiService {
@@ -336,12 +337,24 @@ class ClientApiService {
     } on DioException catch (e) {
       debugPrint('ClientApiService: DioException - ${e.message}');
       debugPrint('ClientApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'create client',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'firstName': client.firstName, 'lastName': client.lastName},
+      );
       throw ApiException(
         message: 'Network error: ${e.message}',
         originalError: e,
       );
     } catch (e) {
       debugPrint('ClientApiService: Unexpected error - $e');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'create client',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'firstName': client.firstName, 'lastName': client.lastName},
+      );
       throw ApiException(
         message: 'Failed to create client',
         originalError: e,
