@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../../services/error_logging_helper.dart';
 
 /// Result enum for location operations
 enum LocationResult {
@@ -96,6 +97,12 @@ class GeolocationService {
       return (null, LocationResult.timeout, 'Location request timed out. Please try again.');
     } catch (e) {
       debugPrint('GeolocationService: Error getting current position: $e');
+      ErrorLoggingHelper.logNonCriticalError(
+        operation: 'get GPS location',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'usingCachedFallback': 'true'},
+      );
       return (null, LocationResult.error, 'Failed to get location: ${e.toString()}');
     }
   }
