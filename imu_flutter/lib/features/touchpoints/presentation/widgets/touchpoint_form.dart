@@ -545,11 +545,116 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   }
 
   Widget _buildReasonDropdown(BuildContext context) {
-    return const Center(child: Text('Reason Dropdown - TODO'));
+    final state = ref.watch(touchpointFormProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Reason',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: state.reason,
+              hint: Text(
+                'Select reason',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              isExpanded: true,
+              icon: Icon(
+                Icons.keyboard_arrow_down,
+                size: 16,
+                color: Colors.grey[600],
+              ),
+              items: _reasons.map((reason) {
+                return DropdownMenuItem<String>(
+                  value: reason['value'],
+                  child: Text(
+                    reason['label'],
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(touchpointFormProvider.notifier).setReason(value);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildStatusDropdown(BuildContext context) {
-    return const Center(child: Text('Status Dropdown - TODO'));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Status',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedStatus,
+              hint: Text(
+                'Select status',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              isExpanded: true,
+              icon: Icon(
+                Icons.keyboard_arrow_down,
+                size: 16,
+                color: Colors.grey[600],
+              ),
+              items: _statusOptions.map((status) {
+                return DropdownMenuItem<String>(
+                  value: status['value'],
+                  child: Text(
+                    status['label'],
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedStatus = value;
+                  });
+                  // Note: Will add to state provider in Task 8
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildRemarksField(BuildContext context) {
