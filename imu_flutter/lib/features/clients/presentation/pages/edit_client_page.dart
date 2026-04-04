@@ -176,7 +176,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     _clientType = _client!.clientType.name.toUpperCase();
 
     _addresses = _client!.addresses
-        .map((a) => {
+        .map((a) => <String, Object?>{
               'id': a.id,
               'street': a.street,
               'barangay': a.barangay ?? '',
@@ -187,7 +187,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         .toList();
 
     _phoneNumbers = _client!.phoneNumbers
-        .map((p) => {
+        .map((p) => <String, Object?>{
               'id': p.id,
               'number': p.number,
               'label': p.label ?? 'Mobile',
@@ -196,7 +196,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         .toList();
 
     if (_addresses.isEmpty) {
-      _addresses.add({
+      _addresses.add(<String, Object?>{
         'id': '1',
         'street': '',
         'barangay': '',
@@ -207,7 +207,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     }
 
     if (_phoneNumbers.isEmpty) {
-      _phoneNumbers.add({
+      _phoneNumbers.add(<String, Object?>{
         'id': '1',
         'number': '',
         'label': 'Mobile',

@@ -14,6 +14,7 @@ import 'features/touchpoints/services/form_draft_service.dart';
 import 'services/sync/powersync_service.dart';
 import 'services/sync/powersync_connector.dart';
 import 'services/auth/jwt_auth_service.dart';
+import 'services/error_reporter_service.dart';
 import 'shared/widgets/splash_screen.dart';
 
 void main() async {
@@ -133,6 +134,14 @@ Future<void> _initializeServices() async {
   // Initialize connectivity
   final connectivityService = ConnectivityService();
   await connectivityService.initialize();
+
+  // Initialize error reporter
+  try {
+    await ErrorReporterService().init();
+  } catch (e) {
+    debugPrint('ErrorReporter initialization error: $e');
+    // Continue without error reporting - not critical for app
+  }
 
   // Initialize notifications
   final notificationService = NotificationService();
