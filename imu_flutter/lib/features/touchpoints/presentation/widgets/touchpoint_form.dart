@@ -1,11 +1,9 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart' hide TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
 import '../../../../services/media/camera_service.dart';
-import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
@@ -37,7 +35,6 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   final _cameraService = CameraService();
 
   final _remarksController = TextEditingController(); // NEW: remarks field
-  String? _selectedReason;
   String? _selectedStatus; // Changed from TouchpointStatus? to String? for simplified form
 
   // Status options for touchpoints
@@ -320,7 +317,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
               children: [
                 Text(
                   state.timeIn.time != null
-                      ? '${state.timeIn.time.hour}:${state.timeIn.time.minute.toString().padLeft(2, '0')}'
+                      ? '${state.timeIn.time!.hour}:${state.timeIn.time!.minute.toString().padLeft(2, '0')}'
                       : 'Select time',
                   style: TextStyle(
                     fontSize: 14,
@@ -380,7 +377,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
               children: [
                 Text(
                   state.timeOut.time != null
-                      ? '${state.timeOut.time.hour}:${state.timeOut.time.minute.toString().padLeft(2, '0')}'
+                      ? '${state.timeOut.time!.hour}:${state.timeOut.time!.minute.toString().padLeft(2, '0')}'
                       : 'Select time',
                   style: TextStyle(
                     fontSize: 14,
