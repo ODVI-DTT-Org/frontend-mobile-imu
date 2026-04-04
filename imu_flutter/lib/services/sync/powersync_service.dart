@@ -255,6 +255,33 @@ class PowerSyncService {
     }
   }
 
+  /// Close and clear PowerSync database (for logout/user switch)
+  static Future<void> closeAndClear() async {
+    try {
+      // Disconnect if connected
+      if (_isConnected && _database != null) {
+        await _database!.disconnect();
+        _isConnected = false;
+      }
+
+      // Close the database completely
+      if (_database != null) {
+        await _database!.close();
+        _database = null;
+      }
+
+      // Clear the current connector
+      _currentConnector = null;
+
+      logDebug('PowerSync database closed and cleared');
+    } catch (e) {
+      logError('Failed to close PowerSync database', e);
+      // Ensure database is nulled even if close fails
+      _database = null;
+      _currentConnector = null;
+    }
+  }
+
   /// Get sync status stream
   static Stream<SyncStatus> get syncStatus {
     if (_database == null) {

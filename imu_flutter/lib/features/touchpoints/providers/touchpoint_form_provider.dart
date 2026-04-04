@@ -59,6 +59,8 @@ class TouchpointFormState {
   final String? remarks;
   final String? photoPath;
   final String? audioPath;
+  final String? photoUrl;  // NEW: uploaded photo URL
+  final bool isUploadingPhoto;  // NEW: photo upload in progress
 
   const TouchpointFormState({
     this.touchpointType = 'Visit',
@@ -70,6 +72,8 @@ class TouchpointFormState {
     this.remarks,
     this.photoPath,
     this.audioPath,
+    this.photoUrl,  // NEW
+    this.isUploadingPhoto = false,  // NEW
   });
 
   /// Form fields are enabled after Time In is captured (for Visit type)
@@ -148,11 +152,14 @@ class TouchpointFormState {
     String? remarks,
     String? photoPath,
     String? audioPath,
+    String? photoUrl,  // NEW
+    bool? isUploadingPhoto,  // NEW
     bool clearReason = false,
     bool clearStatus = false,  // NEW
     bool clearRemarks = false,
     bool clearPhotoPath = false,
     bool clearAudioPath = false,
+    bool clearPhotoUrl = false,  // NEW
   }) {
     return TouchpointFormState(
       touchpointType: touchpointType ?? this.touchpointType,
@@ -164,6 +171,8 @@ class TouchpointFormState {
       remarks: clearRemarks ? null : (remarks ?? this.remarks),
       photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
       audioPath: clearAudioPath ? null : (audioPath ?? this.audioPath),
+      photoUrl: clearPhotoUrl ? null : (photoUrl ?? this.photoUrl),  // NEW
+      isUploadingPhoto: isUploadingPhoto ?? this.isUploadingPhoto,  // NEW
     );
   }
 }
@@ -258,6 +267,14 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
 
   void setAudioPath(String? audioPath) {
     state = state.copyWith(audioPath: audioPath);
+  }
+
+  void setPhotoUrl(String? photoUrl) {
+    state = state.copyWith(photoUrl: photoUrl);
+  }
+
+  void setIsUploadingPhoto(bool isUploading) {
+    state = state.copyWith(isUploadingPhoto: isUploading);
   }
 
   void setIsSubmitting(bool isSubmitting) {

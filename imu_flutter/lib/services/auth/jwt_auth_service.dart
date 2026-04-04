@@ -253,13 +253,13 @@ class JwtAuthService {
     await clearStoredCredentials();
     logDebug('Stored credentials cleared on logout');
 
-    // Disconnect PowerSync on logout to prevent credential issues
+    // Disconnect and clear PowerSync on logout to prevent credential issues
     try {
-      await PowerSyncService.disconnect();
-      logDebug('PowerSync disconnected on logout');
+      await PowerSyncService.closeAndClear();
+      logDebug('PowerSync closed and cleared on logout');
     } catch (e) {
-      logError('Failed to disconnect PowerSync', e);
-      // Continue logout even if PowerSync disconnect fails
+      logError('Failed to close PowerSync', e);
+      // Continue logout even if PowerSync close fails
     }
 
     // Clear permissions cache on logout

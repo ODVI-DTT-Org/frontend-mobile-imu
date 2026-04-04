@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
 import '../../../../services/media/camera_service.dart';
 import '../../../../services/location/geolocation_service.dart';
+import '../../../../services/api/upload_api_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
@@ -620,6 +621,8 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   }
 
   Widget _buildCameraSection(BuildContext context) {
+    final state = ref.watch(touchpointFormProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -652,6 +655,69 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                     fit: BoxFit.cover,
                   ),
                 ),
+                // Upload progress overlay
+                if (state.isUploadingPhoto)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Uploading...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Uploaded badge
+                if (state.photoUrl != null && !state.isUploadingPhoto)
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Uploaded',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 // Clear button
                 Positioned(
                   top: 4,
@@ -662,6 +728,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
                         _capturedPhoto = null;
                       });
                       ref.read(touchpointFormProvider.notifier).setPhotoPath(null);
+                      ref.read(touchpointFormProvider.notifier).setPhotoUrl(null);
                     },
                     child: Container(
                       padding: const EdgeInsets.all(4),
@@ -770,10 +837,42 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     if (!_canSubmit()) return;
 
     final state = ref.read(touchpointFormProvider);
+    final uploadService = ref.read(uploadApiServiceProvider);
 
     try {
       // Set submitting state
       ref.read(touchpointFormProvider.notifier).setIsSubmitting(true);
+
+      // Upload photo first if captured
+      String? photoUrl;
+      if (_capturedPhoto != null) {
+        try {
+          ref.read(touchpointFormProvider.notifier).setIsUploadingPhoto(true);
+          showToast('Uploading photo...');
+
+          final result = await uploadService.uploadPhoto(
+            _capturedPhoto!,
+          );
+
+          if (result != null) {
+            photoUrl = result.url;
+            ref.read(touchpointFormProvider.notifier).setPhotoUrl(photoUrl);
+            showToast('Photo uploaded successfully');
+          } else {
+            throw Exception('Photo upload failed - no result returned');
+          }
+        } catch (photoError) {
+          if (mounted) {
+            showToast('Failed to upload photo: ${photoError.toString()}');
+            // Don't proceed if photo upload fails
+            ref.read(touchpointFormProvider.notifier).setIsUploadingPhoto(false);
+            ref.read(touchpointFormProvider.notifier).setIsSubmitting(false);
+            return;
+          }
+        } finally {
+          ref.read(touchpointFormProvider.notifier).setIsUploadingPhoto(false);
+        }
+      }
 
       // Capture GPS location automatically
       final geoService = GeolocationService();
@@ -805,9 +904,9 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
           'gps_lng': position.longitude,
         if (gpsAddress != null && gpsAddress.isNotEmpty)
           'gps_address': gpsAddress,
-        // Photo (optional)
-        if (_capturedPhoto != null)
-          'photo': _capturedPhoto!.path,
+        // Photo URL (uploaded)
+        if (photoUrl != null)
+          'photo': photoUrl,
       };
 
       // Submit to API

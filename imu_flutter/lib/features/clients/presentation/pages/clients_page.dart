@@ -218,14 +218,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
         return Scaffold(
           backgroundColor: Colors.white,
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              HapticUtils.lightImpact();
-              _showAddClientModal();
-            },
-            backgroundColor: const Color(0xFF0F172A),
-            child: const Icon(LucideIcons.plus, color: Colors.white),
-          ),
           body: SafeArea(
             child: Column(
               children: [
