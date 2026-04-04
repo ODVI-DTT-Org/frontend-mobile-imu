@@ -53,13 +53,6 @@ class PermissionNavigationGuard {
       checkTouchpointType: true,
     ),
 
-    // Reports routes
-    '/reports': _RoutePermission(
-      resource: 'reports',
-      action: 'read',
-      requiredRoles: [UserRole.admin, UserRole.areaManager, UserRole.assistantAreaManager],
-    ),
-
     // Settings routes
     '/settings/users': _RoutePermission(
       resource: 'users',
@@ -139,12 +132,6 @@ class PermissionNavigationGuard {
         icon: Icons.calendar_today,
         label: 'Itinerary',
         enabled: true, // Everyone can view itinerary
-      ),
-      NavigationItem(
-        route: '/reports',
-        icon: Icons.assessment,
-        label: 'Reports',
-        enabled: userRole.isManager, // Only managers can see reports
       ),
       NavigationItem(
         route: '/settings',

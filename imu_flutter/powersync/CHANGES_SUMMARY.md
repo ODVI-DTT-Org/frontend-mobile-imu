@@ -8,26 +8,32 @@ This document summarizes the comprehensive changes made to normalize the `user_l
 
 ### 1. Database Schema Changes
 
-#### Migration File: `migrations/add_user_location_province_municipality.sql`
-- Added `province TEXT` and `municipality TEXT` columns to `user_locations`
-- Migrated existing data by splitting `municipality_id` on "-" delimiter
-- Added composite indexes for efficient querying:
-  - `idx_user_locations_user_province_municipality` on `(user_id, province, municipality)` WHERE deleted_at IS NULL
-  - `idx_user_locations_province` on `(province)` WHERE deleted_at IS NULL
-  - `idx_user_locations_municipality` on `(municipality)` WHERE deleted_at IS NULL
-- Added unique constraint: `user_locations_user_id_province_municipality_key`
+#### Migration 042: `migrations/042_add_province_to_user_locations.sql`
+- Added `province TEXT` column to `user_locations` table
+- Created index on `province` for faster queries
+- Created composite index on `(user_id, province)` WHERE deleted_at IS NULL
 
-#### Base Schema: `create-database-schema.sql`
-- Updated `user_locations` table definition to use separate `province` and `municipality` columns
-- Added `municipality_id` as a GENERATED column (later changed to trigger-based)
-- Created trigger to auto-populate `municipality_id` from `province` and `municipality`
+#### Migration 043: `migrations/043_add_municipality_to_user_locations.sql`
+- Added `municipality TEXT` column to `user_locations` table
+- Backfilled existing records by parsing `municipality_id` (format: "PROVINCE-MUNICIPALITY")
+- Created index on `municipality` for faster queries
+- Created composite index on `(user_id, province, municipality)` WHERE deleted_at IS NULL
+
+#### Migration 044: `migrations/044_remove_municipality_id_from_user_locations.sql`
+- **REMOVED** `municipality_id` column from `user_locations` table
+- Dropped old unique constraint on `(user_id, municipality_id)`
+- System now uses only separate `province` and `municipality` columns
+
+**Note:** The `municipality_id` column is no longer stored in the database. It is constructed on-the-fly when needed by the backend using `province || '-' || municipality`.
 
 ### 2. PowerSync Configuration Changes
 
-#### Sync Config: `mobile/imu_flutter/powersync/sync-config.yaml`
+#### Sync Config: `backend/powersync/sync-config.yaml` & `docs/powersync-sync-rules.yaml`
 
-**Fixed Issues:**
-1. `user_locations` stream now filters out soft-deleted records (`AND ul.deleted_at IS NULL`)
+**Updated for Separate Columns:**
+1. `user_municipalities` stream now queries `province` and `municipality` columns (not `municipality_id`)
+2. Filters out soft-deleted records (`AND deleted_at IS NULL`)
+3. Syncs separate columns to mobile app
 
 **New Features:**
 1. **Role-based client filtering**:
@@ -45,18 +51,22 @@ This document summarizes the comprehensive changes made to normalize the `user_l
 
 ### 3. Backend API Changes
 
-#### `backend/src/routes/caravans.js`
-- Updated GET endpoint to use new `province` and `municipality` columns
-- Added backward compatibility for legacy `municipality_id` format
-- Maps results to include both legacy and new formats
+#### `backend/src/routes/users.ts`
+- **GET `/api/users/:id/municipalities`**: Returns separate `province` and `municipality` fields
+  - Removed `municipality_id` and `municipality_code` from response
+  - Response now includes: `province`, `municipality`, `municipality_name`, `region_name`, `region_code`
 
-#### `backend/src/routes/users.js`
-- Added format auto-detection for new vs legacy columns
-- Updated GET/POST endpoints with backward compatibility
+- **POST `/api/users/:id/municipalities`**: Accepts separate province/municipality assignments
+  - Changed request body from `{ municipality_ids: string[] }`
+  - To: `{ assignments: [{ province, municipality }[] }`
 
-#### `backend/src/routes/groups.js`
-- Updated caravan assignment logic to use new format when available
-- Falls back to legacy format if new columns don't exist
+- **POST `/api/users/:id/municipalities/bulk`**: Bulk unassign with separate fields
+  - Updated to accept separate province/municipality assignments
+
+#### `backend/src/routes/clients.ts`
+- Maintains `municipality_ids` query parameter for filtering
+  - Internally constructs `province || '-' || mun_city` for PSGC matching
+  - Mobile app sends computed `municipalityId` values
 
 ### 4. Vue Frontend Changes
 
@@ -79,28 +89,27 @@ This document summarizes the comprehensive changes made to normalize the `user_l
 
 ### 5. Flutter Mobile Changes
 
-#### `mobile/imu_flutter/lib/features/territ/data/models/user_municipalities_simple.dart`
-- Renamed class to `UserLocation`
-- Added `province` and `municipality` properties
-- Added `municipalityId` getter for backward compatibility
-- Added factory methods: `fromRow()` (new) and `fromLegacyRow()` (old)
-- Added `matchesClient()` method for filtering
+#### `mobile/imu_flutter/lib/services/area/area_filter_service.dart`
+- Updated `UserLocation` model with separate `province` and `municipality` fields
+- Added computed `municipalityId` getter: `'$province-$municipality'`
+- Updated `fromJson()` to parse new format (separate fields)
+- Updated caching to store separate fields
+- **No legacy format support** - only uses new separate columns
 
-#### `mobile/imu_flutter/lib/features/territ/data/repositories/user_municipalities_simple_repository.dart`
-- Added methods supporting both new and legacy formats
-- Auto-detects format from schema
-- `getAssignedLocations()` with format detection
-- `createAssignment()` for new format
-- Legacy alias methods for backward compatibility
+#### `mobile/imu_flutter/lib/features/territ/data/models/user_municipalities_simple.dart`
+- Uses separate `province` and `municipality` fields
+- Provides `municipalityId` getter for backward compatibility
+- Updated `toJson()` to include both separate fields and computed `municipalityId`
 
 #### `mobile/imu_flutter/lib/features/territ/providers/filter_providers.dart`
-- Auto-detects new vs legacy columns
-- Constructs location keys appropriately
-- Uses different queries based on format
+- **Simplified** - only queries `province` and `municipality` columns
+- Removed legacy format detection
+- Constructs location keys as `'province-municipality'`
 
 #### `mobile/imu_flutter/lib/features/home/presentation/pages/home_page.dart`
-- Updated `_loadAssignedMunicipalities()` to detect and use new format
-- Falls back to legacy format if needed
+- **Simplified** - only queries `province` and `municipality` columns
+- Removed legacy format detection
+- Constructs location keys as `'province-municipality'`
 
 #### `mobile/imu_flutter/lib/services/sync/powersync_service.dart`
 - Updated `user_locations` table schema with `province` and `municipality` columns
@@ -109,36 +118,53 @@ This document summarizes the comprehensive changes made to normalize the `user_l
 
 ## Backward Compatibility
 
-All changes maintain backward compatibility with the legacy `municipality_id` format:
+**IMPORTANT:** The `municipality_id` column has been **REMOVED** from the database.
 
-1. **Database**: `municipality_id` column is auto-populated via trigger
-2. **Backend**: Endpoints detect and support both formats
-3. **Frontend**: Mapping includes both formats for compatibility
-4. **Mobile**: Auto-detects format and uses appropriate queries
+The system now uses **only** separate `province` and `municipality` columns:
+
+1. **Database**: Only `province` and `municipality` columns exist (no `municipality_id`)
+2. **Backend API**: Returns separate `province` and `municipality` fields
+3. **Mobile App**: Uses separate `province` and `municipality` fields
+4. **PowerSync**: Sync rules query separate columns
+
+**Note:** The mobile app maintains a computed `municipalityId` getter (`'$province-$municipality'`) for internal use, but this is not stored in or synced from the database.
 
 ## Database Migration Applied
 
-The following SQL changes were applied directly to the database:
+The following migrations have been applied to the database:
 
+### Migration 042: Add Province Column
 ```sql
--- Added unique constraint
-ALTER TABLE user_locations ADD CONSTRAINT user_locations_user_id_province_municipality_key
-UNIQUE (user_id, province, municipality);
+ALTER TABLE user_locations ADD COLUMN province TEXT;
+CREATE INDEX idx_user_locations_province ON user_locations(province);
+CREATE INDEX idx_user_locations_user_province ON user_locations(user_id, province) WHERE deleted_at IS NULL;
+```
 
--- Created trigger for auto-populating municipality_id
-CREATE OR REPLACE FUNCTION user_locations_update_municipality_id()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.municipality_id := NEW.province || '-' || NEW.municipality;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+### Migration 043: Add Municipality Column
+```sql
+ALTER TABLE user_locations ADD COLUMN municipality TEXT;
+CREATE INDEX idx_user_locations_municipality ON user_locations(municipality);
+CREATE INDEX idx_user_locations_user_province_municipality ON user_locations(user_id, province, municipality) WHERE deleted_at IS NULL;
 
-CREATE TRIGGER user_locations_municipality_id_trigger
-  BEFORE INSERT OR UPDATE OF province, municipality ON user_locations
-  FOR EACH ROW
-  EXECUTE FUNCTION user_locations_update_municipality_id();
+-- Backfill existing records
+UPDATE user_locations
+SET municipality = SUBSTRING(municipality_id FROM POSITION('-' IN municipality_id) + 1)
+WHERE municipality IS NULL
+  AND municipality_id IS NOT NULL
+  AND municipality_id LIKE '%-%';
+```
 
+### Migration 044: Remove Municipality ID Column
+```sql
+-- Drop old unique constraint
+DROP INDEX IF EXISTS idx_user_locations_user_municipality_id;
+
+-- Remove the municipality_id column
+ALTER TABLE user_locations DROP COLUMN IF EXISTS municipality_id;
+```
+
+### PowerSync Publication
+```sql
 -- Added itineraries and approvals to PowerSync publication
 ALTER PUBLICATION powersync ADD TABLE itineraries, approvals;
 ```

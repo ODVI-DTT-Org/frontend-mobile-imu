@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'jwt_auth_service.dart';
-import 'secure_storage_service.dart';
 import '../sync/powersync_service.dart';
 import '../sync/powersync_connector.dart';
 import '../../core/utils/logger.dart';
@@ -20,8 +19,8 @@ class AuthService {
   Future<void> initialize() => _jwtAuth.initialize();
 
   /// Login with email and password
-  Future<JwtUser> login(String email, String password) =>
-      _jwtAuth.login(email: email, password: password);
+  Future<JwtUser> login(String email, String password, {bool rememberMe = false}) =>
+      _jwtAuth.login(email: email, password: password, rememberMe: rememberMe);
 
   /// Logout current user
   Future<void> logout() => _jwtAuth.logout();
@@ -79,10 +78,13 @@ class AuthService {
 /// Provider for JWT auth service
 /// Provider for JWT auth service (singleton to maintain token state)
 final jwtAuthProvider = Provider<JwtAuthService>((ref) {
-  final service = JwtAuthService();
+  final service = JwtAuthService.instance;
   // Initialize to load stored tokens
-  service.initialize().catchError((e) {
-    debugPrint('JwtAuthService initialization error: $e');
+  // Note: This runs asynchronously but should complete before PIN entry
+  service.initialize().then((_) {
+    debugPrint('[AUTH-PROVIDER] JwtAuthService initialized successfully');
+  }).catchError((e) {
+    debugPrint('[AUTH-PROVIDER] JwtAuthService initialization error: $e');
   });
   ref.onDispose(() {
     // Service will be disposed automatically
@@ -146,14 +148,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await _authService.initialize();
 
-      // Check if user has PIN setup as secondary auth indicator
-      final secureStorage = SecureStorageService();
-      final hasPin = await secureStorage.hasPin();
-
-      // Consider authenticated if either:
-      // 1. JWT token is valid, OR
-      // 2. User has PIN setup (for PIN-based auth flow)
-      final isAuth = _authService.isAuthenticated || hasPin;
+      // PIN FUNCTIONALITY DISABLED - Only check JWT token validity
+      // Consider authenticated if JWT token is valid
+      final isAuth = _authService.isAuthenticated;
 
       state = state.copyWith(
         isAuthenticated: isAuth,
@@ -166,10 +163,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Login with email and password
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final user = await _authService.login(email, password);
+      final user = await _authService.login(email, password, rememberMe: rememberMe);
 
       // Connect to PowerSync after successful login
       // NOTE: PowerSync connection failures should NOT affect login success

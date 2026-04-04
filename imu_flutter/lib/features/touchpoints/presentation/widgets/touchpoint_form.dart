@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart' hide TimeOfDay;
+import 'package:flutter/material.dart' as material;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dio/dio.dart';
@@ -8,7 +8,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../providers/touchpoint_form_provider.dart';
-import '../../../clients/data/models/client_model.dart' hide TimeOfDay;
+import '../../../clients/data/models/client_model.dart';
 import '../../../../app.dart' show showToast;
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
@@ -411,9 +411,9 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
   Future<void> _selectTimeIn(BuildContext context) async {
     final now = DateTime.now();
-    final picked = await showTimePicker(
+    final picked = await material.showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
+      initialTime: material.TimeOfDay(hour: now.hour, minute: now.minute),
     );
 
     if (picked != null) {
@@ -440,9 +440,9 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     final now = DateTime.now();
     final initialTime = state.timeOut.time ?? now;
 
-    final picked = await showTimePicker(
+    final picked = await material.showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
+      initialTime: material.TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
     );
 
     if (picked != null) {
@@ -499,7 +499,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
               ),
               isExpanded: true,
               icon: Icon(
-                Icons.keyboard_arrow_down,
+                material.Icon(material.Icons.keyboard_arrow_down),
                 size: 16,
                 color: Colors.grey[600],
               ),
@@ -553,7 +553,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
               ),
               isExpanded: true,
               icon: Icon(
-                Icons.keyboard_arrow_down,
+                material.Icon(material.Icons.keyboard_arrow_down),
                 size: 16,
                 color: Colors.grey[600],
               ),

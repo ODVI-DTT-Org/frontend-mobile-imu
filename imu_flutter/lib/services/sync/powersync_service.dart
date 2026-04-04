@@ -146,7 +146,6 @@ const Schema _powerSyncSchema = Schema([
   // PSGC geographic data (single table with all locations)
   // Note: PowerSync automatically adds an 'id' column, so we don't define it here
   Table('psgc', [
-    Column.integer('id'),
     Column.text('region'),
     Column.text('province'),
     Column.text('mun_city_kind'),
@@ -393,3 +392,6 @@ final syncStatusProvider = StreamProvider<SyncStatus>((ref) {
 final powerSyncServiceProvider = Provider<PowerSyncService>((ref) {
   return PowerSyncService();
 });
+
+/// Get the PowerSync schema (for testing)
+Schema get powerSyncSchema => _powerSyncSchema;

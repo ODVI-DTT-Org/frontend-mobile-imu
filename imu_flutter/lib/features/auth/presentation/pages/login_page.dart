@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:imu_flutter/app.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/services/auth/offline_auth_service.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
@@ -19,6 +20,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _rememberMe = false;
   final _formKey = GlobalKey<FormState>();
 
   // Offline auth state
@@ -65,6 +67,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         await ref.read(authNotifierProvider.notifier).login(
               _emailController.text.trim(),
               _passwordController.text,
+              rememberMe: _rememberMe,
             );
       },
       onError: (e) {
@@ -76,14 +79,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // No manual navigation needed here
   }
 
-  Future<void> _handleOfflineLogin() async {
-    HapticUtils.lightImpact();
-
-    // Navigate to PIN entry for offline authentication
-    if (mounted) {
-      context.go('/pin-entry?offline=true');
-    }
-  }
+  // PIN/OFFLINE LOGIN DISABLED - Commenting out to focus on core authentication
+  // Future<void> _handleOfflineLogin() async {
+  //   HapticUtils.lightImpact();
+  //
+  //   // Navigate to PIN entry for offline authentication
+  //   if (mounted) {
+  //     context.go('/pin-entry?offline=true');
+  //   }
+  // }
 
   String _formatGracePeriod(Duration duration) {
     final hours = duration.inHours;
@@ -105,20 +109,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (next.error != null && next.error != prev?.error) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(next.error!),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-                action: SnackBarAction(
-                  label: 'Dismiss',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    ref.read(authNotifierProvider.notifier).clearError();
-                  },
-                ),
-              ),
-            );
+            // Use top-positioned toast instead of bottom SnackBar
+            showToast(next.error!);
+            // Clear error after showing toast
+            ref.read(authNotifierProvider.notifier).clearError();
           }
         });
       }
@@ -181,18 +175,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ],
                           ),
                         ),
-                        if (_canLoginOffline)
-                          ElevatedButton.icon(
-                            onPressed: _handleOfflineLogin,
-                            icon: const Icon(Icons.fingerprint, size: 16),
-                            label: const Text('PIN Login'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade600,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              textStyle: const TextStyle(fontSize: 12),
-                            ),
-                          ),
+                        // PIN/OFFLINE LOGIN DISABLED - Commenting out to focus on core authentication
+                        // if (_canLoginOffline)
+                        //   ElevatedButton.icon(
+                        //     onPressed: _handleOfflineLogin,
+                        //     icon: const Icon(Icons.fingerprint, size: 16),
+                        //     label: const Text('PIN Login'),
+                        //     style: ElevatedButton.styleFrom(
+                        //       backgroundColor: Colors.green.shade600,
+                        //       foregroundColor: Colors.white,
+                        //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        //       textStyle: const TextStyle(fontSize: 12),
+                        //     ),
+                        //   ),
                       ],
                     ),
                   ),
@@ -291,17 +286,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
-                // Forgot password link
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: authState.isLoading
-                        ? null
-                        : () => context.go('/forgot-password'),
-                    child: const Text('Forgot your password?'),
-                  ),
+                // Remember me checkbox
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (value) {
+                        setState(() {
+                          _rememberMe = value ?? false;
+                        });
+                      },
+                      activeColor: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Remember me'),
+                    const Spacer(),
+                    // Forgot password link
+                    TextButton(
+                      onPressed: authState.isLoading
+                          ? null
+                          : () => context.go('/forgot-password'),
+                      child: const Text('Forgot your password?'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 

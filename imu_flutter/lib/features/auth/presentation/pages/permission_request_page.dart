@@ -263,8 +263,10 @@ class _PermissionRequestPageState extends State<PermissionRequestPage> {
 
   void _continueToApp() {
     HapticUtils.lightImpact();
+    // PIN SETUP DISABLED - Skip PIN setup, go directly to sync loading
     // After permissions, go to PIN setup for first-time users
-    context.go('/pin-setup');
+    // context.go('/pin-setup');
+    context.go('/sync-loading');
   }
 
   bool get _hasRequiredPermissions {

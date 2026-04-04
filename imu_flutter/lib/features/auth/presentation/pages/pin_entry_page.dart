@@ -102,27 +102,41 @@ class _PinEntryPageState extends ConsumerState<PinEntryPage> {
   }
 
   Future<void> _handleOnlineAuth() async {
-    logDebug('Handling online authentication...');
+    logDebug('[PIN-ONLINE-AUTH] Handling online authentication...');
 
     try {
-      // Try to refresh tokens to ensure we have a valid session (with timeout)
       final authService = ref.read(authServiceProvider);
+
+      // CRITICAL FIX: Ensure JwtAuthService is initialized before any token operations
+      logDebug('[PIN-ONLINE-AUTH] Ensuring JwtAuthService is initialized...');
+      await _jwtAuthService.initialize();
+      logDebug('[PIN-ONLINE-AUTH] JwtAuthService initialization completed');
+
+      // Now check if we have tokens
+      logDebug('[PIN-ONLINE-AUTH] Checking token status after initialization...');
+      logDebug('[PIN-ONLINE-AUTH] Has access token: ${_jwtAuthService.accessToken != null}');
+      logDebug('[PIN-ONLINE-AUTH] Is authenticated: ${authService.isAuthenticated}');
+      logDebug('[PIN-ONLINE-AUTH] Needs refresh: ${authService.needsRefresh}');
+      logDebug('[PIN-ONLINE-AUTH] Has current user: ${authService.currentUser?.fullName}');
+      logDebug('[PIN-ONLINE-AUTH] Token expires at: ${_jwtAuthService.currentUser?.expiresAt}');
 
       // Check if token is still valid before refreshing
       if (authService.isAuthenticated && !authService.needsRefresh) {
-        logDebug('Token is still valid, skipping refresh');
+        logDebug('[PIN-ONLINE-AUTH] Token is still valid, skipping refresh');
       } else {
-        logDebug('Refreshing tokens after PIN entry...');
+        logDebug('[PIN-ONLINE-AUTH] Refreshing tokens after PIN entry...');
 
         // Add timeout to prevent hanging
         await authService.refreshToken().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            logWarning('Token refresh timed out, continuing anyway...');
+            logWarning('[PIN-ONLINE-AUTH] Token refresh timed out, continuing anyway...');
           },
         );
 
-        logDebug('Token refresh completed');
+        logDebug('[PIN-ONLINE-AUTH] Token refresh completed');
+        logDebug('[PIN-ONLINE-AUTH] Is authenticated after refresh: ${authService.isAuthenticated}');
+        logDebug('[PIN-ONLINE-AUTH] Current user after refresh: ${authService.currentUser?.fullName}');
         // Reset session start time to extend the 8-hour timeout
         _sessionService.resetSessionStartTime();
       }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart';
@@ -218,12 +219,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
     if (client.id == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid client: missing ID'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Use top-positioned toast instead of bottom SnackBar
+        showToast('Invalid client: missing ID');
       }
       return;
     }
@@ -232,12 +229,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     final uuidRegex = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false);
     if (!uuidRegex.hasMatch(client.id!)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Invalid client ID format: ${client.id}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Use top-positioned toast instead of bottom SnackBar
+        showToast('Invalid client ID format: ${client.id}');
       }
       return;
     }
@@ -260,15 +253,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       if (mounted) {
         HapticUtils.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(customDate == null
-                ? '${client.firstName} ${client.lastName} added to Today'
-                : '${client.firstName} ${client.lastName} added to ${_formatDateShort(customDate)}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        // Use top-positioned toast instead of bottom SnackBar
+        showToast(customDate == null
+            ? '${client.firstName} ${client.lastName} added to Today'
+            : '${client.firstName} ${client.lastName} added to ${_formatDateShort(customDate)}');
 
         // Remove client from list
         setState(() {
@@ -295,21 +283,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
             errorMessage.contains('already in today\'s itinerary') ||
             errorMessage.contains('already has an itinerary for this date') ||
             errorMessage.contains('already in My Day')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${client.firstName} ${client.lastName} is already in the itinerary for this date'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          // Use top-positioned toast instead of bottom SnackBar
+          showToast('${client.firstName} ${client.lastName} is already in the itinerary for this date');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to add client: ${errorMessage}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          // Use top-positioned toast instead of bottom SnackBar
+          showToast('Failed to add client: ${errorMessage}');
         }
       }
     } finally {

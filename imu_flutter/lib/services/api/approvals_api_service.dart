@@ -137,6 +137,119 @@ class ApprovalsApiService {
       rethrow;
     }
   }
+
+  /// Approve an approval request
+  ///
+  /// For UDI approvals: marks as approved, updates client's UDI number
+  /// For client edit approvals: applies the client changes
+  ///
+  /// Parameters:
+  /// - [id] The approval ID to approve
+  /// - [notes] Optional notes for the approval
+  ///
+  /// Returns the updated approval data
+  Future<Map<String, dynamic>> approveApproval({
+    required String id,
+    String? notes,
+  }) async {
+    try {
+      debugPrint('ApprovalsApiService: Approving approval $id');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ApprovalsApiService: No access token available');
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _dio.post(
+        '/approvals/$id/approve',
+        data: {
+          if (notes != null) 'notes': notes,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        debugPrint('ApprovalsApiService: Approval $id approved successfully');
+        return data;
+      } else {
+        debugPrint('ApprovalsApiService: API returned status ${response.statusCode}');
+        throw Exception('Failed to approve approval: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ApprovalsApiService: DioException - ${e.message}');
+      debugPrint('ApprovalsApiService: Response - ${e.response?.data}');
+      throw Exception(
+        'Network error: ${e.message}',
+      );
+    } catch (e) {
+      debugPrint('ApprovalsApiService: Error - $e');
+      rethrow;
+    }
+  }
+
+  /// Reject an approval request
+  ///
+  /// Parameters:
+  /// - [id] The approval ID to reject
+  /// - [rejectionReason] The reason for rejection (required)
+  ///
+  /// Returns the updated approval data
+  Future<Map<String, dynamic>> rejectApproval({
+    required String id,
+    required String rejectionReason,
+  }) async {
+    try {
+      debugPrint('ApprovalsApiService: Rejecting approval $id');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ApprovalsApiService: No access token available');
+        throw Exception('Not authenticated');
+      }
+
+      if (rejectionReason.trim().isEmpty) {
+        throw Exception('Rejection reason is required');
+      }
+
+      final response = await _dio.post(
+        '/approvals/$id/reject',
+        data: {
+          'rejection_reason': rejectionReason.trim(),
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        debugPrint('ApprovalsApiService: Approval $id rejected successfully');
+        return data;
+      } else {
+        debugPrint('ApprovalsApiService: API returned status ${response.statusCode}');
+        throw Exception('Failed to reject approval: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ApprovalsApiService: DioException - ${e.message}');
+      debugPrint('ApprovalsApiService: Response - ${e.response?.data}');
+      throw Exception(
+        'Network error: ${e.message}',
+      );
+    } catch (e) {
+      debugPrint('ApprovalsApiService: Error - $e');
+      rethrow;
+    }
+  }
 }
 
 /// Provider for ApprovalsApiService

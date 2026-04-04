@@ -33,7 +33,6 @@ final currentUserIdProvider = Provider<String?>((ref) {
 
 /// Provider that watches user's assigned locations from PowerSync
 /// Connects to the user_locations table and returns location keys (province-municipality)
-/// Supports both new format (province, municipality columns) and legacy format (municipality_id)
 final userAssignedLocationsWatchProvider = StreamProvider<Set<String>>((ref) {
   // Get the current user's ID from auth service
   final authService = ref.watch(authServiceProvider);
@@ -52,59 +51,23 @@ final userAssignedLocationsWatchProvider = StreamProvider<Set<String>>((ref) {
     try {
       final db = await PowerSyncService.database;
 
-      // First, check if the new columns exist
-      final schemaCheck = await db.getAll(
-        "SELECT COUNT(*) as count FROM user_locations WHERE user_id = ? LIMIT 1",
-        [userId],
-      );
-
-      if (schemaCheck.isEmpty) {
-        controller.add(<String>{});
-        return;
-      }
-
-      // Check if we have the new province/municipality columns
-      final firstRow = schemaCheck.first;
-      final hasNewColumns = firstRow.containsKey('province') && firstRow.containsKey('municipality');
-
       // Use PowerSync's watch method to get real-time updates
-      late Stream<List<Map<String, dynamic>>> stream;
-
-      if (hasNewColumns) {
-        // New format: query province and municipality columns
-        stream = db.watch(
-          'SELECT DISTINCT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
-          parameters: [userId],
-        );
-      } else {
-        // Legacy format: query municipality_id column
-        stream = db.watch(
-          'SELECT DISTINCT municipality_id FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
-          parameters: [userId],
-        );
-      }
+      final stream = db.watch(
+        'SELECT DISTINCT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+        parameters: [userId],
+      );
 
       // Listen to the stream and emit location key sets
       stream.listen(
         (results) {
           final locationKeys = <String>{};
 
-          if (hasNewColumns) {
-            // New format: construct "province-municipality" keys
-            for (final row in results) {
-              final province = row['province'] as String?;
-              final municipality = row['municipality'] as String?;
-              if (province != null && municipality != null) {
-                locationKeys.add('$province-$municipality');
-              }
-            }
-          } else {
-            // Legacy format: use municipality_id directly
-            for (final row in results) {
-              final municipalityId = row['municipality_id'] as String?;
-              if (municipalityId != null && municipalityId.isNotEmpty) {
-                locationKeys.add(municipalityId);
-              }
+          // Construct "province-municipality" keys
+          for (final row in results) {
+            final province = row['province'] as String?;
+            final municipality = row['municipality'] as String?;
+            if (province != null && municipality != null) {
+              locationKeys.add('$province-$municipality');
             }
           }
 

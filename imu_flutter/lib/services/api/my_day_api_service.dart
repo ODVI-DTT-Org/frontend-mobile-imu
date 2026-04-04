@@ -304,11 +304,36 @@ class MyDayApiService {
         final tasksData = data['tasks'] as List<dynamic>? ?? [];
         debugPrint('MyDayApiService: Got ${tasksData.length} tasks from API');
 
-        return tasksData.map((item) {
+        // Filter out completed clients - they should not appear in My Day after visit is recorded
+        const completedStatus = 'completed';
+        final activeTasks = tasksData.where((item) {
+          final taskData = item as Map<String, dynamic>;
+          final status = taskData['status'] as String?;
+          if (status == null) {
+            debugPrint('Warning: Task ${taskData['id']} has null status, including in list');
+            return true; // Include tasks with null status for visibility
+          }
+          return status != completedStatus;
+        }).toList();
+
+        debugPrint('MyDayApiService: Filtered to ${activeTasks.length} active tasks (excluding completed)');
+
+        return activeTasks.map((item) {
           final taskData = item as Map<String, dynamic>;
           final clientData = taskData['client'] as Map<String, dynamic>? ?? {};
+
+          // Get clientId from task data (preferred) or client data (fallback)
+          final clientId = taskData['client_id'] as String? ??
+                          (clientData['id'] as String?);
+
+          if (clientId == null || clientId.isEmpty) {
+            debugPrint('Warning: Task ${taskData['id']} has missing or empty clientId, skipping');
+            return null; // Skip this task
+          }
+
           return MyDayClient(
             id: taskData['id'] ?? '',
+            clientId: clientId,
             fullName: '${clientData['first_name'] ?? ''} ${clientData['last_name'] ?? ''}'.trim(),
             agencyName: clientData['agency']?['name'],
             location: clientData['addresses'] != null && (clientData['addresses'] as List).isNotEmpty
@@ -317,8 +342,10 @@ class MyDayApiService {
             touchpointNumber: taskData['touchpoint_number'] ?? 0,
             touchpointType: taskData['touchpoint_type'] ?? 'visit',
             isTimeIn: taskData['time_in'] != null,
+            priority: taskData['priority'] ?? 'normal',
+            notes: taskData['notes'],
           );
-        }).toList();
+        }).where((client) => client != null).cast<MyDayClient>().toList();
       } else {
         debugPrint('MyDayApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to fetch my day clients: ${response.statusCode}');

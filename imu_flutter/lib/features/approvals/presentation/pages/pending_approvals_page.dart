@@ -276,6 +276,51 @@ class _ApprovalCard extends HookWidget {
                 ],
               ),
             ),
+            // UDI Number for loan releases
+            if (approval.type == ApprovalType.udi && approval.udiNumber != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.dollarSign,
+                      size: 16,
+                      color: AppColors.success,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'UDI Number',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            approval.udiNumber!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             // Touchpoint number (if applicable)
             if (approval.touchpointNumber != null) ...[
               const SizedBox(height: 8),

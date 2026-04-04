@@ -8,6 +8,7 @@ import '../../core/models/user_role.dart' as core_models;
 import '../../core/utils/logger.dart';
 import '../area/area_filter_service.dart';
 import '../permissions/remote_permission_service.dart';
+import '../sync/powersync_service.dart';
 import 'secure_storage_service.dart';
 
 /// User model parsed from JWT token
@@ -77,6 +78,11 @@ class JwtAuthService {
   bool _isRefreshing = false;
   Completer<void>? _refreshCompleter;
 
+  // Initialize lock to prevent concurrent initialization attempts
+  bool _isInitializing = false;
+  Completer<void>? _initCompleter;
+  bool _isInitialized = false;
+
   // Singleton instance
   static JwtAuthService? _instance;
 
@@ -113,36 +119,68 @@ class JwtAuthService {
 
   /// Initialize service by loading stored tokens
   Future<void> initialize() async {
+    // Prevent multiple simultaneous initialization attempts
+    if (_isInitializing) {
+      logDebug('[JWT-INIT] Initialization already in progress, waiting...');
+      await _initCompleter?.future;
+      return;
+    }
+
+    // If already initialized, just return
+    if (_isInitialized) {
+      logDebug('[JWT-INIT] Already initialized, skipping...');
+      return;
+    }
+
+    // Set initialization lock
+    _isInitializing = true;
+    _initCompleter = Completer<void>();
+
     try {
+      logDebug('[JWT-INIT] Starting JwtAuthService initialization...');
       _accessToken = await _storage.read(key: 'access_token');
       _refreshToken = await _storage.read(key: 'refresh_token');
 
+      logDebug('[JWT-INIT] Access token found: ${_accessToken != null}');
+      logDebug('[JWT-INIT] Refresh token found: ${_refreshToken != null}');
+
       if (_accessToken != null) {
         _currentUser = JwtUser.fromToken(_accessToken!);
+        logDebug('[JWT-INIT] User loaded: ${_currentUser?.fullName}, Token expires at: ${_currentUser?.expiresAt}');
 
         // If token expired, try to refresh
         if (_currentUser?.isExpired == true && _refreshToken != null) {
           logDebug('Token expired, attempting refresh...');
           await refreshTokens();
         } else {
-          logDebug('JwtAuthService initialized, authenticated: $isAuthenticated');
+          logDebug('[JWT-INIT] JwtAuthService initialized, authenticated: $isAuthenticated');
         }
+      } else {
+        logDebug('[JWT-INIT] No access token found in storage');
       }
+
+      _isInitialized = true;
     } catch (e) {
-      logError('Failed to initialize JwtAuthService', e);
+      logError('[JWT-INIT] Failed to initialize JwtAuthService', e);
+    } finally {
+      // Always release the lock
+      _isInitializing = false;
+      _initCompleter?.complete();
+      _initCompleter = null;
     }
   }
 
   /// Login with email and password
-  Future<JwtUser> login({required String email, required String password}) async {
+  Future<JwtUser> login({required String email, required String password, bool rememberMe = false}) async {
     try {
-      logDebug('Attempting login for: $email');
+      logDebug('Attempting login for: $email (rememberMe: $rememberMe)');
 
       final response = await _dio.post(
         '/auth/login',
         data: {
           'email': email,
           'password': password,
+          if (rememberMe) 'remember_me': true,
         },
       );
 
@@ -179,6 +217,16 @@ class JwtAuthService {
         // Continue login even if area fetch fails
       }
 
+      // Store credentials if remember me is enabled
+      if (rememberMe) {
+        await storeCredentials(email: email, password: password);
+        logDebug('Credentials stored for remember me');
+      } else {
+        // Clear any previously stored credentials
+        await clearStoredCredentials();
+        logDebug('Cleared any previously stored credentials');
+      }
+
       logDebug('Login successful for ${_currentUser!.id}');
       return _currentUser!;
     } on DioException catch (e) {
@@ -196,9 +244,23 @@ class JwtAuthService {
     _accessToken = null;
     _refreshToken = null;
     _currentUser = null;
+    _isInitialized = false; // Reset initialization flag so it can be re-initialized
 
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
+
+    // Clear stored credentials on logout (security measure)
+    await clearStoredCredentials();
+    logDebug('Stored credentials cleared on logout');
+
+    // Disconnect PowerSync on logout to prevent credential issues
+    try {
+      await PowerSyncService.disconnect();
+      logDebug('PowerSync disconnected on logout');
+    } catch (e) {
+      logError('Failed to disconnect PowerSync', e);
+      // Continue logout even if PowerSync disconnect fails
+    }
 
     // Clear permissions cache on logout
     try {
@@ -225,20 +287,26 @@ class JwtAuthService {
   Future<void> refreshTokens() async {
     // Prevent concurrent refresh attempts
     if (_isRefreshing) {
-      logDebug('Refresh already in progress, waiting...');
+      logDebug('[JWT-REFRESH] Refresh already in progress, waiting...');
       await _refreshCompleter?.future;
       return;
     }
 
+    logDebug('[JWT-REFRESH] Token refresh requested...');
+    logDebug('[JWT-REFRESH] Has access token: ${_accessToken != null}');
+    logDebug('[JWT-REFRESH] Has refresh token: ${_refreshToken != null}');
+    logDebug('[JWT-REFRESH] Current user: ${_currentUser?.fullName}');
+    logDebug('[JWT-REFRESH] Token expired: ${_currentUser?.isExpired ?? false}');
+
     if (_refreshToken == null) {
-      logError('Cannot refresh: No refresh token available');
+      logError('[JWT-REFRESH] Cannot refresh: No refresh token available');
       throw Exception('No refresh token available');
     }
 
     // Check if current token is still valid (not expired yet)
     // If it's still valid, we might not need to refresh yet
     if (_currentUser != null && !_currentUser!.isExpired) {
-      logDebug('Current token is still valid, skipping unnecessary refresh');
+      logDebug('[JWT-REFRESH] Current token is still valid, skipping unnecessary refresh');
       return;
     }
 
@@ -247,7 +315,7 @@ class JwtAuthService {
     _refreshCompleter = Completer<void>();
 
     try {
-      logDebug('Refreshing tokens...');
+      logDebug('[JWT-REFRESH] Calling /auth/refresh endpoint...');
 
       final response = await _dio.post(
         '/auth/refresh',
@@ -261,35 +329,42 @@ class JwtAuthService {
         ),
       );
 
+      logDebug('[JWT-REFRESH] Response status: ${response.statusCode}');
+
       if (response.statusCode == 200 && response.data != null) {
         _accessToken = response.data['access_token'];
+        logDebug('[JWT-REFRESH] New access token received');
         // Update refresh token if provided (some APIs rotate refresh tokens)
         if (response.data['refresh_token'] != null) {
           _refreshToken = response.data['refresh_token'];
+          logDebug('[JWT-REFRESH] New refresh token received (token rotation)');
         }
         _currentUser = JwtUser.fromToken(_accessToken!);
+        logDebug('[JWT-REFRESH] New user: ${_currentUser?.fullName}, expires: ${_currentUser?.expiresAt}');
 
         await _storage.write(key: 'access_token', value: _accessToken);
         if (response.data['refresh_token'] != null) {
           await _storage.write(key: 'refresh_token', value: _refreshToken);
         }
+        logDebug('[JWT-REFRESH] Tokens stored to secure storage');
 
         // Refresh permissions cache when tokens are refreshed
         try {
           final permissionService = RemotePermissionService();
           await permissionService.fetchPermissions(_accessToken!);
-          logDebug('Permissions refreshed successfully');
+          logDebug('[JWT-REFRESH] Permissions refreshed successfully');
         } catch (e) {
-          logError('Failed to refresh permissions (non-critical)', e);
+          logError('[JWT-REFRESH] Failed to refresh permissions (non-critical)', e);
           // Continue even if permission refresh fails
         }
 
-        logDebug('Token refresh successful');
+        logDebug('[JWT-REFRESH] Token refresh successful');
       } else {
+        logError('[JWT-REFRESH] Invalid response from refresh endpoint: ${response.statusCode}');
         throw Exception('Invalid response from refresh endpoint');
       }
     } on DioException catch (e) {
-      logError('Token refresh failed with DioException', e);
+      logError('[JWT-REFRESH] Token refresh failed with DioException', e);
 
       // Check if it's a network error vs auth error
       if (e.type == DioExceptionType.connectionTimeout ||
@@ -433,5 +508,79 @@ class JwtAuthService {
       await _storage.write(key: 'refresh_token', value: refreshToken);
     }
     logDebug('Cached tokens updated');
+  }
+
+  // ===== REMEMBER ME CREDENTIAL STORAGE =====
+
+  /// Store credentials for auto-login (when "Remember me" is enabled)
+  Future<void> storeCredentials({required String email, required String password}) async {
+    try {
+      await _storage.write(key: 'remembered_email', value: email);
+      await _storage.write(key: 'remembered_password', value: password);
+      logDebug('[REMEMBER-ME] Credentials stored securely');
+    } catch (e) {
+      logError('[REMEMBER-ME] Failed to store credentials', e);
+      // Don't throw - login should succeed even if credential storage fails
+    }
+  }
+
+  /// Get stored credentials for auto-login
+  /// Returns null if no credentials are stored
+  Future<Map<String, String>?> getStoredCredentials() async {
+    try {
+      final email = await _storage.read(key: 'remembered_email');
+      final password = await _storage.read(key: 'remembered_password');
+
+      if (email != null && password != null) {
+        logDebug('[REMEMBER-ME] Found stored credentials');
+        return {'email': email, 'password': password};
+      }
+
+      logDebug('[REMEMBER-ME] No stored credentials found');
+      return null;
+    } catch (e) {
+      logError('[REMEMBER-ME] Failed to retrieve stored credentials', e);
+      return null;
+    }
+  }
+
+  /// Check if there are stored credentials available
+  Future<bool> hasStoredCredentials() async {
+    final creds = await getStoredCredentials();
+    return creds != null;
+  }
+
+  /// Clear stored credentials (for security)
+  Future<void> clearStoredCredentials() async {
+    try {
+      await _storage.delete(key: 'remembered_email');
+      await _storage.delete(key: 'remembered_password');
+      logDebug('[REMEMBER-ME] Stored credentials cleared');
+    } catch (e) {
+      logError('[REMEMBER-ME] Failed to clear stored credentials', e);
+      // Don't throw - logout should succeed even if clearing fails
+    }
+  }
+
+  /// Auto-login using stored credentials
+  /// Returns true if login was successful, false otherwise
+  Future<bool> autoLogin() async {
+    try {
+      final creds = await getStoredCredentials();
+      if (creds == null) {
+        logDebug('[REMEMBER-ME] No stored credentials for auto-login');
+        return false;
+      }
+
+      logDebug('[REMEMBER-ME] Attempting auto-login with stored credentials');
+      await login(email: creds['email']!, password: creds['password']!, rememberMe: true);
+      logDebug('[REMEMBER-ME] Auto-login successful');
+      return true;
+    } catch (e) {
+      logError('[REMEMBER-ME] Auto-login failed', e);
+      // Clear invalid credentials
+      await clearStoredCredentials();
+      return false;
+    }
   }
 }

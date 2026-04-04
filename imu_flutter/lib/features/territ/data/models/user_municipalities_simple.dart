@@ -63,7 +63,9 @@ class UserLocation {
   Map<String, dynamic> toJson() => {
         'id': id,
         'user_id': userId,
-        'municipality_id': municipalityId,
+        'province': province,
+        'municipality': municipality,
+        'municipality_id': municipalityId, // For backward compatibility
         'assigned_at': assignedAt?.toIso8601String(),
         'assigned_by': assignedBy,
         'deleted_at': deletedAt?.toIso8601String(),

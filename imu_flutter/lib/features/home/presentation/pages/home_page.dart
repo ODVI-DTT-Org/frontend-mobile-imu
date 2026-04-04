@@ -6,7 +6,7 @@ import '../../../../services/auth/session_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/powersync_connector.dart' show powerSyncConnectorProvider;
 import '../../../../core/utils/haptic_utils.dart';
-import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/providers/app_providers.dart' hide assignedMunicipalitiesProvider;
 import '../../../../shared/providers/filter_providers.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
@@ -35,37 +35,18 @@ class _HomePageState extends ConsumerState<HomePage> {
       final currentUserId = ref.read(currentUserIdProvider);
       if (currentUserId == null) return;
 
-      // First, check if the new columns exist
-      final schemaCheck = await PowerSyncService.query(
-        "SELECT * FROM user_locations WHERE user_id = ? LIMIT 1",
-        [currentUserId]
-      );
-
-      if (schemaCheck.isEmpty) {
-        ref.read(assignedMunicipalitiesProvider.notifier).state = [];
-        return;
-      }
-
-      // Check if we have the new province/municipality columns
-      final firstRow = schemaCheck.first;
-      final hasNewColumns = firstRow.containsKey('province') && firstRow.containsKey('municipality');
-
       final userLocations = await PowerSyncService.query(
-        hasNewColumns
-            ? "SELECT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL"
-            : "SELECT municipality_id FROM user_locations WHERE user_id = ? AND deleted_at IS NULL",
+        "SELECT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL",
         [currentUserId]
       );
 
       final municipalities = userLocations.map((row) {
-        if (hasNewColumns) {
-          final province = row['province'] as String?;
-          final municipality = row['municipality'] as String?;
-          if (province != null && municipality != null) {
-            return '$province-$municipality';
-          }
+        final province = row['province'] as String?;
+        final municipality = row['municipality'] as String?;
+        if (province != null && municipality != null) {
+          return '$province-$municipality';
         }
-        return row['municipality_id'] as String?;
+        return null;
       }).whereType<String>().toList();
 
       ref.read(assignedMunicipalitiesProvider.notifier).state = municipalities;
@@ -139,26 +120,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       itemBuilder: (context, index) {
         final item = menuItems[index];
 
-        // Wrap Reports icon in PermissionWidget
-        if (item.id == 'reports') {
-          return PermissionWidget(
-            resource: 'reports',
-            action: 'read',
-            child: _MenuButton(
-              icon: item.icon,
-              label: item.label,
-              size: itemSize,
-              onTap: () => _handleNavigation(context, item.id),
-            ),
-            fallback: _MenuButton(
-              icon: item.icon,
-              label: item.label,
-              size: itemSize,
-              onTap: () => PermissionDeniedDialog.show(context),
-            ),
-          );
-        }
-
         return _MenuButton(
           icon: item.icon,
           label: item.label,
@@ -170,7 +131,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   List<_MenuItem> _getMenuItems() {
-    // Updated: 8 items in 2 columns - Reports added for managers
     return [
       _MenuItem(icon: LucideIcons.sun, label: 'My Day', id: 'my-day'),
       _MenuItem(icon: LucideIcons.users, label: 'My Clients', id: 'clients'),
@@ -178,7 +138,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       _MenuItem(icon: LucideIcons.mapPin, label: 'Missed Visits', id: 'visits'),
       _MenuItem(icon: LucideIcons.calculator, label: 'Loan Calculator', id: 'calculator'),
       _MenuItem(icon: LucideIcons.clipboardList, label: 'Attendance', id: 'attendance'),
-      _MenuItem(icon: LucideIcons.barChart3, label: 'Reports', id: 'reports'),
       _MenuItem(icon: LucideIcons.userCog, label: 'My Profile', id: 'profile'),
     ];
   }
@@ -219,10 +178,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         break;
       case 'profile':
         context.push('/profile');
-        break;
-      case 'reports':
-        // Only accessible by managers - will be filtered by PermissionWidget
-        context.push('/reports');
         break;
       case 'settings':
         context.push('/settings');

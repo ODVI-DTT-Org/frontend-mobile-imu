@@ -13,10 +13,12 @@ class MockAuthNotifier extends StateNotifier<AuthState>
     implements AuthNotifier {
   MockAuthNotifier(super.state);
 
-  Future<bool> login(String email, String password) async {
+  @override
+  Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     return Future.value(true);
   }
 
+  @override
   void clearError() {}
 }
 

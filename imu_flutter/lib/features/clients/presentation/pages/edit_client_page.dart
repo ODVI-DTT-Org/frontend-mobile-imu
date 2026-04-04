@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
+import '../../../../services/api/client_api_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
@@ -56,8 +57,9 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         await _hiveService.init();
       }
 
+      // First try to load from Hive (offline support)
       final clientData = _hiveService.getClient(widget.clientId);
-      if (clientData != null && mounted) {
+      if (clientData != null) {
         try {
           // Try fromRow first for API data (snake_case), fallback to fromJson for camelCase
           try {
@@ -69,13 +71,30 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
           }
           _populateForm();
           setState(() => _isLoading = false);
+          return;
         } catch (e, stack) {
-          debugPrint('Error parsing client data: $e\n$stack');
-          if (mounted) {
-            setState(() => _isLoading = false);
-            _showErrorDialog('Failed to load client', e);
-          }
+          debugPrint('Error parsing client data from Hive: $e\n$stack');
+          // Fall through to API fetch
         }
+      }
+
+      // If not in Hive or parsing failed, fetch from API
+      debugPrint('Client not in Hive, fetching from API: ${widget.clientId}');
+      final clientApiService = ref.read(clientApiServiceProvider);
+      final client = await clientApiService.fetchClient(widget.clientId);
+
+      if (client != null && mounted) {
+        _client = client;
+        // Store in Hive for future use
+        try {
+          await _hiveService.addClient(client);
+          debugPrint('Client stored in Hive successfully');
+        } catch (e) {
+          debugPrint('Warning: Failed to store client in Hive: $e');
+          // Continue anyway - we have the client data
+        }
+        _populateForm();
+        setState(() => _isLoading = false);
       } else {
         if (mounted) {
           setState(() => _isLoading = false);

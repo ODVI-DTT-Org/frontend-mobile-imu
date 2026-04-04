@@ -103,26 +103,85 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   }
 
   Future<void> _loadClient() async {
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Loading client...',
-      operation: () async {
-        if (!_hiveService.isInitialized) {
-          await _hiveService.init();
-        }
-
-        final clientData = _hiveService.getClient(widget.clientId);
-        if (clientData != null && mounted) {
-          setState(() {
-            _client = Client.fromJson(clientData);
-            _isLoading = false;
-          });
-        } else {
-          if (mounted) {
-            setState(() => _isLoading = false);
+    try {
+      await LoadingHelper.withLoading(
+        ref: ref,
+        message: 'Loading client...',
+        operation: () async {
+          if (!_hiveService.isInitialized) {
+            await _hiveService.init();
           }
-        }
-      },
+
+          final clientData = _hiveService.getClient(widget.clientId);
+          if (clientData != null && mounted) {
+            try {
+              setState(() {
+                _client = Client.fromJson(clientData);
+                _isLoading = false;
+              });
+            } catch (e, stack) {
+              debugPrint('Error parsing client data: $e\n$stack');
+              if (mounted) {
+                setState(() => _isLoading = false);
+                _showErrorDialog('Failed to load client', e);
+              }
+            }
+          } else {
+            if (mounted) {
+              setState(() => _isLoading = false);
+              _showNotFoundError();
+            }
+          }
+        },
+      );
+    } catch (e, stack) {
+      debugPrint('Error in _loadClient: $e\n$stack');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showErrorDialog('Failed to load client', e);
+      }
+    }
+  }
+
+  void _showNotFoundError() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Client Not Found'),
+        content: const Text('The requested client could not be found.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.pop();
+            },
+            child: const Text('Go Back'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message, Object error) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(message),
+        content: Text('Error: ${error.toString()}'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _loadClient(); // Retry
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
     );
   }
 

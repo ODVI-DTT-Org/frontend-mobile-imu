@@ -22,18 +22,25 @@ class ClientApiService {
     int perPage = 20,
     String? search,
     String? clientType,
+    List<String>? municipalityIds,
   }) async {
     try {
-      debugPrint('ClientApiService: Fetching clients from REST API...');
-      debugPrint('ClientApiService: page=$page, perPage=$perPage, search=$search');
+      debugPrint('[CLIENT-API] Fetching clients from REST API...');
+      debugPrint('[CLIENT-API] page=$page, perPage=$perPage, search=$search');
 
-      // Get the access token
+      // Get the access token with diagnostic logging
       final token = _authService.accessToken;
+      debugPrint('[CLIENT-API] Access token available: ${token != null}');
+      debugPrint('[CLIENT-API] Is authenticated: ${_authService.isAuthenticated}');
+      debugPrint('[CLIENT-API] Current user: ${_authService.currentUser?.fullName}');
+
       if (token == null) {
-        debugPrint('ClientApiService: No access token available');
-        throw ApiException(message: 'Not authenticated');
+        debugPrint('[CLIENT-API] ERROR: No access token available');
+        debugPrint('[CLIENT-API] This usually means JwtAuthService.initialize() has not completed or no tokens are stored');
+        throw ApiException(message: 'Not authenticated - Please login again');
       }
 
+      debugPrint('[CLIENT-API] Making API request to /clients');
       // Make the API request
       final response = await _dio.get(
         '${AppConfig.postgresApiUrl}/clients',
@@ -48,8 +55,11 @@ class ClientApiService {
           'perPage': perPage,
           if (search != null && search.isNotEmpty) 'search': search,
           if (clientType != null && clientType.isNotEmpty) 'client_type': clientType,
+          if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality_ids': municipalityIds.join(','),
         },
       );
+
+      debugPrint('[CLIENT-API] Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
@@ -57,7 +67,7 @@ class ClientApiService {
         final totalItems = data['totalItems'] as int? ?? 0;
         final totalPages = data['totalPages'] as int? ?? 0;
 
-        debugPrint('ClientApiService: Got ${items.length} clients from API (page $page of $totalPages, total: $totalItems)');
+        debugPrint('[CLIENT-API] Got ${items.length} clients from API (page $page of $totalPages, total: $totalItems)');
 
         final clients = items.map((item) {
           final clientData = item as Map<String, dynamic>;
@@ -73,18 +83,18 @@ class ClientApiService {
           totalPages: totalPages,
         );
       } else {
-        debugPrint('ClientApiService: API returned status ${response.statusCode}');
+        debugPrint('[CLIENT-API] ERROR: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to fetch clients: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      debugPrint('ClientApiService: DioException - ${e.message}');
-      debugPrint('ClientApiService: Response - ${e.response?.data}');
+      debugPrint('[CLIENT-API] DioException - ${e.message}');
+      debugPrint('[CLIENT-API] Response - ${e.response?.data}');
       throw ApiException(
         message: 'Network error: ${e.message}',
         originalError: e,
       );
     } catch (e) {
-      debugPrint('ClientApiService: Unexpected error - $e');
+      debugPrint('[CLIENT-API] Unexpected error - $e');
       throw ApiException(
         message: 'Failed to fetch clients',
         originalError: e,

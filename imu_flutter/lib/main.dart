@@ -192,7 +192,32 @@ Future<void> _initializePowerSyncIfNeeded() async {
       await PowerSyncService.connect(connector);
       debugPrint('PowerSync auto-connected on app start');
     } else {
-      debugPrint('No existing session - PowerSync will connect after login');
+      debugPrint('No existing session - checking for stored credentials...');
+
+      // Check for stored credentials and attempt auto-login
+      final hasStoredCreds = await jwtAuth.hasStoredCredentials();
+      if (hasStoredCreds) {
+        debugPrint('Found stored credentials, attempting auto-login...');
+        final autoLoginSuccess = await jwtAuth.autoLogin();
+
+        if (autoLoginSuccess && jwtAuth.isAuthenticated) {
+          debugPrint('Auto-login successful, connecting to PowerSync...');
+
+          // Create connector with config values
+          final connector = IMUPowerSyncConnector(
+            authService: jwtAuth,
+            powersyncUrl: AppConfig.powerSyncUrl,
+            apiUrl: AppConfig.postgresApiUrl,
+          );
+
+          await PowerSyncService.connect(connector);
+          debugPrint('PowerSync connected after auto-login');
+        } else {
+          debugPrint('Auto-login failed - user will need to login manually');
+        }
+      } else {
+        debugPrint('No stored credentials found - user will need to login');
+      }
     }
   } catch (e) {
     debugPrint('PowerSync initialization skipped: $e');

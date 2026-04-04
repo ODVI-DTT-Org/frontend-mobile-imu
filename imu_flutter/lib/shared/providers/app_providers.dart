@@ -22,6 +22,9 @@ export 'permission_providers.dart' show
   canDeleteProvider;
 // Re-export user providers
 export './app_providers.dart' show currentUserRoleProvider;
+// Re-export area filter providers
+export '../../services/area/area_filter_service.dart' show
+  areaFilterServiceProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -38,7 +41,7 @@ import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
 import '../../features/profile/data/models/user_profile.dart';
 import '../../core/models/user_role.dart';
-import '../../services/auth/auth_service.dart';
+import '../../services/auth/auth_service.dart' show jwtAuthProvider, authNotifierProvider;
 import '../../services/auth/offline_auth_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/api/client_api_service.dart';
@@ -51,6 +54,7 @@ import '../../services/api/my_day_api_service.dart';
 import '../../services/api/approvals_api_service.dart';
 import '../../services/api/groups_api_service.dart';
 import '../../services/sync/powersync_service.dart';
+import '../../services/area/area_filter_service.dart';
 
 // ==================== Service Providers ====================
 
@@ -254,17 +258,44 @@ final onlineClientsMetaProvider = Provider<ClientsResponse?>((ref) {
   );
 });
 
-/// Online clients - fetches ALL clients from REST API (not PowerSync)
+/// Online clients - fetches clients from REST API with area-based filtering
 /// This is used for "All Clients" mode to search beyond territory-filtered PowerSync data
+/// Area filtering rules:
+/// - Admin: No filtering (see all clients)
+/// - Assistant Area Manager: No filtering (see all clients)
+/// - Area Manager: Filter by assigned municipalities
+/// - Caravan/Tele: Filter by assigned municipalities
 final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(onlineClientSearchQueryProvider);
   final page = ref.watch(onlineClientPageProvider);
+  final userRole = ref.watch(currentUserRoleProvider);
+  final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
 
   // Must be online to fetch all clients
   if (!isOnline) {
     debugPrint('onlineClientsProvider: Device is offline, cannot fetch online clients');
     throw Exception('Device is offline. Please connect to the internet to search all clients.');
+  }
+
+  // Determine municipality IDs based on user role
+  List<String>? municipalityIds;
+  final shouldFilterByArea = switch (userRole) {
+    UserRole.admin || UserRole.assistantAreaManager => false,
+    UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
+  };
+
+  if (shouldFilterByArea) {
+    // Extract municipality IDs from assigned municipalities
+    municipalityIds = assignedMunicipalitiesAsync.when(
+      data: (ids) => ids.isNotEmpty ? ids : null,
+      loading: () => null,
+      error: (_, __) => null,
+    );
+
+    debugPrint('onlineClientsProvider: User role $userRole - filtering by ${municipalityIds?.length ?? 0} municipalities');
+  } else {
+    debugPrint('onlineClientsProvider: User role $userRole - no area filtering');
   }
 
   try {
@@ -277,6 +308,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       page: page,
       perPage: 50,
       search: searchQuery.isNotEmpty ? searchQuery : null,
+      municipalityIds: municipalityIds,
     );
 
     debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
@@ -285,6 +317,28 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     debugPrint('onlineClientsProvider: Failed to fetch clients - $e');
     rethrow;
   }
+});
+
+/// Provider for user's assigned municipality IDs
+/// Fetches and caches the user's assigned municipalities from the backend
+final assignedMunicipalitiesProvider = FutureProvider<List<String>>((ref) async {
+  // Import and use jwtAuthProvider from auth_service.dart
+  final jwtAuth = ref.watch(jwtAuthProvider);
+  final token = jwtAuth.accessToken;
+
+  if (token == null) {
+    return [];
+  }
+
+  final userId = jwtAuth.currentUser?.id ?? '';
+  if (userId.isEmpty) {
+    return [];
+  }
+
+  final areaFilterService = ref.watch(areaFilterServiceProvider);
+  final locations = await areaFilterService.fetchUserLocations(token, userId);
+
+  return locations.map((l) => l.municipalityId).toSet().toList();
 });
 
 /// Selected client ID

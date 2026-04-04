@@ -108,17 +108,10 @@ class _AgenciesPageState extends ConsumerState<AgenciesPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _onAddProspectAgency,
         backgroundColor: const Color(0xFF0F172A),
-        icon: const Icon(LucideIcons.plus, color: Colors.white),
-        label: const Text(
-          'Add Prospect Agency',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        child: const Icon(LucideIcons.plus, size: 28, color: Colors.white),
       ),
       body: SafeArea(
         child: Column(

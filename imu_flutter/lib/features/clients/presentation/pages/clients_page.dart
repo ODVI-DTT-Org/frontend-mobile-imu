@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../app.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
@@ -137,12 +138,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   Future<void> _addToMyDay(Client client) async {
     if (client.id == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Client ID is missing'),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
+        showToast('Client ID is missing');
       }
       return;
     }
@@ -154,24 +150,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       final success = await myDayApiService.addToMyDay(client.id!);
       if (success && mounted) {
         HapticUtils.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${client.fullName} added to My Day'),
-            backgroundColor: const Color(0xFF22C55E),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        showToast('${client.fullName} added to My Day');
         ref.invalidate(_isInMyDayProvider(client.id!));
       }
     } catch (e) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to add to My Day: $e'),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
+        showToast('Failed to add to My Day: $e');
       }
     }
   }
@@ -207,8 +192,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         _filteredClients = clients.where((client) {
           if (_showMyClientsOnly) {
             // My Clients: filter by assigned municipalities
-            final matchesViewMode = client.municipality != null &&
-                assignedMunicipalities.contains(client.municipality);
+            // Construct municipality ID from client's province and municipality
+            final clientMunicipalityId = client.province != null && client.municipality != null
+                ? '${client.province}-${client.municipality}'
+                : null;
+            final matchesViewMode = clientMunicipalityId != null &&
+                assignedMunicipalities.contains(clientMunicipalityId);
 
             // Filter by search (local)
             final matchesSearch = query.isEmpty ||
@@ -309,13 +298,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             // Check if online before switching to All Clients
                             final isOnlineNow = ref.read(isOnlineProvider);
                             if (!isOnlineNow) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Cannot search all clients while offline'),
-                                  backgroundColor: Color(0xFFEF4444),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
+                              showToast('Cannot search all clients while offline');
                               return;
                             }
                             setState(() {
@@ -807,6 +790,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     final latestTouchpoint = client.touchpoints.isNotEmpty
         ? client.touchpoints.last
         : null;
+    final isFirstTime = client.touchpoints.isEmpty;
 
     final myDayApiService = ref.watch(myDayApiServiceProvider);
     final isInMyDayValue = client.id != null
@@ -840,12 +824,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           if (client.id != null) {
             context.push('/clients/${client.id}');
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Client ID is missing'),
-                backgroundColor: Color(0xFFEF4444),
-              ),
-            );
+            showToast('Client ID is missing');
           }
         },
         borderRadius: BorderRadius.circular(12),
@@ -857,8 +836,27 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               // Top row: badge + name + status
               Row(
                 children: [
-                  // Touchpoint badge
-                  if (latestTouchpoint != null) ...[
+                  // Touchpoint badge or NEW badge
+                  if (isFirstTime) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3), width: 1),
+                      ),
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF16A34A),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ] else if (latestTouchpoint != null) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -953,6 +951,58 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                   ),
                 ],
               ),
+              // Touchpoint summary (if not first time)
+              if (!isFirstTime && latestTouchpoint != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      latestTouchpoint.type == TouchpointType.visit
+                          ? LucideIcons.mapPin
+                          : LucideIcons.phone,
+                      size: 12,
+                      color: const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        _getTouchpointSummary(latestTouchpoint),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              // Touchpoint reason (if available)
+              if (!isFirstTime && latestTouchpoint != null && latestTouchpoint.reason != null) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.messageCircle,
+                      size: 12,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        latestTouchpoint.reason!.apiValue,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               // Quick actions and Add button row
               Row(
@@ -1022,36 +1072,52 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     );
   }
 
+  String _getTouchpointSummary(Touchpoint touchpoint) {
+    final ordinal = touchpoint.ordinal;
+    final type = touchpoint.type == TouchpointType.visit ? 'Visit' : 'Call';
+    final timeAgo = _getTimeAgo(touchpoint.date);
+    return '$ordinal $type - $timeAgo';
+  }
+
+  String _getTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      if (difference.inHours == 0) {
+        final minutes = difference.inMinutes;
+        return minutes <= 1 ? 'just now' : '${minutes}m ago';
+      }
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays == 1) {
+      return 'yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return weeks == 1 ? 'last week' : '${weeks}w ago';
+    } else {
+      final months = (difference.inDays / 30).floor();
+      return months == 1 ? 'last month' : '${months}mo ago';
+    }
+  }
+
   void _callClient(String? phone) {
     if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No phone number available'),
-          backgroundColor: Color(0xFF64748B),
-        ),
-      );
+      showToast('No phone number available');
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Calling $phone...')),
-    );
+    showToast('Calling $phone...');
   }
 
   void _navigateToAddress(String? address) {
     if (address == null || address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No address available'),
-          backgroundColor: Color(0xFF64748B),
-        ),
-      );
+      showToast('No address available');
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigating to $address...')),
-    );
+    showToast('Navigating to $address...');
   }
 }
 

@@ -2,27 +2,54 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
+import '../../services/auth/jwt_auth_service.dart';
 
 /// User location/assignment model
+/// Supports both new format (separate province, municipality) and legacy format (municipality_id)
 class UserLocation {
-  final String userId;
-  final String municipalityId;
-  final String? municipalityName;
+  final String? userId; // Optional - not returned by backend
+  final String province; // Province code (e.g., "CEBU")
+  final String municipality; // Municipality name (e.g., "CEBU CITY")
+  final String? municipalityName; // Alias for municipality (for backward compatibility)
   final DateTime? assignedAt;
 
-  UserLocation({
-    required this.userId,
-    required this.municipalityId,
+  const UserLocation({
+    this.userId,
+    required this.province,
+    required this.municipality,
     this.municipalityName,
     this.assignedAt,
   });
 
+  /// Computed municipalityId for backward compatibility
+  /// Format: "PROVINCE-MUNICIPALITY"
+  String get municipalityId => '$province-$municipality';
+
+  /// Create from JSON (supports both new and legacy formats)
   factory UserLocation.fromJson(Map<String, dynamic> json) {
+    // Try new format first (separate province, municipality)
+    if (json.containsKey('province') && json.containsKey('municipality_name')) {
+      return UserLocation(
+        userId: json['user_id'] as String?,
+        province: json['province'] as String? ?? '',
+        municipality: json['municipality_name'] as String? ?? '',
+        municipalityName: json['municipality_name'] as String?,
+        assignedAt: json['assigned_at'] != null
+            ? DateTime.parse(json['assigned_at'] as String)
+            : null,
+      );
+    }
+
+    // Fall back to legacy format (municipality_id)
+    final municipalityId = json['municipality_id'] as String? ?? '';
+    final parts = municipalityId.split('-');
     return UserLocation(
-      userId: json['user_id'] as String,
-      municipalityId: json['municipality_id'] as String,
+      userId: json['user_id'] as String?,
+      province: parts.isNotEmpty ? parts[0] : '',
+      municipality: parts.length > 1 ? parts.sublist(1).join('-') : '',
       municipalityName: json['municipality_name'] as String?,
       assignedAt: json['assigned_at'] != null
           ? DateTime.parse(json['assigned_at'] as String)
@@ -31,7 +58,7 @@ class UserLocation {
   }
 
   @override
-  String toString() => 'UserLocation(municipality: $municipalityId, name: $municipalityName)';
+  String toString() => 'UserLocation(province: $province, municipality: $municipality)';
 }
 
 /// Service to fetch and cache user's assigned areas (municipalities)
@@ -57,14 +84,14 @@ class AreaFilterService {
       logDebug('Fetching user locations from backend...');
 
       final response = await _dio.get(
-        '/users/$userId/locations',
+        '/users/$userId/municipalities',
         options: Options(
           headers: {'Authorization': 'Bearer $accessToken'},
         ),
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> locationsJson = response.data['locations'] ?? [];
+        final List<dynamic> locationsJson = response.data['items'] ?? [];
         final locations = locationsJson
             .map((json) => UserLocation.fromJson(json as Map<String, dynamic>))
             .toList();
@@ -116,9 +143,11 @@ class AreaFilterService {
     try {
       final locationsJson = jsonEncode(
         locations.map((l) => {
-          'user_id': l.userId,
-          'municipality_id': l.municipalityId,
-          'municipality_name': l.municipalityName,
+          if (l.userId != null) 'user_id': l.userId,
+          'province': l.province,
+          'municipality': l.municipality,
+          'municipality_name': l.municipalityName ?? l.municipality,
+          'municipality_id': l.municipalityId, // For backward compatibility
           'assigned_at': l.assignedAt?.toIso8601String(),
         }).toList(),
       );
@@ -177,3 +206,8 @@ class AreaFilterService {
         .toList();
   }
 }
+
+/// Provider for AreaFilterService
+final areaFilterServiceProvider = Provider<AreaFilterService>((ref) {
+  return AreaFilterService();
+});
