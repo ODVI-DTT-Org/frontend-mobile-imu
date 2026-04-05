@@ -754,6 +754,69 @@ class Touchpoint {
       createdAt: parseDateTime(getValue<String>('created_at', 'createdAt')) ?? DateTime.now(),
     );
   }
+
+  /// Create Touchpoint from PowerSync/PostgreSQL row (snake_case columns)
+  factory Touchpoint.fromRow(Map<String, dynamic> row) {
+    // Helper to parse TimeOfDay from string format
+    TimeOfDay? parseTime(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString();
+      final parts = str.split(':');
+      if (parts.length >= 2) {
+        return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+      return null;
+    }
+
+    // Helper to parse DateTime from various formats
+    DateTime? parseDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          // Try parsing with microseconds - remove them: 2026-04-05T22:30:12.123456+00
+          try {
+            final clean = value.replaceAll(RegExp(r'\.\d+([+-])'), r'$1');
+            return DateTime.parse(clean);
+          } catch (e2) {
+            return null;
+          }
+        }
+      }
+      return null;
+    }
+
+    return Touchpoint(
+      id: row['id'] as String,
+      clientId: row['client_id'] as String,
+      userId: row['user_id'] as String?,
+      touchpointNumber: row['touchpoint_number'] as int,
+      type: row['type'] == 'Visit' ? TouchpointType.visit : TouchpointType.call,
+      date: row['date'] != null
+          ? DateTime.parse(row['date'] as String)
+          : DateTime.now(),
+      timeArrival: parseTime(row['time_arrival']),
+      timeDeparture: parseTime(row['time_departure']),
+      reason: TouchpointReason.fromApi(row['reason'] as String? ?? 'INTERESTED'),
+      status: TouchpointStatus.fromApi(row['status'] as String? ?? 'Interested'),
+      remarks: row['notes'] as String?,
+      photoPath: row['photo_path'] as String?,
+      audioPath: row['audio_path'] as String?,
+      latitude: row['latitude'] as double?,
+      longitude: row['longitude'] as double?,
+      timeIn: parseDateTime(row['time_in']),
+      timeInGpsLat: row['time_in_gps_lat'] as double?,
+      timeInGpsLng: row['time_in_gps_lng'] as double?,
+      timeInGpsAddress: row['time_in_gps_address'] as String?,
+      timeOut: parseDateTime(row['time_out']),
+      timeOutGpsLat: row['time_out_gps_lat'] as double?,
+      timeOutGpsLng: row['time_out_gps_lng'] as double?,
+      timeOutGpsAddress: row['time_out_gps_address'] as String?,
+      createdAt: parseDateTime(row['created_at']) ?? DateTime.now(),
+    );
+  }
 }
 
 /// Touchpoint type enum with API-compatible values
