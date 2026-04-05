@@ -5,6 +5,7 @@ import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
 import '../auth/auth_service.dart';
 import '../auth/jwt_auth_service.dart';
+import '../error_logging_helper.dart';
 
 /// Backend connector for PowerSync
 /// Handles authentication credentials and data upload to PostgreSQL backend
@@ -103,8 +104,18 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         userId: userId,
         expiresAt: expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : null,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       logError('Failed to fetch PowerSync credentials', e);
+      // Log non-critical error - PowerSync credential fetch doesn't block app workflow
+      await ErrorLoggingHelper.logNonCriticalError(
+        operation: 'PowerSync credentials fetch',
+        error: e,
+        stackTrace: stackTrace,
+        context: {
+          'isAuthenticated': _authService.isAuthenticated,
+          'hasAccessToken': _authService.accessToken != null,
+        },
+      );
       return null;
     }
   }
@@ -154,12 +165,28 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
       } else {
         throw Exception('Upload failed: ${response.statusCode}');
       }
-    } on DioException catch (e) {
+    } on DioException catch (e, stackTrace) {
       logError('Upload failed with DioException', e);
+      // Log non-critical error - upload failures don't block app workflow
+      await ErrorLoggingHelper.logNonCriticalError(
+        operation: 'PowerSync data upload',
+        error: e,
+        stackTrace: stackTrace,
+        context: {
+          'errorType': 'DioException',
+          'responseStatus': e.response?.statusCode?.toString(),
+        },
+      );
       // Don't complete the batch - will retry on next sync
       rethrow;
-    } catch (e) {
+    } catch (e, stackTrace) {
       logError('Upload failed', e);
+      // Log non-critical error - upload failures don't block app workflow
+      await ErrorLoggingHelper.logNonCriticalError(
+        operation: 'PowerSync data upload',
+        error: e,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }

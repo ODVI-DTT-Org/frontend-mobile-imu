@@ -8,6 +8,7 @@ import '../sync/powersync_service.dart';
 import '../auth/jwt_auth_service.dart';
 import '../auth/auth_service.dart' show jwtAuthProvider;
 import '../sync/powersync_connector.dart';
+import '../error_logging_helper.dart';
 import '../../core/utils/logger.dart';
 import '../../core/config/app_config.dart';
 
@@ -195,8 +196,18 @@ class BackgroundSyncService extends ChangeNotifier {
       logDebug('BackgroundSyncService: PowerSync not connected, connecting...');
       try {
         await _connectPowerSync();
-      } catch (e) {
+      } catch (e, stackTrace) {
         logError('BackgroundSyncService: Failed to connect PowerSync', e);
+        // Log critical error - PowerSync connection blocks all sync operations
+        await ErrorLoggingHelper.logCriticalError(
+          operation: 'PowerSync connection',
+          error: e,
+          stackTrace: stackTrace,
+          context: {
+            'isAuthenticated': _authService.isAuthenticated,
+            'isOnline': _connectivityService.isOnline,
+          },
+        );
         return SyncResult(
           success: false,
           errorMessage: 'Failed to connect to sync service',
@@ -260,6 +271,18 @@ class BackgroundSyncService extends ChangeNotifier {
         return performSync();
       }
 
+      // Log critical error - sync failed after all retries
+      await ErrorLoggingHelper.logCriticalError(
+        operation: 'background sync',
+        error: e,
+        stackTrace: stackTrace,
+        context: {
+          'retryCount': _currentSyncRetry.toString(),
+          'maxRetries': _maxSyncRetries.toString(),
+          'pendingCount': _pendingCount.toString(),
+        },
+      );
+
       // Notify sync error
       for (final callback in _syncErrorCallbacks) {
         try {
@@ -302,6 +325,16 @@ class BackgroundSyncService extends ChangeNotifier {
 
     if (DateTime.now().difference(startTime) >= maxWaitTime) {
       logWarning('BackgroundSyncService: Timeout waiting for uploads to complete');
+      // Log non-critical error - timeout doesn't block workflow but indicates performance issue
+      await ErrorLoggingHelper.logNonCriticalError(
+        operation: 'sync timeout',
+        error: Exception('Sync timeout after ${maxWaitTime.inSeconds}s with $_pendingCount pending uploads'),
+        stackTrace: StackTrace.current,
+        context: {
+          'pendingCount': _pendingCount.toString(),
+          'maxWaitTime': '${maxWaitTime.inSeconds}s',
+        },
+      );
     }
   }
 
@@ -313,8 +346,14 @@ class BackgroundSyncService extends ChangeNotifier {
         logDebug('BackgroundSyncService: $_pendingCount pending uploads');
       }
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       logError('BackgroundSyncService: Failed to update pending count', e);
+      // Log non-critical error - pending count update doesn't block workflow
+      await ErrorLoggingHelper.logNonCriticalError(
+        operation: 'pending count update',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -326,7 +365,7 @@ class BackgroundSyncService extends ChangeNotifier {
       apiUrl: AppConfig.postgresApiUrl,
     );
 
-    await PowerSyncService.connect(connector: connector);
+    await PowerSyncService.connect(connector);
     logDebug('BackgroundSyncService: Connected to PowerSync');
   }
 
