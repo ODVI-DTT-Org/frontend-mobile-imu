@@ -365,7 +365,8 @@ final selectedClientProvider = Provider<Client?>((ref) {
 
 // ==================== Touchpoint Providers ====================
 
-/// Touchpoints for selected client
+/// Touchpoints for selected client from Hive (used by touchpoint form)
+/// Kept for offline touchpoint creation
 final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
   final clientId = ref.watch(selectedClientIdProvider);
   if (clientId == null) return [];
@@ -378,6 +379,38 @@ final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
 
   final touchpointsData = hiveService.getTouchpointsForClient(clientId);
   return touchpointsData.map((data) => Touchpoint.fromJson(data)).toList();
+});
+
+/// Touchpoints for selected client from PowerSync (used by client selector)
+/// Provides real-time synced touchpoint data for status display
+final clientTouchpointsSyncProvider = FutureProvider.autoDispose<List<Touchpoint>>((ref) async {
+  final clientId = ref.watch(selectedClientIdProvider);
+  if (clientId == null) return [];
+
+  // Query PowerSync for touchpoints
+  final touchpoints = await PowerSyncService.query('''
+    SELECT t.id, t.client_id, t.user_id, t.touchpoint_number, t.type,
+           t.date, t.time_arrival, t.time_departure, t.reason, t.status,
+           t.notes, t.photo_path, t.audio_path,
+           t.latitude, t.longitude,
+           t.time_in, t.time_in_gps_lat, t.time_in_gps_lng, t.time_in_gps_address,
+           t.time_out, t.time_out_gps_lat, t.time_out_gps_lng, t.time_out_gps_address
+    FROM touchpoints t
+    WHERE t.client_id = ?
+    ORDER BY t.touchpoint_number ASC
+  ''', [clientId]);
+
+  // Fallback to Hive if PowerSync empty (migration safety)
+  if (touchpoints.isEmpty) {
+    final hiveService = ref.watch(hiveServiceProvider);
+    if (!hiveService.isInitialized) {
+      await hiveService.init();
+    }
+    final touchpointsData = hiveService.getTouchpointsForClient(clientId);
+    return touchpointsData.map((data) => Touchpoint.fromJson(data)).toList();
+  }
+
+  return touchpoints.map((row) => Touchpoint.fromRow(row)).toList();
 });
 
 // ==================== Sync Providers ====================
