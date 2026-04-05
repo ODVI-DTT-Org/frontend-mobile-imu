@@ -56,6 +56,11 @@ class FieldErrorMessageMapper {
     // Handle single-character field name
     if (fieldName.length == 1) return fieldName.toUpperCase();
 
+    // Acronyms that should always be uppercase (even if input is lowercase)
+    const allCapsAcronyms = {
+      'faq', 'FAQ',
+    };
+
     // Replace underscores with spaces
     final withSpaces = fieldName.replaceAll('_', ' ');
 
@@ -67,7 +72,12 @@ class FieldErrorMessageMapper {
       // Handle single-character words
       if (word.length == 1) return word.toUpperCase();
 
-      // Preserve all-caps acronyms (ID, FAQ, API, URL, etc.)
+      // Check if this is an acronym that should be all-caps
+      if (allCapsAcronyms.contains(word.toLowerCase())) {
+        return word.toUpperCase();
+      }
+
+      // Preserve all-caps words (already uppercase)
       if (word == word.toUpperCase()) return word;
 
       // Handle mixed case with numbers (e.g., "2fa_backup")
