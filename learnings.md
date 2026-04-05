@@ -11,7 +11,7 @@
 | **Last Updated** | 2026-04-05 |
 | **Contributors** | IMU Development Team |
 | **Project Phase** | Active Development |
-| **Document Version** | 2.1 |
+| **Document Version** | 2.2 |
 
 ---
 
@@ -43,6 +43,7 @@
 | D022 | Enhanced RBAC permissions | Added dashboard, approvals, error_logs permissions for better access control | Security/UX | 2026-04-04 | Team |
 | D023 | Tele role client update permission | Tele users can now update assigned client information | Feature enhancement | 2026-04-04 | Team |
 | D024 | Background jobs table | Added table for async job processing (PSGC matching, report generation) | Backend architecture | 2026-04-04 | Team |
+| D025 | Error logging integration to sync services | Integrated ErrorLoggingHelper into BackgroundSyncService and PowerSyncConnector for centralized error tracking | Error tracking | 2026-04-05 | Team |
 
 ---
 
@@ -347,6 +348,59 @@ error_logs (
 - Fingerprint-based deduplication with 1-minute window
 - Occurrences count tracking for high-frequency errors
 - Indexes on fingerprint, app_version, and timestamp+platform for performance
+
+---
+
+#### Pattern: Error Logging Integration for Sync Services
+
+**Description:** Integrate ErrorLoggingHelper into critical sync and authentication services for centralized error tracking
+
+**When to use:** All sync and authentication services that handle critical operations
+
+**Example:**
+```dart
+// Critical errors - blocks workflow, direct API call
+try {
+  await _connectPowerSync();
+} catch (e, stackTrace) {
+  await ErrorLoggingHelper.logCriticalError(
+    operation: 'PowerSync connection',
+    error: e,
+    stackTrace: stackTrace,
+    context: {
+      'isAuthenticated': _authService.isAuthenticated,
+      'isOnline': _connectivityService.isOnline,
+    },
+  );
+  throw;
+}
+
+// Non-critical errors - user can continue, PowerSync queue
+try {
+  await _updatePendingCount();
+} catch (e, stackTrace) {
+  await ErrorLoggingHelper.logNonCriticalError(
+    operation: 'pending count update',
+    error: e,
+    stackTrace: stackTrace,
+  );
+}
+```
+
+**Why it works:** Centralized error tracking helps identify and diagnose sync issues in production
+
+**Services with Error Logging:**
+- ✅ jwt_auth_service.dart - Login and token refresh failures
+- ✅ background_sync_service.dart - Sync failures, connection errors, timeouts
+- ✅ powersync_connector.dart - Credential fetch failures, upload failures
+- ✅ client_api_service.dart - Client operation failures
+- ✅ itinerary_api_service.dart - Itinerary operation failures
+- ✅ touchpoint_api_service.dart - Touchpoint operation failures
+
+**Related Files:**
+- BackgroundSyncService: `mobile/imu_flutter/lib/services/api/background_sync_service.dart`
+- PowerSyncConnector: `mobile/imu_flutter/lib/services/sync/powersync_connector.dart`
+- ErrorLoggingHelper: `mobile/imu_flutter/lib/services/error_logging_helper.dart`
 
 ---
 
