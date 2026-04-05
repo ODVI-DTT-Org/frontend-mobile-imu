@@ -113,6 +113,9 @@ api_keys.dart
 secrets.dart
 *.env
 .env.*
+.env.dev
+.env.prod
+.env.qa
 
 # macOS
 .DS_Store
