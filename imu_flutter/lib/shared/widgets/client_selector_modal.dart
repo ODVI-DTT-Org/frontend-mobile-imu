@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
+import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/api/itinerary_api_service.dart';
@@ -52,6 +54,7 @@ class ClientSelectorModal extends ConsumerStatefulWidget {
 
 class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   final _searchController = TextEditingController();
+  final _searchDebounce = Debounce(milliseconds: 300);
   List<Client> _allClients = [];
   List<Client> _clients = [];
   List<Client> _filteredClients = [];
@@ -64,13 +67,18 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   void initState() {
     super.initState();
     _loadClients();
-    _searchController.addListener(_filterClients);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce.run(_filterClients);
   }
 
   Future<void> _loadClients() async {
@@ -235,6 +243,27 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       return;
     }
 
+    // Validate next touchpoint number - prevent adding clients whose next touchpoint is 2, 3, 5, 6 (Call touchpoints)
+    // Itinerary is for scheduling visits, which are touchpoints 1, 4, 7
+    if (client.touchpoints != null && client.touchpoints!.isNotEmpty) {
+      // Find the highest touchpoint number
+      final highestTouchpoint = client.touchpoints!
+          .map((t) => t.touchpointNumber)
+          .reduce((a, b) => a > b ? a : b);
+
+      final nextTouchpoint = highestTouchpoint + 1;
+
+      // Call touchpoints are 2, 3, 5, 6 - prevent adding these clients to itinerary
+      if (nextTouchpoint == 2 || nextTouchpoint == 3 || nextTouchpoint == 5 || nextTouchpoint == 6) {
+        if (mounted) {
+          HapticUtils.error();
+          final ordinal = _getTouchpointOrdinal(nextTouchpoint);
+          showToast('Cannot add to itinerary: Next touchpoint is $ordinal (Call). Use Call feature instead.');
+        }
+        return;
+      }
+    }
+
     setState(() {
       _addingClientIds.add(client.id!);
     });
@@ -300,6 +329,28 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   String _formatDateShort(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}';
+  }
+
+  String _getTouchpointOrdinal(int number) {
+    if (number >= 11 && number <= 13) return 'th';
+    switch (number % 10) {
+      case 1:
+        return '1st';
+      case 2:
+        return '2nd';
+      case 3:
+        return '3rd';
+      case 4:
+        return '4th';
+      case 5:
+        return '5th';
+      case 6:
+        return '6th';
+      case 7:
+        return '7th';
+      default:
+        return '${number}th';
+    }
   }
 
   Future<void> _showDatePicker(Client client) async {

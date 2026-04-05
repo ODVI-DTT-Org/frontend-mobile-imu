@@ -10,12 +10,14 @@ import '../../../../shared/widgets/swipeable_list_tile.dart';
 import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
+import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/itinerary_api_service.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
+import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
 
@@ -190,6 +192,12 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         subtitle: visit.address,
         options: [
           ActionOption(
+            icon: LucideIcons.history,
+            title: 'View History',
+            description: 'See all touchpoints',
+            value: 'history',
+          ),
+          ActionOption(
             icon: LucideIcons.edit,
             title: 'Edit Client',
             description: 'View and update client information',
@@ -227,6 +235,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           break;
         case 'edit':
           await _editClient(visit);
+          break;
+        case 'history':
+          await _viewHistory(visit);
           break;
       }
     }
@@ -344,6 +355,17 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _editClient(ItineraryItem visit) async {
     HapticUtils.lightImpact();
     context.push('/clients/${visit.clientId}/edit');
+  }
+
+  Future<void> _viewHistory(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
+    if (mounted) {
+      await TouchpointHistoryDialog.show(
+        context,
+        clientId: visit.clientId,
+        clientName: visit.clientName,
+      );
+    }
   }
 
   /// Show dialog when all 7 touchpoints are completed
@@ -1027,127 +1049,177 @@ class _VisitCard extends StatelessWidget {
             ),
           // Left side: Touchpoint + Client info
           Expanded(
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Touchpoint icon and number
-                SizedBox(
-                  width: 30,
-                  child: Column(
-                    children: [
-                      Icon(
-                        LucideIcons.mapPin,
-                        size: 20,
-                        color: const Color(0xFF0F172A),
-                      ),
-                      const SizedBox(height: 4),
+                // Previous touchpoint badge and date row
+                Row(
+                  children: [
+                    PreviousTouchpointBadge(
+                      touchpointNumber: visit.previousTouchpointNumber,
+                      touchpointType: visit.previousTouchpointType,
+                      touchpointReason: visit.previousTouchpointReason,
+                    ),
+                    const Spacer(),
+                    if (visit.previousTouchpointDate != null)
                       Text(
-                        _getOrdinal(visit.touchpointNumber ?? 0),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Client name and agency
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        visit.clientName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        visit.address ?? '',
+                        DateFormat('MMM d').format(visit.previousTouchpointDate!),
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade600,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Client name
+                Text(
+                  visit.clientName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                // Previous reason
+                if (visit.previousTouchpointReason != null && visit.previousTouchpointReason!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    visit.previousTouchpointReason!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                // Notes
+                if (visit.notes != null && visit.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        LucideIcons.stickyNote,
+                        size: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          visit.notes!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Right side: Priority, Status and notes
-          SizedBox(
-            width: 133,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Priority badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _getPriorityColor(visit.priority).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: _getPriorityColor(visit.priority).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    _formatPriority(visit.priority),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: _getPriorityColor(visit.priority),
-                      letterSpacing: 0.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(visit.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    _formatStatus(visit.status),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: _getStatusColor(visit.status),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                if (visit.notes != null && visit.notes!.isNotEmpty) ...[
+                ],
+                // Location (optional, below notes)
+                if (visit.address != null && visit.address!.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    visit.notes!,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey.shade500,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Icon(
+                        LucideIcons.mapPin,
+                        size: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          visit.address!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
             ),
           ),
+          const SizedBox(width: 12),
+          // Right side: Priority and Status badges (optional, can be removed)
+          if (visit.priority != 'normal' || visit.status != 'pending')
+            SizedBox(
+              width: 80,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (visit.priority != 'normal') ...[
+                    // Priority badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getPriorityColor(visit.priority).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: _getPriorityColor(visit.priority).withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        _formatPriority(visit.priority),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: _getPriorityColor(visit.priority),
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  if (visit.status != 'pending')
+                    // Status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(visit.status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _formatStatus(visit.status),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: _getStatusColor(visit.status),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  IconData _getTouchpointIcon(String? touchpointType) {
+    if (touchpointType?.toLowerCase() == 'call') {
+      return LucideIcons.phone;
+    }
+    return LucideIcons.mapPin;
+  }
+
+  Color _getTouchpointIconColor(String? touchpointType) {
+    if (touchpointType?.toLowerCase() == 'call') {
+      return const Color(0xFF22C55E); // Green for calls
+    }
+    return const Color(0xFF3B82F6); // Blue for visits
   }
 
   String _formatStatus(String status) {

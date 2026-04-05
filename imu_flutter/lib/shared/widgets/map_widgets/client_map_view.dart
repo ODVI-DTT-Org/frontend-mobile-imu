@@ -7,6 +7,7 @@ import '../../../core/config/map_config.dart';
 import '../../../services/maps/interactive_map_service.dart';
 import '../../../services/maps/map_service.dart';
 import '../../../core/utils/haptic_utils.dart';
+import '../../../core/utils/debounce_utils.dart';
 import '../../../shared/utils/loading_helper.dart';
 
 /// Provider for map service
@@ -45,6 +46,7 @@ class _ClientMapViewState extends ConsumerState<ClientMapView> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   final TextEditingController _searchController = TextEditingController();
+  final _searchDebounce = Debounce(milliseconds: 300);
 
   MapViewMode _currentMode = MapViewMode.allClients;
   MapFilters _filters = const MapFilters();
@@ -272,6 +274,7 @@ class _ClientMapViewState extends ConsumerState<ClientMapView> {
     _markersSubscription?.cancel();
     _locationSubscription?.cancel();
     _searchController.dispose();
+    _searchDebounce.dispose();
     super.dispose();
   }
 
@@ -324,7 +327,7 @@ class _ClientMapViewState extends ConsumerState<ClientMapView> {
               right: 16,
               child: _SearchBar(
                 controller: _searchController,
-                onSearch: _performSearch,
+                onSearch: (query) => _searchDebounce.run(() => _performSearch(query)),
               ),
             ),
 

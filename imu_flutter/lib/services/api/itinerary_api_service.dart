@@ -27,6 +27,12 @@ class ItineraryItem {
   final DateTime? updatedAt;
   final String? createdBy;
 
+  // Previous touchpoint info
+  final int? previousTouchpointNumber; // Last completed touchpoint number
+  final String? previousTouchpointReason; // Last completed touchpoint reason
+  final String? previousTouchpointType; // Last completed touchpoint type (visit/call)
+  final DateTime? previousTouchpointDate; // Last completed touchpoint date
+
   ItineraryItem({
     required this.id,
     required this.clientId,
@@ -44,6 +50,10 @@ class ItineraryItem {
     required this.createdAt,
     this.updatedAt,
     this.createdBy,
+    this.previousTouchpointNumber,
+    this.previousTouchpointReason,
+    this.previousTouchpointType,
+    this.previousTouchpointDate,
   });
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) {
@@ -97,6 +107,17 @@ class ItineraryItem {
 
     debugPrint('[ItineraryItem] Parsing date: $scheduledDateStr -> $scheduledDate (UTC: ${scheduledDate.toUtc()}, Local: ${DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day)})');
 
+    // Validate and parse previous touchpoint number (must be 1-7)
+    final previousTouchpointNumber = json['previous_touchpoint_number'] as int?;
+    int? validatedPreviousNumber;
+    if (previousTouchpointNumber != null) {
+      if (previousTouchpointNumber >= 1 && previousTouchpointNumber <= 7) {
+        validatedPreviousNumber = previousTouchpointNumber;
+      } else {
+        debugPrint('[ItineraryItem] Invalid previous touchpoint number: $previousTouchpointNumber (must be 1-7), ignoring');
+      }
+    }
+
     return ItineraryItem(
       id: json['id'] ?? '',
       clientId: json['client_id'] ?? '',
@@ -116,6 +137,12 @@ class ItineraryItem {
           ? DateTime.parse(json['updated'] ?? json['updated_at'])
           : null,
       createdBy: json['created_by'],
+      previousTouchpointNumber: validatedPreviousNumber,
+      previousTouchpointReason: json['previous_touchpoint_reason'],
+      previousTouchpointType: json['previous_touchpoint_type'],
+      previousTouchpointDate: json['previous_touchpoint_date'] != null
+          ? DateTime.parse(json['previous_touchpoint_date'])
+          : null,
     );
   }
 
@@ -150,6 +177,10 @@ class ItineraryItem {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBy,
+    int? previousTouchpointNumber,
+    String? previousTouchpointReason,
+    String? previousTouchpointType,
+    DateTime? previousTouchpointDate,
   }) {
     return ItineraryItem(
       id: id ?? this.id,
@@ -168,6 +199,10 @@ class ItineraryItem {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
+      previousTouchpointNumber: previousTouchpointNumber ?? this.previousTouchpointNumber,
+      previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
+      previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
+      previousTouchpointDate: previousTouchpointDate ?? this.previousTouchpointDate,
     );
   }
 }

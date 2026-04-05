@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/debounce_utils.dart';
 
 class CallLogPage extends ConsumerStatefulWidget {
   const CallLogPage({super.key});
@@ -13,6 +14,7 @@ class CallLogPage extends ConsumerStatefulWidget {
 
 class _CallLogPageState extends ConsumerState<CallLogPage> {
   final _searchController = TextEditingController();
+  final _searchDebounce = Debounce(milliseconds: 300);
   String _searchQuery = '';
   int _selectedMainTab = 0; // 0 = Client Contacts, 1 = Call Logs
   String _selectedFilter = 'all';
@@ -176,6 +178,7 @@ class _CallLogPageState extends ConsumerState<CallLogPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce.dispose();
     super.dispose();
   }
 
@@ -229,8 +232,11 @@ class _CallLogPageState extends ConsumerState<CallLogPage> {
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
+                        _searchDebounce.run(() {
+                          if (!mounted) return;
+                          setState(() {
+                            _searchQuery = value;
+                          });
                         });
                       },
                       decoration: InputDecoration(

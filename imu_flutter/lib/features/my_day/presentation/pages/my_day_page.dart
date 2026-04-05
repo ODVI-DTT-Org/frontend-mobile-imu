@@ -9,6 +9,7 @@ import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
+import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
@@ -266,6 +267,12 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         subtitle: client.location,
         options: [
           ActionOption(
+            icon: LucideIcons.history,
+            title: 'View History',
+            description: 'See all touchpoints',
+            value: 'history',
+          ),
+          ActionOption(
             icon: LucideIcons.edit,
             title: 'Edit Client',
             description: 'View and update client information',
@@ -303,6 +310,9 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           break;
         case 'edit':
           await _editClient(client);
+          break;
+        case 'history':
+          await _viewHistory(client);
           break;
       }
     }
@@ -414,6 +424,17 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _editClient(MyDayClient client) async {
     HapticUtils.lightImpact();
     context.push('/clients/${client.clientId}/edit');
+  }
+
+  Future<void> _viewHistory(MyDayClient client) async {
+    HapticUtils.lightImpact();
+    if (mounted) {
+      await TouchpointHistoryDialog.show(
+        context,
+        clientId: client.clientId,
+        clientName: client.fullName,
+      );
+    }
   }
 
   void _onClientLongPress(MyDayClient client) {

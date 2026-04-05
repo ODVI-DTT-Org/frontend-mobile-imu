@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../app.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/debounce_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../../../shared/providers/app_providers.dart' show
@@ -34,6 +35,7 @@ class ClientsPage extends ConsumerStatefulWidget {
 
 class _ClientsPageState extends ConsumerState<ClientsPage> {
   final _searchController = TextEditingController();
+  final _searchDebounce = Debounce(milliseconds: 300);
   String _searchQuery = '';
   bool _showMyClientsOnly = true; // true = My Clients (PowerSync), false = All Clients (Online)
 
@@ -50,28 +52,33 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   }
 
   void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text;
-      _currentPage = 1; // Reset to first page on search
-    });
-
-    // Defer provider updates until after build cycle
-    Future.microtask(() {
+    _searchDebounce.run(() {
       if (!mounted) return;
 
-      // Update the appropriate search query provider based on mode
-      if (_showMyClientsOnly) {
-        // My Clients: filter locally (PowerSync already has territory-filtered data)
-      } else {
-        // All Clients: update online search query provider
-        ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
-      }
+      setState(() {
+        _searchQuery = _searchController.text;
+        _currentPage = 1; // Reset to first page on search
+      });
+
+      // Defer provider updates until after build cycle
+      Future.microtask(() {
+        if (!mounted) return;
+
+        // Update the appropriate search query provider based on mode
+        if (_showMyClientsOnly) {
+          // My Clients: filter locally (PowerSync already has territory-filtered data)
+        } else {
+          // All Clients: update online search query provider
+          ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
+        }
+      });
     });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce.dispose();
     super.dispose();
   }
 

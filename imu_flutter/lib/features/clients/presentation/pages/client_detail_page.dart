@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
@@ -19,6 +20,7 @@ import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
+import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart';
 import '../../../../core/models/user_role.dart';
@@ -365,38 +367,41 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         : null;
 
     if (primaryAddress?.latitude != null && primaryAddress?.longitude != null) {
-      // Use map service for navigation
-      showModalBottomSheet(
-        context: context,
-        builder: (context) => SafeArea(
-          child: Wrap(
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Choose Navigation App',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.map),
-                title: const Text('Google Maps'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _openNavigation(primaryAddress!);
-                },
-              ),
-            ],
-          ),
-        ),
-      );
+      // Open Google Maps directly with coordinates
+      _openGoogleMapsNavigation(primaryAddress!);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Navigating to $address...')),
-      );
+      // If no coordinates, search by address string
+      _openGoogleMapsSearch(address);
+    }
+  }
+
+  Future<void> _openGoogleMapsNavigation(Address address) async {
+    final latitude = address.latitude;
+    final longitude = address.longitude;
+    final url = 'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude';
+
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open Google Maps: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openGoogleMapsSearch(String address) async {
+    final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}';
+
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open Google Maps: $e')),
+        );
+      }
     }
   }
 
@@ -696,40 +701,19 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           onPressed: () => context.pop(),
         ),
         actions: [
-          // Loan release button - only for Caravan and Tele users
-          Consumer(
-            builder: (context, ref, _) {
-              final authState = ref.watch(authNotifierProvider);
-              final userRole = authState.user?.role?.apiValue;
-
-              // Show loan release button for Admin, Caravan and Tele
-              if (userRole == 'admin' || userRole == 'caravan' || userRole == 'tele') {
-                return IconButton(
-                  icon: const Icon(LucideIcons.dollarSign),
-                  tooltip: 'Release Loan',
-                  onPressed: _handleLoanRelease,
+          IconButton(
+            icon: const Icon(LucideIcons.history),
+            tooltip: 'View History',
+            onPressed: () async {
+              HapticUtils.lightImpact();
+              if (mounted) {
+                await TouchpointHistoryDialog.show(
+                  context,
+                  clientId: widget.clientId,
+                  clientName: _client?.fullName ?? 'Client',
                 );
               }
-
-              return const SizedBox.shrink();
             },
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.pencil),
-            onPressed: _editClient,
-          ),
-          PermissionDeleter(
-            resource: 'clients',
-            child: IconButton(
-              icon: const Icon(LucideIcons.trash2, color: Colors.red),
-              onPressed: _handleDelete,
-            ),
-            fallback: IconButton(
-              icon: const Icon(LucideIcons.trash2, color: Colors.red),
-              onPressed: () {
-                PermissionDeniedDialog.show(context);
-              },
-            ),
           ),
         ],
       ),
@@ -814,36 +798,90 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Quick actions
+            // View History button
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _QuickActionButton(
-                      icon: LucideIcons.phone,
-                      label: 'Call',
-                      onTap: () => _callClient(primaryPhone),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    HapticUtils.lightImpact();
+                    if (mounted) {
+                      await TouchpointHistoryDialog.show(
+                        context,
+                        clientId: widget.clientId,
+                        clientName: _client?.fullName ?? 'Client',
+                      );
+                    }
+                  },
+                  icon: const Icon(LucideIcons.history, size: 18),
+                  label: const Text('View Touchpoint History'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _QuickActionButton(
-                      icon: LucideIcons.mapPin,
-                      label: 'Navigate',
-                      onTap: () => _navigateToAddress(primaryAddress?.fullAddress),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _QuickActionButton(
-                      icon: LucideIcons.plusCircle,
-                      label: 'New Visit',
-                      onTap: _startTouchpoint,
-                      isPrimary: true,
-                    ),
-                  ),
-                ],
+                ),
+              ),
+            ),
+
+            // Action buttons
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[200]!),
+                ),
+              ),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final authState = ref.watch(authNotifierProvider);
+                  final userRole = authState.user?.role?.apiValue;
+                  final canReleaseLoan = userRole == 'admin' || userRole == 'caravan' || userRole == 'tele';
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _ActionButton(
+                          icon: LucideIcons.mapPin,
+                          label: 'Navigate',
+                          onTap: () => _navigateToAddress(primaryAddress?.fullAddress),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ActionButton(
+                          icon: LucideIcons.plusCircle,
+                          label: 'Visit',
+                          onTap: _startTouchpoint,
+                          isPrimary: true,
+                        ),
+                      ),
+                      if (canReleaseLoan) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _ActionButton(
+                            icon: LucideIcons.dollarSign,
+                            label: 'Release Loan',
+                            onTap: _handleLoanRelease,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ActionButton(
+                          icon: LucideIcons.pencil,
+                          label: 'Edit',
+                          onTap: _editClient,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
 
@@ -1136,13 +1174,13 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _QuickActionButton extends StatelessWidget {
+class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool isPrimary;
 
-  const _QuickActionButton({
+  const _ActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -1159,7 +1197,7 @@ class _QuickActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isPrimary ? Theme.of(context).colorScheme.primary : Colors.grey[100],
+          color: isPrimary ? const Color(0xFF0F172A) : Colors.grey[100],
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(

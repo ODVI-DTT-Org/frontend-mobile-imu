@@ -291,6 +291,7 @@ class MyDayApiService {
 
       final response = await _dio.get(
         '${AppConfig.postgresApiUrl}/my-day/tasks',
+        queryParameters: {'date': dateStr},
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',

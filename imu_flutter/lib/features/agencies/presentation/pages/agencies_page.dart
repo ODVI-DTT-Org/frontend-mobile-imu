@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/debounce_utils.dart';
 
 class AgenciesPage extends ConsumerStatefulWidget {
   const AgenciesPage({super.key});
@@ -13,6 +14,7 @@ class AgenciesPage extends ConsumerStatefulWidget {
 
 class _AgenciesPageState extends ConsumerState<AgenciesPage> {
   final _searchController = TextEditingController();
+  final _searchDebounce = Debounce(milliseconds: 300);
   String _searchQuery = '';
   int _selectedTabIndex = 0;
 
@@ -94,6 +96,7 @@ class _AgenciesPageState extends ConsumerState<AgenciesPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce.dispose();
     super.dispose();
   }
 
@@ -151,8 +154,11 @@ class _AgenciesPageState extends ConsumerState<AgenciesPage> {
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
+                        _searchDebounce.run(() {
+                          if (!mounted) return;
+                          setState(() {
+                            _searchQuery = value;
+                          });
                         });
                       },
                       decoration: InputDecoration(

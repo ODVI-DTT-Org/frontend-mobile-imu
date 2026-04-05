@@ -1,67 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../data/models/my_day_client.dart';
 
-/// Priority badge widget for displaying visit priority
-class _PriorityBadge extends StatelessWidget {
-  final String priority;
-
-  const _PriorityBadge({required this.priority});
-
-  Color _getPriorityColor() {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFEF4444); // Red
-      case 'normal':
-        return const Color(0xFF3B82F6); // Blue
-      case 'low':
-        return const Color(0xFF64748B); // Slate
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatPriority() {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return 'HIGH';
-      case 'normal':
-        return 'NORMAL';
-      case 'low':
-        return 'LOW';
-      default:
-        return 'NORMAL';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: _getPriorityColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: _getPriorityColor().withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        _formatPriority(),
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          color: _getPriorityColor(),
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-}
-
-/// Simplified client card widget for My Day list
-/// Displays client info with map pin icon, touchpoint badge, and navigation chevron
+/// Client card widget for My Day list
+/// Displays client info with previous touchpoint details
 /// Includes swipe-to-dismiss functionality for removing from My Day
 /// Supports multi-select mode with long press and visual feedback
 class ClientCard extends StatelessWidget {
@@ -97,7 +42,7 @@ class ClientCard extends StatelessWidget {
         // Explicitly ignore double tap - do nothing
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -106,115 +51,117 @@ class ClientCard extends StatelessWidget {
             width: isSelected ? 2 : 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Selection checkmark indicator (shown in multi-select mode when selected)
-            if (isMultiSelectMode)
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade300,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  LucideIcons.check,
-                  size: 14,
-                  color: isSelected ? Colors.white : Colors.grey.shade600,
-                ),
-              ),
-            if (isMultiSelectMode) const SizedBox(width: 12),
-            // Map pin icon container
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Center(
-                child: Icon(
-                  LucideIcons.mapPin,
-                  size: 18,
-                  color: Color(0xFF3B82F6),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Touchpoint badge and Priority badge
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            // Selection checkmark indicator and Previous touchpoint badge row
+            Row(
               children: [
-                if (client.touchpointNumber > 0) ...[
+                if (isMultiSelectMode)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(4),
+                      color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade300,
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      client.touchpointOrdinal,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF64748B),
-                      ),
+                    child: Icon(
+                      LucideIcons.check,
+                      size: 14,
+                      color: isSelected ? Colors.white : Colors.grey.shade600,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                ],
-                _PriorityBadge(priority: client.priority),
+                if (isMultiSelectMode) const SizedBox(width: 12),
+                PreviousTouchpointBadge(
+                  touchpointNumber: client.previousTouchpointNumber,
+                  touchpointType: client.previousTouchpointType,
+                  touchpointReason: client.previousTouchpointReason,
+                ),
+                const Spacer(),
+                if (client.previousTouchpointDate != null)
+                  Text(
+                    DateFormat('MMM d').format(client.previousTouchpointDate!),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
               ],
             ),
-            const SizedBox(width: 8),
-            // Client name, location, and notes
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+            const SizedBox(height: 8),
+            // Client name
+            Text(
+              client.fullName,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            // Previous reason
+            if (client.previousTouchpointReason != null && client.previousTouchpointReason!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                client.previousTouchpointReason!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            // Notes
+            if (client.notes != null && client.notes!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
                 children: [
-                  Text(
-                    client.fullName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  Icon(
+                    LucideIcons.stickyNote,
+                    size: 12,
+                    color: Colors.grey.shade500,
                   ),
-                  if (client.location != null && client.location!.isNotEmpty)
-                    Text(
-                      client.location!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  if (client.notes != null && client.notes!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
                       client.notes!,
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
                         fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            // Location (optional, below notes)
+            if (client.location != null && client.location!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    LucideIcons.mapPin,
+                    size: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      client.location!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            // Chevron navigation icon
-            const Icon(
-              LucideIcons.chevronRight,
-              size: 16,
-              color: Color(0xFF94A3B8),
-            ),
+            ],
           ],
         ),
       ),

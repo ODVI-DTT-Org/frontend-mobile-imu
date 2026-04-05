@@ -251,8 +251,9 @@ class ClientApiService {
       if (response.statusCode == 200) {
         final clientData = response.data as Map<String, dynamic>;
         debugPrint('ClientApiService: Got client: ${clientData['first_name']} ${clientData['last_name']}');
-        // Use fromRow to handle snake_case from API
-        return Client.fromRow(clientData);
+        debugPrint('ClientApiService: Touchpoints count: ${clientData['touchpoints']?.length ?? 0}');
+        // Use fromJson to properly parse touchpoints array from API
+        return Client.fromJson(clientData);
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to fetch client: ${response.statusCode}');
