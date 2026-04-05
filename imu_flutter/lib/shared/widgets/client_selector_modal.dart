@@ -354,34 +354,22 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       return;
     }
 
-    // Prevent adding loan released clients
-    if (client.loanReleased) {
+    // Get client status and touchpoint info for validation
+    final status = _clientStatuses[client.id];
+    final touchpointsAsync = ref.watch(clientTouchpointsSyncProvider);
+    final touchpoints = touchpointsAsync.valueOrNull ?? [];
+    final clientTouchpoints = touchpoints.where((t) => t.clientId == client.id).toList();
+    final nextTouchpoint = clientTouchpoints.length;
+    final nextType = nextTouchpoint < 7 ? TouchpointPattern.getType(nextTouchpoint + 1) : TouchpointType.visit;
+
+    // NEW: Check if can add before proceeding
+    if (!_canAddToItinerary(client, status, nextType)) {
       if (mounted) {
+        final reason = _getDisableReason(client, status, nextType);
         HapticUtils.error();
-        showToast('Cannot add to itinerary: Loan has been released');
+        showToast(reason);
       }
       return;
-    }
-
-    // Validate next touchpoint number - prevent adding clients whose next touchpoint is 2, 3, 5, 6 (Call touchpoints)
-    // Itinerary is for scheduling visits, which are touchpoints 1, 4, 7
-    if (client.touchpoints != null && client.touchpoints!.isNotEmpty) {
-      // Find the highest touchpoint number
-      final highestTouchpoint = client.touchpoints!
-          .map((t) => t.touchpointNumber)
-          .reduce((a, b) => a > b ? a : b);
-
-      final nextTouchpoint = highestTouchpoint + 1;
-
-      // Call touchpoints are 2, 3, 5, 6 - prevent adding these clients to itinerary
-      if (nextTouchpoint == 2 || nextTouchpoint == 3 || nextTouchpoint == 5 || nextTouchpoint == 6) {
-        if (mounted) {
-          HapticUtils.error();
-          final ordinal = _getTouchpointOrdinal(nextTouchpoint);
-          showToast('Cannot add to itinerary: Next touchpoint is $ordinal (Call). Use Call feature instead.');
-        }
-        return;
-      }
     }
 
     setState(() {
@@ -470,6 +458,61 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     }
   }
 
+  Widget _buildBadge(String label, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.only(right: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _canAddToItinerary(Client client, ClientStatus? status, TouchpointType nextType) {
+    // Check loan released
+    if (client.loanReleased) return false;
+
+    // Check already in today's itinerary
+    if (status?.inItinerary == true) return false;
+
+    // Check next touchpoint type (Caravan can only do Visit: 1, 4, 7)
+    final userRole = ref.read(currentUserRoleProvider);
+    if (userRole == UserRole.caravan && nextType == TouchpointType.call) {
+      return false;
+    }
+
+    return true;
+  }
+
+  String _getDisableReason(Client client, ClientStatus? status, TouchpointType nextType) {
+    if (client.loanReleased) return 'Loan released - cannot add';
+    if (status?.inItinerary == true) return 'Already added today';
+
+    final userRole = ref.read(currentUserRoleProvider);
+    if (userRole == UserRole.caravan && nextType == TouchpointType.call) {
+      return 'Next is Call - use Call feature';
+    }
+
+    return '';
+  }
+
   Future<void> _showDatePicker(Client client) async {
     final selectedDate = await showDatePicker(
       context: context,
@@ -506,6 +549,78 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
             fontSize: 14,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildClientSkeleton() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _buildSkeletonCircle(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSkeletonLine(width: 120),
+                      const SizedBox(height: 4),
+                      _buildSkeletonLine(width: 180),
+                      const SizedBox(height: 4),
+                      _buildSkeletonLine(width: 100),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildSkeletonButton()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildSkeletonButton()),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonCircle() {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLine({required double width}) {
+    return Container(
+      height: 12,
+      width: width,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonButton() {
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(8),
       ),
     );
   }
@@ -621,6 +736,16 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   Widget _buildClientList(ScrollController? scrollController) {
+    // Show skeleton loading while fetching client statuses
+    if (_isLoadingStatuses && !_hasStatusError) {
+      return ListView.builder(
+        controller: scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: 5, // Show 5 skeleton cards
+        itemBuilder: (context, index) => _buildClientSkeleton(),
+      );
+    }
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -638,6 +763,32 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadClients,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_hasStatusError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.alertCircle, size: 48, color: Colors.orange.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load client status',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to retry',
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _retryLoadStatuses,
               child: const Text('Retry'),
             ),
           ],
@@ -705,94 +856,118 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       itemBuilder: (context, index) {
         final client = _displayableClients[index];
         final isAdding = _addingClientIds.contains(client.id);
+        final status = _clientStatuses[client.id];
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
+          child: ExpansionTile(
+            leading: CircleAvatar(
+              backgroundColor: client.clientType == ClientType.existing
+                  ? Colors.green.shade100
+                  : Colors.blue.shade100,
+              child: Text(
+                '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
+                style: TextStyle(
+                  color: client.clientType == ClientType.existing
+                      ? Colors.green.shade700
+                      : Colors.blue.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            title: Text(
+              '${client.firstName} ${client.lastName}',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Client info row
-                Row(
+                if (client.email != null && client.email!.isNotEmpty)
+                  Text(
+                    client.email!,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                Wrap(
+                  spacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundColor: client.clientType == ClientType.existing
-                          ? Colors.green.shade100
-                          : Colors.blue.shade100,
-                      child: Text(
-                        '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
-                        style: TextStyle(
-                          color: client.clientType == ClientType.existing ? Colors.green.shade700 : Colors.blue.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${client.firstName} ${client.lastName}',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                          ),
-                          if (client.email != null && client.email!.isNotEmpty)
-                            Text(
-                              client.email!,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                          if (client.phone != null && client.phone!.isNotEmpty)
-                            Text(
-                              client.phone!,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (client.clientType != null)
-                      Chip(
-                        label: Text(
-                          client.clientType!.name.toUpperCase(),
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-                        ),
-                        backgroundColor: client.clientType == ClientType.existing
-                            ? Colors.green.shade50
-                            : Colors.blue.shade50,
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Action buttons row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: LucideIcons.calendar,
-                        label: 'Add to Today',
-                        isPrimary: true,
-                        isLoading: isAdding,
-                        onTap: () => _addClientToItinerary(client),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: LucideIcons.calendarClock,
-                        label: 'Add with Date',
-                        isPrimary: false,
-                        isLoading: isAdding,
-                        onTap: () => _showDatePicker(client),
-                      ),
-                    ),
+                    if (status?.loanReleased == true)
+                      _buildBadge('Loan Released', Colors.red, LucideIcons.ban),
+                    if (status?.inItinerary == true)
+                      _buildBadge('Already added', Colors.orange, LucideIcons.calendarCheck),
+                    _buildNextTouchpointBadge(client.id),
                   ],
                 ),
               ],
             ),
+            trailing: Icon(LucideIcons.chevronDown),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Touchpoint history preview
+                    Text(
+                      'Touchpoint History',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Action buttons row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: LucideIcons.calendar,
+                            label: 'Add to Today',
+                            isPrimary: true,
+                            isLoading: isAdding,
+                            onTap: () => _addClientToItinerary(client),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: LucideIcons.calendarClock,
+                            label: 'Add with Date',
+                            isPrimary: false,
+                            isLoading: isAdding,
+                            onTap: () => _showDatePicker(client),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildNextTouchpointBadge(String? clientId) {
+    if (clientId == null) return const SizedBox.shrink();
+
+    // Get touchpoints for this client
+    final touchpointsAsync = ref.watch(clientTouchpointsSyncProvider);
+    final touchpoints = touchpointsAsync.valueOrNull ?? [];
+    final clientTouchpoints = touchpoints.where((t) => t.clientId == clientId).toList();
+    final nextTouchpoint = clientTouchpoints.length;
+
+    if (nextTouchpoint >= 7) return const SizedBox.shrink(); // All touchpoints done
+
+    final nextType = TouchpointPattern.getType(nextTouchpoint + 1);
+    final isCall = nextType == TouchpointType.call;
+
+    return _buildBadge(
+      'Next: ${_getTouchpointOrdinal(nextTouchpoint + 1)} ${nextType.name}',
+      isCall ? Colors.orange : Colors.green,
+      isCall ? LucideIcons.phone : LucideIcons.mapPin,
     );
   }
 
@@ -802,21 +977,34 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     required bool isPrimary,
     required bool isLoading,
     VoidCallback? onTap,
+    String? reason, // NEW: Disable reason
   }) {
+    final isDisabled = onTap == null && !isLoading;
+
     return InkWell(
-      onTap: isLoading ? null : onTap,
+      onTap: isDisabled
+          ? () {
+              // Show reason toast when clicking disabled button
+              if (reason != null && mounted) {
+                showToast(reason);
+                HapticUtils.error();
+              }
+            }
+          : onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isLoading
               ? Colors.grey.shade200
-              : isPrimary
-                  ? const Color(0xFF0F172A)
-                  : const Color(0xFFF1F5F9),
+              : isDisabled
+                  ? Colors.grey.shade300
+                  : isPrimary
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isPrimary ? const Color(0xFF0F172A) : Colors.grey.shade300,
+            color: isDisabled ? Colors.grey.shade400 : Colors.grey.shade300,
           ),
         ),
         child: Row(
@@ -837,7 +1025,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
               Icon(
                 icon,
                 size: 14,
-                color: isPrimary ? Colors.white : const Color(0xFF0F172A),
+                color: isDisabled
+                    ? Colors.grey.shade500
+                    : (isPrimary ? Colors.white : const Color(0xFF0F172A)),
               ),
             const SizedBox(width: 6),
             Text(
@@ -847,9 +1037,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                 fontWeight: FontWeight.w500,
                 color: isLoading
                     ? Colors.grey.shade500
-                    : isPrimary
-                        ? Colors.white
-                        : const Color(0xFF0F172A),
+                    : isDisabled
+                        ? Colors.grey.shade500
+                        : isPrimary
+                            ? Colors.white
+                            : const Color(0xFF0F172A),
               ),
             ),
           ],
