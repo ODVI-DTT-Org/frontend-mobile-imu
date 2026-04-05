@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
+import '../../../../core/config/app_config.dart';
+import '../../../../core/utils/logger.dart';
 
 /// Sync loading state
 class SyncLoadingState {
@@ -50,6 +52,13 @@ class SyncLoadingNotifier extends StateNotifier<SyncLoadingState> {
   }
 
   void _init() async {
+    // Log API configuration for debugging
+    logDebug('[SyncLoadingPage] API Configuration:');
+    logDebug('[SyncLoadingPage]   Backend API: ${AppConfig.backendApiUrl}');
+    logDebug('[SyncLoadingPage]   PowerSync URL: ${AppConfig.powerSyncUrl}');
+    logDebug('[SyncLoadingPage]   Environment: ${AppConfig.environment}');
+    logDebug('[SyncLoadingPage]   Debug Mode: ${AppConfig.debugMode}');
+
     // Check if sync is needed
     final syncNeeded = await _preferencesService.shouldSync();
 
