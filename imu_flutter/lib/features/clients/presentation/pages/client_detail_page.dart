@@ -623,6 +623,20 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _startTouchpoint() async {
     if (_client == null) return;
 
+    // Prevent touchpoint creation for loan released clients
+    if (_client!.loanReleased) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot create touchpoints: Loan has been released'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     HapticUtils.lightImpact();
 
     final nextType = _client!.nextTouchpointType;
@@ -865,11 +879,59 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Client header
+      body: Column(
+        children: [
+          // Loan Released Sash
+          if (_client!.loanReleased)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4), // Light red/pink background
+                border: Border(
+                  bottom: BorderSide(color: Colors.red.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    LucideIcons.checkCircle,
+                    size: 20,
+                    color: const Color(0xFF16A34A), // Green checkmark
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Loan Released',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFBE123C), // Dark red
+                          ),
+                        ),
+                        Text(
+                          'This client has completed their loan. No further touchpoints or edits allowed.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // Main content
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Client header
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -991,6 +1053,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                   final userRole = authState.user?.role?.apiValue;
                   final canReleaseLoan = userRole == 'admin' || userRole == 'caravan' || userRole == 'tele';
 
+                  final isLoanReleased = _client!.loanReleased;
+
                   return Row(
                     children: [
                       Expanded(
@@ -1005,11 +1069,11 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                         child: _ActionButton(
                           icon: LucideIcons.plusCircle,
                           label: 'Visit',
-                          onTap: _startTouchpoint,
+                          onTap: isLoanReleased ? null : _startTouchpoint,
                           isPrimary: true,
                         ),
                       ),
-                      if (canReleaseLoan) ...[
+                      if (canReleaseLoan && !isLoanReleased) ...[
                         const SizedBox(width: 8),
                         Expanded(
                           child: _ActionButton(
@@ -1024,7 +1088,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                         child: _ActionButton(
                           icon: LucideIcons.pencil,
                           label: 'Edit',
-                          onTap: _editClient,
+                          onTap: isLoanReleased ? null : _editClient,
                         ),
                       ),
                     ],
@@ -1216,7 +1280,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           ],
         ),
       ),
-    );
+    ),
+    ],
+  ),
+);
   }
 
   String _formatDate(DateTime date) {
@@ -1424,34 +1491,41 @@ class _TouchpointSkeletonItem extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isPrimary;
 
   const _ActionButton({
     required this.icon,
     required this.label,
-    required this.onTap,
+    this.onTap,
     this.isPrimary = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDisabled = onTap == null;
+
     return GestureDetector(
       onTap: () {
+        if (isDisabled) return;
         HapticUtils.lightImpact();
-        onTap();
+        onTap!();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFF0F172A) : Colors.grey[100],
+          color: isDisabled
+              ? Colors.grey[300]
+              : (isPrimary ? const Color(0xFF0F172A) : Colors.grey[100]),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           children: [
             Icon(
               icon,
-              color: isPrimary ? Colors.white : Colors.grey[700],
+              color: isDisabled
+                  ? Colors.grey[500]
+                  : (isPrimary ? Colors.white : Colors.grey[700]),
               size: 20,
             ),
             const SizedBox(height: 4),
@@ -1459,7 +1533,9 @@ class _ActionButton extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: isPrimary ? Colors.white : Colors.grey[700],
+                color: isDisabled
+                    ? Colors.grey[500]
+                    : (isPrimary ? Colors.white : Colors.grey[700]),
                 fontWeight: FontWeight.w500,
               ),
             ),

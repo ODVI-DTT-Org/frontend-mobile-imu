@@ -224,6 +224,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     });
   }
 
+  List<Client> get _displayableClients {
+    // Hide loan released clients from the list
+    return _filteredClients.where((client) => !client.loanReleased).toList();
+  }
+
   Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
     if (client.id == null) {
       if (mounted) {
@@ -239,6 +244,15 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       if (mounted) {
         // Use top-positioned toast instead of bottom SnackBar
         showToast('Invalid client ID format: ${client.id}');
+      }
+      return;
+    }
+
+    // Prevent adding loan released clients
+    if (client.loanReleased) {
+      if (mounted) {
+        HapticUtils.error();
+        showToast('Cannot add to itinerary: Loan has been released');
       }
       return;
     }
@@ -528,7 +542,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       );
     }
 
-    if (_filteredClients.isEmpty) {
+    if (_displayableClients.isEmpty) {
       // Check if user has no assigned municipalities
       final userRole = ref.read(currentUserRoleProvider);
       final shouldFilterByArea = switch (userRole) {
@@ -584,9 +598,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _filteredClients.length,
+      itemCount: _displayableClients.length,
       itemBuilder: (context, index) {
-        final client = _filteredClients[index];
+        final client = _displayableClients[index];
         final isAdding = _addingClientIds.contains(client.id);
 
         return Card(
