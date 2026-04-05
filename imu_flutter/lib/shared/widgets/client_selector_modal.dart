@@ -182,7 +182,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       if (shouldFilterByArea) {
         // Get assigned municipalities and filter clients
-        final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
+        // Use ref.read instead of ref.watch since we're not in build method
+        final assignedMunicipalitiesAsync = ref.read(assignedMunicipalitiesProvider);
         assignedMunicipalitiesAsync.when(
           data: (municipalityIds) {
             if (municipalityIds.isEmpty) {
