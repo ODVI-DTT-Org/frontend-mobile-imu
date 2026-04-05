@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+// import 'package:package_info_plus/package_info_plus.dart'; // Temporarily disabled for build
+import 'package:uuid/uuid.dart';
 import '../models/error_report_model.dart';
 import 'error_reporter_service.dart';
 import 'sync/powersync_service.dart';
@@ -110,15 +112,15 @@ class ErrorLoggingHelper {
 
   /// Get app version from package_info_plus
   static Future<String> _getAppVersion() async {
+    // Temporarily disabled package_info_plus due to Kotlin compilation issues
+    // TODO: Re-enable after updating to compatible package_info_plus version
     try {
-      // Note: Requires package_info_plus dependency
-      // For now, return hardcoded version
-      // TODO: Add package_info_plus and use:
       // final info = await PackageInfo.fromPlatform();
       // return info.version;
-      return '1.0.0';
+      return '1.3.2'; // Fallback to known version from pubspec.yaml
     } catch (e) {
-      return '1.0.0';
+      debugPrint('[ErrorLogging] Failed to get app version: $e');
+      return '1.3.2'; // Fallback to known version
     }
   }
 

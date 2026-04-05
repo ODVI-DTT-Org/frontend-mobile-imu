@@ -69,6 +69,7 @@ dependencies:
   url_launcher: ^6.2.2
   quick_actions: ^1.0.7
   crypto: ^3.0.3
+  # package_info_plus: ^4.2.0 # Temporarily disabled due to Kotlin compilation issues
 
   # Permissions
   permission_handler: ^11.0.1

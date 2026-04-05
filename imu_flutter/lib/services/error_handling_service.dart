@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:imu_flutter/services/api/api_exception.dart';
+import 'api/api_exception.dart';
+import 'error_message_mapper.dart';
+import 'error_contextualizer.dart';
 
 /// Error severity level
 enum ErrorSeverity {
@@ -79,24 +81,58 @@ class ErrorHandlingService extends StateNotifier<AppError?> {
     debugPrint('ErrorHandlingService: Would report to analytics - ${error.message}');
   }
 
-  /// Get user-friendly error message
-  String getUserMessage(dynamic error) {
+  /// Get user-friendly error message using ErrorMessageMapper
+  String getUserMessage(dynamic error, {String? userAction}) {
     if (error is ApiException) {
-      switch (error.errorCode) {
-        case 'INVALID_CREDENTIALS':
-          return 'Invalid email or password. Please try again.';
-        case 'RATE_LIMITED':
-          return 'Too many attempts. Please wait a moment and try again.';
-        case 'NETWORK_ERROR':
-          return 'No internet connection. Please check your network.';
-        case 'UNAUTHORIZED':
-          return 'Your session has expired. Please log in again.';
-        default:
-          return error.message;
+      final errorCode = error.errorCode ?? 'UNKNOWN_ERROR';
+
+      // Use contextualizer if userAction is provided
+      if (userAction != null) {
+        final contextualMessage = ErrorContextualizer.getContextualMessage(
+          errorCode,
+          userAction,
+        );
+        if (contextualMessage != null) {
+          return contextualMessage;
+        }
       }
+
+      // Fall back to ErrorMessageMapper
+      return ErrorMessageMapper.getMessage(errorCode);
     }
 
     return 'An unexpected error occurred. Please try again.';
+  }
+
+  /// Get error suggestions using ErrorMessageMapper
+  List<String> getErrorSuggestions(dynamic error) {
+    if (error is ApiException) {
+      final errorCode = error.errorCode ?? 'UNKNOWN_ERROR';
+      return ErrorMessageMapper.getSuggestions(errorCode);
+    }
+    return [];
+  }
+
+  /// Get error severity from status code
+  static ErrorSeverity getErrorSeverity(dynamic error) {
+    if (error is ApiException) {
+      final statusCode = error.statusCode;
+
+      if (statusCode != null) {
+        if (statusCode! >= 500) {
+          return ErrorSeverity.critical;
+        } else if (statusCode! >= 400) {
+          return ErrorSeverity.error;
+        }
+      }
+
+      // Network errors (status code 0)
+      if (statusCode == 0) {
+        return ErrorSeverity.error;
+      }
+    }
+
+    return ErrorSeverity.error;
   }
 }
 

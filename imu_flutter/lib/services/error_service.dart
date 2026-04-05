@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/error_model.dart';
+import 'error_message_mapper.dart';
 
 /// Error Service for displaying standardized error messages
 ///
 /// Provides methods to show errors in SnackBars with consistent formatting
+/// Uses ErrorMessageMapper to convert technical errors to user-friendly messages
 class ErrorService {
-  /// Show error as SnackBar
+  /// Show error as SnackBar with human-readable message
   static void showError(
     BuildContext context,
     AppError error, {
@@ -16,10 +18,9 @@ class ErrorService {
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-    // Build error message with metadata
-    final message = error.message;
-    final code = error.code;
-    final shortRequestId = error.shortRequestId;
+    // Get human-readable message and color from mapper
+    final message = ErrorMessageMapper.getMessage(error.code, details: error.details);
+    final color = ErrorMessageMapper.getColor(error.code);
 
     // Create content widget with error details
     final content = Column(
@@ -28,29 +29,7 @@ class ErrorService {
       children: [
         Text(
           message,
-          style: const TextStyle(color: Colors.white),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Text(
-              'Code: $code',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'ID: $shortRequestId',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 11,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
+          style: const TextStyle(color: Colors.white, fontSize: 14),
         ),
       ],
     );
@@ -58,7 +37,7 @@ class ErrorService {
     scaffoldMessenger.showSnackBar(
       SnackBar(
         content: content,
-        backgroundColor: Colors.red.shade700,
+        backgroundColor: color,
         duration: duration,
         action: action != null
             ? SnackBarAction(
@@ -79,7 +58,7 @@ class ErrorService {
     );
   }
 
-  /// Show error dialog with details
+  /// Show error dialog with details and suggestions
   static void showErrorDialog(
     BuildContext context,
     AppError error, {
@@ -87,10 +66,18 @@ class ErrorService {
   }) {
     if (!context.mounted) return;
 
+    // Get human-readable content from mapper
+    final displayTitle = title ?? ErrorMessageMapper.getTitle(error.code);
+    final message = ErrorMessageMapper.getMessage(error.code, details: error.details);
+    final suggestions = ErrorMessageMapper.getSuggestions(error.code);
+    final icon = ErrorMessageMapper.getIcon(error.code);
+    final color = ErrorMessageMapper.getColor(error.code);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title ?? 'Error'),
+        icon: Icon(icon, color: color, size: 32),
+        title: Text(displayTitle),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -98,34 +85,48 @@ class ErrorService {
             children: [
               // Main error message
               Text(
-                error.message,
+                message,
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 16),
 
-              // Error code and request ID
-              _buildDetailRow('Code', error.code),
-              _buildDetailRow('Request ID', error.shortRequestId),
-              _buildDetailRow('Timestamp', error.timestamp),
-
-              // Suggestions if available
-              if (error.suggestions != null && error.suggestions!.isNotEmpty) ...[
-                const SizedBox(height: 16),
+              // Show suggestions from mapper (not from backend response)
+              if (suggestions.isNotEmpty) ...[
+                const SizedBox(height: 8),
                 const Text(
-                  'Suggestions:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  'What you can do:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
-                ...error.suggestions!.map(
+                ...suggestions.map(
                   (suggestion) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 4),
-                    child: Text(
-                      '• $suggestion',
-                      style: const TextStyle(fontSize: 14),
+                    padding: const EdgeInsets.only(left: 8, bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('• ', style: TextStyle(fontSize: 14)),
+                        Expanded(
+                          child: Text(
+                            suggestion,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
+
+              // Show request ID for debugging (in small text)
+              const SizedBox(height: 16),
+              Text(
+                'Reference: ${error.shortRequestId}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontFamily: 'monospace',
+                ),
+              ),
             ],
           ),
         ),
@@ -199,83 +200,43 @@ class ErrorService {
     return 'client-$random';
   }
 
-  /// Build detail row for error dialog
-  static Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ],
-      ),
+  /// Get human-readable error from AppError
+  ///
+  /// Returns a formatted human-readable error with title, message, and suggestions
+  static HumanReadableError getHumanReadableError(AppError error) {
+    return HumanReadableError(
+      title: ErrorMessageMapper.getTitle(error.code),
+      message: ErrorMessageMapper.getMessage(error.code, details: error.details),
+      suggestions: ErrorMessageMapper.getSuggestions(error.code),
+      icon: ErrorMessageMapper.getIcon(error.code),
+      color: ErrorMessageMapper.getColor(error.code),
+      requestId: error.shortRequestId,
     );
   }
 }
 
-/// Extension on AppError to get user-friendly display name
-extension AppErrorExtension on AppError {
-  /// Get user-friendly title for the error
-  String get title {
-    switch (code) {
-      case 'VALIDATION_ERROR':
-        return 'Invalid Input';
-      case 'UNAUTHORIZED':
-      case 'INVALID_CREDENTIALS':
-      case 'TOKEN_EXPIRED':
-      case 'TOKEN_INVALID':
-        return 'Authentication Error';
-      case 'FORBIDDEN':
-      case 'INSUFFICIENT_PERMISSIONS':
-        return 'Access Denied';
-      case 'NOT_FOUND':
-        return 'Not Found';
-      case 'CONFLICT':
-        return 'Conflict';
-      case 'RATE_LIMIT_EXCEEDED':
-        return 'Too Many Requests';
-      case 'NETWORK_ERROR':
-        return 'Network Error';
-      default:
-        return 'Error';
-    }
-  }
+/// Human-readable error data class
+///
+/// Contains user-friendly error information for display
+class HumanReadableError {
+  final String title;
+  final String message;
+  final List<String> suggestions;
+  final IconData icon;
+  final Color color;
+  final String requestId;
 
-  /// Get user-friendly icon for the error
-  IconData get icon {
-    switch (code) {
-      case 'VALIDATION_ERROR':
-        return Icons.error_outline;
-      case 'UNAUTHORIZED':
-      case 'INVALID_CREDENTIALS':
-      case 'TOKEN_EXPIRED':
-      case 'TOKEN_INVALID':
-        return Icons.lock_outline;
-      case 'FORBIDDEN':
-      case 'INSUFFICIENT_PERMISSIONS':
-        return Icons.block;
-      case 'NOT_FOUND':
-        return Icons.search_off;
-      case 'CONFLICT':
-        return Icons.sync_problem;
-      case 'RATE_LIMIT_EXCEEDED':
-        return Icons.speed;
-      case 'NETWORK_ERROR':
-        return Icons.wifi_off;
-      default:
-        return Icons.error;
-    }
+  const HumanReadableError({
+    required this.title,
+    required this.message,
+    required this.suggestions,
+    required this.icon,
+    required this.color,
+    required this.requestId,
+  });
+
+  @override
+  String toString() {
+    return 'HumanReadableError(title: $title, message: $message, requestId: $requestId)';
   }
 }

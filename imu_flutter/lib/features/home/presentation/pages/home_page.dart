@@ -448,7 +448,7 @@ class _DeveloperOptionsSheetState extends ConsumerState<_DeveloperOptionsSheet> 
                       // Trigger a sync by connecting again
                       final connector = ref.read(powerSyncConnectorProvider);
                       if (connector != null) {
-                        await PowerSyncService.connect(connector);
+                        await PowerSyncService.connect(connector: connector);
                       }
                       _loadTableCounts();
                     },

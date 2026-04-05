@@ -972,7 +972,7 @@ class AuthCoordinator extends ChangeNotifier {
             powersyncUrl: AppConfig.powerSyncUrl,
             apiUrl: AppConfig.postgresApiUrl,
           );
-          await PowerSyncService.connect(connector);
+          await PowerSyncService.connect(connector: connector);
           debugPrint('AuthCoordinator: PowerSync connected successfully');
         } catch (e) {
           // Log the error but DON'T fail the login

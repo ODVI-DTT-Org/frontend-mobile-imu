@@ -326,7 +326,7 @@ class BackgroundSyncService extends ChangeNotifier {
       apiUrl: AppConfig.postgresApiUrl,
     );
 
-    await PowerSyncService.connect(connector);
+    await PowerSyncService.connect(connector: connector);
     logDebug('BackgroundSyncService: Connected to PowerSync');
   }
 

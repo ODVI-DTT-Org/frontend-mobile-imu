@@ -179,7 +179,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           powersyncUrl: AppConfig.powerSyncUrl,
           apiUrl: AppConfig.postgresApiUrl,
         );
-        await PowerSyncService.connect(_powerSyncConnector!);
+        await PowerSyncService.connect(connector: _powerSyncConnector!);
         logDebug('PowerSync connected successfully');
       } catch (e) {
         // Log the error but DON'T fail the login

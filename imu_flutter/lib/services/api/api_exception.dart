@@ -1,4 +1,5 @@
 import '../../services/error_service.dart';
+import '../../services/error_message_mapper.dart';
 import '../../models/error_model.dart' as models;
 
 /// Custom exception class for API errors
@@ -111,16 +112,19 @@ class ApiException implements Exception {
 
   /// Network error (no internet)
   factory ApiException.networkError([dynamic originalError]) {
+    const errorCode = 'NETWORK_ERROR';
+    final message = ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: 'No internet connection. Please check your network settings.',
+      message: message,
       statusCode: 0,
-      errorCode: 'NETWORK_ERROR',
+      errorCode: errorCode,
       originalError: originalError,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'NETWORK_ERROR',
-        message: 'No internet connection. Please check your network settings.',
+        code: errorCode,
+        message: message,
         path: '',
         method: '',
       ),
@@ -129,16 +133,19 @@ class ApiException implements Exception {
 
   /// Timeout error
   factory ApiException.timeoutError([dynamic originalError]) {
+    const errorCode = 'TIMEOUT';
+    final message = ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: 'Request timed out. Please try again.',
+      message: message,
       statusCode: 408,
-      errorCode: 'TIMEOUT',
+      errorCode: errorCode,
       originalError: originalError,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'TIMEOUT',
-        message: 'Request timed out. Please try again.',
+        code: errorCode,
+        message: message,
         path: '',
         method: '',
       ),
@@ -147,15 +154,18 @@ class ApiException implements Exception {
 
   /// Unauthorized error (401)
   factory ApiException.unauthorized([String? message]) {
+    const errorCode = 'UNAUTHORIZED';
+    final mappedMessage = message ?? ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: message ?? 'Your session has expired. Please log in again.',
+      message: mappedMessage,
       statusCode: 401,
-      errorCode: 'UNAUTHORIZED',
+      errorCode: errorCode,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'UNAUTHORIZED',
-        message: message ?? 'Your session has expired. Please log in again.',
+        code: errorCode,
+        message: mappedMessage,
         path: '',
         method: '',
       ),
@@ -164,15 +174,18 @@ class ApiException implements Exception {
 
   /// Forbidden error (403)
   factory ApiException.forbidden([String? message]) {
+    const errorCode = 'FORBIDDEN';
+    final mappedMessage = message ?? ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: message ?? 'You do not have permission to perform this action.',
+      message: mappedMessage,
       statusCode: 403,
-      errorCode: 'FORBIDDEN',
+      errorCode: errorCode,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'FORBIDDEN',
-        message: message ?? 'You do not have permission to perform this action.',
+        code: errorCode,
+        message: mappedMessage,
         path: '',
         method: '',
       ),
@@ -181,15 +194,18 @@ class ApiException implements Exception {
 
   /// Not found error (404)
   factory ApiException.notFound([String? message]) {
+    const errorCode = 'NOT_FOUND';
+    final mappedMessage = message ?? ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: message ?? 'The requested resource was not found.',
+      message: mappedMessage,
       statusCode: 404,
-      errorCode: 'NOT_FOUND',
+      errorCode: errorCode,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'NOT_FOUND',
-        message: message ?? 'The requested resource was not found.',
+        code: errorCode,
+        message: mappedMessage,
         path: '',
         method: '',
       ),
@@ -198,15 +214,18 @@ class ApiException implements Exception {
 
   /// Server error (500)
   factory ApiException.serverError([String? message]) {
+    const errorCode = 'INTERNAL_SERVER_ERROR';
+    final mappedMessage = message ?? ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: message ?? 'A server error occurred. Please try again later.',
+      message: mappedMessage,
       statusCode: 500,
-      errorCode: 'SERVER_ERROR',
+      errorCode: errorCode,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'INTERNAL_SERVER_ERROR',
-        message: message ?? 'A server error occurred. Please try again later.',
+        code: errorCode,
+        message: mappedMessage,
         path: '',
         method: '',
       ),
@@ -215,16 +234,19 @@ class ApiException implements Exception {
 
   /// Validation error (400)
   factory ApiException.validationError(Map<String, dynamic> errors) {
+    const errorCode = 'VALIDATION_ERROR';
+    final message = ErrorMessageMapper.getMessage(errorCode);
+
     return ApiException(
-      message: 'Validation failed. Please check your input.',
+      message: message,
       statusCode: 400,
-      errorCode: 'VALIDATION_ERROR',
+      errorCode: errorCode,
       data: errors,
       appError: models.AppError(
         requestId: ErrorService.generateRequestId(),
         timestamp: DateTime.now().toIso8601String(),
-        code: 'VALIDATION_ERROR',
-        message: 'Validation failed. Please check your input.',
+        code: errorCode,
+        message: message,
         path: '',
         method: '',
         details: errors,
@@ -254,5 +276,20 @@ class ApiException implements Exception {
       buffer.write(' [code: $errorCode]');
     }
     return buffer.toString();
+  }
+
+  /// Convert to human-readable error using ErrorMessageMapper
+  ///
+  /// Returns a HumanReadableError with user-friendly title, message, suggestions, icon, and color
+  HumanReadableError toHumanReadable() {
+    final code = errorCode ?? 'UNKNOWN_ERROR';
+    return HumanReadableError(
+      title: ErrorMessageMapper.getTitle(code),
+      message: ErrorMessageMapper.getMessage(code),
+      suggestions: ErrorMessageMapper.getSuggestions(code),
+      icon: ErrorMessageMapper.getIcon(code),
+      color: ErrorMessageMapper.getColor(code),
+      requestId: appError?.shortRequestId ?? 'unknown',
+    );
   }
 }

@@ -14,6 +14,7 @@ import '../../../../services/sync/powersync_connector.dart' show powerSyncConnec
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/providers/app_providers.dart' show offlineAuthProvider;
 import '../../../../core/utils/logger.dart';
+import '../../../../services/error_message_mapper.dart';
 
 class PinEntryPage extends ConsumerStatefulWidget {
   const PinEntryPage({super.key});
@@ -213,7 +214,7 @@ class _PinEntryPageState extends ConsumerState<PinEntryPage> {
             if (connector != null) {
               logDebug('PowerSync connector found, connecting in background...');
               // Connect to PowerSync in background without blocking
-              PowerSyncService.connect(connector).then((_) {
+              PowerSyncService.connect(connector: connector).then((_) {
                 logDebug('PowerSync connected successfully');
                 // Wait for initial sync in background (non-blocking)
                 PowerSyncService.waitForInitialSync(
@@ -240,9 +241,15 @@ class _PinEntryPageState extends ConsumerState<PinEntryPage> {
             _isVerifying = false;
             _hasError = true;
             _attempts++;
-            _errorMessage = e.toString().contains('Invalid PIN')
-                ? 'Incorrect PIN. Please try again.'
-                : 'Session expired. Please login with your password.';
+            // Use ErrorMessageMapper for consistent error messaging
+            final errorString = e.toString().toLowerCase();
+            if (errorString.contains('invalid pin') || errorString.contains('incorrect')) {
+              _errorMessage = ErrorMessageMapper.getMessage('INVALID_CREDENTIALS');
+            } else if (errorString.contains('expired') || errorString.contains('session')) {
+              _errorMessage = ErrorMessageMapper.getMessage('TOKEN_EXPIRED');
+            } else {
+              _errorMessage = ErrorMessageMapper.getMessage('UNAUTHORIZED');
+            }
             _pin = '';
           });
           HapticFeedback.heavyImpact();
@@ -279,7 +286,8 @@ class _PinEntryPageState extends ConsumerState<PinEntryPage> {
       setState(() {
         _isVerifying = false;
         _hasError = true;
-        _errorMessage = 'An error occurred. Please try again.';
+        // Use ErrorMessageMapper for consistent error messaging
+        _errorMessage = ErrorMessageMapper.getMessage('INTERNAL_SERVER_ERROR');
         _pin = '';
       });
     }
