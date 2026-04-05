@@ -78,14 +78,15 @@ class MyDayApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
-      final scheduledDateStr = scheduledDate != null
-          ? '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}'
-          : null;
+      // Default to today's local date if not provided
+      // IMPORTANT: Always send a date to backend to avoid timezone issues with CURRENT_DATE
+      final localDate = scheduledDate ?? DateTime.now();
+      final scheduledDateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
       debugPrint('MyDayApiService: Adding client $clientId to my day');
       debugPrint('MyDayApiService: scheduledDate (local): $scheduledDate');
+      debugPrint('MyDayApiService: localDate (used): $localDate');
       debugPrint('MyDayApiService: scheduledDate (string): $scheduledDateStr');
-      debugPrint('MyDayApiService: scheduledDate (toIso8601String): ${scheduledDate?.toIso8601String()}');
 
       final response = await _dio.post(
         '${AppConfig.postgresApiUrl}/my-day/add-client',
@@ -97,7 +98,7 @@ class MyDayApiService {
         ),
         data: {
           'client_id': clientId,
-          if (scheduledDateStr != null) 'scheduled_date': scheduledDateStr,
+          'scheduled_date': scheduledDateStr, // Always send date
           if (scheduledTime != null) 'scheduled_time': scheduledTime,
           'priority': priority,
           if (notes != null) 'notes': notes,

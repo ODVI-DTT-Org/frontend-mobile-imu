@@ -378,7 +378,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     try {
       final myDayApi = MyDayApiService();
-      final targetDate = customDate ?? widget.selectedDate;
+      // Default to today if no date is provided (ensure we always send a date to backend)
+      final targetDate = customDate ?? widget.selectedDate ?? DateTime.now();
 
       debugPrint('ClientSelectorModal: _addClientToItinerary');
       debugPrint('ClientSelectorModal: widget.selectedDate = $widget.selectedDate');
