@@ -8,6 +8,8 @@ import 'package:imu_flutter/services/auth/offline_auth_service.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
 import 'package:imu_flutter/core/utils/haptic_utils.dart';
 import 'package:imu_flutter/shared/utils/loading_helper.dart';
+import 'package:imu_flutter/shared/widgets/initial_sync_dialog.dart';
+import 'package:imu_flutter/services/sync/initial_sync_service.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -104,8 +106,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final authState = ref.watch(authNotifierProvider);
     final isOnline = ref.watch(isOnlineProvider);
 
-    // Listen to auth state changes for error handling
+    // Listen to auth state changes for error handling and initial sync
     ref.listen<AuthState>(authNotifierProvider, (prev, next) {
+      // Handle errors
       if (next.error != null && next.error != prev?.error) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -113,6 +116,49 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             showToast(next.error!);
             // Clear error after showing toast
             ref.read(authNotifierProvider.notifier).clearError();
+          }
+        });
+      }
+
+      // Trigger initial sync on first successful login
+      if (next.isAuthenticated && !prev!.isAuthenticated && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          // Check if initial sync is needed
+          final needsSync = await InitialSyncService.needsInitialSync();
+
+          if (needsSync && mounted) {
+            // Check if online before starting sync
+            final isOnline = ref.read(isOnlineProvider);
+
+            if (!isOnline) {
+              // Show message that sync will happen when online
+              showToast('Your clients will sync when you connect to the internet');
+              return;
+            }
+
+            // Show initial sync dialog
+            if (mounted) {
+              await showInitialSyncDialog(
+                context: context,
+                onSync: (current, total) async {
+                  await InitialSyncService.syncAssignedClients(
+                    onProgress: (current, total) {
+                      // Progress updates are handled by the dialog
+                    },
+                    onError: (error) {
+                      // Log error but don't block login
+                      debugPrint('[Login] Initial sync error: $error');
+                    },
+                  );
+                },
+                onComplete: () {
+                  debugPrint('[Login] Initial sync complete');
+                },
+                onError: () {
+                  debugPrint('[Login] Initial sync failed, but login succeeded');
+                },
+              );
+            }
           }
         });
       }

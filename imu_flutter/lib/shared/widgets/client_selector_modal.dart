@@ -380,6 +380,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       final myDayApi = MyDayApiService();
       final targetDate = customDate ?? widget.selectedDate;
 
+      debugPrint('ClientSelectorModal: _addClientToItinerary');
+      debugPrint('ClientSelectorModal: widget.selectedDate = $widget.selectedDate');
+      debugPrint('ClientSelectorModal: customDate = $customDate');
+      debugPrint('ClientSelectorModal: targetDate = $targetDate');
+
       // Use my-day API for adding to itinerary (supports both today and custom dates)
       await myDayApi.addToMyDay(
         client.id!,
