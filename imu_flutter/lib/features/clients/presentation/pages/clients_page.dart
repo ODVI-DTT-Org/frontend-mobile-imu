@@ -828,7 +828,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       error: (_, __) => isInMyDay = false,
     );
 
-    final primaryPhone = client.phone;
     final primaryAddress = client.fullAddress;
 
     return Container(
@@ -1032,23 +1031,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               // Quick actions and Add button row
               Row(
                 children: [
-                  // Quick actions: Call and Navigate (only in My Clients tab)
-                  if (_showMyClientsOnly && primaryPhone != null)
-                    _QuickActionButton(
-                      icon: LucideIcons.phone,
-                      label: 'Call',
-                      onTap: () => _callClient(primaryPhone),
-                    ),
-                  if (_showMyClientsOnly && primaryPhone != null && primaryAddress != null)
-                    const SizedBox(width: 8),
+                  // Quick action: Navigate (only in My Clients tab)
                   if (_showMyClientsOnly && primaryAddress != null)
                     _QuickActionButton(
                       icon: LucideIcons.navigation,
                       label: 'Navigate',
                       onTap: () => _navigateToAddress(primaryAddress),
                     ),
-                  if (_showMyClientsOnly && (primaryPhone != null || primaryAddress != null))
-                    const SizedBox(width: 8),
                   // Spacer to push button to the right
                   const Spacer(),
                   // "Add to My Day" button
@@ -1125,15 +1114,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       final months = (difference.inDays / 30).floor();
       return months == 1 ? 'last month' : '${months}mo ago';
     }
-  }
-
-  void _callClient(String? phone) {
-    if (phone == null || phone.isEmpty) {
-      showToast('No phone number available');
-      return;
-    }
-    HapticUtils.lightImpact();
-    showToast('Calling $phone...');
   }
 
   void _navigateToAddress(String? address) {
