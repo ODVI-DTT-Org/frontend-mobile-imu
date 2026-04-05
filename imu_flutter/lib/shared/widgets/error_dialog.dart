@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../models/error_model.dart' as backend_models;
 import '../../services/error_handling_service.dart';
 import '../../services/error_message_mapper.dart';
+import '../../services/error_contextualizer.dart';
 
 /// Error dialog widget for showing user-friendly error messages
 ///
@@ -53,11 +54,11 @@ class ErrorDialog extends StatelessWidget {
     // Apply contextualization if userAction is provided
     if (userAction != null && isBackendError) {
       final backendError = error as backend_models.AppError;
-      final contextualMessage = _ErrorContextualizer.getContextualMessage(
+      final contextualMessage = ErrorContextualizer.getContextualMessage(
         backendError.code,
         userAction!,
       );
-      if (contextualMessage != null) {
+      if (contextualMessage.isNotEmpty) {
         message = contextualMessage;
       }
     }
@@ -240,29 +241,4 @@ class ErrorDialog extends StatelessWidget {
         return Colors.grey;
     }
   }
-}
-
-/// Private contextualizer for error dialog
-class _ErrorContextualizer {
-  static String? getContextualMessage(String errorCode, String userAction) {
-    final key = '${userAction}_$errorCode';
-    return _contextualMessages[key];
-  }
-
-  static const Map<String, String> _contextualMessages = {
-    // Login action
-    'login_INVALID_CREDENTIALS': 'Invalid email or password. Please try again.',
-    'login_NETWORK_ERROR': 'Unable to sign in. Please check your internet connection.',
-
-    // Save client action
-    'save_client_VALIDATION_ERROR': 'Please check the client information.',
-    'save_client_NETWORK_ERROR': 'Unable to save client. Please check your connection.',
-
-    // Submit touchpoint action
-    'submit_touchpoint_VALIDATION_ERROR': 'Please check the touchpoint information.',
-    'submit_touchpoint_INVALID_TOUCHPOINT_TYPE': 'You can only create visit touchpoints.',
-
-    // Sync data action
-    'sync_data_NETWORK_ERROR': 'Unable to sync. Please check your internet connection.',
-  };
 }

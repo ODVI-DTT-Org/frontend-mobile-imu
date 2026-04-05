@@ -50,15 +50,38 @@ class FieldErrorMessageMapper {
 
   /// Generate label from snake_case field name
   static String _generateLabel(String fieldName) {
+    // Handle empty field name
+    if (fieldName.isEmpty) return 'Field';
+
+    // Handle single-character field name
+    if (fieldName.length == 1) return fieldName.toUpperCase();
+
     // Replace underscores with spaces
     final withSpaces = fieldName.replaceAll('_', ' ');
+
     // Capitalize first letter of each word
     final words = withSpaces.split(' ');
     final capitalized = words.map((word) {
       if (word.isEmpty) return '';
+
+      // Handle single-character words
+      if (word.length == 1) return word.toUpperCase();
+
+      // Preserve all-caps acronyms (ID, FAQ, API, URL, etc.)
+      if (word == word.toUpperCase()) return word;
+
+      // Handle mixed case with numbers (e.g., "2fa_backup")
+      if (word.contains(RegExp(r'[0-9]'))) {
+        // Keep numbers as-is, capitalize letters
+        return word[0].toUpperCase() + word.substring(1);
+      }
+
+      // Standard case: capitalize first letter, lowercase the rest
       return word[0].toUpperCase() + word.substring(1).toLowerCase();
     }).join(' ');
-    return capitalized;
+
+    // Return original field name if result is empty
+    return capitalized.isEmpty ? fieldName : capitalized;
   }
 
   // ==================== FIELD LABEL MAPPINGS ====================
