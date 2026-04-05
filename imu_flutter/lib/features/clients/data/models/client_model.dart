@@ -1,4 +1,5 @@
 /// Client data model for IMU app
+/// Aligned with database schema - uses direct columns instead of nested lists
 class Client {
   final String? id;
   final String firstName;
@@ -11,7 +12,7 @@ class Client {
   final String? payrollDate;
   final int? tenure;
   final DateTime? birthDate;
-  final String? phone; // Primary contact number
+  final String? phone; // Primary contact number (single field)
   final String? remarks;
   final ClientType clientType;
   final MarketType? marketType;
@@ -22,13 +23,12 @@ class Client {
   final String? facebookLink;
   final String? agencyId;
   final String? userId; // The user (caravan/tele) who owns this client
-  final String? municipality;
-  final String? psgcId; // Foreign key to PSGC table
+  final int? psgcId; // Foreign key to PSGC table (INTEGER in database)
   final String? region; // Region from PSGC (e.g., NCR, Region I)
   final String? province; // Province from PSGC (e.g., Metro Manila, Pangasinan)
+  final String? municipality; // Municipality from PSGC
   final String? barangay; // Barangay from PSGC
-  final List<Address> addresses;
-  final List<PhoneNumber> phoneNumbers;
+  final String? udi; // Unified ID
   final List<Touchpoint> touchpoints;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -59,22 +59,30 @@ class Client {
     this.facebookLink,
     this.agencyId,
     this.userId,
-    this.addresses = const [],
-    this.phoneNumbers = const [],
+    this.psgcId,
+    this.region,
+    this.province,
+    this.municipality,
+    this.barangay,
+    this.udi,
     this.touchpoints = const [],
     required this.createdAt,
     this.updatedAt,
     this.isStarred = false,
     this.loanReleased = false,
     this.loanReleasedAt,
-    this.municipality,
-    this.psgcId,
-    this.region,
-    this.province,
-    this.barangay,
   });
 
   String get fullName => '$firstName ${middleName != null ? '$middleName ' : ''}$lastName';
+
+  String get fullAddress {
+    final parts = <String>[];
+    if (barangay != null && barangay!.isNotEmpty) parts.add(barangay!);
+    if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
+    if (province != null && province!.isNotEmpty) parts.add(province!);
+    if (region != null && region!.isNotEmpty) parts.add(region!);
+    return parts.join(', ');
+  }
 
   int get age {
     if (birthDate == null) return 0;
@@ -95,18 +103,47 @@ class Client {
     return TouchpointPattern.types[next];
   }
 
-  /// Check if client's address matches the given PSGC municipality code
+  /// Check if client's location matches the given municipality code
   /// This is used for territory-based filtering
   bool matchesMunicipality(String? municipalityCode) {
     if (municipalityCode == null || municipalityCode.isEmpty) return true;
+    // Direct match on municipality field
+    return municipality == municipalityCode;
+  }
 
-    // Check if any of the client's addresses match the municipality
-    for (final address in addresses) {
-      // Direct match on city field (which stores PSGC code)
-      if (address.city == municipalityCode) return true;
+  /// Compatibility getter for addresses - returns list with single address from direct fields
+  List<Address> get addresses {
+    if (region == null && province == null && municipality == null && barangay == null) {
+      return [];
     }
+    return [
+      Address(
+        id: '${id}_primary',
+        street: '', // No street field in new schema
+        barangay: barangay,
+        city: municipality ?? '',
+        province: province,
+        zipCode: null,
+        isPrimary: true,
+        latitude: null,
+        longitude: null,
+      ),
+    ];
+  }
 
-    return false;
+  /// Compatibility getter for phoneNumbers - returns list with single phone from direct field
+  List<PhoneNumber> get phoneNumbers {
+    if (phone == null || phone!.isEmpty) {
+      return [];
+    }
+    return [
+      PhoneNumber(
+        id: '${id}_primary',
+        number: phone!,
+        label: 'Primary',
+        isPrimary: true,
+      ),
+    ];
   }
 
   Client copyWith({
@@ -132,18 +169,18 @@ class Client {
     String? facebookLink,
     String? agencyId,
     String? userId,
-    List<Address>? addresses,
-    List<PhoneNumber>? phoneNumbers,
+    int? psgcId,
+    String? region,
+    String? province,
+    String? municipality,
+    String? barangay,
+    String? udi,
     List<Touchpoint>? touchpoints,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isStarred,
     bool? loanReleased,
     DateTime? loanReleasedAt,
-    String? psgcId,
-    String? region,
-    String? province,
-    String? barangay,
   }) {
     return Client(
       id: id ?? this.id,
@@ -168,18 +205,18 @@ class Client {
       facebookLink: facebookLink ?? this.facebookLink,
       agencyId: agencyId ?? this.agencyId,
       userId: userId ?? this.userId,
-      addresses: addresses ?? this.addresses,
-      phoneNumbers: phoneNumbers ?? this.phoneNumbers,
+      psgcId: psgcId ?? this.psgcId,
+      region: region ?? this.region,
+      province: province ?? this.province,
+      municipality: municipality ?? this.municipality,
+      barangay: barangay ?? this.barangay,
+      udi: udi ?? this.udi,
       touchpoints: touchpoints ?? this.touchpoints,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isStarred: isStarred ?? this.isStarred,
       loanReleased: loanReleased ?? this.loanReleased,
       loanReleasedAt: loanReleasedAt ?? this.loanReleasedAt,
-      psgcId: psgcId ?? this.psgcId,
-      region: region ?? this.region,
-      province: province ?? this.province,
-      barangay: barangay ?? this.barangay,
     );
   }
 
@@ -207,71 +244,79 @@ class Client {
       'facebookLink': facebookLink,
       'agencyId': agencyId,
       'userId': userId,
-      'addresses': addresses.map((a) => a.toJson()).toList(),
-      'phoneNumbers': phoneNumbers.map((p) => p.toJson()).toList(),
+      'psgcId': psgcId,
+      'region': region,
+      'province': province,
+      'municipality': municipality,
+      'barangay': barangay,
+      'udi': udi,
       'touchpoints': touchpoints.map((t) => t.toJson()).toList(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'isStarred': isStarred,
       'loanReleased': loanReleased,
       'loanReleasedAt': loanReleasedAt?.toIso8601String(),
-      'psgcId': psgcId,
-      'region': region,
-      'province': province,
-      'barangay': barangay,
     };
   }
 
   factory Client.fromJson(Map<String, dynamic> json) {
     return Client(
       id: json['id'] ?? '',
-      firstName: json['firstName'] ?? '',
-      middleName: json['middleName'],
-      lastName: json['lastName'] ?? '',
-      agencyName: json['agencyName'],
+      firstName: json['firstName'] ?? json['first_name'] ?? '',
+      middleName: json['middleName'] ?? json['middle_name'],
+      lastName: json['lastName'] ?? json['last_name'] ?? '',
+      agencyName: json['agencyName'] ?? json['agency_name'],
       department: json['department'],
       position: json['position'],
-      employmentStatus: json['employmentStatus'],
-      payrollDate: json['payrollDate'],
+      employmentStatus: json['employmentStatus'] ?? json['employment_status'],
+      payrollDate: json['payrollDate'] ?? json['payroll_date'],
       tenure: json['tenure'],
-      birthDate: json['birthDate'] != null ? DateTime.parse(json['birthDate']) : null,
+      birthDate: json['birthDate'] != null
+          ? DateTime.parse(json['birthDate'])
+          : (json['birth_date'] != null ? DateTime.parse(json['birth_date']) : null),
       phone: json['phone'] ?? json['contactNumber'] ?? json['phone_number'],
       remarks: json['remarks'],
       clientType: ClientType.values.firstWhere(
-        (e) => e.name == json['clientType'],
+        (e) => e.name == json['clientType'] || e.name == json['client_type'],
         orElse: () => ClientType.potential,
       ),
-      marketType: json['marketType'] != null
+      marketType: json['marketType'] != null || json['market_type'] != null
           ? MarketType.values.firstWhere(
-              (e) => e.name == json['marketType'],
+              (e) => e.name == (json['marketType'] ?? json['market_type']),
               orElse: () => MarketType.residential,
             )
           : null,
       productType: ProductType.values.firstWhere(
-        (e) => e.name == json['productType'],
+        (e) => e.name == json['productType'] || e.name == json['product_type'],
         orElse: () => ProductType.sssPensioner,
       ),
       pensionType: PensionType.values.firstWhere(
-        (e) => e.name == json['pensionType'],
+        (e) => e.name == json['pensionType'] || e.name == json['pension_type'],
         orElse: () => PensionType.none,
       ),
       pan: json['pan'],
       email: json['email'],
-      facebookLink: json['facebookLink'],
-      agencyId: json['agencyId'],
+      facebookLink: json['facebookLink'] ?? json['facebook_link'],
+      agencyId: json['agencyId'] ?? json['agency_id'],
       userId: json['userId'] ?? json['user_id'] ?? json['caravanId'] ?? json['caravan_id'],
-      addresses: (json['addresses'] as List?)?.map((a) => Address.fromJson(a)).toList() ?? [],
-      phoneNumbers: (json['phoneNumbers'] as List?)?.map((p) => PhoneNumber.fromJson(p)).toList() ?? [],
+      psgcId: json['psgcId'] ?? json['psgc_id'] is int ? json['psgc_id'] : (json['psgc_id'] != null ? int.tryParse(json['psgc_id'].toString()) : null),
+      region: json['region'] ?? json['psgc_region'],
+      province: json['province'] ?? json['psgc_province'],
+      municipality: json['municipality'] ?? json['municipality_id'],
+      barangay: json['barangay'] ?? json['psgc_barangay'],
+      udi: json['udi'],
       touchpoints: (json['touchpoints'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
-      isStarred: json['isStarred'] ?? false,
-      loanReleased: json['loanReleased'] ?? false,
-      loanReleasedAt: json['loanReleasedAt'] != null ? DateTime.parse(json['loanReleasedAt']) : null,
-      psgcId: json['psgc_id'] ?? json['psgcId'],
-      region: json['psgc_region'] ?? json['region'],
-      province: json['psgc_province'] ?? json['province'],
-      barangay: json['psgc_barangay'] ?? json['barangay'],
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : (json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now()),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : (json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null),
+      isStarred: json['isStarred'] ?? json['is_starred'] ?? false,
+      loanReleased: json['loanReleased'] ?? json['loan_released'] ?? false,
+      loanReleasedAt: json['loanReleasedAt'] != null
+          ? DateTime.parse(json['loanReleasedAt'])
+          : (json['loan_released_at'] != null ? DateTime.parse(json['loan_released_at']) : null),
     );
   }
 
@@ -327,11 +372,12 @@ class Client {
       remarks: row['remarks'] as String?,
       agencyId: row['agency_id'] as String?,
       userId: row['user_id'] as String? ?? row['caravan_id'] as String?,
-      municipality: row['municipality'] as String?,
-      psgcId: row['psgc_id']?.toString(),
+      psgcId: row['psgc_id'] as int?,
       region: row['region'] as String?,
       province: row['province'] as String?,
+      municipality: row['municipality'] as String?,
       barangay: row['barangay'] as String?,
+      udi: row['udi'] as String?,
       isStarred: (row['is_starred'] as bool?) ?? false,
       loanReleased: (row['loan_released'] as bool?) ?? false,
       loanReleasedAt: row['loan_released_at'] != null
@@ -488,6 +534,9 @@ class Touchpoint {
   final double? timeOutGpsLng;
   final String? timeOutGpsAddress;
 
+  final String? rejectionReason; // NEW: Reason for touchpoint rejection
+  final DateTime? updatedAt; // NEW: Last update timestamp
+
   final DateTime createdAt;
 
   Touchpoint({
@@ -518,6 +567,8 @@ class Touchpoint {
     this.timeOutGpsLat,
     this.timeOutGpsLng,
     this.timeOutGpsAddress,
+    this.rejectionReason, // NEW
+    this.updatedAt, // NEW
     required this.createdAt,
   });
 
@@ -558,6 +609,8 @@ class Touchpoint {
     double? timeOutGpsLat,
     double? timeOutGpsLng,
     String? timeOutGpsAddress,
+    String? rejectionReason, // NEW
+    DateTime? updatedAt, // NEW
     DateTime? createdAt,
   }) {
     return Touchpoint(
@@ -588,6 +641,8 @@ class Touchpoint {
       timeOutGpsLat: timeOutGpsLat ?? this.timeOutGpsLat,
       timeOutGpsLng: timeOutGpsLng ?? this.timeOutGpsLng,
       timeOutGpsAddress: timeOutGpsAddress ?? this.timeOutGpsAddress,
+      rejectionReason: rejectionReason ?? this.rejectionReason, // NEW
+      updatedAt: updatedAt ?? this.updatedAt, // NEW
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -625,6 +680,8 @@ class Touchpoint {
     'time_out_gps_lat': timeOutGpsLat,
     'time_out_gps_lng': timeOutGpsLng,
     'time_out_gps_address': timeOutGpsAddress,
+    'rejection_reason': rejectionReason, // NEW
+    'updated_at': updatedAt?.toIso8601String(), // NEW
     'created_at': createdAt.toIso8601String(),
   };
 
@@ -675,6 +732,10 @@ class Touchpoint {
       timeOutGpsLat: getValue<double>('time_out_gps_lat', 'timeOutGpsLat'),
       timeOutGpsLng: getValue<double>('time_out_gps_lng', 'timeOutGpsLng'),
       timeOutGpsAddress: getValue<String>('time_out_gps_address', 'timeOutGpsAddress'),
+      rejectionReason: getValue<String>('rejection_reason', 'rejectionReason'), // NEW
+      updatedAt: getValue<String>('updated_at', 'updatedAt') != null // NEW
+          ? DateTime.parse(getValue<String>('updated_at', 'updatedAt')!)
+          : null,
       createdAt: getValue<String>('created_at', 'createdAt') != null
           ? DateTime.parse(getValue<String>('created_at', 'createdAt')!)
           : DateTime.now(),

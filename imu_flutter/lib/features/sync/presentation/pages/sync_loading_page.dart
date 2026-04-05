@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:powersync/powersync.dart';
+import 'package:powersync/powersync.dart' hide Column, SyncStatus;
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
@@ -102,7 +104,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   final PowerSyncDatabase _powerSyncDb;
   final SyncPreferencesService _preferencesService;
 
-  StreamSubscription<SyncStatus>? _syncStatusSubscription;
+  StreamSubscription? _syncStatusSubscription;
   bool _hasNavigated = false;
 
   EnhancedSyncLoadingNotifier(this._powerSyncDb)
@@ -149,7 +151,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
           progress: 1.0,
           currentStep: 'Data is up to date',
         );
-        _navigateToHome();
+        // Navigation handled by widget
         return;
       }
     }
@@ -209,7 +211,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 
       // Navigate to home after a short delay
       Future.delayed(const Duration(milliseconds: 500), () {
-        _navigateToHome();
+        // Navigation handled by widget
       });
 
     } catch (e) {
@@ -323,19 +325,6 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     state = state.copyWith(tableStatus: updatedTableStatus);
   }
 
-  void _navigateToHome() {
-    if (_hasNavigated || !mounted) return;
-    _hasNavigated = true;
-
-    logDebug('[SyncLoadingPage] Navigating to home screen');
-    // Use a post-frame callback to ensure the widget is fully built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.go('/home');
-      }
-    });
-  }
-
   @override
   void dispose() {
     _syncStatusSubscription?.cancel();
@@ -373,6 +362,12 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
         ref.listen<EnhancedSyncLoadingState>(enhancedSyncLoadingProvider(db), (prev, next) {
           if (next.syncComplete && !isNavigating && mounted) {
             ref.read(_isNavigatingProvider.notifier).state = true;
+            // Navigate to home after a short delay
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                context.go('/home');
+              }
+            });
           }
         });
 

@@ -882,7 +882,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       // Submit to API as multipart/form-data with timeout and progress tracking
       final dio = Dio();
       final response = await dio.post(
-        '${AppConfig.postgresApiUrl}/api/my-day/visits',
+        '${AppConfig.postgresApiUrl}/my-day/visits',
         data: formData,
         onSendProgress: (sent, total) {
           if (total > 0 && mounted) {

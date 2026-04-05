@@ -198,7 +198,7 @@ Future<void> _initializePowerSyncIfNeeded() async {
       // Note: We can't use LoadingHelper here since we're not in a widget context
       // The loading is shown via the splash screen during initialization
 
-      await PowerSyncService.connect(connector: connector);
+      await PowerSyncService.connect(connector);
       debugPrint('PowerSync auto-connected on app start');
     } else {
       debugPrint('No existing session - checking for stored credentials...');
@@ -219,7 +219,7 @@ Future<void> _initializePowerSyncIfNeeded() async {
             apiUrl: AppConfig.postgresApiUrl,
           );
 
-          await PowerSyncService.connect(connector: connector);
+          await PowerSyncService.connect(connector);
           debugPrint('PowerSync connected after auto-login');
         } else {
           debugPrint('Auto-login failed - user will need to login manually');

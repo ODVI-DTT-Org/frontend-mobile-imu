@@ -81,7 +81,7 @@ class SyncService extends ChangeNotifier {
   Future<void> connectToBackend() async {
     try {
       final connector = _ref.read(powerSyncConnectorProvider);
-      await PowerSyncService.connect(connector: connector);
+      await PowerSyncService.connect(connector);
       logDebug('SyncService: Connected to PowerSync backend');
     } catch (e) {
       logError('SyncService: Failed to connect to PowerSync backend', e);

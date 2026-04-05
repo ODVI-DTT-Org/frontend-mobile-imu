@@ -8,13 +8,12 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../../../shared/providers/app_providers.dart' show
-    currentUserIdProvider,
     clientsProvider,
     onlineClientsProvider,
     onlineClientSearchQueryProvider,
     onlineClientPageProvider,
-    isOnlineProvider;
-import '../../../../shared/providers/filter_providers.dart';
+    isOnlineProvider,
+    assignedMunicipalitiesProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
@@ -173,7 +172,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final assignedMunicipalities = ref.watch(assignedMunicipalitiesProvider);
+    final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
     final isOnline = ref.watch(isOnlineProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
@@ -192,6 +191,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
         // For online mode, get pagination metadata from response
         final onlineMeta = _showMyClientsOnly ? null : (data as ClientsResponse);
+
+        // Get assigned municipalities from async provider
+        final assignedMunicipalities = assignedMunicipalitiesAsync.when(
+          data: (municipalities) => municipalities,
+          loading: () => [],
+          error: (_, __) => [],
+        );
 
         // Filter clients based on selected mode
         _allClients = clients;
@@ -212,8 +218,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
             // Filter by search (local)
             final matchesSearch = query.isEmpty ||
                 client.fullName.toLowerCase().contains(query) ||
-                (client.addresses.isNotEmpty &&
-                 client.addresses.first.city.toLowerCase().contains(query));
+                (client.municipality != null &&
+                 client.municipality!.toLowerCase().contains(query));
 
             return matchesViewMode && matchesSearch;
           } else {
@@ -807,12 +813,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         ? ref.watch(_isInMyDayProvider(client.id!))
         : const AsyncValue.data(false);
 
-    final primaryPhone = client.phoneNumbers.isNotEmpty
-        ? client.phoneNumbers.first.number
-        : null;
-    final primaryAddress = client.addresses.isNotEmpty
-        ? client.addresses.first.fullAddress
-        : null;
+    final primaryPhone = client.phone;
+    final primaryAddress = client.fullAddress;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -949,9 +951,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      client.addresses.isNotEmpty
-                          ? client.addresses.first.street
-                          : 'No address',
+                      client.fullAddress ?? 'No address',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -1017,22 +1017,22 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               // Quick actions and Add button row
               Row(
                 children: [
-                  // Quick actions: Call and Navigate
-                  if (primaryPhone != null)
+                  // Quick actions: Call and Navigate (only in My Clients tab)
+                  if (_showMyClientsOnly && primaryPhone != null)
                     _QuickActionButton(
                       icon: LucideIcons.phone,
                       label: 'Call',
                       onTap: () => _callClient(primaryPhone),
                     ),
-                  if (primaryPhone != null && primaryAddress != null)
+                  if (_showMyClientsOnly && primaryPhone != null && primaryAddress != null)
                     const SizedBox(width: 8),
-                  if (primaryAddress != null)
+                  if (_showMyClientsOnly && primaryAddress != null)
                     _QuickActionButton(
                       icon: LucideIcons.navigation,
                       label: 'Navigate',
                       onTap: () => _navigateToAddress(primaryAddress),
                     ),
-                  if ((primaryPhone != null || primaryAddress != null))
+                  if (_showMyClientsOnly && (primaryPhone != null || primaryAddress != null))
                     const SizedBox(width: 8),
                   // Spacer to push button to the right
                   const Spacer(),

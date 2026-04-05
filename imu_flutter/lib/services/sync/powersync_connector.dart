@@ -96,6 +96,9 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
 
       logDebug('PowerSync credentials fetched successfully');
       logDebug('Creating PowerSyncCredentials with endpoint: $endpoint, userId: $userId');
+      logDebug('PowerSync token length: ${powerSyncToken.length}');
+      logDebug('PowerSync token prefix: ${powerSyncToken.substring(0, 20)}...');
+      logDebug('PowerSync expiresAt: ${expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : "null"}');
 
       // Return credentials with proper userId and expiresAt
       return PowerSyncCredentials(
@@ -138,6 +141,8 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
       }
 
       logDebug('Uploading ${batch.crud.length} operations to backend');
+      logDebug('Upload endpoint: $_apiUrl/upload');
+      logDebug('Token length: ${token.length}');
 
       // Prepare operations for upload
       final operations = batch.crud.map((op) {
@@ -149,6 +154,8 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         };
       }).toList();
 
+      logDebug('Operations prepared: ${operations.length}');
+
       // Send to backend upload endpoint
       final response = await _httpClient.post(
         '$_apiUrl/upload',
@@ -158,15 +165,24 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         ),
       );
 
+      logDebug('Upload response status: ${response.statusCode}');
+      logDebug('Upload response data: ${response.data}');
+
       if (response.statusCode == 200) {
         // Mark batch as complete
         await batch.complete();
         logDebug('Upload completed successfully');
       } else {
+        logError('Upload failed with status: ${response.statusCode}');
+        logError('Upload response body: ${response.data}');
         throw Exception('Upload failed: ${response.statusCode}');
       }
     } on DioException catch (e, stackTrace) {
       logError('Upload failed with DioException', e);
+      logError('DioException type: ${e.type}');
+      logError('DioException message: ${e.message}');
+      logError('DioException response: ${e.response}');
+      logError('DioException response data: ${e.response?.data}');
       // Log non-critical error - upload failures don't block app workflow
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'PowerSync data upload',
@@ -175,17 +191,24 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         context: {
           'errorType': 'DioException',
           'responseStatus': e.response?.statusCode?.toString(),
+          'responseData': e.response?.data?.toString(),
         },
       );
       // Don't complete the batch - will retry on next sync
       rethrow;
     } catch (e, stackTrace) {
       logError('Upload failed', e);
+      logError('Upload error type: ${e.runtimeType}');
+      logError('Upload error message: ${e.toString()}');
       // Log non-critical error - upload failures don't block app workflow
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'PowerSync data upload',
         error: e,
         stackTrace: stackTrace,
+        context: {
+          'errorType': e.runtimeType.toString(),
+          'errorMessage': e.toString(),
+        },
       );
       rethrow;
     }

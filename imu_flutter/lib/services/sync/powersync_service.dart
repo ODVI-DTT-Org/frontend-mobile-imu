@@ -32,7 +32,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('facebook_link'),
     Column.text('remarks'),
     Column.text('agency_id'),
-    Column.text('psgc_id'),
+    Column.integer('psgc_id'), // INTEGER in database schema
     Column.text('province'),
     Column.text('municipality'),
     Column.text('region'),
@@ -89,6 +89,7 @@ const Schema _powerSyncSchema = Schema([
     Column.real('time_out_gps_lng'),
     Column.text('time_out_gps_address'),
     Column.text('rejection_reason'),
+    Column.text('updated_at'), // NEW: Last update timestamp
   ]),
   Table('itineraries', [
     Column.text('user_id'),
@@ -244,21 +245,42 @@ class PowerSyncService {
 
     _isConnecting = true;
     try {
+      logDebug('[PowerSync Connect] Starting connection...');
+      logDebug('[PowerSync Connect] PowerSync URL: ${AppConfig.powerSyncUrl}');
+      logDebug('[PowerSync Connect] Database path: ${await _getDatabasePath()}');
+
       final db = await database;
+      logDebug('[PowerSync Connect] Database instance created');
 
       await db.connect(connector: connector);
       _currentConnector = connector;
       _isConnected = true;
       _isConnecting = false;
-      logDebug('Connected to PowerSync');
-    } catch (e) {
+      logDebug('✅ [PowerSync Connect] Connected to PowerSync successfully');
+    } catch (e, stackTrace) {
       _isConnecting = false;
-      logError('Failed to connect to PowerSync', e);
-      ErrorLoggingHelper.logCriticalError(
+      logError('❌ [PowerSync Connect] Failed to connect to PowerSync', e);
+      logError('[PowerSync Connect] Error type: ${e.runtimeType}');
+      logError('[PowerSync Connect] Error message: ${e.toString()}');
+
+      // Check if it's a SyncResponseException
+      if (e.toString().contains('SyncResponseException')) {
+        logError('[PowerSync Connect] PowerSync service returned error response');
+        logError('[PowerSync Connect] This usually means:');
+        logError('[PowerSync Connect] 1. Database connection failed');
+        logError('[PowerSync Connect] 2. Sync configuration has errors');
+        logError('[PowerSync Connect] 3. PowerSync service internal error');
+      }
+
+      await ErrorLoggingHelper.logCriticalError(
         operation: 'PowerSync connect',
         error: e,
-        stackTrace: StackTrace.current,
-        context: {'powersyncUrl': AppConfig.powerSyncUrl},
+        stackTrace: stackTrace,
+        context: {
+          'powersyncUrl': AppConfig.powerSyncUrl,
+          'errorType': e.runtimeType.toString(),
+          'errorMessage': e.toString(),
+        },
       );
       rethrow;
     }

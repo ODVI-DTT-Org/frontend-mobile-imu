@@ -42,6 +42,8 @@ class Approval {
   final String? role;
   final String? reason;
   final String? notes;
+  final Map<String, dynamic>? updatedClientInformation; // NEW: JSONB field for client changes
+  final String? updatedUdi; // NEW: Updated UDI value
   final String? udiNumber;
   final String? approvedBy;
   final DateTime? approvedAt;
@@ -62,6 +64,8 @@ class Approval {
     this.role,
     this.reason,
     this.notes,
+    this.updatedClientInformation, // NEW
+    this.updatedUdi, // NEW
     this.udiNumber,
     this.approvedBy,
     this.approvedAt,
@@ -84,6 +88,8 @@ class Approval {
       role: json['role'] as String?,
       reason: json['reason'] as String?,
       notes: json['notes'] as String?,
+      updatedClientInformation: json['updated_client_information'] as Map<String, dynamic>?, // NEW
+      updatedUdi: json['updated_udi'] as String?, // NEW
       udiNumber: json['udi_number'] as String?,
       approvedBy: json['approved_by'] as String?,
       approvedAt: json['approved_at'] != null
@@ -113,6 +119,8 @@ class Approval {
       'role': role,
       'reason': reason,
       'notes': notes,
+      'updated_client_information': updatedClientInformation, // NEW
+      'updated_udi': updatedUdi, // NEW
       'udi_number': udiNumber,
       'approved_by': approvedBy,
       'approved_at': approvedAt?.toIso8601String(),

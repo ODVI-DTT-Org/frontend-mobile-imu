@@ -6,27 +6,21 @@ import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
 
-/// Reusable Edit Client Form Widget
+/// Edit Client Form Widget - Aligned with Database Schema
 ///
-/// Can be used as:
-/// 1. Standalone page (EditClientPage)
-/// 2. Modal dialog (from other screens)
-/// 3. Embedded in other views
-///
-/// Features:
-/// - Pre-loads client values from API or local storage
-/// - Categorized sections for better UX
-/// - Online/offline support
-/// - Approval workflow for caravan/tele users
-/// - Comprehensive validation
-class EditClientForm extends ConsumerStatefulWidget {
+/// Uses direct columns instead of nested lists:
+/// - region, province, municipality, barangay (direct fields)
+/// - phone (single field instead of phoneNumbers list)
+/// - udi field added
+/// - All fields match the database schema
+class EditClientFormV2 extends ConsumerStatefulWidget {
   final String clientId;
   final Client? initialClient;
   final Function(Client)? onSave;
   final bool isModal;
   final VoidCallback? onCancel;
 
-  const EditClientForm({
+  const EditClientFormV2({
     super.key,
     required this.clientId,
     this.initialClient,
@@ -36,10 +30,10 @@ class EditClientForm extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<EditClientForm> createState() => _EditClientFormState();
+  ConsumerState<EditClientFormV2> createState() => _EditClientFormV2State();
 }
 
-class _EditClientFormState extends ConsumerState<EditClientForm> {
+class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
   final _formKey = GlobalKey<FormState>();
   final _hiveService = HiveService();
   final _scrollController = ScrollController();
@@ -56,8 +50,23 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
   final _middleNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _facebookController = TextEditingController();
+  final _agencyNameController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _positionController = TextEditingController();
+  final _employmentStatusController = TextEditingController();
+  final _payrollDateController = TextEditingController();
+  final _tenureController = TextEditingController();
+  final _panController = TextEditingController();
+  final _udiController = TextEditingController();
   final _remarksController = TextEditingController();
+
+  // Location controllers
+  final _regionController = TextEditingController();
+  final _provinceController = TextEditingController();
+  final _municipalityController = TextEditingController();
+  final _barangayController = TextEditingController();
 
   // Dropdown values
   String _productType = 'SSS Pensioner';
@@ -65,24 +74,23 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
   String _marketType = 'Residential';
   String _clientType = 'POTENTIAL';
 
-  // Lists
-  final List<Address> _addresses = [];
-  final List<PhoneNumber> _phoneNumbers = [];
+  // Date picker
+  DateTime? _birthDate;
 
   // Section expansion states
   final Map<String, bool> _expandedSections = {
     'basic': true,
     'contact': true,
+    'employment': false,
     'product': true,
-    'address': false,
-    'phone': false,
+    'location': true,
+    'udi': false,
     'remarks': false,
   };
 
   @override
   void initState() {
     super.initState();
-    // Defer loading until after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadClient();
     });
@@ -94,8 +102,21 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
     _middleNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _facebookController.dispose();
+    _agencyNameController.dispose();
+    _departmentController.dispose();
+    _positionController.dispose();
+    _employmentStatusController.dispose();
+    _payrollDateController.dispose();
+    _tenureController.dispose();
+    _panController.dispose();
+    _udiController.dispose();
     _remarksController.dispose();
+    _regionController.dispose();
+    _provinceController.dispose();
+    _municipalityController.dispose();
+    _barangayController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -104,7 +125,6 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
     setState(() => _isLoading = true);
 
     try {
-      // Use initialClient if provided, otherwise fetch
       if (widget.initialClient != null) {
         _client = widget.initialClient;
       } else {
@@ -112,18 +132,16 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
           await _hiveService.init();
         }
 
-        // Try local storage first (offline support)
         final clientData = _hiveService.getClient(widget.clientId);
         if (clientData != null) {
           try {
             _client = Client.fromRow(clientData);
           } catch (e) {
-            debugPrint('[EditClientForm] fromRow failed, trying fromJson: $e');
+            debugPrint('[EditClientFormV2] fromRow failed, trying fromJson: $e');
             _client = Client.fromJson(clientData);
           }
         }
 
-        // If online and no local data, fetch from API
         final isOnline = ref.read(isOnlineProvider);
         if (_client == null && isOnline) {
           final clientApi = ref.read(clientApiServiceProvider);
@@ -141,7 +159,7 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
         }
       }
     } catch (e, stack) {
-      debugPrint('[EditClientForm] Error loading client: $e\n$stack');
+      debugPrint('[EditClientFormV2] Error loading client: $e\n$stack');
       if (mounted) {
         setState(() => _isLoading = false);
         _showErrorDialog('Failed to load client', e);
@@ -153,15 +171,26 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
     if (_client == null) return;
 
     setState(() {
-      // Populate text fields
+      // Basic info
       _firstNameController.text = _client!.firstName;
       _middleNameController.text = _client!.middleName ?? '';
       _lastNameController.text = _client!.lastName;
-      _emailController.text = _client!.email ?? '';
-      _facebookController.text = _client!.facebookLink ?? '';
-      _remarksController.text = _client!.remarks ?? '';
+      _birthDate = _client!.birthDate;
 
-      // Populate dropdowns
+      // Contact info
+      _emailController.text = _client!.email ?? '';
+      _phoneController.text = _client!.phone ?? '';
+      _facebookController.text = _client!.facebookLink ?? '';
+
+      // Employment info
+      _agencyNameController.text = _client!.agencyName ?? '';
+      _departmentController.text = _client!.department ?? '';
+      _positionController.text = _client!.position ?? '';
+      _employmentStatusController.text = _client!.employmentStatus ?? '';
+      _payrollDateController.text = _client!.payrollDate ?? '';
+      _tenureController.text = _client!.tenure?.toString() ?? '';
+
+      // Product info
       _productType = _getProductTypeLabel(_client!.productType);
       _pensionType = _getPensionTypeLabel(_client!.pensionType);
       _marketType = _client!.marketType != null
@@ -169,30 +198,20 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
           : 'Residential';
       _clientType = _client!.clientType.name.toUpperCase();
 
-      // Populate lists
-      _addresses.clear();
-      _addresses.addAll(_client!.addresses);
-      if (_addresses.isEmpty) {
-        _addresses.add(Address(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          street: '',
-          barangay: '',
-          city: '',
-          province: '',
-          isPrimary: true,
-        ),);
-      }
+      // UDI
+      _udiController.text = _client!.udi ?? '';
 
-      _phoneNumbers.clear();
-      _phoneNumbers.addAll(_client!.phoneNumbers);
-      if (_phoneNumbers.isEmpty) {
-        _phoneNumbers.add(PhoneNumber(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          number: '',
-          label: 'Mobile',
-          isPrimary: true,
-        ),);
-      }
+      // Location
+      _regionController.text = _client!.region ?? '';
+      _provinceController.text = _client!.province ?? '';
+      _municipalityController.text = _client!.municipality ?? '';
+      _barangayController.text = _client!.barangay ?? '';
+
+      // PAN
+      _panController.text = _client!.pan ?? '';
+
+      // Remarks
+      _remarksController.text = _client!.remarks ?? '';
     });
   }
 
@@ -246,11 +265,9 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
     }
 
     HapticUtils.mediumImpact();
-
     setState(() => _isSaving = true);
 
     try {
-      // Build updated client object
       final updatedClient = Client(
         id: widget.clientId,
         firstName: _firstNameController.text.trim(),
@@ -261,9 +278,31 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
         email: _emailController.text.trim().isEmpty
             ? null
             : _emailController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
         facebookLink: _facebookController.text.trim().isEmpty
             ? null
             : _facebookController.text.trim(),
+        agencyName: _agencyNameController.text.trim().isEmpty
+            ? null
+            : _agencyNameController.text.trim(),
+        department: _departmentController.text.trim().isEmpty
+            ? null
+            : _departmentController.text.trim(),
+        position: _positionController.text.trim().isEmpty
+            ? null
+            : _positionController.text.trim(),
+        employmentStatus: _employmentStatusController.text.trim().isEmpty
+            ? null
+            : _employmentStatusController.text.trim(),
+        payrollDate: _payrollDateController.text.trim().isEmpty
+            ? null
+            : _payrollDateController.text.trim(),
+        tenure: _tenureController.text.trim().isEmpty
+            ? null
+            : int.tryParse(_tenureController.text.trim()),
+        birthDate: _birthDate,
         remarks: _remarksController.text.trim().isEmpty
             ? null
             : _remarksController.text.trim(),
@@ -271,46 +310,65 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
         pensionType: _parsePensionType(_pensionType),
         marketType: _parseMarketType(_marketType),
         clientType: _parseClientType(_clientType),
+        pan: _panController.text.trim().isEmpty
+            ? null
+            : _panController.text.trim(),
+        udi: _udiController.text.trim().isEmpty
+            ? null
+            : _udiController.text.trim(),
+        region: _regionController.text.trim().isEmpty
+            ? null
+            : _regionController.text.trim(),
+        province: _provinceController.text.trim().isEmpty
+            ? null
+            : _provinceController.text.trim(),
+        municipality: _municipalityController.text.trim().isEmpty
+            ? null
+            : _municipalityController.text.trim(),
+        barangay: _barangayController.text.trim().isEmpty
+            ? null
+            : _barangayController.text.trim(),
         createdAt: _client?.createdAt,
         updatedAt: DateTime.now(),
+        touchpoints: _client?.touchpoints ?? [],
+        isStarred: _client?.isStarred ?? false,
+        loanReleased: _client?.loanReleased ?? false,
+        loanReleasedAt: _client?.loanReleasedAt,
+        agencyId: _client?.agencyId,
+        userId: _client?.userId,
+        psgcId: _client?.psgcId,
       );
 
-      debugPrint('[EditClientForm] Submitting client edit: ${widget.clientId}');
+      debugPrint('[EditClientFormV2] Submitting client edit: ${widget.clientId}');
 
-      // Check connectivity
       final isOnline = ref.read(isOnlineProvider);
 
       if (isOnline) {
-        // Send to backend for approval
-        debugPrint('[EditClientForm] Online - submitting to backend API');
+        debugPrint('[EditClientFormV2] Online - submitting to backend API');
         final clientApi = ref.read(clientApiServiceProvider);
         final result = await clientApi.updateClient(updatedClient);
 
         if (result != null) {
-          debugPrint('[EditClientForm] Client edit submitted successfully');
-          // Update local storage with the response
+          debugPrint('[EditClientFormV2] Client edit submitted successfully');
           await _hiveService.saveClient(widget.clientId, result.toJson());
 
-          // Call onSave callback if provided
           if (widget.onSave != null) {
             widget.onSave!(result);
           }
 
           if (mounted) {
-            _showSuccessSnackBar('Client edit submitted for approval');
+            _showSuccessSnackBar('Client updated successfully');
             if (widget.isModal) {
               Navigator.of(context).pop(true);
             }
           }
         } else {
-          throw Exception('Failed to submit client edit - client not found');
+          throw Exception('Failed to update client - client not found');
         }
       } else {
-        // Offline - save to local storage only
-        debugPrint('[EditClientForm] Offline - saving to local storage only');
+        debugPrint('[EditClientFormV2] Offline - saving to local storage only');
         await _hiveService.saveClient(widget.clientId, updatedClient.toJson());
 
-        // Call onSave callback if provided
         if (widget.onSave != null) {
           widget.onSave!(updatedClient);
         }
@@ -323,10 +381,10 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
         }
       }
     } catch (e, stack) {
-      debugPrint('[EditClientForm] Error: $e\n$stack');
+      debugPrint('[EditClientFormV2] Error: $e\n$stack');
       HapticUtils.error();
       if (mounted) {
-        _showErrorSnackBar('Failed to submit client edit: $e');
+        _showErrorSnackBar('Failed to update client: $e');
       }
     } finally {
       if (mounted) {
@@ -511,6 +569,18 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
 
           const SizedBox(height: 24),
 
+          // Employment Information Section
+          _buildSectionHeader(
+            title: 'Employment Information',
+            icon: LucideIcons.briefcase,
+            sectionKey: 'employment',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildEmploymentSection(colorScheme),
+
+          const SizedBox(height: 24),
+
           // Product Information Section
           _buildSectionHeader(
             title: 'Product Information',
@@ -523,27 +593,27 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
 
           const SizedBox(height: 24),
 
-          // Address Section
+          // Location Section
           _buildSectionHeader(
-            title: 'Address',
+            title: 'Location',
             icon: LucideIcons.mapPin,
-            sectionKey: 'address',
+            sectionKey: 'location',
             color: colorScheme.primary,
           ),
           const SizedBox(height: 12),
-          _buildAddressSection(colorScheme),
+          _buildLocationSection(colorScheme),
 
           const SizedBox(height: 24),
 
-          // Phone Numbers Section
+          // UDI Section
           _buildSectionHeader(
-            title: 'Phone Numbers',
-            icon: LucideIcons.phone,
-            sectionKey: 'phone',
+            title: 'Unified ID (UDI)',
+            icon: LucideIcons.idCard,
+            sectionKey: 'udi',
             color: colorScheme.primary,
           ),
           const SizedBox(height: 12),
-          _buildPhoneNumbersSection(colorScheme),
+          _buildUDISection(colorScheme),
 
           const SizedBox(height: 24),
 
@@ -603,7 +673,6 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
       ),
     );
 
-    // Only wrap in Scaffold for modal mode
     if (widget.isModal) {
       return Scaffold(
         backgroundColor: Colors.white,
@@ -611,7 +680,6 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
       );
     }
 
-    // For page mode, return just the body content
     return formContent;
   }
 
@@ -707,6 +775,40 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
         ),
         const SizedBox(height: 16),
 
+        // Birth Date
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _birthDate ?? DateTime.now(),
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              setState(() => _birthDate = picked);
+            }
+          },
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Birth Date',
+              border: OutlineInputBorder(),
+              isDense: true,
+              suffixIcon: Icon(LucideIcons.calendar, size: 20),
+            ),
+            baseStyle: TextStyle(
+              fontSize: 16,
+              color: _birthDate != null ? Colors.black : Colors.grey,
+            ),
+            child: Text(
+              _birthDate != null
+                  ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
+                  : 'Select birth date',
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
         // Client Type
         const Text(
           'Client Type',
@@ -753,29 +855,17 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Primary Contact (from phoneNumbers list)
+        // Phone
         TextFormField(
-          decoration: InputDecoration(
-            labelText: 'Primary Contact',
+          controller: _phoneController,
+          decoration: const InputDecoration(
+            labelText: 'Phone Number',
             hintText: '+63 912 345 6789',
-            prefixIcon: const Icon(LucideIcons.phone),
-            border: const OutlineInputBorder(),
+            prefixIcon: Icon(LucideIcons.phone),
+            border: OutlineInputBorder(),
             isDense: true,
           ),
           keyboardType: TextInputType.phone,
-          controller: TextEditingController(
-            text: _phoneNumbers.isNotEmpty ? _phoneNumbers.first.number : '',
-          ),
-          onChanged: (value) {
-            if (_phoneNumbers.isNotEmpty) {
-              _phoneNumbers[0] = PhoneNumber(
-                id: _phoneNumbers[0].id,
-                number: value,
-                label: _phoneNumbers[0].label,
-                isPrimary: _phoneNumbers[0].isPrimary,
-              );
-            }
-          },
         ),
         const SizedBox(height: 16),
 
@@ -803,6 +893,97 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
             border: OutlineInputBorder(),
             isDense: true,
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmploymentSection(ColorScheme colorScheme) {
+    if (!_expandedSections['employment']!) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _agencyNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Agency Name',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _departmentController,
+                decoration: const InputDecoration(
+                  labelText: 'Department',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _positionController,
+                decoration: const InputDecoration(
+                  labelText: 'Position',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _employmentStatusController,
+                decoration: const InputDecoration(
+                  labelText: 'Employment Status',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _payrollDateController,
+                decoration: const InputDecoration(
+                  labelText: 'Payroll Date',
+                  hintText: 'YYYY-MM-DD',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _tenureController,
+                decoration: const InputDecoration(
+                  labelText: 'Tenure (months)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -847,7 +1028,6 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
                       if (value != null) {
                         HapticUtils.lightImpact();
                         setState(() => _productType = value);
-                        // Auto-set pension type
                         if (value == 'SSS Pensioner') {
                           _pensionType = 'SSS';
                         } else if (value == 'GSIS Pensioner') {
@@ -926,99 +1106,85 @@ class _EditClientFormState extends ConsumerState<EditClientForm> {
     );
   }
 
-  Widget _buildAddressSection(ColorScheme colorScheme) {
-    if (!_expandedSections['address']!) return const SizedBox.shrink();
+  Widget _buildLocationSection(ColorScheme colorScheme) {
+    if (!_expandedSections['location']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ..._addresses.asMap().entries.map((entry) {
-          final index = entry.key;
-          final address = entry.value;
-          return _AddressEditField(
-            address: address,
-            onChanged: (updated) {
-              setState(() {
-                _addresses[index] = updated;
-              });
-            },
-            onRemove: _addresses.length > 1
-                ? () {
-                    HapticUtils.lightImpact();
-                    setState(() {
-                      _addresses.removeAt(index);
-                    });
-                  }
-                : null,
-            colorScheme: colorScheme,
-          );
-        }),
-        const SizedBox(height: 8),
-        TextButton.icon(
-          onPressed: () {
-            HapticUtils.lightImpact();
-            setState(() {
-              _addresses.add(Address(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                street: '',
-                barangay: '',
-                city: '',
-                province: '',
-                isPrimary: _addresses.isEmpty,
-              ));
-            });
-          },
-          icon: const Icon(LucideIcons.plus, size: 18),
-          label: const Text('Add Address'),
-          style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _regionController,
+                decoration: const InputDecoration(
+                  labelText: 'Region',
+                  hintText: 'e.g., NCR, Region I',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _provinceController,
+                decoration: const InputDecoration(
+                  labelText: 'Province',
+                  hintText: 'e.g., Metro Manila',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _municipalityController,
+                decoration: const InputDecoration(
+                  labelText: 'Municipality',
+                  hintText: 'e.g., Cebu City',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _barangayController,
+                decoration: const InputDecoration(
+                  labelText: 'Barangay',
+                  hintText: 'e.g., Luz',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildPhoneNumbersSection(ColorScheme colorScheme) {
-    if (!_expandedSections['phone']!) return const SizedBox.shrink();
+  Widget _buildUDISection(ColorScheme colorScheme) {
+    if (!_expandedSections['udi']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ..._phoneNumbers.asMap().entries.map((entry) {
-          final index = entry.key;
-          final phone = entry.value;
-          return _PhoneEditField(
-            phone: phone,
-            onChanged: (updated) {
-              setState(() {
-                _phoneNumbers[index] = updated;
-              });
-            },
-            onRemove: _phoneNumbers.length > 1
-                ? () {
-                    HapticUtils.lightImpact();
-                    setState(() {
-                      _phoneNumbers.removeAt(index);
-                    });
-                  }
-                : null,
-            colorScheme: colorScheme,
-          );
-        }),
-        const SizedBox(height: 8),
-        TextButton.icon(
-          onPressed: () {
-            HapticUtils.lightImpact();
-            setState(() {
-              _phoneNumbers.add(PhoneNumber(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                number: '',
-                label: 'Mobile',
-                isPrimary: _phoneNumbers.isEmpty,
-              ));
-            });
-          },
-          icon: const Icon(LucideIcons.plus, size: 18),
-          label: const Text('Add Phone'),
-          style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
+        TextFormField(
+          controller: _udiController,
+          decoration: const InputDecoration(
+            labelText: 'Unified ID (UDI)',
+            hintText: 'Enter UDI',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
         ),
       ],
     );
@@ -1073,213 +1239,6 @@ class _ClientTypeButton extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AddressEditField extends StatelessWidget {
-  final Address address;
-  final Function(Address) onChanged;
-  final VoidCallback? onRemove;
-  final ColorScheme colorScheme;
-
-  const _AddressEditField({
-    required this.address,
-    required this.onChanged,
-    this.onRemove,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  initialValue: address.street,
-                  decoration: const InputDecoration(
-                    labelText: 'Street',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    onChanged(Address(
-                      id: address.id,
-                      street: value,
-                      barangay: address.barangay,
-                      city: address.city,
-                      province: address.province,
-                      isPrimary: address.isPrimary,
-                    ));
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  initialValue: address.barangay,
-                  decoration: const InputDecoration(
-                    labelText: 'Barangay',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    onChanged(Address(
-                      id: address.id,
-                      street: address.street,
-                      barangay: value,
-                      city: address.city,
-                      province: address.province,
-                      isPrimary: address.isPrimary,
-                    ));
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  initialValue: address.city,
-                  decoration: const InputDecoration(
-                    labelText: 'City',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    onChanged(Address(
-                      id: address.id,
-                      street: address.street,
-                      barangay: address.barangay,
-                      city: value,
-                      province: address.province,
-                      isPrimary: address.isPrimary,
-                    ));
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  initialValue: address.province,
-                  decoration: const InputDecoration(
-                    labelText: 'Province',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    onChanged(Address(
-                      id: address.id,
-                      street: address.street,
-                      barangay: address.barangay,
-                      city: address.city,
-                      province: value,
-                      isPrimary: address.isPrimary,
-                    ));
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PhoneEditField extends StatelessWidget {
-  final PhoneNumber phone;
-  final Function(PhoneNumber) onChanged;
-  final VoidCallback? onRemove;
-  final ColorScheme colorScheme;
-
-  const _PhoneEditField({
-    required this.phone,
-    required this.onChanged,
-    this.onRemove,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 110,
-            child: DropdownButtonFormField<String>(
-              value: phone.label,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              ),
-              items: ['Mobile', 'Home', 'Work', 'Other']
-                  .map((label) => DropdownMenuItem(
-                        value: label,
-                        child: Text(label),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  onChanged(PhoneNumber(
-                    id: phone.id,
-                    number: phone.number,
-                    label: value,
-                    isPrimary: phone.isPrimary,
-                  ));
-                }
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextFormField(
-              initialValue: phone.number,
-              decoration: const InputDecoration(
-                hintText: '+63 912 345 6789',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: TextInputType.phone,
-              onChanged: (value) {
-                onChanged(PhoneNumber(
-                  id: phone.id,
-                  number: value,
-                  label: phone.label,
-                  isPrimary: phone.isPrimary,
-                ));
-              },
-            ),
-          ),
-          if (onRemove != null) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(LucideIcons.x, size: 18),
-              onPressed: onRemove,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              style: IconButton.styleFrom(
-                foregroundColor: Colors.grey[600],
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }

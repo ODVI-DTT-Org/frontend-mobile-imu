@@ -539,12 +539,8 @@ final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
 
         // Check if overdue
         if (DateTime.now().isAfter(scheduledDate)) {
-          final primaryPhone = client.phoneNumbers.isNotEmpty
-              ? client.phoneNumbers.first.number
-              : null;
-          final primaryAddress = client.addresses.isNotEmpty
-              ? client.addresses.first.fullAddress
-              : null;
+          final primaryPhone = client.phone;
+          final primaryAddress = client.fullAddress;
 
           if (client.id == null) continue; // Skip clients without ID
           missedVisits.add(MissedVisit(

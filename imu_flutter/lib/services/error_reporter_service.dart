@@ -209,7 +209,7 @@ class ErrorReporterService {
       final lastFingerprints = jsonDecode(lastFingerprintsJson) as Map<String, dynamic>;
       final lastSeen = lastFingerprints[fingerprint] as String?;
 
-      if (lastSeen == null) {
+      if (lastSeen == null || lastSeen.isEmpty) {
         return false;
       }
 
@@ -246,7 +246,9 @@ class ErrorReporterService {
       final now = DateTime.now();
       lastFingerprints.removeWhere((key, value) {
         try {
-          final timestamp = DateTime.parse(value as String);
+          final valueStr = value as String?;
+          if (valueStr == null) return true; // Remove null entries
+          final timestamp = DateTime.parse(valueStr);
           return now.difference(timestamp).inSeconds > 60;
         } catch (e) {
           return true; // Remove invalid entries
@@ -256,7 +258,13 @@ class ErrorReporterService {
       // Keep only last 100 fingerprints to prevent memory bloat
       if (lastFingerprints.length > 100) {
         final entries = lastFingerprints.entries.toList()
-          ..sort((a, b) => (a.value as String).compareTo(b.value as String));
+          ..sort((a, b) {
+            final aValue = a.value as String?;
+            final bValue = b.value as String?;
+            if (aValue == null) return 1;
+            if (bValue == null) return -1;
+            return aValue.compareTo(bValue);
+          });
         final toRemove = entries.take(lastFingerprints.length - 100);
         for (final entry in toRemove) {
           lastFingerprints.remove(entry.key);

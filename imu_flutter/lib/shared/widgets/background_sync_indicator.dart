@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:powersync/powersync.dart';
+import 'package:powersync/powersync.dart' hide Column;
 import '../../services/api/background_sync_service.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/connectivity_service.dart';
@@ -29,7 +29,13 @@ class BackgroundSyncIndicator extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncStatus = ref.watch(backgroundSyncStatusProvider);
-    final connectivityStatus = ref.watch(connectivityStatusProvider);
+    final connectivityStatusAsync = ref.watch(connectivityStatusProvider);
+
+    // Extract connectivity status from AsyncValue, default to online
+    final connectivityStatus = connectivityStatusAsync.maybeWhen(
+      data: (status) => status,
+      orElse: () => ConnectivityStatus.online,
+    );
 
     return GestureDetector(
       onTap: onTap ?? () => _handleTap(context, ref, syncStatus),
@@ -196,8 +202,14 @@ class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackground
   Widget build(BuildContext context) {
     final syncStatus = ref.watch(backgroundSyncStatusProvider);
     final syncService = ref.watch(backgroundSyncServiceProvider);
-    final connectivityStatus = ref.watch(connectivityStatusProvider);
+    final connectivityStatusAsync = ref.watch(connectivityStatusProvider);
     final powerSyncDbAsync = ref.watch(powerSyncDatabaseProvider);
+
+    // Extract connectivity status from AsyncValue, default to online
+    final connectivityStatus = connectivityStatusAsync.maybeWhen(
+      data: (status) => status,
+      orElse: () => ConnectivityStatus.online,
+    );
 
     return Container(
       decoration: const BoxDecoration(

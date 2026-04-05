@@ -104,9 +104,10 @@ streams:
       - SELECT t.id, t.client_id, t.user_id, t.touchpoint_number, t.type,
           t.date, t.time_arrival, t.time_departure, t.reason, t.status, t.notes,
           t.photo_path, t.audio_path,
-          t.time_in_gps_lat, t.time_in_gps_lng, t.time_in_gps_address,
-          t.time_out_gps_lat, t.time_out_gps_lng, t.time_out_gps_address,
-          t.created_at, t.updated_at
+          t.latitude, t.longitude,
+          t.time_in, t.time_in_gps_lat, t.time_in_gps_lng, t.time_in_gps_address,
+          t.time_out, t.time_out_gps_lat, t.time_out_gps_lng, t.time_out_gps_address,
+          t.rejection_reason, t.created_at, t.updated_at
         FROM touchpoints t
         WHERE EXISTS (
           SELECT 1 FROM clients c
@@ -134,7 +135,9 @@ streams:
     auto_subscribe: true
     queries:
       - SELECT a.id, a.type, a.status, a.client_id, a.touchpoint_number,
-          a.role, a.reason, a.notes, a.approved_by, a.approved_at,
+          a.role, a.reason, a.notes,
+          a.updated_client_information, a.updated_udi, a.udi_number,
+          a.approved_by, a.approved_at, a.rejected_by, a.rejected_at, a.rejection_reason,
           a.created_at, a.updated_at
         FROM approvals a
         WHERE a.role = auth.user_id()

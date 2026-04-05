@@ -122,6 +122,7 @@ class PsgcBarangay {
   final String province;
   final String municipality;
   final String barangay;
+  final String? municipalityKind; // NEW: mun_city_kind from database (e.g., 'Municipality', 'City')
   final String? zipCode;
   final Map<String, dynamic>? pinLocation;
 
@@ -131,6 +132,7 @@ class PsgcBarangay {
     required this.province,
     required this.municipality,
     required this.barangay,
+    this.municipalityKind, // NEW
     this.zipCode,
     this.pinLocation,
   });
@@ -142,6 +144,7 @@ class PsgcBarangay {
       province: json['province'] ?? '',
       municipality: json['municipality'] ?? '',
       barangay: json['barangay'] ?? '',
+      municipalityKind: json['municipality_kind'] ?? json['kind'], // NEW
       zipCode: json['zip_code'],
       pinLocation: json['pin_location'],
     );
@@ -159,6 +162,7 @@ class PsgcBarangay {
     'province': province,
     'municipality': municipality,
     'barangay': barangay,
+    'municipality_kind': municipalityKind, // NEW
     'zip_code': zipCode,
     'pin_location': pinLocation,
   };
