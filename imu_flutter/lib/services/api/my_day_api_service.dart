@@ -96,8 +96,21 @@ class MyDayApiService {
       return response.data['message'] == 'Client added to My Day';
     } on DioException catch (e) {
       debugPrint('Error adding to my day: ${e.message}');
+      debugPrint('Error adding to my day: Response - ${e.response?.data}');
+
+      // Extract error message from backend response
+      String errorMessage = 'Network error: ${e.message}';
+      if (e.response?.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        if (data.containsKey('message')) {
+          errorMessage = data['message'].toString();
+        } else if (data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        }
+      }
+
       throw ApiException(
-        message: 'Network error: ${e.message}',
+        message: errorMessage,
         originalError: e,
       );
     } catch (e) {

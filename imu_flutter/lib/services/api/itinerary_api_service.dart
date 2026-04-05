@@ -523,8 +523,20 @@ class ItineraryApiService {
     } on DioException catch (e) {
       debugPrint('ItineraryApiService: DioException - ${e.message}');
       debugPrint('ItineraryApiService: Response - ${e.response?.data}');
+
+      // Extract error message from backend response
+      String errorMessage = 'Network error: ${e.message}';
+      if (e.response?.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        if (data.containsKey('message')) {
+          errorMessage = data['message'].toString();
+        } else if (data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        }
+      }
+
       throw ApiException(
-        message: 'Network error: ${e.message}',
+        message: errorMessage,
         originalError: e,
       );
     } catch (e) {
