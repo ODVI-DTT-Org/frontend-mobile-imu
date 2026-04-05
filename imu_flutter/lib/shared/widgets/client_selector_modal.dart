@@ -8,9 +8,11 @@ import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart';
+import '../../models/client_status.dart';
 import '../../services/api/my_day_api_service.dart';
 import '../../services/api/itinerary_api_service.dart';
 import '../../services/api/api_exception.dart';
+import '../../services/sync/powersync_service.dart';
 import '../../shared/providers/app_providers.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
@@ -65,11 +67,17 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   String? _error;
   String _clientFilter = 'assigned'; // 'assigned' or 'all'
 
+  // NEW: Status tracking state
+  Map<String, ClientStatus> _clientStatuses = {};
+  bool _isLoadingStatuses = true;
+  bool _hasStatusError = false;
+
   @override
   void initState() {
     super.initState();
     _loadClients();
     _searchController.addListener(_onSearchChanged);
+    _loadClientStatuses(); // NEW: Load status information
   }
 
   @override
@@ -229,6 +237,102 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   List<Client> get _displayableClients {
     // Hide loan released clients from the list
     return _filteredClients.where((client) => !client.loanReleased).toList();
+  }
+
+  Future<void> _loadClientStatuses() async {
+    if (_clients.isEmpty) return; // Wait for clients to load first
+
+    setState(() {
+      _isLoadingStatuses = true;
+      _hasStatusError = false;
+    });
+
+    try {
+      final isOnline = ref.read(isOnlineProvider);
+      final today = DateTime.now();
+
+      if (isOnline) {
+        // Use API when online
+        await _loadStatusesFromAPI(today);
+      } else {
+        // Use PowerSync when offline
+        await _loadStatusesFromPowerSync(today);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasStatusError = true;
+          _isLoadingStatuses = false;
+        });
+        debugPrint('Error loading client statuses: $e');
+      }
+    }
+  }
+
+  Future<void> _loadStatusesFromAPI(DateTime today) async {
+    try {
+      final myDayApi = MyDayApiService();
+      final todayClients = await myDayApi.fetchMyDayClients(today);
+
+      final statuses = <String, ClientStatus>{};
+      for (final client in _clients) {
+        final inItinerary = todayClients.any((c) => c.clientId == client.id);
+        statuses[client.id!] = ClientStatus(
+          inItinerary: inItinerary,
+          loanReleased: client.loanReleased,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _clientStatuses = statuses;
+          _isLoadingStatuses = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('API status load failed, falling back to PowerSync: $e');
+      await _loadStatusesFromPowerSync(today);
+    }
+  }
+
+  Future<void> _loadStatusesFromPowerSync(DateTime today) async {
+    try {
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final todayClients = await PowerSyncService.query('''
+        SELECT client_id FROM itineraries
+        WHERE scheduled_date = ?
+      ''', [todayStr]);
+
+      final inItineraryIds = todayClients.map((row) => row['client_id'] as String).toSet();
+
+      final statuses = <String, ClientStatus>{};
+      for (final client in _clients) {
+        statuses[client.id!] = ClientStatus(
+          inItinerary: inItineraryIds.contains(client.id),
+          loanReleased: client.loanReleased,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _clientStatuses = statuses;
+          _isLoadingStatuses = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('PowerSync status load failed: $e');
+      if (mounted) {
+        setState(() {
+          _hasStatusError = true;
+          _isLoadingStatuses = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryLoadStatuses() async {
+    await _loadClientStatuses();
   }
 
   Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
