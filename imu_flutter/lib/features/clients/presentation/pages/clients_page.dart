@@ -19,12 +19,7 @@ import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
 import '../providers/clients_provider.dart';
-
-// Provider to check if client is in My Day
-final _isInMyDayProvider = FutureProvider.family<bool, String>((ref, clientId) async {
-  final myDayApiService = ref.watch(myDayApiServiceProvider);
-  return await myDayApiService.isInMyDay(clientId);
-});
+import '../../../../services/api/itinerary_api_service.dart';
 
 class ClientsPage extends ConsumerStatefulWidget {
   const ClientsPage({super.key});
@@ -167,7 +162,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       if (success && mounted) {
         HapticUtils.success();
         showToast('${client.fullName} added to My Day');
-        ref.invalidate(_isInMyDayProvider(client.id!));
+        ref.invalidate(todayItineraryProvider);
       }
     } catch (e) {
       if (mounted) {
@@ -815,10 +810,23 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         : null;
     final isFirstTime = client.touchpoints.isEmpty;
 
-    final myDayApiService = ref.watch(myDayApiServiceProvider);
-    final isInMyDayValue = client.id != null
-        ? ref.watch(_isInMyDayProvider(client.id!))
-        : const AsyncValue.data(false);
+    // Check if client is in today's itinerary using local data
+    final todayItineraryAsync = ref.watch(todayItineraryProvider);
+    final today = DateTime.now();
+
+    bool isInMyDay = false;
+    todayItineraryAsync.when(
+      data: (items) {
+        isInMyDay = items.any((item) =>
+          item.clientId == client.id &&
+          item.scheduledDate.year == today.year &&
+          item.scheduledDate.month == today.month &&
+          item.scheduledDate.day == today.day
+        );
+      },
+      loading: () => isInMyDay = false,
+      error: (_, __) => isInMyDay = false,
+    );
 
     final primaryPhone = client.phone;
     final primaryAddress = client.fullAddress;
@@ -908,7 +916,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if ((isInMyDayValue.value ?? false) == true)
+                        if (isInMyDay)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -1044,7 +1052,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                   // Spacer to push button to the right
                   const Spacer(),
                   // "Add to My Day" button
-                  if ((isInMyDayValue.value ?? false) == true)
+                  if (isInMyDay)
                     Icon(
                       LucideIcons.checkCircle,
                       size: 20,
