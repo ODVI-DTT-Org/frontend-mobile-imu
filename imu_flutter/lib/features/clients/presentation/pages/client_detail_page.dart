@@ -3,27 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:convert';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
-import '../../../../services/sync/sync_service.dart';
 import '../../../../services/api/client_api_service.dart';
-import '../../../../services/api/touchpoint_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/auth/auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
-import '../../../../services/connectivity_service.dart';
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
-import '../../../../shared/widgets/permission_widgets.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart';
-import '../../../../core/models/user_role.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
 // Client detail provider
@@ -163,7 +157,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Widget _buildSkeletonLoading() {
     // Skeleton box widget for shimmer effect
-    Container skeletonBox({
+    Widget skeletonBox({
       required double width,
       required double height,
       Color? color,
