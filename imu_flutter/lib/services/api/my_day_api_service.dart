@@ -88,7 +88,7 @@ class MyDayApiService {
         ),
         data: {
           'client_id': clientId,
-          if (scheduledDate != null) 'scheduled_date': scheduledDate.toIso8601String().split('T').first,
+          if (scheduledDate != null) 'scheduled_date': '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}',
           if (scheduledTime != null) 'scheduled_time': scheduledTime,
           'priority': priority,
           if (notes != null) 'notes': notes,
@@ -530,6 +530,98 @@ class MyDayApiService {
       debugPrint('MyDayApiService: Unexpected error - $e');
       throw ApiException(
         message: 'Failed to submit visit form',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Complete visit - unified endpoint that handles touchpoint creation and itinerary completion
+  /// This replaces the separate submitVisitForm + itinerary update calls
+  Future<Map<String, dynamic>> completeVisit({
+    required String clientId,
+    required int touchpointNumber,
+    required String type,
+    required String reason,
+    String? status,
+    String? address,
+    String? timeArrival,
+    String? timeDeparture,
+    String? odometerArrival,
+    String? odometerDeparture,
+    String? nextVisitDate,
+    String? notes,
+    double? latitude,
+    double? longitude,
+    String? scheduledTime,
+    String? photoPath,
+    String? audioPath,
+  }) async {
+    try {
+      debugPrint('MyDayApiService: Completing visit for client $clientId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      // Create multipart form data
+      final formData = FormData();
+      formData.fields.add(MapEntry('client_id', clientId));
+      formData.fields.add(MapEntry('touchpoint_number', touchpointNumber.toString()));
+      formData.fields.add(MapEntry('type', type));
+      formData.fields.add(MapEntry('reason', reason));
+      if (status != null) formData.fields.add(MapEntry('status', status));
+      if (address != null) formData.fields.add(MapEntry('address', address));
+      if (timeArrival != null) formData.fields.add(MapEntry('time_arrival', timeArrival));
+      if (timeDeparture != null) formData.fields.add(MapEntry('time_departure', timeDeparture));
+      if (odometerArrival != null) formData.fields.add(MapEntry('odometer_arrival', odometerArrival));
+      if (odometerDeparture != null) formData.fields.add(MapEntry('odometer_departure', odometerDeparture));
+      if (nextVisitDate != null) formData.fields.add(MapEntry('next_visit_date', nextVisitDate));
+      if (notes != null) formData.fields.add(MapEntry('notes', notes));
+      if (latitude != null) formData.fields.add(MapEntry('latitude', latitude.toString()));
+      if (longitude != null) formData.fields.add(MapEntry('longitude', longitude.toString()));
+      if (scheduledTime != null) formData.fields.add(MapEntry('scheduled_time', scheduledTime));
+
+      // Attach files if provided
+      if (photoPath != null) {
+        final photoFile = await MultipartFile.fromFile(photoPath, filename: photoPath.split('/').last);
+        formData.files.add(MapEntry('photo', photoFile));
+      }
+      if (audioPath != null) {
+        final audioFile = await MultipartFile.fromFile(audioPath, filename: audioPath.split('/').last);
+        formData.files.add(MapEntry('audio', audioFile));
+      }
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/my-day/complete-visit',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('MyDayApiService: Visit completed successfully');
+        return response.data as Map<String, dynamic>;
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to complete visit: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to complete visit',
         originalError: e,
       );
     }

@@ -569,7 +569,7 @@ class ItineraryApiService {
 
       final requestData = {
         if (clientId != null) 'client_id': clientId,
-        if (scheduledDate != null) 'scheduled_date': scheduledDate.toIso8601String().split('T').first,
+        if (scheduledDate != null) 'scheduled_date': '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}',
         if (scheduledTime != null) 'scheduled_time': scheduledTime,
         if (status != null) 'status': status,
         if (priority != null) 'priority': priority,
@@ -674,6 +674,7 @@ class ItineraryApiService {
       }
 
       final today = DateTime.now();
+      final localToday = DateTime(today.year, today.month, today.day);
       final pastDate = today.subtract(const Duration(days: 30));
       final dateStr = '${pastDate.year}-${pastDate.month.toString().padLeft(2, '0')}-${pastDate.day.toString().padLeft(2, '0')}';
 
@@ -687,7 +688,7 @@ class ItineraryApiService {
         ),
         queryParameters: {
           'start_date': dateStr,
-          'end_date': today.toIso8601String().split('T').first,
+          'end_date': '${localToday.year}-${localToday.month.toString().padLeft(2, '0')}-${localToday.day.toString().padLeft(2, '0')}',
           'status': 'pending',
         },
       );

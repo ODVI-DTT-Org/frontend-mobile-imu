@@ -479,9 +479,11 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       data: (items) {
         final filteredItems = items.where((item) {
           final itemDate = item.scheduledDate;
-          return itemDate.year == targetDate.year &&
+          final dateMatches = itemDate.year == targetDate.year &&
                  itemDate.month == targetDate.month &&
                  itemDate.day == targetDate.day;
+          final isNotCompleted = item.status != 'completed';
+          return dateMatches && isNotCompleted;
         }).toList();
 
         final visit = filteredItems.firstWhere((v) => v.id == visitId, orElse: null);
@@ -509,9 +511,11 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           data: (items) {
             final filteredItems = items.where((item) {
               final itemDate = item.scheduledDate;
-              return itemDate.year == targetDate.year &&
+              final dateMatches = itemDate.year == targetDate.year &&
                      itemDate.month == targetDate.month &&
                      itemDate.day == targetDate.day;
+              final isNotCompleted = item.status != 'completed';
+              return dateMatches && isNotCompleted;
             }).toList();
 
             final index = filteredItems.indexWhere((v) => v.id == visitId);
@@ -786,12 +790,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                     debugPrint('[ItineraryPage] item: ${item.clientName} - scheduledDate: $itemDate (${itemDate.year}-${itemDate.month}-${itemDate.day}) -> matches: $matches');
                   }
 
-                  // Filter items for the selected date
+                  // Filter items for the selected date and exclude completed visits
                   final filteredItems = items.where((item) {
                     final itemDate = item.scheduledDate;
-                    return itemDate.year == targetDate.year &&
+                    final dateMatches = itemDate.year == targetDate.year &&
                            itemDate.month == targetDate.month &&
                            itemDate.day == targetDate.day;
+                    final isNotCompleted = item.status != 'completed';
+                    return dateMatches && isNotCompleted;
                   }).toList();
 
                   debugPrint('[ItineraryPage] Filtered ${filteredItems.length} items for ${_getSelectedTabLabel()}');
@@ -1663,7 +1669,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
             'clientName': _clientNameController.text,
             'address': _addressController.text,
             'notes': _notesController.text,
-            'date': _selectedDate.toIso8601String().split('T')[0],
+            'date': '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
             'timeArrival': _formatTime(_timeArrival),
             'timeDeparture': _formatTime(_timeDeparture),
             'productType': _productType,

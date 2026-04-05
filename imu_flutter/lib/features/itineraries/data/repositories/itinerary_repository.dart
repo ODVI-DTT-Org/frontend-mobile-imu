@@ -142,7 +142,7 @@ class ItineraryRepository {
   Stream<List<Itinerary>> watchDateItineraries(DateTime date) async* {
     try {
       final db = await PowerSyncService.database;
-      final dateStr = date.toIso8601String().split('T').first;
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       await for (final row in db.watch(
         'SELECT * FROM itineraries WHERE DATE(scheduled_date) = ? ORDER BY scheduled_time ASC',
         parameters: [dateStr],
@@ -204,7 +204,7 @@ class ItineraryRepository {
   Future<List<Itinerary>> getDateItineraries(DateTime date) async {
     try {
       final db = await PowerSyncService.database;
-      final dateStr = date.toIso8601String().split('T').first;
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       final results = await db.getAll(
         'SELECT * FROM itineraries WHERE DATE(scheduled_date) = ? ORDER BY scheduled_time ASC',
         [dateStr],

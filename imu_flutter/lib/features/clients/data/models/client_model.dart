@@ -261,6 +261,18 @@ class Client {
     };
   }
 
+  /// Helper to parse boolean values from various types (bool, int, String)
+  static bool _parseBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) {
+      final lower = value.toLowerCase();
+      return lower == 'true' || lower == '1';
+    }
+    return false;
+  }
+
   factory Client.fromJson(Map<String, dynamic> json) {
     return Client(
       id: json['id'] ?? '',
@@ -301,7 +313,7 @@ class Client {
       facebookLink: json['facebookLink'] ?? json['facebook_link'],
       agencyId: json['agencyId'] ?? json['agency_id'],
       userId: json['userId'] ?? json['user_id'] ?? json['caravanId'] ?? json['caravan_id'],
-      psgcId: json['psgcId'] ?? json['psgc_id'] is int ? json['psgc_id'] : (json['psgc_id'] != null ? int.tryParse(json['psgc_id'].toString()) : null),
+      psgcId: json['psgcId'] ?? (json['psgc_id'] is int ? json['psgc_id'] : (json['psgc_id'] != null ? int.tryParse(json['psgc_id'].toString()) : null)),
       region: json['region'] ?? json['psgc_region'],
       province: json['province'] ?? json['psgc_province'],
       municipality: json['municipality'] ?? json['municipality_id'],
@@ -314,8 +326,8 @@ class Client {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : (json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null),
-      isStarred: json['isStarred'] ?? json['is_starred'] ?? false,
-      loanReleased: json['loanReleased'] ?? json['loan_released'] ?? false,
+      isStarred: _parseBool(json['isStarred'] ?? json['is_starred']),
+      loanReleased: _parseBool(json['loanReleased'] ?? json['loan_released']),
       loanReleasedAt: json['loanReleasedAt'] != null
           ? DateTime.parse(json['loanReleasedAt'])
           : (json['loan_released_at'] != null ? DateTime.parse(json['loan_released_at']) : null),
