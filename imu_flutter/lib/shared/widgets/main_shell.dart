@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/haptic_utils.dart';
+import '../../services/sync/powersync_service.dart';
+import '../../services/connectivity_service.dart';
 import 'background_sync_indicator.dart';
 
 class MainShell extends StatelessWidget {
@@ -45,13 +47,12 @@ class _SyncStatusOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: () {
-        // Show sync status sheet
+        // Show enhanced sync status sheet
         showModalBottomSheet(
           context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          builder: (context) => const BackgroundSyncSheet(),
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const EnhancedBackgroundSyncSheet(),
         );
       },
       child: const BackgroundSyncIndicator(

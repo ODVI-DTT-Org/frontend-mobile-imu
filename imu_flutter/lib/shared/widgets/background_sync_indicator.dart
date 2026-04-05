@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:powersync/powersync.dart';
 import '../../services/api/background_sync_service.dart';
+import '../../services/sync/powersync_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../core/config/app_config.dart';
+import '../../core/utils/logger.dart';
 
 /// Compact background sync indicator widget
 ///
@@ -24,31 +29,32 @@ class BackgroundSyncIndicator extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncStatus = ref.watch(backgroundSyncStatusProvider);
+    final connectivityStatus = ref.watch(connectivityStatusProvider);
 
     return GestureDetector(
       onTap: onTap ?? () => _handleTap(context, ref, syncStatus),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: _getBackgroundColor(syncStatus),
+          color: _getBackgroundColor(syncStatus, connectivityStatus),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _getBorderColor(syncStatus),
+            color: _getBorderColor(syncStatus, connectivityStatus),
             width: 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildIcon(syncStatus),
+            _buildIcon(syncStatus, connectivityStatus),
             if (showLabel || (showPendingCount && syncStatus.pendingCount > 0)) ...[
               const SizedBox(width: 6),
               Text(
-                _getLabel(syncStatus),
+                _getLabel(syncStatus, connectivityStatus),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: _getTextColor(syncStatus),
+                  color: _getTextColor(syncStatus, connectivityStatus),
                 ),
               ),
             ],
@@ -58,178 +64,466 @@ class BackgroundSyncIndicator extends ConsumerWidget {
     );
   }
 
-  Widget _buildIcon(BackgroundSyncStatus status) {
-    if (status.isSyncing) {
+  Widget _buildIcon(BackgroundSyncStatus syncStatus, ConnectivityStatus connectivityStatus) {
+    // Priority: Error > Syncing > Pending > Offline > Connected
+    if (syncStatus.lastSyncError != null) {
+      return Icon(
+        Icons.error_outline,
+        size: 14,
+        color: _getTextColor(syncStatus, connectivityStatus),
+      );
+    }
+
+    if (syncStatus.isSyncing) {
       return SizedBox(
         width: 14,
         height: 14,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(_getTextColor(status)),
+          valueColor: AlwaysStoppedAnimation<Color>(_getTextColor(syncStatus, connectivityStatus)),
         ),
       );
     }
 
+    if (syncStatus.pendingCount > 0) {
+      return Icon(
+        Icons.cloud_upload,
+        size: 14,
+        color: _getTextColor(syncStatus, connectivityStatus),
+      );
+    }
+
+    if (connectivityStatus == ConnectivityStatus.offline) {
+      return Icon(
+        Icons.cloud_off,
+        size: 14,
+        color: _getTextColor(syncStatus, connectivityStatus),
+      );
+    }
+
     return Icon(
-      _getIconData(status),
+      Icons.cloud_done,
       size: 14,
-      color: _getTextColor(status),
+      color: _getTextColor(syncStatus, connectivityStatus),
     );
   }
 
-  IconData _getIconData(BackgroundSyncStatus status) {
-    if (status.lastSyncError != null) {
-      return Icons.error_outline;
-    }
-    if (status.pendingCount > 0) {
-      return Icons.cloud_upload;
-    }
-    if (status.lastSyncTime != null) {
-      return Icons.cloud_done;
-    }
-    return Icons.cloud_sync;
-  }
-
-  Color _getBackgroundColor(BackgroundSyncStatus status) {
-    if (status.isSyncing) {
-      return Colors.blue[50]!;
-    }
-    if (status.lastSyncError != null) {
+  Color _getBackgroundColor(BackgroundSyncStatus syncStatus, ConnectivityStatus connectivityStatus) {
+    if (syncStatus.lastSyncError != null) {
       return Colors.red[50]!;
     }
-    if (status.pendingCount > 0) {
+    if (syncStatus.isSyncing) {
+      return Colors.blue[50]!;
+    }
+    if (syncStatus.pendingCount > 0) {
       return Colors.orange[50]!;
+    }
+    if (connectivityStatus == ConnectivityStatus.offline) {
+      return Colors.grey[300]!;
     }
     return Colors.green[50]!;
   }
 
-  Color _getBorderColor(BackgroundSyncStatus status) {
-    if (status.isSyncing) {
-      return Colors.blue[300]!;
-    }
-    if (status.lastSyncError != null) {
+  Color _getBorderColor(BackgroundSyncStatus syncStatus, ConnectivityStatus connectivityStatus) {
+    if (syncStatus.lastSyncError != null) {
       return Colors.red[300]!;
     }
-    if (status.pendingCount > 0) {
+    if (syncStatus.isSyncing) {
+      return Colors.blue[300]!;
+    }
+    if (syncStatus.pendingCount > 0) {
       return Colors.orange[300]!;
+    }
+    if (connectivityStatus == ConnectivityStatus.offline) {
+      return Colors.grey[400]!;
     }
     return Colors.green[300]!;
   }
 
-  Color _getTextColor(BackgroundSyncStatus status) {
-    if (status.isSyncing) {
-      return Colors.blue[700]!;
-    }
-    if (status.lastSyncError != null) {
+  Color _getTextColor(BackgroundSyncStatus syncStatus, ConnectivityStatus connectivityStatus) {
+    if (syncStatus.lastSyncError != null) {
       return Colors.red[700]!;
     }
-    if (status.pendingCount > 0) {
+    if (syncStatus.isSyncing) {
+      return Colors.blue[700]!;
+    }
+    if (syncStatus.pendingCount > 0) {
       return Colors.orange[700]!;
+    }
+    if (connectivityStatus == ConnectivityStatus.offline) {
+      return Colors.grey[600]!;
     }
     return Colors.green[700]!;
   }
 
-  String _getLabel(BackgroundSyncStatus status) {
-    if (status.isSyncing) {
-      return 'Syncing...';
-    }
-    if (status.lastSyncError != null) {
+  String _getLabel(BackgroundSyncStatus syncStatus, ConnectivityStatus connectivityStatus) {
+    if (syncStatus.lastSyncError != null) {
       return 'Sync failed';
     }
-    if (status.pendingCount > 0) {
-      return '${status.pendingCount} pending';
+    if (syncStatus.isSyncing) {
+      return 'Syncing...';
     }
-    return status.lastSyncFormatted;
+    if (syncStatus.pendingCount > 0) {
+      return '${syncStatus.pendingCount} pending';
+    }
+    if (connectivityStatus == ConnectivityStatus.offline) {
+      return 'Offline';
+    }
+    return syncStatus.lastSyncFormatted;
   }
 
-  void _handleTap(BuildContext context, WidgetRef ref, BackgroundSyncStatus status) {
+  void _handleTap(BuildContext context, WidgetRef ref, BackgroundSyncStatus syncStatus) {
     // Show sync status bottom sheet
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => const BackgroundSyncSheet(),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const EnhancedBackgroundSyncSheet(),
     );
   }
 }
 
-/// Bottom sheet showing detailed sync status
-class BackgroundSyncSheet extends ConsumerWidget {
-  const BackgroundSyncSheet({super.key});
+/// Enhanced bottom sheet showing detailed sync status
+class EnhancedBackgroundSyncSheet extends ConsumerStatefulWidget {
+  const EnhancedBackgroundSyncSheet({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EnhancedBackgroundSyncSheet> createState() => _EnhancedBackgroundSyncSheetState();
+}
+
+class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackgroundSyncSheet> {
+  @override
+  Widget build(BuildContext context) {
     final syncStatus = ref.watch(backgroundSyncStatusProvider);
     final syncService = ref.watch(backgroundSyncServiceProvider);
+    final connectivityStatus = ref.watch(connectivityStatusProvider);
+    final powerSyncDbAsync = ref.watch(powerSyncDatabaseProvider);
 
     return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Sync Status',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Sync Status',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+              const SizedBox(height: 24),
+
+              // Connection Status Section
+              _buildSectionHeader('Connection', Icons.cloud_sync),
+              const SizedBox(height: 12),
+              _buildConnectionStatusCard(context, connectivityStatus, powerSyncDbAsync),
+              const SizedBox(height: 24),
+
+              // Sync Status Section
+              _buildSectionHeader('Data Sync', Icons.sync),
+              const SizedBox(height: 12),
+              _buildSyncStatusCard(context, syncStatus),
+              const SizedBox(height: 24),
+
+              // Services Section
+              _buildSectionHeader('Services', Icons.settings),
+              const SizedBox(height: 12),
+              _buildServicesCard(context),
+              const SizedBox(height: 24),
+
+              // Last Sync Info
+              _buildSectionHeader('Last Sync', Icons.schedule),
+              const SizedBox(height: 12),
+              _buildLastSyncCard(context, syncStatus),
+              const SizedBox(height: 24),
+
+              // Sync Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: syncStatus.isSyncing
+                      ? null
+                      : () {
+                          syncService.performSync();
+                          Navigator.pop(context);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: syncStatus.isSyncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.sync, size: 18),
+                  label: Text(
+                    syncStatus.isSyncing ? 'Syncing...' : 'Sync Now',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.grey[700]),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConnectionStatusCard(
+    BuildContext context,
+    ConnectivityStatus connectivityStatus,
+    AsyncValue<PowerSyncDatabase> powerSyncDbAsync,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          // Server Status (Backend API)
           _buildStatusRow(
-            icon: syncStatus.isSyncing ? Icons.sync : Icons.cloud_done,
-            label: 'Status',
-            value: syncStatus.statusMessage,
-            color: _getStatusColor(syncStatus),
-            isSpinning: syncStatus.isSyncing,
+            icon: Icons.dns,
+            label: 'Server',
+            value: connectivityStatus == ConnectivityStatus.online ? 'Connected' : 'Offline',
+            color: connectivityStatus == ConnectivityStatus.online ? Colors.green[700]! : Colors.grey[500]!,
+            showBorder: true,
+            subtitle: _getBackendUrl(),
           ),
           const SizedBox(height: 12),
+
+          // PowerSync Status
+          powerSyncDbAsync.when(
+            data: (db) {
+              final isConnected = db.connected;
+              return _buildStatusRow(
+                icon: Icons.sync_alt,
+                label: 'PowerSync',
+                value: isConnected ? 'Connected' : 'Disconnected',
+                color: isConnected ? Colors.green[700]! : Colors.orange[700]!,
+                showBorder: true,
+                subtitle: AppConfig.powerSyncUrl.replaceAll('https://', '').replaceAll('http://', ''),
+              );
+            },
+            loading: () => _buildStatusRow(
+              icon: Icons.sync_alt,
+              label: 'PowerSync',
+              value: 'Initializing...',
+              color: Colors.grey[500]!,
+              showBorder: true,
+              showSpinner: true,
+            ),
+            error: (_, __) => _buildStatusRow(
+              icon: Icons.sync_alt,
+              label: 'PowerSync',
+              value: 'Error',
+              color: Colors.red[700]!,
+              showBorder: true,
+            ),
+          ),
+
+          // Network Status
+          _buildStatusRow(
+            icon: connectivityStatus == ConnectivityStatus.online ? Icons.wifi : Icons.wifi_off,
+            label: 'Network',
+            value: connectivityStatus == ConnectivityStatus.online ? 'Online' : 'Offline',
+            color: connectivityStatus == ConnectivityStatus.online ? Colors.green[700]! : Colors.grey[500]!,
+            showBorder: false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSyncStatusCard(BuildContext context, BackgroundSyncStatus syncStatus) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          // Sync Status
+          _buildStatusRow(
+            icon: _getSyncStatusIcon(syncStatus),
+            label: 'Status',
+            value: syncStatus.statusMessage,
+            color: _getSyncStatusColor(syncStatus),
+            showBorder: true,
+            showSpinner: syncStatus.isSyncing,
+          ),
+          const SizedBox(height: 12),
+
+          // Pending Items
           _buildStatusRow(
             icon: Icons.pending_actions,
             label: 'Pending',
             value: '${syncStatus.pendingCount} items',
-            color: syncStatus.pendingCount > 0 ? Colors.orange : Colors.green,
+            color: syncStatus.pendingCount > 0 ? Colors.orange[700]! : Colors.green[700]!,
+            showBorder: true,
+          ),
+          const SizedBox(height: 12),
+
+          // Upload/Download Status
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatusRow(
+                  icon: Icons.cloud_upload,
+                  label: 'Uploads',
+                  value: syncStatus.pendingCount > 0 ? 'Pending' : 'Complete',
+                  color: syncStatus.pendingCount > 0 ? Colors.orange[700]! : Colors.green[700]!,
+                  showBorder: false,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatusRow(
+                  icon: Icons.cloud_download,
+                  label: 'Downloads',
+                  value: 'Complete',
+                  color: Colors.green[700]!,
+                  showBorder: false,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServicesCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          _buildStatusRow(
+            icon: Icons.api,
+            label: 'Backend API',
+            value: AppConfig.backendApiUrl.replaceAll('https://', '').replaceAll('http://', ''),
+            color: Colors.grey[700]!,
+            showBorder: true,
+            subtitle: 'REST API v1',
           ),
           const SizedBox(height: 12),
           _buildStatusRow(
-            icon: Icons.schedule,
+            icon: Icons.storage,
+            label: 'Database',
+            value: 'PowerSync SQLite',
+            color: Colors.grey[700]!,
+            showBorder: true,
+            subtitle: 'Local offline storage',
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            icon: Icons.phone_android,
+            label: 'App Version',
+            value: _getAppVersion(),
+            color: Colors.grey[700]!,
+            showBorder: false,
+            subtitle: AppConfig.environment.toUpperCase(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLastSyncCard(BuildContext context, BackgroundSyncStatus syncStatus) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          _buildStatusRow(
+            icon: Icons.access_time,
             label: 'Last Sync',
             value: syncStatus.lastSyncFormatted,
-            color: Colors.grey,
+            color: Colors.grey[700]!,
+            showBorder: true,
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: syncStatus.isSyncing
-                  ? null
-                  : () {
-                      syncService.performSync();
-                      Navigator.pop(context);
-                    },
-              icon: syncStatus.isSyncing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
+          if (syncStatus.lastSyncError != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 16, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Error: ${syncStatus.lastSyncError}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[900],
                       ),
-                    )
-                  : const Icon(Icons.sync),
-              label: Text(syncStatus.isSyncing ? 'Syncing...' : 'Sync Now'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -240,50 +534,119 @@ class BackgroundSyncSheet extends ConsumerWidget {
     required String label,
     required String value,
     required Color color,
-    bool isSpinning = false,
+    bool showBorder = false,
+    bool showSpinner = false,
+    String? subtitle,
   }) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 20,
-          height: 20,
-          child: isSpinning
-              ? CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(color),
-                )
-              : Icon(icon, size: 20, color: color),
-        ),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: showBorder
+          ? BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
+            )
+          : null,
+      child: Row(
+        children: [
+          // Icon
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: showSpinner
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
+                  )
+                : Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+
+          // Label and Value
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                    fontSize: 14,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: color,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Color _getStatusColor(BackgroundSyncStatus status) {
-    if (status.isSyncing) return Colors.blue;
-    if (status.lastSyncError != null) return Colors.red;
-    if (status.pendingCount > 0) return Colors.orange;
+  IconData _getSyncStatusIcon(BackgroundSyncStatus status) {
+    if (status.lastSyncError != null) {
+      return Icons.error_outline;
+    }
+    if (status.isSyncing) {
+      return Icons.sync;
+    }
+    if (status.pendingCount > 0) {
+      return Icons.pending_actions;
+    }
+    return Icons.cloud_done;
+  }
+
+  Color _getSyncStatusColor(BackgroundSyncStatus status) {
+    if (status.lastSyncError != null) {
+      return Colors.red;
+    }
+    if (status.isSyncing) {
+      return Colors.blue;
+    }
+    if (status.pendingCount > 0) {
+      return Colors.orange;
+    }
     return Colors.green;
+  }
+
+  String _getBackendUrl() {
+    try {
+      final uri = Uri.parse(AppConfig.backendApiUrl);
+      return '${uri.host}:${uri.port}';
+    } catch (e) {
+      logWarning('Failed to parse backend URL: $e');
+      return AppConfig.backendApiUrl;
+    }
+  }
+
+  String _getAppVersion() {
+    // TODO: Get from pubspec.yaml or package_info
+    return '1.0.0';
   }
 }
 
