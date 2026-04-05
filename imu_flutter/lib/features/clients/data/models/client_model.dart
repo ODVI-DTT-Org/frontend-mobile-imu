@@ -693,6 +693,27 @@ class Touchpoint {
       return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
     }
 
+    // Robust DateTime parser that handles various ISO 8601 formats including microseconds
+    DateTime? parseDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          // Try parsing with microseconds - remove them: 2026-04-05T22:30:12.123456+00
+          try {
+            final clean = value.replaceAll(RegExp(r'\.\d+([+-])'), '$1');
+            return DateTime.parse(clean);
+          } catch (e2) {
+            debugPrint('[Touchpoint] Failed to parse date: "$value", error: $e');
+            return null;
+          }
+        }
+      }
+      return null;
+    }
+
     // Helper to get value from either snake_case or camelCase
     T? getValue<T>(String snakeCase, String camelCase) {
       return (json[snakeCase] ?? json[camelCase]) as T?;
@@ -712,33 +733,23 @@ class Touchpoint {
       odometerDeparture: getValue<String>('odometer_end', 'odometerDeparture'),
       reason: TouchpointReason.fromApi(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
       status: TouchpointStatus.fromApi(getValue<String>('status', 'status') ?? 'INTERESTED'),
-      nextVisitDate: getValue<String>('next_visit_date', 'nextVisitDate') != null
-          ? DateTime.parse(getValue<String>('next_visit_date', 'nextVisitDate')!)
-          : null,
+      nextVisitDate: parseDateTime(getValue<String>('next_visit_date', 'nextVisitDate')),
       remarks: getValue<String>('notes', 'remarks'),
       photoPath: getValue<String>('photo_url', 'photoUrl') ?? getValue<String>('photo_path', 'photoPath'),
       audioPath: getValue<String>('audio_url', 'audioUrl') ?? getValue<String>('audio_path', 'audioPath'),
       latitude: getValue<double>('latitude', 'latitude'),
       longitude: getValue<double>('longitude', 'longitude'),
-      timeIn: getValue<String>('time_in', 'timeIn') != null
-          ? DateTime.parse(getValue<String>('time_in', 'timeIn')!)
-          : null,
+      timeIn: parseDateTime(getValue<String>('time_in', 'timeIn')),
       timeInGpsLat: getValue<double>('time_in_gps_lat', 'timeInGpsLat'),
       timeInGpsLng: getValue<double>('time_in_gps_lng', 'timeInGpsLng'),
       timeInGpsAddress: getValue<String>('time_in_gps_address', 'timeInGpsAddress'),
-      timeOut: getValue<String>('time_out', 'timeOut') != null
-          ? DateTime.parse(getValue<String>('time_out', 'timeOut')!)
-          : null,
+      timeOut: parseDateTime(getValue<String>('time_out', 'timeOut')),
       timeOutGpsLat: getValue<double>('time_out_gps_lat', 'timeOutGpsLat'),
       timeOutGpsLng: getValue<double>('time_out_gps_lng', 'timeOutGpsLng'),
       timeOutGpsAddress: getValue<String>('time_out_gps_address', 'timeOutGpsAddress'),
       rejectionReason: getValue<String>('rejection_reason', 'rejectionReason'), // NEW
-      updatedAt: getValue<String>('updated_at', 'updatedAt') != null // NEW
-          ? DateTime.parse(getValue<String>('updated_at', 'updatedAt')!)
-          : null,
-      createdAt: getValue<String>('created_at', 'createdAt') != null
-          ? DateTime.parse(getValue<String>('created_at', 'createdAt')!)
-          : DateTime.now(),
+      updatedAt: parseDateTime(getValue<String>('updated_at', 'updatedAt')),
+      createdAt: parseDateTime(getValue<String>('created_at', 'createdAt')) ?? DateTime.now(),
     );
   }
 }

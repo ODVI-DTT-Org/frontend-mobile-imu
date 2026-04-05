@@ -20,6 +20,7 @@ import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../../services/maps/map_service.dart';
 
 class ItineraryPage extends ConsumerStatefulWidget {
   const ItineraryPage({super.key});
@@ -582,10 +583,27 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     );
   }
 
-  void _navigateToVisit(String address) {
+  Future<void> _navigateToVisit(ItineraryItem visit) async {
     HapticUtils.lightImpact();
-    showToast('Navigating to $address...');
-    // In production, open maps for navigation
+
+    // If coordinates are available, use them for navigation
+    if (visit.latitude != null && visit.longitude != null) {
+      final mapService = MapService();
+      final success = await mapService.openGoogleMapsNavigation(
+        latitude: visit.latitude!,
+        longitude: visit.longitude!,
+        label: visit.clientName,
+      );
+
+      if (!success && mounted) {
+        showToast('Unable to open navigation. Please install Google Maps.');
+      }
+    } else if (visit.address != null && visit.address!.isNotEmpty) {
+      // Fallback to showing address if no coordinates
+      showToast('Address: ${visit.address}');
+    } else {
+      showToast('No address or coordinates available for this client.');
+    }
   }
 
   void _callClient(String phone) {
@@ -860,7 +878,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                         return SwipeableListTile(
                           leftActions: [
                             SwipeAction.call(() => _callClient('+63 912 345 6789')),
-                            SwipeAction.navigate(() => _navigateToVisit(visit.address ?? '')),
+                            SwipeAction.navigate(() => _navigateToVisit(visit)),
                           ],
                           rightActions: [
                             SwipeAction.edit(() => _editVisit(visit.id)),

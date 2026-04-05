@@ -109,55 +109,49 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Future<void> _loadClient() async {
     try {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Loading client...',
-        operation: () async {
-          if (!_hiveService.isInitialized) {
-            await _hiveService.init();
-          }
+      if (!_hiveService.isInitialized) {
+        await _hiveService.init();
+      }
 
-          // Try loading from Hive first
-          var clientData = _hiveService.getClient(widget.clientId);
-          if (clientData != null && mounted) {
-            try {
-              setState(() {
-                _client = Client.fromJson(clientData);
-                _isLoading = false;
-              });
-              return;
-            } catch (e, stack) {
-              debugPrint('Error parsing client data: $e\n$stack');
-              // Continue to API fetch
-            }
-          }
+      // Try loading from Hive first
+      var clientData = _hiveService.getClient(widget.clientId);
+      if (clientData != null && mounted) {
+        try {
+          setState(() {
+            _client = Client.fromJson(clientData);
+            _isLoading = false;
+          });
+          return;
+        } catch (e, stack) {
+          debugPrint('Error parsing client data: $e\n$stack');
+          // Continue to API fetch
+        }
+      }
 
-          // If Hive doesn't have client or parsing failed, try fetching from API
-          final isOnline = ref.read(isOnlineProvider);
-          if (isOnline && mounted) {
-            try {
-              final clientApi = ref.read(clientApiServiceProvider);
-              final client = await clientApi.fetchClient(widget.clientId);
-              if (client != null && mounted) {
-                setState(() {
-                  _client = client;
-                  _isLoading = false;
-                });
-                return;
-              }
-            } catch (e, stack) {
-              debugPrint('Error fetching client from API: $e\n$stack');
-              // Continue to error state
-            }
+      // If Hive doesn't have client or parsing failed, try fetching from API
+      final isOnline = ref.read(isOnlineProvider);
+      if (isOnline && mounted) {
+        try {
+          final clientApi = ref.read(clientApiServiceProvider);
+          final client = await clientApi.fetchClient(widget.clientId);
+          if (client != null && mounted) {
+            setState(() {
+              _client = client;
+              _isLoading = false;
+            });
+            return;
           }
+        } catch (e, stack) {
+          debugPrint('Error fetching client from API: $e\n$stack');
+          // Continue to error state
+        }
+      }
 
-          // Client not found
-          if (mounted) {
-            setState(() => _isLoading = false);
-            _showNotFoundError();
-          }
-        },
-      );
+      // Client not found
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showNotFoundError();
+      }
     } catch (e, stack) {
       debugPrint('Error in _loadClient: $e\n$stack');
       if (mounted) {
