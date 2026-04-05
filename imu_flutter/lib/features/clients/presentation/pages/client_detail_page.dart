@@ -161,6 +161,168 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
   }
 
+  Widget _buildSkeletonLoading() {
+    // Skeleton box widget for shimmer effect
+    Container skeletonBox({
+      required double width,
+      required double height,
+      Color? color,
+      BorderRadius? borderRadius,
+      double? marginBottom,
+    }) {
+      return Container(
+        width: width,
+        height: height,
+        margin: marginBottom != null ? EdgeInsets.only(bottom: marginBottom) : null,
+        decoration: BoxDecoration(
+          color: color ?? Colors.grey.shade300,
+          borderRadius: borderRadius ?? BorderRadius.circular(4),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(LucideIcons.arrowLeft),
+          onPressed: () => context.pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.history),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Client header skeleton
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200!),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Name skeleton
+                        skeletonBox(
+                          width: 200,
+                          height: 24,
+                          marginBottom: 8,
+                        ),
+                        // Client type skeleton
+                        skeletonBox(
+                          width: 120,
+                          height: 16,
+                          marginBottom: 8,
+                        ),
+                        // Product type skeleton
+                        skeletonBox(
+                          width: 150,
+                          height: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Status badge skeleton
+                  skeletonBox(
+                    width: 80,
+                    height: 28,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ],
+              ),
+            ),
+            // Quick stats skeleton
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _StatCardSkeleton(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatCardSkeleton(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatCardSkeleton(),
+                  ),
+                ],
+              ),
+            ),
+            // Touchpoints section skeleton
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  skeletonBox(width: 150, height: 20, marginBottom: 16),
+                  ...List.generate(3, (index) => _TouchpointSkeletonItem()),
+                ],
+              ),
+            ),
+            // Address section skeleton
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  skeletonBox(width: 100, height: 18, marginBottom: 12),
+                  skeletonBox(
+                    width: double.infinity,
+                    height: 60,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ],
+              ),
+            ),
+            // Phone section skeleton
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  skeletonBox(width: 80, height: 18, marginBottom: 8),
+                  skeletonBox(
+                    width: double.infinity,
+                    height: 40,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              ),
+            ),
+            // Remarks section skeleton
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  skeletonBox(width: 80, height: 18, marginBottom: 8),
+                  skeletonBox(
+                    width: double.infinity,
+                    height: 60,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showNotFoundError() {
     showDialog(
       context: context,
@@ -652,13 +814,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Client Details')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     if (_client == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Client Not Found')),
@@ -678,6 +833,11 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           ),
         ),
       );
+    }
+
+    // Show skeleton loading while data is being fetched
+    if (_isLoading) {
+      return _buildSkeletonLoading();
     }
 
     final primaryAddress = _client!.addresses.isNotEmpty
@@ -1162,6 +1322,105 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton stat card widget for loading state
+class _StatCardSkeleton extends StatelessWidget {
+  const _StatCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 16,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 60,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton touchpoint item widget for loading state
+class _TouchpointSkeletonItem extends StatelessWidget {
+  const _TouchpointSkeletonItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 150,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
