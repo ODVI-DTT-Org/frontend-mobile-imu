@@ -139,6 +139,13 @@ class MyDayApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
+      // Always send local date to avoid timezone issues with CURRENT_DATE on backend
+      final localDate = DateTime.now();
+      final scheduledDateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
+
+      debugPrint('MyDayApiService: Removing client $clientId from my day');
+      debugPrint('MyDayApiService: scheduled_date being sent: $scheduledDateStr');
+
       final response = await _dio.delete(
         '${AppConfig.postgresApiUrl}/my-day/remove-client/$clientId',
         options: Options(
@@ -147,6 +154,9 @@ class MyDayApiService {
             'Content-Type': 'application/json',
           },
         ),
+        data: {
+          'scheduled_date': scheduledDateStr,
+        },
       );
 
       return response.data['message'] == 'Client removed from My Day';
