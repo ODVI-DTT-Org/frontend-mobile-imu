@@ -9,6 +9,8 @@ import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/api/my_day_api_service.dart';
+import '../../services/api/itinerary_api_service.dart';
+import '../../services/api/api_exception.dart';
 import '../../shared/providers/app_providers.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
@@ -288,7 +290,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       // Use my-day API for adding to itinerary (supports both today and custom dates)
       await myDayApi.addToMyDay(
-        clientId: client.id!,
+        client.id!,
         scheduledDate: targetDate,
         priority: 5,
       );
