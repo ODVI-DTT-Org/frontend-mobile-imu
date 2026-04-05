@@ -143,8 +143,18 @@ class BackgroundSyncService extends ChangeNotifier {
 
   /// Handle app resumed event
   void _onAppResumed() {
-    if (!_isOnlineAndAuthenticated()) {
-      logDebug('BackgroundSyncService: Not online or authenticated, skipping sync on resume');
+    final isAuth = _authService.isAuthenticated;
+    final isOnline = _connectivityService.isOnline;
+
+    logDebug('BackgroundSyncService: App resumed - isOnline=$isOnline, isAuthenticated=$isAuth');
+
+    if (!isAuth) {
+      logDebug('BackgroundSyncService: Not authenticated, skipping sync on resume');
+      return;
+    }
+
+    if (!isOnline) {
+      logDebug('BackgroundSyncService: Not online, skipping sync on resume');
       return;
     }
 
