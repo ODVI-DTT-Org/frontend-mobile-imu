@@ -8,7 +8,7 @@ import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart';
-import '../../services/api/itinerary_api_service.dart';
+import '../../services/api/my_day_api_service.dart';
 import '../../shared/providers/app_providers.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
@@ -283,15 +283,14 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     });
 
     try {
-      final itineraryApi = ItineraryApiService();
+      final myDayApi = MyDayApiService();
       final targetDate = customDate ?? widget.selectedDate;
 
-      // Always use createItinerary to add to the itinerary system
-      await itineraryApi.createItinerary(
+      // Use my-day API for adding to itinerary (supports both today and custom dates)
+      await myDayApi.addToMyDay(
         clientId: client.id!,
         scheduledDate: targetDate,
-        status: 'pending',
-        priority: 'normal',
+        priority: 5,
       );
 
       if (mounted) {
@@ -320,18 +319,16 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         HapticUtils.error();
         debugPrint('Error adding client to itinerary: $e');
 
-        // Check if it's the specific "already in itinerary" error
-        String errorMessage = e.toString();
-        if (errorMessage.contains('Client already in today\'s itinerary') ||
-            errorMessage.contains('already in today\'s itinerary') ||
-            errorMessage.contains('already has an itinerary for this date') ||
-            errorMessage.contains('already in My Day')) {
-          // Use top-positioned toast instead of bottom SnackBar
-          showToast('${client.firstName} ${client.lastName} is already in the itinerary for this date');
-        } else {
-          // Use top-positioned toast instead of bottom SnackBar
-          showToast('Failed to add client: ${errorMessage}');
+        // Extract error message from exception
+        String errorMessage = 'Failed to add client';
+        if (e is ApiException) {
+          errorMessage = e.message;
+        } else if (e.toString().contains('Client already')) {
+          errorMessage = e.toString();
         }
+
+        // Use top-positioned toast instead of bottom SnackBar
+        showToast(errorMessage);
       }
     } finally {
       setState(() {

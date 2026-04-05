@@ -65,8 +65,9 @@ class MyDayApiService {
       : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
         _authService = authService ?? JwtAuthService();
 
-  /// Add client to today's itinerary
+  /// Add client to today's itinerary or custom date
   Future<bool> addToMyDay(String clientId, {
+    DateTime? scheduledDate,
     String? scheduledTime,
     int priority = 5,
     String? notes,
@@ -87,6 +88,7 @@ class MyDayApiService {
         ),
         data: {
           'client_id': clientId,
+          if (scheduledDate != null) 'scheduled_date': scheduledDate.toIso8601String().split('T').first,
           if (scheduledTime != null) 'scheduled_time': scheduledTime,
           'priority': priority,
           if (notes != null) 'notes': notes,
