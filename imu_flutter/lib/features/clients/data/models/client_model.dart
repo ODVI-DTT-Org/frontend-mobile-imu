@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Client data model for IMU app
 /// Aligned with database schema - uses direct columns instead of nested lists
 class Client {
@@ -703,7 +705,7 @@ class Touchpoint {
         } catch (e) {
           // Try parsing with microseconds - remove them: 2026-04-05T22:30:12.123456+00
           try {
-            final clean = value.replaceAll(RegExp(r'\.\d+([+-])'), '$1');
+            final clean = value.replaceAll(RegExp(r'\.\d+([+-])'), r'$1');
             return DateTime.parse(clean);
           } catch (e2) {
             debugPrint('[Touchpoint] Failed to parse date: "$value", error: $e');
