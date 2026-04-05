@@ -78,6 +78,15 @@ class MyDayApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
+      final scheduledDateStr = scheduledDate != null
+          ? '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}'
+          : null;
+
+      debugPrint('MyDayApiService: Adding client $clientId to my day');
+      debugPrint('MyDayApiService: scheduledDate (local): $scheduledDate');
+      debugPrint('MyDayApiService: scheduledDate (string): $scheduledDateStr');
+      debugPrint('MyDayApiService: scheduledDate (toIso8601String): ${scheduledDate?.toIso8601String()}');
+
       final response = await _dio.post(
         '${AppConfig.postgresApiUrl}/my-day/add-client',
         options: Options(
@@ -88,7 +97,7 @@ class MyDayApiService {
         ),
         data: {
           'client_id': clientId,
-          if (scheduledDate != null) 'scheduled_date': '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}',
+          if (scheduledDateStr != null) 'scheduled_date': scheduledDateStr,
           if (scheduledTime != null) 'scheduled_time': scheduledTime,
           'priority': priority,
           if (notes != null) 'notes': notes,
