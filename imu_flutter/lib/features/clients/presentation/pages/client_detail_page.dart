@@ -891,6 +891,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Show skeleton loading while data is being fetched
+    // Check this FIRST before checking if client is null to avoid "Client not found" flash
+    if (_isLoading) {
+      return _buildSkeletonLoading();
+    }
+
     if (_client == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Client Not Found')),
@@ -910,11 +916,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           ),
         ),
       );
-    }
-
-    // Show skeleton loading while data is being fetched
-    if (_isLoading) {
-      return _buildSkeletonLoading();
     }
 
     final primaryAddress = _client!.addresses.isNotEmpty
