@@ -1088,25 +1088,27 @@ class _VisitCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Previous touchpoint badge and date row
-                Row(
-                  children: [
-                    PreviousTouchpointBadge(
-                      touchpointNumber: visit.previousTouchpointNumber,
-                      touchpointType: visit.previousTouchpointType,
-                      touchpointReason: visit.previousTouchpointReason,
-                    ),
-                    const Spacer(),
-                    if (visit.previousTouchpointDate != null)
+                // Previous touchpoint date
+                if (visit.previousTouchpointDate != null)
+                  Row(
+                    children: [
                       Text(
-                        DateFormat('MMM d').format(visit.previousTouchpointDate!),
+                        'Last activity: ',
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade600,
                         ),
                       ),
-                  ],
-                ),
+                      Text(
+                        DateFormat('MMM d').format(visit.previousTouchpointDate!),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade800,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 8),
                 // Client name
                 Text(
