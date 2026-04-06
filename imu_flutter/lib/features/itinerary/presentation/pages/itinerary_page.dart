@@ -9,6 +9,7 @@ import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/swipeable_list_tile.dart';
 import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
+import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -128,52 +129,36 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   }
 
   Future<void> _onBulkRemove() async {
-    if (_selectedVisitIds.isEmpty) return;
+    if (_selectedVisitIds.isEmpty) {
+      showToast('No visits selected');
+      return;
+    }
 
     final state = ref.watch(todayItineraryProvider);
     final selectedVisits = state.valueOrNull ?? [];
     final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
 
-    if (filteredVisits.isEmpty) return;
+    if (filteredVisits.isEmpty) {
+      showToast('No visits selected');
+      return;
+    }
 
     HapticUtils.lightImpact();
 
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
+    // Show bulk delete bottom sheet
+    await BulkDeleteBottomSheet.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Selected Visits'),
-        content: Text('Remove ${filteredVisits.length} visit(s) from itinerary?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              HapticUtils.lightImpact();
-              Navigator.pop(context, false);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              HapticUtils.mediumImpact();
-              Navigator.pop(context, true);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      itemIds: _selectedVisitIds.toList(),
+      itemType: 'itineraries',
+      onDelete: (ids) {
+        final bulkDeleteApi = ref.read(bulkDeleteApiServiceProvider);
+        return bulkDeleteApi.bulkDeleteItineraries(ids);
+      },
+      onComplete: () {
+        _exitMultiSelectMode();
+        ref.invalidate(todayItineraryProvider);
+      },
     );
-
-    if (confirmed == true) {
-      // Delete each visit using the API
-      for (final visit in filteredVisits) {
-        await _deleteVisit(visit.id);
-      }
-      // Exit multi-select mode after processing
-      _exitMultiSelectMode();
-    } else {
-      _exitMultiSelectMode();
-    }
   }
 
   Future<void> _onVisitTap(ItineraryItem visit) async {
