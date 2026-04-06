@@ -1082,7 +1082,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
           items: _barangays.map((barangay) {
             return DropdownMenuItem<PsgcBarangay>(
               value: barangay,
-              child: Text(barangay.barangay),
+              child: Text(barangay.barangay ?? 'Unknown'),
             );
           }).toList(),
           onChanged: (barangay) {

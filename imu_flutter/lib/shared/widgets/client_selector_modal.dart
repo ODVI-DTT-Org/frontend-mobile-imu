@@ -24,7 +24,8 @@ import '../../shared/providers/app_providers.dart' show
     isOnlineProvider,
     currentUserRoleProvider,
     assignedMunicipalitiesProvider,
-    clientTouchpointsSyncProvider;
+    clientTouchpointsSyncProvider,
+    myDayApiServiceProvider;
 
 /// Reusable client selector modal for adding clients to itinerary
 /// Used by both ItineraryPage and MyDayPage
@@ -70,20 +71,14 @@ class ClientSelectorModal extends ConsumerStatefulWidget {
 class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   final _searchController = TextEditingController();
   final _searchDebounce = Debounce(milliseconds: 300);
-  List<Client> _clients = [];
-  List<Client> _filteredClients = [];
+  String _searchQuery = '';
+  String _clientFilter = 'assigned'; // 'assigned' or 'all'
   Set<String> _addingClientIds = {};
   Set<String> _addedClientIds = {}; // Track clients that have been added
-  bool _isLoading = true;
-  String? _error;
-  String _clientFilter = 'assigned'; // 'assigned' or 'all'
 
   // Pagination state
+  final int _itemsPerPage = 10;
   int _currentPage = 1;
-  int _totalPages = 1;
-  int _totalItems = 0;
-  bool _isLoadingMore = false;
-  bool _hasMorePages = true;
 
   // Status tracking state
   Map<String, ClientStatus> _clientStatuses = {};
@@ -93,9 +88,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   @override
   void initState() {
     super.initState();
-    _loadClients();
     _searchController.addListener(_onSearchChanged);
-    _loadClientStatuses(); // NEW: Load status information
   }
 
   @override
@@ -106,196 +99,100 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   void _onSearchChanged() {
-    _searchDebounce.run(() async {
+    _searchDebounce.run(() {
+      if (!mounted) return;
+
       setState(() {
+        _searchQuery = _searchController.text;
         _currentPage = 1; // Reset to first page on search
       });
 
-      // Update search query provider
-      final query = _searchController.text;
-      if (_clientFilter == 'assigned') {
-        ref.read(assignedClientSearchQueryProvider.notifier).state = query;
-        ref.read(assignedClientPageProvider.notifier).state = 1;
-        ref.invalidate(assignedClientsProvider);
-        // Wait for provider to refresh, then load clients
-        await Future.delayed(const Duration(milliseconds: 100));
-        _loadClients();
-      } else {
-        // For 'all' mode, use online pagination providers
-        ref.read(onlineClientSearchQueryProvider.notifier).state = query;
-        ref.read(onlineClientPageProvider.notifier).state = 1;
-        ref.invalidate(onlineClientsProvider);
-        // Wait for provider to refresh, then load clients
-        await Future.delayed(const Duration(milliseconds: 100));
-        _loadClients();
-      }
+      // Defer provider updates until after build cycle
+      Future.microtask(() {
+        if (!mounted) return;
+
+        // Update the appropriate search query provider based on mode
+        if (_clientFilter == 'assigned') {
+          ref.read(assignedClientSearchQueryProvider.notifier).state = _searchQuery;
+          ref.read(assignedClientPageProvider.notifier).state = _currentPage;
+          ref.invalidate(assignedClientsProvider);
+        } else {
+          // All Clients: update online search query provider
+          ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
+          ref.read(onlineClientPageProvider.notifier).state = _currentPage;
+          ref.invalidate(onlineClientsProvider);
+        }
+      });
     });
-  }
-
-  Future<void> _loadClients({bool append = false}) async {
-    if (!append) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    } else {
-      setState(() {
-        _isLoadingMore = true;
-      });
-    }
-
-    try {
-      // Load clients from provider based on filter
-      // Use ref.read() instead of ref.watch() since we're in a method, not build()
-      final clientsAsync = _clientFilter == 'assigned'
-          ? ref.read(assignedClientsProvider)
-          : ref.read(onlineClientsProvider);
-
-      clientsAsync.when(
-        data: (data) {
-          // Both providers return ClientsResponse
-          final response = data as ClientsResponse;
-          final clients = response.items;
-
-          // Get today's itinerary to filter out already added clients
-          final itineraryAsync = ref.read(todayItineraryProvider);
-          final today = DateTime.now();
-
-          Set<String> existingClientIds = {};
-          itineraryAsync.when(
-            data: (items) {
-              existingClientIds = items
-                  .where((item) => item.scheduledDate.year == today.year &&
-                                 item.scheduledDate.month == today.month &&
-                                 item.scheduledDate.day == today.day)
-                  .map((item) => item.clientId)
-                  .toSet();
-            },
-            loading: () {},
-            error: (_, __) {},
-          );
-
-          // Filter out clients already in today's itinerary
-          final filteredClients = clients.where((client) => !existingClientIds.contains(client.id)).toList();
-
-          if (mounted) {
-            setState(() {
-              if (append) {
-                // Append new clients to existing list
-                _clients.addAll(clients);
-                _filteredClients.addAll(filteredClients);
-              } else {
-                // Replace list with new data
-                _clients = clients;
-                _filteredClients = filteredClients;
-              }
-              _totalPages = response.totalPages;
-              _totalItems = response.totalItems;
-              _hasMorePages = _currentPage < _totalPages;
-              _isLoading = false;
-              _isLoadingMore = false;
-            });
-          }
-        },
-        loading: () {
-          // Still loading - don't update state if we're appending
-          if (!append && mounted) {
-            setState(() {
-              _isLoading = true;
-            });
-          }
-        },
-        error: (error, _) {
-          if (mounted) {
-            setState(() {
-              _error = error.toString();
-              _isLoading = false;
-              _isLoadingMore = false;
-            });
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-          _isLoadingMore = false;
-        });
-      }
-    }
   }
 
   void _applyClientFilter() {
-    // Reset pagination and reload from appropriate provider
+    // Reset pagination and update provider
     setState(() {
       _currentPage = 1;
-      _hasMorePages = true;
+      _searchQuery = '';
+      _searchController.clear();
     });
 
-    Future.microtask(() async {
+    // Defer provider updates until after build cycle
+    Future.microtask(() {
       if (!mounted) return;
 
       if (_clientFilter == 'assigned') {
-        ref.read(assignedClientPageProvider.notifier).state = 1;
-        ref.invalidate(assignedClientsProvider);
-        // Wait for provider to refresh, then load clients
-        await Future.delayed(const Duration(milliseconds: 100));
-        _loadClients();
-      } else {
-        // For 'all' mode, use online pagination providers
-        ref.read(onlineClientPageProvider.notifier).state = 1;
-        ref.invalidate(onlineClientsProvider);
-        // Wait for provider to refresh, then load clients
-        await Future.delayed(const Duration(milliseconds: 100));
-        _loadClients();
-      }
-    });
-  }
-
-  Future<void> _loadMoreClients() async {
-    if (_isLoadingMore || !_hasMorePages) return;
-
-    setState(() {
-      _currentPage++;
-      _isLoadingMore = true;
-    });
-
-    try {
-      if (_clientFilter == 'assigned') {
         ref.read(assignedClientPageProvider.notifier).state = _currentPage;
         ref.invalidate(assignedClientsProvider);
-        await _loadClients(append: true);
       } else {
         // For 'all' mode, use online pagination providers
         ref.read(onlineClientPageProvider.notifier).state = _currentPage;
         ref.invalidate(onlineClientsProvider);
-        await _loadClients(append: true);
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _currentPage--;
-          _isLoadingMore = false;
-        });
+    });
+  }
+
+  void _goToPage(int page) {
+    HapticUtils.lightImpact();
+    setState(() {
+      _currentPage = page;
+    });
+
+    // Defer provider updates until after build cycle
+    Future.microtask(() {
+      if (!mounted) return;
+
+      // Update the appropriate provider's page state and invalidate to trigger refetch
+      if (_clientFilter == 'assigned') {
+        ref.read(assignedClientPageProvider.notifier).state = page;
+        ref.invalidate(assignedClientsProvider);
+      } else {
+        ref.read(onlineClientPageProvider.notifier).state = page;
+        ref.invalidate(onlineClientsProvider);
       }
-    }
+    });
   }
 
   void _filterClients() {
     // Clear search and reload clients
     _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+    });
     _applyClientFilter();
   }
 
-  List<Client> get _displayableClients {
+  int _totalPages(ClientsResponse meta) {
+    return meta.totalPages;
+  }
+
+  int _totalItems(ClientsResponse meta) {
+    return meta.totalItems;
+  }
+
+  List<Client> _getDisplayableClients(List<Client> clients) {
     // Hide loan released clients from the list
-    return _filteredClients.where((client) => !client.loanReleased).toList();
+    return clients.where((client) => !client.loanReleased).toList();
   }
 
   Future<void> _loadClientStatuses() async {
-    if (_clients.isEmpty) return; // Wait for clients to load first
-
     setState(() {
       _isLoadingStatuses = true;
       _hasStatusError = false;
@@ -328,14 +225,25 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       final myDayApi = MyDayApiService();
       final todayClients = await myDayApi.fetchMyDayClients(today);
 
+      final clientsAsync = _clientFilter == 'assigned'
+          ? ref.read(assignedClientsProvider)
+          : ref.read(onlineClientsProvider);
+
       final statuses = <String, ClientStatus>{};
-      for (final client in _clients) {
-        final inItinerary = todayClients.any((c) => c.clientId == client.id);
-        statuses[client.id!] = ClientStatus(
-          inItinerary: inItinerary,
-          loanReleased: client.loanReleased,
-        );
-      }
+      clientsAsync.when(
+        data: (data) {
+          final clients = data.items;
+          for (final client in clients) {
+            final inItinerary = todayClients.any((c) => c.clientId == client.id);
+            statuses[client.id!] = ClientStatus(
+              inItinerary: inItinerary,
+              loanReleased: client.loanReleased,
+            );
+          }
+        },
+        loading: () {},
+        error: (_, __) {},
+      );
 
       if (mounted) {
         setState(() {
@@ -360,13 +268,24 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       final inItineraryIds = todayClients.map((row) => row['client_id'] as String).toSet();
 
+      final clientsAsync = _clientFilter == 'assigned'
+          ? ref.read(assignedClientsProvider)
+          : ref.read(onlineClientsProvider);
+
       final statuses = <String, ClientStatus>{};
-      for (final client in _clients) {
-        statuses[client.id!] = ClientStatus(
-          inItinerary: inItineraryIds.contains(client.id),
-          loanReleased: client.loanReleased,
-        );
-      }
+      clientsAsync.when(
+        data: (data) {
+          final clients = data.items;
+          for (final client in clients) {
+            statuses[client.id!] = ClientStatus(
+              inItinerary: inItineraryIds.contains(client.id),
+              loanReleased: client.loanReleased,
+            );
+          }
+        },
+        loading: () {},
+        error: (_, __) {},
+      );
 
       if (mounted) {
         setState(() {
@@ -392,7 +311,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
     if (client.id == null) {
       if (mounted) {
-        // Use top-positioned toast instead of bottom SnackBar
         showToast('Invalid client: missing ID');
       }
       return;
@@ -402,7 +320,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     final uuidRegex = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false);
     if (!uuidRegex.hasMatch(client.id!)) {
       if (mounted) {
-        // Use top-positioned toast instead of bottom SnackBar
         showToast('Invalid client ID format: ${client.id}');
       }
       return;
@@ -416,7 +333,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     final nextTouchpoint = clientTouchpoints.length;
     final nextType = nextTouchpoint < 7 ? TouchpointPattern.getType(nextTouchpoint + 1) : TouchpointType.visit;
 
-    // NEW: Check if can add before proceeding
+    // Check if can add before proceeding
     if (!_canAddToItinerary(client, status, nextType)) {
       if (mounted) {
         final reason = _getDisableReason(client, status, nextType);
@@ -431,7 +348,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     });
 
     try {
-      final myDayApi = MyDayApiService();
+      final myDayApiService = ref.read(myDayApiServiceProvider);
       // Default to today if no date is provided (ensure we always send a date to backend)
       final targetDate = customDate ?? widget.selectedDate ?? DateTime.now();
 
@@ -441,7 +358,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       debugPrint('ClientSelectorModal: targetDate = $targetDate');
 
       // Use my-day API for adding to itinerary (supports both today and custom dates)
-      await myDayApi.addToMyDay(
+      await myDayApiService.addToMyDay(
         client.id!,
         scheduledDate: targetDate,
         priority: 5,
@@ -449,24 +366,22 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       if (mounted) {
         HapticUtils.success();
-        // Use top-positioned toast instead of bottom SnackBar
         showToast(customDate == null
             ? '${client.firstName} ${client.lastName} added to Today'
             : '${client.firstName} ${client.lastName} added to ${_formatDateShort(customDate)}');
 
         // Mark client as added (disable button, show "Added" status)
-        // Don't remove from list - keep modal open for adding more clients
         setState(() {
           if (client.id != null) {
-            _addedClientIds.add(client.id!); // Use ! to assert non-null after check
+            _addedClientIds.add(client.id!);
           }
         });
 
         // Trigger parent refresh immediately
         widget.onClientAdded();
 
-        // Keep modal open - don't close it
-        // This allows users to add multiple clients without reopening
+        // Invalidate todayItineraryProvider to refresh the itinerary
+        ref.invalidate(todayItineraryProvider);
       }
     } catch (e) {
       if (mounted) {
@@ -481,7 +396,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
           errorMessage = e.toString();
         }
 
-        // Use top-positioned toast instead of bottom SnackBar
         showToast(errorMessage);
       }
     } finally {
@@ -613,6 +527,468 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    // Watch today's itinerary to filter out already-added clients
+    final itineraryAsync = ref.watch(todayItineraryProvider);
+    final today = DateTime.now();
+
+    // Get existing client IDs from today's itinerary
+    final existingClientIds = itineraryAsync.when(
+      data: (items) {
+        return items
+            .where((item) => item.scheduledDate.year == today.year &&
+                           item.scheduledDate.month == today.month &&
+                           item.scheduledDate.day == today.day)
+            .map((item) => item.clientId)
+            .toSet();
+      },
+      loading: () => <String>{},
+      error: (_, __) => <String>{},
+    );
+
+    // Choose provider based on mode (Assigned Clients vs All Clients)
+    final clientsAsync = _clientFilter == 'assigned'
+        ? ref.watch(assignedClientsProvider)
+        : ref.watch(onlineClientsProvider);
+
+    return clientsAsync.when(
+      data: (data) {
+        // Both providers return ClientsResponse
+        final clients = data.items;
+        final meta = data;
+        final totalPages = _totalPages(meta);
+        final totalItems = _totalItems(meta);
+
+        // Filter out clients already in today's itinerary
+        final filteredClients = clients.where((client) => !existingClientIds.contains(client.id)).toList();
+        final displayableClients = _getDisplayableClients(filteredClients);
+
+        // Load client statuses after clients are loaded
+        if (_clientStatuses.isEmpty || _clientStatuses.length != clients.length) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _isLoadingStatuses) {
+              _loadClientStatuses();
+            }
+          });
+        }
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey[200]!),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(LucideIcons.x),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Search bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search clients...',
+                        prefixIcon: const Icon(LucideIcons.search, size: 20),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(LucideIcons.x, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _filterClients();
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  // Filter toggle
+                  if (widget.showAssignedFilter)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          _buildFilterChip('Assigned', 'assigned'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('All Clients', 'all'),
+                        ],
+                      ),
+                    ),
+                  // Client count indicator
+                  if (totalItems > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: Text(
+                        'Showing ${displayableClients.length} of $totalItems clients',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  // Pagination controls
+                  if (totalPages > 1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Previous page button
+                          IconButton(
+                            icon: const Icon(LucideIcons.chevronLeft, size: 18),
+                            onPressed: _currentPage > 1
+                                ? () => _goToPage(_currentPage - 1)
+                                : null,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                          // Page indicator
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              'Page $_currentPage of $totalPages',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                          // Next page button
+                          IconButton(
+                            icon: const Icon(LucideIcons.chevronRight, size: 18),
+                            onPressed: _currentPage < totalPages
+                                ? () => _goToPage(_currentPage + 1)
+                                : null,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Client list
+                  Expanded(
+                    child: _buildClientList(displayableClients, totalItems),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+      loading: () {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          },
+        );
+      },
+      error: (error, _) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(LucideIcons.alertCircle, size: 48, color: Colors.red.shade400),
+                    const SizedBox(height: 16),
+                    Text('Failed to load clients', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text(error.toString(), style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_clientFilter == 'assigned') {
+                          ref.invalidate(assignedClientsProvider);
+                        } else {
+                          ref.invalidate(onlineClientsProvider);
+                        }
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildClientList(List<Client> displayableClients, int totalItems) {
+    // Show skeleton loading while fetching client statuses
+    if (_isLoadingStatuses && !_hasStatusError) {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: 5, // Show 5 skeleton cards
+        itemBuilder: (context, index) => _buildClientSkeleton(),
+      );
+    }
+
+    if (_hasStatusError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.alertCircle, size: 48, color: Colors.orange.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load client status',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to retry',
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _retryLoadStatuses,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (displayableClients.isEmpty) {
+      // Check if user has no assigned municipalities
+      final UserRole userRole = ref.read(currentUserRoleProvider);
+      final shouldFilterByArea = switch (userRole) {
+        UserRole.admin || UserRole.assistantAreaManager => false,
+        UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
+        _ => false, // Fallback for any other roles
+      };
+
+      final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
+      final hasNoAssignedLocations = shouldFilterByArea &&
+          assignedMunicipalitiesAsync.valueOrNull?.isEmpty == true &&
+          _clientFilter == 'assigned';
+
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              hasNoAssignedLocations
+                  ? LucideIcons.mapPinOff
+                  : LucideIcons.users,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              hasNoAssignedLocations
+                  ? 'No Assigned Locations'
+                  : (_searchQuery.isEmpty ? 'No clients available' : 'No clients found'),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasNoAssignedLocations
+                  ? 'You have no assigned locations. Please contact your administrator to assign areas to you.'
+                  : (_searchQuery.isEmpty
+                      ? 'All clients have been added to today\'s itinerary'
+                      : 'Try a different search term'),
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+            if (hasNoAssignedLocations) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Switch to "All Clients" to see all available clients',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: displayableClients.length,
+      itemBuilder: (context, index) {
+        final client = displayableClients[index];
+        final isAdding = _addingClientIds.contains(client.id);
+        final status = _clientStatuses[client.id];
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ExpansionTile(
+            leading: CircleAvatar(
+              backgroundColor: client.clientType == ClientType.existing
+                  ? Colors.green.shade100
+                  : Colors.blue.shade100,
+              child: Text(
+                '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
+                style: TextStyle(
+                  color: client.clientType == ClientType.existing
+                      ? Colors.green.shade700
+                      : Colors.blue.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            title: Text(
+              '${client.firstName} ${client.lastName}',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (client.email != null && client.email!.isNotEmpty)
+                  Text(
+                    client.email!,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                Wrap(
+                  spacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.start,
+                  children: [
+                    if (status?.loanReleased == true)
+                      _buildBadge('Loan Released', Colors.red, LucideIcons.ban),
+                    if (status?.inItinerary == true)
+                      _buildBadge('Already added', Colors.orange, LucideIcons.calendarCheck),
+                    _buildNextTouchpointBadge(client.id),
+                  ],
+                ),
+              ],
+            ),
+            trailing: Icon(LucideIcons.chevronDown),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Touchpoint history preview
+                    Text(
+                      'Touchpoint History',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Action buttons row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: LucideIcons.calendar,
+                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add to Today',
+                            isPrimary: true,
+                            isLoading: isAdding,
+                            onTap: client.id != null && _addedClientIds.contains(client.id) ? null : () => _addClientToItinerary(client),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: LucideIcons.calendarClock,
+                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add with Date',
+                            isPrimary: false,
+                            isLoading: isAdding,
+                            onTap: client.id != null && _addedClientIds.contains(client.id) ? null : () => _showDatePicker(client),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildClientSkeleton() {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -685,381 +1061,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        // Add scroll listener for pagination
-        scrollController.addListener(() {
-          if (scrollController.position.pixels >=
-              scrollController.position.maxScrollExtent - 200) {
-            _loadMoreClients();
-          }
-        });
-
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey[200]!),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            DateFormat('EEEE, MMMM d').format(widget.selectedDate),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.x),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              // Search bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search clients...',
-                    prefixIcon: const Icon(LucideIcons.search, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(LucideIcons.x, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _filterClients();
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                ),
-              ),
-              // Filter toggle
-              if (widget.showAssignedFilter)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      _buildFilterChip('Assigned', 'assigned'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('All Clients', 'all'),
-                    ],
-                  ),
-                ),
-              // Client count indicator
-              if (_totalItems > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: Text(
-                    'Showing ${_displayableClients.length} of $_totalItems clients',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
-              // Client list
-              Expanded(
-                child: _buildClientList(scrollController),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildClientList(ScrollController? scrollController) {
-    // Show skeleton loading while fetching client statuses
-    if (_isLoadingStatuses && !_hasStatusError) {
-      return ListView.builder(
-        controller: scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: 5, // Show 5 skeleton cards
-        itemBuilder: (context, index) => _buildClientSkeleton(),
-      );
-    }
-
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.alertCircle, size: 48, color: Colors.red.shade400),
-            const SizedBox(height: 16),
-            Text('Failed to load clients', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadClients,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_hasStatusError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.alertCircle, size: 48, color: Colors.orange.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load client status',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap to retry',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _retryLoadStatuses,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_displayableClients.isEmpty) {
-      // Check if user has no assigned municipalities
-      final UserRole userRole = ref.read(currentUserRoleProvider);
-      final shouldFilterByArea = switch (userRole) {
-        UserRole.admin || UserRole.assistantAreaManager => false,
-        UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
-        _ => false, // Fallback for any other roles
-      };
-
-      final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
-      final hasNoAssignedLocations = shouldFilterByArea &&
-          assignedMunicipalitiesAsync.valueOrNull?.isEmpty == true &&
-          _clientFilter == 'assigned';
-
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              hasNoAssignedLocations
-                  ? LucideIcons.mapPinOff
-                  : LucideIcons.users,
-              size: 48,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              hasNoAssignedLocations
-                  ? 'No Assigned Locations'
-                  : (_searchController.text.isEmpty ? 'No clients available' : 'No clients found'),
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              hasNoAssignedLocations
-                  ? 'You have no assigned locations. Please contact your administrator to assign areas to you.'
-                  : (_searchController.text.isEmpty
-                      ? 'All clients have been added to today\'s itinerary'
-                      : 'Try a different search term'),
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-              textAlign: TextAlign.center,
-            ),
-            if (hasNoAssignedLocations) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Switch to "All Clients" to see all available clients',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _displayableClients.length + (_hasMorePages || _isLoadingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        // Load more indicator at the bottom
-        if (index == _displayableClients.length) {
-          if (_isLoadingMore) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-          if (!_hasMorePages && _displayableClients.isNotEmpty) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  'Showing all $_totalItems clients',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ),
-            );
-          }
-          return const SizedBox.shrink();
-        }
-
-        final client = _displayableClients[index];
-        final isAdding = _addingClientIds.contains(client.id);
-        final status = _clientStatuses[client.id];
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ExpansionTile(
-            leading: CircleAvatar(
-              backgroundColor: client.clientType == ClientType.existing
-                  ? Colors.green.shade100
-                  : Colors.blue.shade100,
-              child: Text(
-                '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
-                style: TextStyle(
-                  color: client.clientType == ClientType.existing
-                      ? Colors.green.shade700
-                      : Colors.blue.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            title: Text(
-              '${client.firstName} ${client.lastName}',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (client.email != null && client.email!.isNotEmpty)
-                  Text(
-                    client.email!,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                Wrap(
-                  spacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.start,
-                  children: [
-                    if (status?.loanReleased == true)
-                      _buildBadge('Loan Released', Colors.red, LucideIcons.ban),
-                    if (status?.inItinerary == true)
-                      _buildBadge('Already added', Colors.orange, LucideIcons.calendarCheck),
-                    _buildNextTouchpointBadge(client.id),
-                  ],
-                ),
-              ],
-            ),
-            trailing: Icon(LucideIcons.chevronDown),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Touchpoint history preview
-                    Text(
-                      'Touchpoint History',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Action buttons row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: LucideIcons.calendar,
-                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add to Today',
-                            isPrimary: true,
-                            isLoading: isAdding,
-                            onTap: client.id != null && _addedClientIds.contains(client.id!) ? null : () => _addClientToItinerary(client),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: LucideIcons.calendarClock,
-                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add with Date',
-                            isPrimary: false,
-                            isLoading: isAdding,
-                            onTap: client.id != null && _addedClientIds.contains(client.id) ? null : () => _showDatePicker(client),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildNextTouchpointBadge(String? clientId) {
     if (clientId == null) return const SizedBox.shrink();
 
@@ -1087,20 +1088,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     required bool isPrimary,
     required bool isLoading,
     VoidCallback? onTap,
-    String? reason, // NEW: Disable reason
   }) {
     final isDisabled = onTap == null && !isLoading;
 
     return InkWell(
-      onTap: isDisabled
-          ? () {
-              // Show reason toast when clicking disabled button
-              if (reason != null && mounted) {
-                showToast(reason);
-                HapticUtils.error();
-              }
-            }
-          : onTap,
+      onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

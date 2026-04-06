@@ -61,7 +61,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
   final _payrollDateController = TextEditingController();
   final _tenureController = TextEditingController();
   final _panController = TextEditingController();
-  final _udiController = TextEditingController();
   final _remarksController = TextEditingController();
 
   // Location dropdown values
@@ -91,7 +90,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     'employment': false,
     'product': true,
     'location': true,
-    'udi': false,
     'remarks': false,
   };
 
@@ -118,7 +116,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     _payrollDateController.dispose();
     _tenureController.dispose();
     _panController.dispose();
-    _udiController.dispose();
     _remarksController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -251,9 +248,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         ? _getMarketTypeLabel(_client!.marketType!)
         : 'Residential';
     _clientType = _client!.clientType.name.toUpperCase();
-
-    // UDI
-    _udiController.text = _client!.udi ?? '';
 
     // Location - Find and set dropdown values
     if (_client!.region != null && _client!.region!.isNotEmpty) {
@@ -410,9 +404,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         pan: _panController.text.trim().isEmpty
             ? null
             : _panController.text.trim(),
-        udi: _udiController.text.trim().isEmpty
-            ? null
-            : _udiController.text.trim(),
         region: _selectedRegion?.name,
         province: _selectedProvince?.name,
         municipality: _selectedMunicipality?.name,
@@ -691,18 +682,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
           ),
           const SizedBox(height: 12),
           _buildLocationSection(colorScheme),
-
-          const SizedBox(height: 24),
-
-          // UDI Section
-          _buildSectionHeader(
-            title: 'Unified ID (UDI)',
-            icon: LucideIcons.creditCard,
-            sectionKey: 'udi',
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          _buildUDISection(colorScheme),
 
           const SizedBox(height: 24),
 
@@ -1322,25 +1301,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
               _selectedBarangay = barangay;
             });
           },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUDISection(ColorScheme colorScheme) {
-    if (!_expandedSections['udi']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _udiController,
-          decoration: const InputDecoration(
-            labelText: 'Unified ID (UDI)',
-            hintText: 'Enter UDI',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
         ),
       ],
     );
