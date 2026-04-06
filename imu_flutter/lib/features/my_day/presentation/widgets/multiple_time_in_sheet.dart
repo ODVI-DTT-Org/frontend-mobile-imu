@@ -176,15 +176,60 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
 
           // Client list
           Expanded(
-            child: ListView.builder(
-              itemCount: widget.clients.length,
-              itemBuilder: (context, index) {
-                final client = widget.clients[index];
-                final isSelected = _selectedClientIds.contains(client.id);
+            child: widget.clients.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            LucideIcons.users,
+                            size: 48,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No clients available',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add clients to your My Day list first',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            icon: const Icon(LucideIcons.x, size: 16),
+                            label: const Text('Close'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3B82F6),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: widget.clients.length,
+                    itemBuilder: (context, index) {
+                      final client = widget.clients[index];
+                      final isSelected = _selectedClientIds.contains(client.id);
 
-                return _buildClientItem(client, isSelected);
-              },
-            ),
+                      return _buildClientItem(client, isSelected);
+                    },
+                  ),
           ),
 
           // Touchpoint details section
@@ -285,31 +330,41 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
               ),
             ),
             child: SafeArea(
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _canSubmit
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFF94A3B8),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _canSubmit
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFF94A3B8),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: _canSubmit && !_isSubmitting ? _handleBulkTouchpointSubmit : null,
+                      child: _isLoading || _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text('SUBMIT ${_selectedClientIds.length} TOUCHPOINT${_selectedClientIds.length > 1 ? 'S' : ''}'),
                     ),
                   ),
-                  onPressed: _canSubmit && !_isSubmitting ? _handleBulkTouchpointSubmit : null,
-                  child: _isLoading || _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text('SUBMIT ${_selectedClientIds.length} TOUCHPOINT${_selectedClientIds.length > 1 ? 'S' : ''}'),
-                ),
+                  // Show requirement hints when submit is disabled
+                  if (!_canSubmit && widget.clients.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _buildRequirementHints(),
+                  ],
+                ],
               ),
             ),
           ),
@@ -592,6 +647,63 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
   }
 
   bool get _canSubmit => _selectedClientIds.isNotEmpty && _locationCaptured && _selectedReason != null;
+
+  Widget _buildRequirementHints() {
+    final hints = <String>[];
+
+    if (_selectedClientIds.isEmpty) {
+      hints.add('• Select at least one client');
+    }
+    if (!_locationCaptured) {
+      hints.add('• Capture GPS location');
+    }
+    if (_selectedReason == null) {
+      hints.add('• Select a reason');
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEE2E2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEF4444)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.alertCircle,
+                size: 16,
+                color: Color(0xFFEF4444),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Required to submit:',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFEF4444),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...hints.map((hint) => Padding(
+                padding: const EdgeInsets.only(left: 24, bottom: 4),
+                child: Text(
+                  hint,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF991B1B),
+                  ),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
 
   void _toggleClient(String clientId) {
     HapticUtils.lightImpact();

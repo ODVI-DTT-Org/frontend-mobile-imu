@@ -6,6 +6,7 @@ import 'package:imu_flutter/shared/models/bulk_delete_models.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
 import 'package:imu_flutter/services/error_logging_helper.dart';
+import 'package:imu_flutter/services/auth/jwt_auth_service.dart' show jwtAuthProvider;
 
 /// Bulk Delete API Service
 /// Handles bulk delete operations for itineraries and My Day items

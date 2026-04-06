@@ -790,14 +790,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                     debugPrint('[ItineraryPage] item: ${item.clientName} - scheduledDate: $itemDate (${itemDate.year}-${itemDate.month}-${itemDate.day}) -> matches: $matches');
                   }
 
-                  // Filter items for the selected date and exclude completed visits
+                  // Filter items for the selected date and only show pending items
                   final filteredItems = items.where((item) {
                     final itemDate = item.scheduledDate;
                     final dateMatches = itemDate.year == targetDate.year &&
                            itemDate.month == targetDate.month &&
                            itemDate.day == targetDate.day;
-                    final isNotCompleted = item.status != 'completed';
-                    return dateMatches && isNotCompleted;
+                    final isPending = item.status == 'pending';
+                    return dateMatches && isPending;
                   }).toList();
 
                   debugPrint('[ItineraryPage] Filtered ${filteredItems.length} items for ${_getSelectedTabLabel()}');
