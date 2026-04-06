@@ -771,6 +771,23 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
       status: AttendanceStatus.checkedIn,
     );
 
+    // ✅ FIXED: Call API to sync to database when online
+    final isOnline = _ref.read(isOnlineProvider);
+    if (isOnline) {
+      try {
+        final attendanceApi = _ref.read(attendanceApiServiceProvider);
+        final apiRecord = await attendanceApi.checkIn(
+          latitude: location.latitude,
+          longitude: location.longitude,
+          notes: location.address,
+        );
+        debugPrint('TodayAttendanceNotifier: Check-in synced to database');
+      } catch (e) {
+        debugPrint('TodayAttendanceNotifier: Failed to sync check-in to database: $e');
+        // Continue with local save even if API fails
+      }
+    }
+
     await _saveRecord(record);
     state = record;
   }
@@ -784,6 +801,23 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
       checkOutLocation: location,
       status: AttendanceStatus.checkedOut,
     );
+
+    // ✅ FIXED: Call API to sync to database when online
+    final isOnline = _ref.read(isOnlineProvider);
+    if (isOnline) {
+      try {
+        final attendanceApi = _ref.read(attendanceApiServiceProvider);
+        final apiRecord = await attendanceApi.checkOut(
+          latitude: location.latitude,
+          longitude: location.longitude,
+          notes: location.address,
+        );
+        debugPrint('TodayAttendanceNotifier: Check-out synced to database');
+      } catch (e) {
+        debugPrint('TodayAttendanceNotifier: Failed to sync check-out to database: $e');
+        // Continue with local save even if API fails
+      }
+    }
 
     await _saveRecord(record);
     state = record;

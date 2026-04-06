@@ -285,6 +285,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             await myDayApiService.uploadSelfie(visit.clientId, result['photoPath']);
           }
 
+          // ✅ FIXED: Wait a moment for database transaction to commit before refreshing
+          // This ensures the itinerary status update is visible when we refetch
+          await Future.delayed(const Duration(milliseconds: 500));
+
           // Refresh itinerary to show updated status
           ref.invalidate(todayItineraryProvider);
         },
