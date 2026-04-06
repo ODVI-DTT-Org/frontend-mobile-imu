@@ -8,6 +8,7 @@ import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
+import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -104,60 +105,34 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   }
 
   Future<void> _onBulkRemove() async {
-    if (_selectedClientIds.isEmpty) return;
+    if (_selectedClientIds.isEmpty) {
+      showToast('No clients selected');
+      return;
+    }
 
     final selectedClients = ref.read(myDayStateProvider).clients.where((c) => _selectedClientIds.contains(c.id)).toList();
 
-    if (selectedClients.isEmpty) return;
+    if (selectedClients.isEmpty) {
+      showToast('No clients selected');
+      return;
+    }
 
     HapticUtils.lightImpact();
 
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
+    // Show bulk delete bottom sheet
+    await BulkDeleteBottomSheet.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Selected Clients'),
-        content: Text('Remove ${selectedClients.length} client(s) from today\'s list?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              HapticUtils.lightImpact();
-              Navigator.pop(context, false);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              HapticUtils.mediumImpact();
-              Navigator.pop(context, true);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      itemIds: _selectedClientIds.toList(),
+      itemType: 'clients',
+      onDelete: (ids) {
+        final bulkDeleteApi = ref.read(bulkDeleteApiServiceProvider);
+        return bulkDeleteApi.bulkRemoveFromMyDay(ids);
+      },
+      onComplete: () {
+        _exitMultiSelectMode();
+        ref.read(myDayStateProvider.notifier).refresh();
+      },
     );
-
-    if (confirmed == true && mounted) {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Removing clients...',
-        operation: () async {
-          final myDayApiService = ref.read(myDayApiServiceProvider);
-          for (final client in selectedClients) {
-            await myDayApiService.removeFromMyDay(client.clientId);
-          }
-          if (mounted) {
-            HapticUtils.success();
-            showToast('${selectedClients.length} client(s) removed from My Day');
-            await ref.read(myDayStateProvider.notifier).refresh();
-          }
-        },
-      );
-    }
-
-    // Exit multi-select mode after processing
-    _exitMultiSelectMode();
   }
 
   void _onMultipleTimeIn() {
