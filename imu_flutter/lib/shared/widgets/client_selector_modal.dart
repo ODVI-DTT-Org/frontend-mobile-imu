@@ -235,9 +235,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
           final clients = data.items;
           for (final client in clients) {
             final inItinerary = todayClients.any((c) => c.clientId == client.id);
+            // Only track inItinerary status, loanReleased is already available from client.loanReleased
             statuses[client.id!] = ClientStatus(
               inItinerary: inItinerary,
-              loanReleased: client.loanReleased,
+              loanReleased: client.loanReleased, // Keep for backward compatibility, but client.loanReleased is used
             );
           }
         },
@@ -277,9 +278,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         data: (data) {
           final clients = data.items;
           for (final client in clients) {
+            // Only track inItinerary status, loanReleased is already available from client.loanReleased
             statuses[client.id!] = ClientStatus(
               inItinerary: inItineraryIds.contains(client.id),
-              loanReleased: client.loanReleased,
+              loanReleased: client.loanReleased, // Keep for backward compatibility, but client.loanReleased is used
             );
           }
         },
@@ -460,10 +462,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   bool _canAddToItinerary(Client client, ClientStatus? status, TouchpointType nextType) {
-    // Check loan released
+    // Check loan released (client.loanReleased is already available from API data)
     if (client.loanReleased) return false;
 
-    // Check already in today's itinerary
+    // Check already in today's itinerary (from _clientStatuses)
     if (status?.inItinerary == true) return false;
 
     // Check next touchpoint type (Caravan can only do Visit: 1, 4, 7)
@@ -476,6 +478,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   String _getDisableReason(Client client, ClientStatus? status, TouchpointType nextType) {
+    // client.loanReleased is already available from API data
     if (client.loanReleased) return 'Loan released - cannot add';
     if (status?.inItinerary == true) return 'Already added today';
 
@@ -1016,10 +1019,13 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   spacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
-                    if (status?.loanReleased == true)
+                    // Use client.loanReleased directly from client data
+                    if (client.loanReleased)
                       _buildBadge('Loan Released', Colors.red, LucideIcons.ban),
+                    // Keep the "Already added" badge from _clientStatuses
                     if (status?.inItinerary == true)
                       _buildBadge('Already added', Colors.orange, LucideIcons.calendarCheck),
+                    // Touchpoint history badge uses ref.watch, so it updates reactively
                     _buildNextTouchpointBadge(client.id),
                   ],
                 ),
