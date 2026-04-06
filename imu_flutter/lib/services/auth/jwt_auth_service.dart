@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/user_role.dart' as core_models;
 import '../../core/utils/logger.dart';
@@ -70,6 +71,7 @@ class JwtUser {
 class JwtAuthService {
   final Dio _dio;
   final FlutterSecureStorage _storage;
+  SharedPreferences? _prefs;  // Fallback storage for Samsung devices
 
   String? _accessToken;
   String? _refreshToken;
@@ -100,7 +102,20 @@ class JwtAuthService {
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
         ),),
-        _storage = const FlutterSecureStorage();
+        _storage = FlutterSecureStorage() {
+    // Initialize SharedPreferences asynchronously
+    _initPreferences();
+  }
+
+  /// Initialize SharedPreferences
+  Future<void> _initPreferences() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      logDebug('[STORAGE] SharedPreferences initialized');
+    } catch (e) {
+      logError('[STORAGE] Failed to initialize SharedPreferences', e);
+    }
+  }
 
   /// Public constructor (for backwards compatibility, returns singleton)
   factory JwtAuthService({Dio? dio, FlutterSecureStorage? storage}) {
@@ -139,8 +154,34 @@ class JwtAuthService {
 
     try {
       logDebug('[JWT-INIT] Starting JwtAuthService initialization...');
+
+      // Try FlutterSecureStorage first
+      logDebug('[STORAGE-READ] Attempting to read access_token from secure storage...');
       _accessToken = await _storage.read(key: 'access_token');
+
+      // Fallback to SharedPreferences if secure storage is empty (Samsung workaround)
+      if (_accessToken == null && _prefs != null) {
+        logDebug('[STORAGE-READ] Secure storage empty, trying SharedPreferences...');
+        _accessToken = _prefs!.getString('access_token');
+        if (_accessToken != null) {
+          logDebug('[STORAGE-READ] Access token found in SharedPreferences (fallback worked!)');
+          // Restore to secure storage for next time
+          await _storage.write(key: 'access_token', value: _accessToken);
+          logDebug('[STORAGE-READ] Restored token to secure storage');
+        }
+      }
+
+      logDebug('[STORAGE-READ] Access token read: ${_accessToken != null ? "YES (" + _accessToken!.substring(0, 20) + "...)" : "NO"}');
+
+      logDebug('[STORAGE-READ] Attempting to read refresh_token from storage...');
       _refreshToken = await _storage.read(key: 'refresh_token');
+
+      // Fallback to SharedPreferences for refresh token
+      if (_refreshToken == null && _prefs != null) {
+        _refreshToken = _prefs!.getString('refresh_token');
+      }
+
+      logDebug('[STORAGE-READ] Refresh token read: ${_refreshToken != null ? "YES" : "NO"}');
 
       logDebug('[JWT-INIT] Access token found: ${_accessToken != null}');
       logDebug('[JWT-INIT] Refresh token found: ${_refreshToken != null}');
@@ -187,11 +228,43 @@ class JwtAuthService {
 
       _accessToken = response.data['access_token'];
       _refreshToken = response.data['refresh_token'];
+
+      logDebug('[LOGIN-RESPONSE] Access token received: ${_accessToken != null ? "YES (${_accessToken!.substring(0, 20)}...)" : "NO"}');
+      logDebug('[LOGIN-RESPONSE] Refresh token received: ${_refreshToken != null ? "YES" : "NO"}');
+
       _currentUser = JwtUser.fromToken(_accessToken!);
 
       // Store tokens securely
+      logDebug('[STORAGE] Saving access token to secure storage...');
       await _storage.write(key: 'access_token', value: _accessToken);
-      await _storage.write(key: 'refresh_token', value: _refreshToken);
+      logDebug('[STORAGE] Access token saved successfully');
+
+      // ALSO save to SharedPreferences as fallback for Samsung devices
+      if (_prefs != null) {
+        await _prefs!.setString('access_token', _accessToken!);
+        logDebug('[STORAGE] Access token also saved to SharedPreferences (fallback)');
+      }
+
+      // Verify token was actually stored by reading it back immediately
+      final verificationToken = await _storage.read(key: 'access_token');
+      logDebug('[STORAGE-VERIFY] Token verification read: ${verificationToken != null ? "SUCCESS" : "FAILED"}');
+      if (verificationToken != null) {
+        logDebug('[STORAGE-VERIFY] Token matches: ${verificationToken == _accessToken ? "YES" : "NO"}');
+      }
+
+      if (_refreshToken != null) {
+        logDebug('[STORAGE] Saving refresh token to secure storage...');
+        await _storage.write(key: 'refresh_token', value: _refreshToken);
+        logDebug('[STORAGE] Refresh token saved successfully');
+
+        // ALSO save to SharedPreferences as fallback
+        if (_prefs != null) {
+          await _prefs!.setString('refresh_token', _refreshToken!);
+          logDebug('[STORAGE] Refresh token also saved to SharedPreferences (fallback)');
+        }
+      } else {
+        logDebug('[STORAGE] No refresh token to save (backend did not provide one)');
+      }
 
       // Save login time for offline grace period
       final secureStorage = SecureStorageService();

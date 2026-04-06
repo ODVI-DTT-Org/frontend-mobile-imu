@@ -54,6 +54,7 @@ dependencies:
   # Authentication
   local_auth: ^2.1.8
   flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.2.2
 
   # UI Components
   flutter_svg: ^2.0.9

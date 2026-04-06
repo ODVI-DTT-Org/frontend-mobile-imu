@@ -96,6 +96,7 @@ class BackgroundSyncService extends ChangeNotifier {
     switch (state) {
       case AppLifecycleState.resumed:
         // App came to foreground - trigger sync
+        logDebug('[LIFECYCLE] App resumed - checking storage...');
         _onAppResumed();
         break;
       case AppLifecycleState.inactive:
@@ -103,7 +104,7 @@ class BackgroundSyncService extends ChangeNotifier {
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         // App went to background - just log
-        logDebug('BackgroundSyncService: App went to background');
+        logDebug('[LIFECYCLE] App paused/detached - storage may be cleared by Samsung memory management');
         break;
     }
   }

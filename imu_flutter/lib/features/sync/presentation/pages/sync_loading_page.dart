@@ -133,8 +133,25 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 
     state = state.copyWith(
       tableStatus: initialTableStatus,
-      currentStep: 'Connecting to PowerSync...',
+      currentStep: 'Checking for local data...',
     );
+
+    // CRITICAL: Check if we have local data FIRST before trying PowerSync
+    final hasLocalData = await _checkForLocalData();
+
+    if (hasLocalData) {
+      logDebug('[SyncLoadingPage] Local data found, skipping PowerSync connection');
+      state = state.copyWith(
+        isInitializing: false,
+        isSyncing: false,
+        isConnected: false,  // Not connected, but we have local data
+        syncComplete: true,
+        progress: 1.0,
+        currentStep: 'Using local data',
+      );
+      // Navigation handled by widget
+      return;
+    }
 
     // Check if already synced recently
     final lastSync = await _preferencesService.getLastSyncTime();
@@ -156,8 +173,26 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
       }
     }
 
-    // Start sync process
+    // No local data and no recent sync - try PowerSync
+    logDebug('[SyncLoadingPage] No local data found, attempting PowerSync sync...');
     await _startPowerSyncSync();
+  }
+
+  /// Check if we have any local data in the database
+  Future<bool> _checkForLocalData() async {
+    try {
+      // Check if clients table has any data
+      final result = await _powerSyncDb.getAll('SELECT COUNT(*) as count FROM clients');
+      final clientCount = result.first['count'] as int;
+
+      logDebug('[SyncLoadingPage] Local clients found: $clientCount');
+
+      // If we have ANY local clients, consider it as having local data
+      return clientCount > 0;
+    } catch (e) {
+      logWarning('[SyncLoadingPage] Failed to check for local data: $e');
+      return false;
+    }
   }
 
   Future<void> _startPowerSyncSync() async {
@@ -666,8 +701,13 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
       infoText = 'Please try again or contact support if the problem persists.';
       infoColor = Colors.red[700];
     } else if (syncState.syncComplete) {
-      infoText = 'Taking you to the home screen...';
-      infoColor = Colors.green[700];
+      if (syncState.currentStep == 'Using local data') {
+        infoText = 'PowerSync will sync in background when available. Taking you to the home screen...';
+        infoColor = Colors.orange[700];
+      } else {
+        infoText = 'Taking you to the home screen...';
+        infoColor = Colors.green[700];
+      }
     } else if (syncState.isInitializing) {
       infoText = 'Please wait while we initialize PowerSync...';
       infoColor = Colors.grey[600];
