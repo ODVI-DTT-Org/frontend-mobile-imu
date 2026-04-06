@@ -158,8 +158,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Check current authentication status
   Future<void> checkAuthStatus() async {
     if (!mounted) return;
+    if (!mounted) state = state.copyWith(isLoading: true);
 
-    state = state.copyWith(isLoading: true);
     try {
       await _authService.initialize();
 
@@ -182,8 +182,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Login with email and password
   Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     if (!mounted) return false;
+    if (!mounted) state = state.copyWith(isLoading: true, error: null);
 
-    state = state.copyWith(isLoading: true, error: null);
     try {
       final user = await _authService.login(email, password, rememberMe: rememberMe);
 
@@ -237,8 +237,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Logout current user
   Future<void> logout() async {
     if (!mounted) return;
-
-    state = state.copyWith(isLoading: true);
+    if (!mounted) state = state.copyWith(isLoading: true);
 
     // Disconnect from PowerSync
     try {
