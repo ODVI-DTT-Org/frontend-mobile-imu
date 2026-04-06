@@ -731,8 +731,29 @@ class Touchpoint {
   factory Touchpoint.fromJson(Map<String, dynamic> json) {
     TimeOfDay? parseTime(String? time) {
       if (time == null) return null;
+
+      // If it looks like a timestamp (contains 'T' or starts with year), parse as DateTime first
+      if (time.contains('T') || time.startsWith('20') || time.startsWith('19')) {
+        try {
+          final dt = DateTime.parse(time);
+          return TimeOfDay(hour: dt.hour, minute: dt.minute);
+        } catch (e) {
+          debugPrint('[Touchpoint] Failed to parse time from timestamp: "$time", error: $e');
+          // Fall through to simple parsing
+        }
+      }
+
+      // Simple "HH:MM" format parsing
       final parts = time.split(':');
-      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      if (parts.length >= 2) {
+        try {
+          return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+        } catch (e) {
+          debugPrint('[Touchpoint] Failed to parse time from simple format: "$time", error: $e');
+        }
+      }
+
+      return null;
     }
 
     // Robust DateTime parser that handles various ISO 8601 formats including microseconds

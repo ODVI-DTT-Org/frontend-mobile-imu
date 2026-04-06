@@ -22,6 +22,7 @@ import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart';
+import '../../../clients/presentation/widgets/edit_client_form_v2.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
 // Client detail provider
@@ -412,13 +413,77 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
   }
 
-  void _editClient() {
+  Future<void> _editClient() async {
     HapticUtils.lightImpact();
-    context.push('/clients/${widget.clientId}/edit').then((_) {
-      // Reload client data after edit
+
+    // Show edit form as a full-page modal with the client data preloaded
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            title: const Text('Edit Client'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.delete),
+                tooltip: 'Delete Client',
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Client'),
+                      content: const Text('Are you sure you want to delete this client?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && context.mounted) {
+                    // Handle delete
+                    final clientApi = ref.read(clientApiServiceProvider);
+                    try {
+                      await clientApi.deleteClient(widget.clientId);
+                      if (context.mounted) {
+                        Navigator.of(context).pop(); // Close edit form
+                        context.pop(); // Close client detail
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to delete client: $e')),
+                        );
+                      }
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+          body: EditClientFormV2(
+            clientId: widget.clientId,
+            initialClient: _client, // Pass the already-loaded client data
+            onSave: (savedClient) {
+              Navigator.of(context).pop(true); // Close edit form
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+
+    // Reload client data after edit if changes were made
+    if (result == true) {
       _loadClient();
       ref.invalidate(assignedClientsProvider);
-    });
+    }
   }
 
   Future<void> _handleLoanRelease() async {
