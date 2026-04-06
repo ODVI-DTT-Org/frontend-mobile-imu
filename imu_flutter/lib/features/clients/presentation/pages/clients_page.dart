@@ -16,7 +16,12 @@ import '../../../../shared/providers/app_providers.dart' show
     onlineClientSearchQueryProvider,
     onlineClientPageProvider,
     isOnlineProvider,
-    assignedMunicipalitiesProvider;
+    assignedMunicipalitiesProvider,
+    currentUserRoleProvider;
+import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
+import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
+import '../../../../shared/widgets/client/client_status_badge.dart';
+import '../../../../models/client_status.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
@@ -1000,6 +1005,34 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                     LucideIcons.chevronRight,
                     size: 18,
                     color: Colors.grey.shade400,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Touchpoint progress and status badges (replicated from ClientSelectorModal)
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.start,
+                children: [
+                  TouchpointProgressBadge(client: client),
+                  TouchpointStatusBadge(client: client),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // Overall status badge (Loan Released, Visited today, Already added, Call Touchpoint)
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.start,
+                children: [
+                  ClientStatusBadge(
+                    client: client,
+                    status: ClientStatus(
+                      inItinerary: isInMyDay,
+                      loanReleased: client.loanReleased,
+                    ),
+                    currentUserRole: ref.watch(currentUserRoleProvider),
                   ),
                 ],
               ),
