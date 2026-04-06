@@ -15,6 +15,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
+import '../../../../shared/providers/app_providers.dart' show bulkDeleteApiServiceProvider;
 import '../../../../features/clients/data/models/client_model.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';

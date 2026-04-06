@@ -18,6 +18,7 @@ import '../../../../services/api/itinerary_api_service.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
+import '../../../../shared/providers/app_providers.dart' show bulkDeleteApiServiceProvider;
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
@@ -775,14 +776,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                     debugPrint('[ItineraryPage] item: ${item.clientName} - scheduledDate: $itemDate (${itemDate.year}-${itemDate.month}-${itemDate.day}) -> matches: $matches');
                   }
 
-                  // Filter items for the selected date and only show pending items
+                  // Filter items for the selected date and exclude completed visits
                   final filteredItems = items.where((item) {
                     final itemDate = item.scheduledDate;
                     final dateMatches = itemDate.year == targetDate.year &&
                            itemDate.month == targetDate.month &&
                            itemDate.day == targetDate.day;
-                    final isPending = item.status == 'pending';
-                    return dateMatches && isPending;
+                    final isNotCompleted = item.status != 'completed';
+                    return dateMatches && isNotCompleted;
                   }).toList();
 
                   debugPrint('[ItineraryPage] Filtered ${filteredItems.length} items for ${_getSelectedTabLabel()}');

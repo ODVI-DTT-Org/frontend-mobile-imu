@@ -329,7 +329,7 @@ class _BulkDeleteBottomSheetState extends State<BulkDeleteBottomSheet> {
             shrinkWrap: true,
             itemCount: _result!.errors.length,
             itemBuilder: (context, index) {
-              final error = _result.errors[index];
+              final error = _result!.errors[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
