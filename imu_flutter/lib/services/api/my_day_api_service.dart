@@ -155,6 +155,7 @@ class MyDayApiService {
           },
         ),
         data: {
+          'client_id': clientId,
           'scheduled_date': scheduledDateStr,
         },
       );

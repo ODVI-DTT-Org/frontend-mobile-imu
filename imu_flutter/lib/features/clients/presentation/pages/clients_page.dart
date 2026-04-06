@@ -1,4 +1,4 @@
-// Simplified Clients page with My Clients / All Clients filters and pagination
+// Simplified Clients page with Assigned Clients / All Clients filters and pagination
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +9,9 @@ import '../../../../core/utils/debounce_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../../../shared/providers/app_providers.dart' show
-    clientsProvider,
+    assignedClientsProvider,
+    assignedClientSearchQueryProvider,
+    assignedClientPageProvider,
     onlineClientsProvider,
     onlineClientSearchQueryProvider,
     onlineClientPageProvider,
@@ -32,13 +34,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   final _searchController = TextEditingController();
   final _searchDebounce = Debounce(milliseconds: 300);
   String _searchQuery = '';
-  bool _showMyClientsOnly = true; // true = My Clients (PowerSync), false = All Clients (Online)
+  bool _showAssignedClientsOnly = true; // true = Assigned Clients (API with municipality filter, cached), false = All Clients (API, no filter)
 
-  // Pagination
-  final int _itemsPerPage = 20;
+  // Pagination - server-side
+  final int _itemsPerPage = 10;
   int _currentPage = 1;
-  List<Client> _allClients = [];
-  List<Client> _filteredClients = [];
 
   @override
   void initState() {
@@ -60,8 +60,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         if (!mounted) return;
 
         // Update the appropriate search query provider based on mode
-        if (_showMyClientsOnly) {
-          // My Clients: filter locally (PowerSync already has territory-filtered data)
+        if (_showAssignedClientsOnly) {
+          // Assigned Clients: update assigned search query provider
+          ref.read(assignedClientSearchQueryProvider.notifier).state = _searchQuery;
         } else {
           // All Clients: update online search query provider
           ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
@@ -77,41 +78,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     super.dispose();
   }
 
-  List<Client> _getPaginatedClients() {
-    if (_filteredClients.isEmpty) return [];
-
-    // For online mode, the server already paginated, so return all items
-    // For offline mode (My Clients), paginate locally
-    if (!_showMyClientsOnly) {
-      return _filteredClients;
-    }
-
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    final endIndex = startIndex + _itemsPerPage;
-
-    if (startIndex >= _filteredClients.length) return [];
-    if (endIndex > _filteredClients.length) {
-      return _filteredClients.sublist(startIndex);
-    }
-    return _filteredClients.sublist(startIndex, endIndex);
+  int _totalPages(ClientsResponse meta) {
+    return meta.totalPages;
   }
 
-  int _totalPages([ClientsResponse? onlineMeta]) {
-    // For online mode, use server's total pages
-    if (!_showMyClientsOnly && onlineMeta != null) {
-      return onlineMeta.totalPages;
-    }
-    // For offline mode, calculate locally
-    return (_filteredClients.length / _itemsPerPage).ceil();
-  }
-
-  int _totalItems([ClientsResponse? onlineMeta]) {
-    // For online mode, use server's total items
-    if (!_showMyClientsOnly && onlineMeta != null) {
-      return onlineMeta.totalItems;
-    }
-    // For offline mode, use filtered count
-    return _filteredClients.length;
+  int _totalItems(ClientsResponse meta) {
+    return meta.totalItems;
   }
 
   void _goToPage(int page) {
@@ -124,8 +96,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     Future.microtask(() {
       if (!mounted) return;
 
-      // For online mode, update the provider's page state and invalidate to trigger refetch
-      if (!_showMyClientsOnly) {
+      // Update the appropriate provider's page state and invalidate to trigger refetch
+      if (_showAssignedClientsOnly) {
+        ref.read(assignedClientPageProvider.notifier).state = page;
+        ref.invalidate(assignedClientsProvider);
+      } else {
         ref.read(onlineClientPageProvider.notifier).state = page;
         ref.invalidate(onlineClientsProvider);
       }
@@ -135,8 +110,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   void _handleRefresh() async {
     HapticUtils.lightImpact();
     // Refresh the appropriate provider based on current mode
-    if (_showMyClientsOnly) {
-      ref.invalidate(clientsProvider);
+    if (_showAssignedClientsOnly) {
+      ref.invalidate(assignedClientsProvider);
     } else {
       ref.invalidate(onlineClientsProvider);
     }
@@ -180,59 +155,22 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     final isTablet = screenWidth > 600;
 
     // Choose provider based on mode
-    // My Clients = PowerSync (offline, territory-filtered)
+    // Assigned Clients = API with municipality filter (cached for offline)
     // All Clients = Online API (search all clients in database)
-    final clientsAsync = _showMyClientsOnly
-        ? ref.watch(clientsProvider)
+    final clientsAsync = _showAssignedClientsOnly
+        ? ref.watch(assignedClientsProvider)
         : ref.watch(onlineClientsProvider);
 
     return clientsAsync.when(
       data: (data) {
-        // Handle different return types: List<Client> vs ClientsResponse
-        final clients = _showMyClientsOnly ? data as List<Client> : (data as ClientsResponse).items;
+        // Both providers now return ClientsResponse
+        final clients = data.items;
+        final meta = data;
 
-        // For online mode, get pagination metadata from response
-        final onlineMeta = _showMyClientsOnly ? null : (data as ClientsResponse);
-
-        // Get assigned municipalities from async provider
-        final assignedMunicipalities = assignedMunicipalitiesAsync.when(
-          data: (municipalities) => municipalities,
-          loading: () => [],
-          error: (_, __) => [],
-        );
-
-        // Filter clients based on selected mode
-        _allClients = clients;
-        final query = _searchQuery.toLowerCase();
-
-        // My Clients: filter by territory and search locally
-        // All Clients: already filtered by search query in provider, just paginate
-        _filteredClients = clients.where((client) {
-          if (_showMyClientsOnly) {
-            // My Clients: filter by assigned municipalities
-            // Construct municipality ID from client's province and municipality
-            final clientMunicipalityId = client.province != null && client.municipality != null
-                ? '${client.province}-${client.municipality}'
-                : null;
-            final matchesViewMode = clientMunicipalityId != null &&
-                assignedMunicipalities.contains(clientMunicipalityId);
-
-            // Filter by search (local)
-            final matchesSearch = query.isEmpty ||
-                client.fullName.toLowerCase().contains(query) ||
-                (client.municipality != null &&
-                 client.municipality!.toLowerCase().contains(query));
-
-            return matchesViewMode && matchesSearch;
-          } else {
-            // All Clients: already searched on server, just return as-is
-            return true;
-          }
-        }).toList();
-
-        final paginatedClients = _getPaginatedClients();
-        final totalPages = _totalPages(onlineMeta);
-        final totalItems = _totalItems(onlineMeta);
+        // Server handles filtering and pagination, just display the results
+        final paginatedClients = clients;
+        final totalPages = _totalPages(meta);
+        final totalItems = _totalItems(meta);
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -276,7 +214,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                           const Spacer(),
                           // Title
                           Text(
-                            _showMyClientsOnly ? 'My Clients' : 'All Clients',
+                            _showAssignedClientsOnly ? 'Assigned Clients' : 'All Clients',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -288,13 +226,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      // Toggle between My Clients and All Clients
+                      // Toggle between Assigned Clients and All Clients
                       Row(
                         children: [
-                          _buildFilterToggle('My Clients', _showMyClientsOnly, () {
+                          _buildFilterToggle('Assigned Clients', _showAssignedClientsOnly, () {
                             HapticUtils.lightImpact();
                             setState(() {
-                              _showMyClientsOnly = true;
+                              _showAssignedClientsOnly = true;
                               _currentPage = 1;
                               _searchQuery = '';
                               _searchController.clear();
@@ -302,12 +240,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             // Defer provider updates until after build cycle
                             Future.microtask(() {
                               if (!mounted) return;
-                              // Invalidate online provider when switching back to My Clients
+                              // Invalidate online provider when switching back to Assigned Clients
                               ref.invalidate(onlineClientsProvider);
                             });
                           }),
                           const SizedBox(width: 8),
-                          _buildFilterToggle('All Clients', !_showMyClientsOnly, () {
+                          _buildFilterToggle('All Clients', !_showAssignedClientsOnly, () {
                             HapticUtils.lightImpact();
                             // Check if online before switching to All Clients
                             final isOnlineNow = ref.read(isOnlineProvider);
@@ -316,7 +254,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               return;
                             }
                             setState(() {
-                              _showMyClientsOnly = false;
+                              _showAssignedClientsOnly = false;
                               _currentPage = 1;
                               _searchQuery = '';
                               _searchController.clear();
@@ -332,7 +270,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                         ],
                       ),
                       // Show online indicator when in All Clients mode
-                      if (!_showMyClientsOnly)
+                      if (!_showAssignedClientsOnly)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Row(
@@ -392,7 +330,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 const SizedBox(height: 12),
 
                 // Top Pagination Info
-                if (_filteredClients.isNotEmpty)
+                if (totalItems > 0)
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
                     child: _buildTopPagination(totalItems, totalPages),
@@ -404,21 +342,46 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 Expanded(
                   child: paginatedClients.isEmpty
                       ? _buildEmptyState()
-                      : RefreshIndicator(
-                          onRefresh: () async => _handleRefresh(),
-                          child: ListView.builder(
-                            padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-                            itemCount: paginatedClients.length,
-                            itemBuilder: (context, index) {
-                              final client = paginatedClients[index];
-                              return _buildClientCard(client);
-                            },
-                          ),
+                      : Column(
+                          children: [
+                            // Add Client button (always visible when there are clients)
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17, vertical: 8),
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton.icon(
+                                onPressed: _showAddClientModal,
+                                icon: const Icon(LucideIcons.plus, size: 18),
+                                label: const Text('Add Client'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F172A),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Client list
+                            Expanded(
+                              child: RefreshIndicator(
+                                onRefresh: () async => _handleRefresh(),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
+                                  itemCount: paginatedClients.length,
+                                  itemBuilder: (context, index) {
+                                    final client = paginatedClients[index];
+                                    return _buildClientCard(client);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                 ),
 
                 // Bottom Pagination
-                if (_filteredClients.isNotEmpty)
+                if (totalItems > 0)
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17, vertical: 16),
                     child: _buildBottomPagination(totalPages),
@@ -516,24 +479,24 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: _showMyClientsOnly
+                  color: _showAssignedClientsOnly
                       ? Colors.red.shade50
                       : Colors.orange.shade50,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _showMyClientsOnly
+                  _showAssignedClientsOnly
                       ? LucideIcons.alertCircle
                       : LucideIcons.wifiOff,
                   size: 40,
-                  color: _showMyClientsOnly
+                  color: _showAssignedClientsOnly
                       ? Colors.red.shade400
                       : Colors.orange.shade400,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                _showMyClientsOnly
+                _showAssignedClientsOnly
                     ? 'Failed to load clients'
                     : 'Cannot search all clients',
                 style: TextStyle(
@@ -551,24 +514,24 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
-                  if (_showMyClientsOnly) {
-                    ref.invalidate(clientsProvider);
+                  if (_showAssignedClientsOnly) {
+                    ref.invalidate(assignedClientsProvider);
                   } else {
                     ref.invalidate(onlineClientsProvider);
                   }
                 },
-                child: Text(_showMyClientsOnly ? 'Retry' : 'Check Connection'),
+                child: Text(_showAssignedClientsOnly ? 'Retry' : 'Check Connection'),
               ),
-              if (!_showMyClientsOnly) ...[
+              if (!_showAssignedClientsOnly) ...[
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () {
                     setState(() {
-                      _showMyClientsOnly = true;
+                      _showAssignedClientsOnly = true;
                       _currentPage = 1;
                     });
                   },
-                  child: const Text('Switch to My Clients (Offline)'),
+                  child: const Text('Switch to Assigned Clients (Offline)'),
                 ),
               ],
             ],
@@ -610,12 +573,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   Widget _buildTopPagination(int totalItems, int totalPages) {
     // For online mode, show actual counts from server
     // For offline mode, calculate local pagination
-    final startIndex = _showMyClientsOnly
+    final startIndex = _showAssignedClientsOnly
         ? (_currentPage - 1) * _itemsPerPage + 1
-        : (_currentPage - 1) * 50 + 1; // Server uses perPage=50
-    final endIndex = _showMyClientsOnly
-        ? (_currentPage * _itemsPerPage).clamp(1, _filteredClients.length)
-        : (_currentPage * 50).clamp(1, totalItems);
+        : (_currentPage - 1) * 10 + 1; // Server uses perPage=10
+    final endIndex = _showAssignedClientsOnly
+        ? (_currentPage * _itemsPerPage).clamp(1, totalItems)
+        : (_currentPage * 10).clamp(1, totalItems);
 
     return Row(
       children: [
@@ -758,7 +721,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _showMyClientsOnly ? LucideIcons.users : LucideIcons.search,
+              _showAssignedClientsOnly ? LucideIcons.users : LucideIcons.search,
               size: 40,
               color: Colors.grey.shade400,
             ),
@@ -766,7 +729,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty
-                ? (_showMyClientsOnly ? 'No assigned clients' : 'No clients found')
+                ? (_showAssignedClientsOnly ? 'No assigned clients' : 'No clients found')
                 : 'No clients found',
             style: TextStyle(
               fontSize: 18,
@@ -777,13 +740,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           const SizedBox(height: 8),
           Text(
             _searchQuery.isEmpty
-                ? (_showMyClientsOnly
+                ? (_showAssignedClientsOnly
                     ? 'Add your first client to get started'
                     : 'Try searching for clients by name')
                 : 'Try a different search term',
             style: TextStyle(color: Colors.grey.shade500),
           ),
-          if (_searchQuery.isEmpty && _showMyClientsOnly) ...[
+          if (_searchQuery.isEmpty) ...[
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _showAddClientModal,
@@ -1031,8 +994,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               // Quick actions and Add button row
               Row(
                 children: [
-                  // Quick action: Navigate (only in My Clients tab)
-                  if (_showMyClientsOnly && primaryAddress != null)
+                  // Quick action: Navigate (only in Assigned Clients tab)
+                  if (_showAssignedClientsOnly && primaryAddress != null)
                     _QuickActionButton(
                       icon: LucideIcons.navigation,
                       label: 'Navigate',

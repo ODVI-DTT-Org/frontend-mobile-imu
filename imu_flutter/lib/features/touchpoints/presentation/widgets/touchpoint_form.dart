@@ -11,6 +11,8 @@ import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../providers/touchpoint_form_provider.dart';
 import '../../../clients/data/models/client_model.dart' hide TimeOfDay;
 import '../../../../app.dart' show showToast;
+import '../../../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
+import '../../../my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
   final String clientId;
@@ -908,6 +910,9 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         // Success
         if (mounted) {
           showToast('Touchpoint recorded successfully');
+          // Invalidate providers to refresh my day and itinerary lists
+          ref.invalidate(todayItineraryProvider);
+          ref.invalidate(myDayStateProvider);
           Navigator.pop(context);
         }
       } else {

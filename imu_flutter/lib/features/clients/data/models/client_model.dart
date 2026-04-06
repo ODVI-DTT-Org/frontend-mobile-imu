@@ -125,7 +125,6 @@ class Client {
         barangay: barangay,
         city: municipality ?? '',
         province: province,
-        zipCode: null,
         isPrimary: true,
         latitude: null,
         longitude: null,
@@ -431,24 +430,32 @@ enum PensionType {
   none,
 }
 
+enum AddressType {
+  home,
+  work,
+  mailing,
+}
+
 class Address {
   final String id;
+  final AddressType type;
   final String street;
   final String? barangay;
   final String city;
   final String? province;
-  final String? zipCode;
+  final String? postalCode;
   final bool isPrimary;
   final double? latitude;
   final double? longitude;
 
   Address({
     required this.id,
+    this.type = AddressType.home,
     required this.street,
     this.barangay,
     required this.city,
     this.province,
-    this.zipCode,
+    this.postalCode,
     this.isPrimary = false,
     this.latitude,
     this.longitude,
@@ -459,17 +466,18 @@ class Address {
     if (barangay != null) parts.add(barangay!);
     parts.add(city);
     if (province != null) parts.add(province!);
-    if (zipCode != null) parts.add(zipCode!);
+    if (postalCode != null) parts.add(postalCode!);
     return parts.join(', ');
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'type': type.name,
     'street': street,
     'barangay': barangay,
     'city': city,
     'province': province,
-    'zipCode': zipCode,
+    'postal_code': postalCode,
     'isPrimary': isPrimary,
     'latitude': latitude,
     'longitude': longitude,
@@ -477,25 +485,38 @@ class Address {
 
   factory Address.fromJson(Map<String, dynamic> json) => Address(
     id: json['id'] ?? '',
+    type: json['type'] != null
+        ? AddressType.values.firstWhere(
+            (e) => e.name == json['type'],
+            orElse: () => AddressType.home,
+          )
+        : AddressType.home,
     street: json['street'] ?? '',
     barangay: json['barangay'],
     city: json['city'] ?? '',
     province: json['province'],
-    zipCode: json['zipCode'],
+    postalCode: json['postal_code'] ?? json['zipCode'], // Handle both old and new field names
     isPrimary: json['isPrimary'] ?? false,
     latitude: json['latitude'],
     longitude: json['longitude'],
   );
 }
 
+enum PhoneType {
+  mobile,
+  landline,
+}
+
 class PhoneNumber {
   final String id;
+  final PhoneType type;
   final String number;
   final String? label;
   final bool isPrimary;
 
   PhoneNumber({
     required this.id,
+    this.type = PhoneType.mobile,
     required this.number,
     this.label,
     this.isPrimary = false,
@@ -503,6 +524,7 @@ class PhoneNumber {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'type': type.name,
     'number': number,
     'label': label,
     'isPrimary': isPrimary,
@@ -510,6 +532,12 @@ class PhoneNumber {
 
   factory PhoneNumber.fromJson(Map<String, dynamic> json) => PhoneNumber(
     id: json['id'] ?? '',
+    type: json['type'] != null
+        ? PhoneType.values.firstWhere(
+            (e) => e.name == json['type'],
+            orElse: () => PhoneType.mobile,
+          )
+        : PhoneType.mobile,
     number: json['number'] ?? '',
     label: json['label'],
     isPrimary: json['isPrimary'] ?? false,

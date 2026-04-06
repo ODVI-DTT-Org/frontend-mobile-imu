@@ -76,8 +76,8 @@ class _PinSetupPageState extends ConsumerState<PinSetupPage> {
         // Save PIN securely (hashed)
         await _secureStorage.savePin(_pin, userId: userId);
 
-        // Update the PIN state so router knows we have a PIN now
-        ref.read(pinStateProvider.notifier).setHasPin(true);
+        // NOTE: PIN state provider is disabled - router doesn't check for PIN
+        // ref.read(pinStateProvider.notifier).setHasPin(true);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

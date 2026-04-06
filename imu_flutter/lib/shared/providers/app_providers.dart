@@ -11,6 +11,7 @@ export '../../services/api/background_sync_service.dart' show backgroundSyncServ
 // Re-export auth providers
 export '../../services/auth/jwt_auth_service.dart' show jwtAuthProvider;
 export '../../services/auth/offline_auth_service.dart' show offlineAuthProvider;
+export './app_providers.dart' show authNotifierProvider;
 // Re-export permission providers
 export 'permission_providers.dart' show
   permissionServiceProvider,
@@ -41,7 +42,7 @@ import '../../features/visits/data/models/missed_visit_model.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
 import '../../features/profile/data/models/user_profile.dart';
 import '../../core/models/user_role.dart';
-import '../../services/auth/auth_service.dart' show jwtAuthProvider, authNotifierProvider;
+import '../../services/auth/auth_service.dart' show AuthService, AuthNotifier, AuthState, jwtAuthProvider;
 import '../../services/auth/offline_auth_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/api/client_api_service.dart';
@@ -75,7 +76,39 @@ final geolocationServiceProvider = Provider<GeolocationService>((ref) {
 // are defined in connectivity_service.dart - use that import
 
 // ==================== Auth Providers ====================
-// Note: Primary auth state is managed by authNotifierProvider in auth_service.dart
+
+/// Provider for authentication service
+final authServiceProvider = Provider<AuthService>((ref) {
+  final jwtAuth = ref.watch(jwtAuthProvider);
+  return AuthService(jwtAuth: jwtAuth);
+});
+
+/// Provider for authentication state with initial sync callback
+final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final authService = ref.watch(authServiceProvider);
+
+  // Create initial sync callback that triggers assigned clients sync
+  Future<void> onLoginSuccess() async {
+    try {
+      debugPrint('[INITIAL SYNC] Login successful - triggering initial client sync...');
+
+      // Invalidate assigned clients provider to trigger sync
+      // This will fetch all assigned clients from API and cache to Hive
+      ref.invalidate(assignedClientsProvider);
+
+      debugPrint('[INITIAL SYNC] Initial client sync triggered');
+    } catch (e) {
+      debugPrint('[INITIAL SYNC] Failed to trigger initial sync: $e');
+    }
+  }
+
+  final notifier = AuthNotifier(authService, onLoginSuccess: onLoginSuccess);
+
+  // Check auth status on initialization
+  notifier.checkAuthStatus();
+
+  return notifier;
+});
 
 /// Authentication state - derived from authNotifierProvider
 final isAuthenticatedProvider = Provider<bool>((ref) {
@@ -134,111 +167,6 @@ final offlineAuthProvider = Provider<OfflineAuthService>((ref) {
 
 // ==================== Client Providers ====================
 
-/// All clients - tries PowerSync first, then REST API, then Hive cache
-final clientsProvider = FutureProvider<List<Client>>((ref) async {
-  final hiveService = ref.watch(hiveServiceProvider);
-  final isOnline = ref.watch(isOnlineProvider);
-
-  if (!hiveService.isInitialized) {
-    await hiveService.init();
-  }
-
-  debugPrint('=== FETCHING CLIENTS ===');
-  debugPrint('Is Online: $isOnline');
-  debugPrint('PowerSync Connected: ${PowerSyncService.isConnected}');
-
-  // Try to fetch from PowerSync first
-  if (PowerSyncService.isConnected) {
-    try {
-      debugPrint('Fetching clients from PowerSync...');
-      final result = await PowerSyncService.query('SELECT * FROM clients ORDER BY created_at DESC');
-      debugPrint('PowerSync returned ${result.length} clients');
-
-      if (result.isNotEmpty) {
-        final clients = result.map((row) {
-          debugPrint('PowerSync client row: $row');
-          return Client.fromRow(row);
-        }).toList();
-        debugPrint('Converted ${clients.length} clients from PowerSync');
-        return clients;
-      } else {
-        debugPrint('PowerSync query returned empty results');
-      }
-    } catch (e) {
-      debugPrint('Failed to fetch clients from PowerSync: $e');
-    }
-  } else {
-    debugPrint('PowerSync not connected, skipping');
-  }
-
-  // Try REST API if online
-  if (isOnline) {
-    try {
-      debugPrint('Fetching clients from REST API...');
-      final clientApi = ref.watch(clientApiServiceProvider);
-      final response = await clientApi.fetchClients();
-      final clients = response.items;
-      debugPrint('REST API returned ${clients.length} clients');
-
-      if (clients.isNotEmpty) {
-        // Cache clients to Hive for offline use
-        for (final client in clients) {
-          await hiveService.addClient(client.toJson());
-        }
-        debugPrint('Cached ${clients.length} clients to Hive');
-        return clients;
-      } else {
-        debugPrint('REST API returned empty results');
-      }
-    } catch (e) {
-      debugPrint('Failed to fetch clients from REST API: $e');
-    }
-  }
-
-  // Fall back to local Hive cache
-  debugPrint('Using local Hive cache for clients');
-  final clientsData = hiveService.getAllClients();
-  final clients = clientsData.map((data) => Client.fromJson(data)).toList();
-  debugPrint('Hive cache returned ${clients.length} clients');
-  debugPrint('=== END CLIENT FETCH ===');
-  return clients;
-});
-
-/// Filtered clients by search query
-final clientSearchQueryProvider = StateProvider<String>((ref) => '');
-
-/// Filtered clients by type
-final clientTypeFilterProvider = StateProvider<ClientType?>((ref) => null);
-
-/// Filtered clients list
-final filteredClientsProvider = Provider<List<Client>>((ref) {
-  final clientsAsync = ref.watch(clientsProvider);
-  final searchQuery = ref.watch(clientSearchQueryProvider);
-  final typeFilter = ref.watch(clientTypeFilterProvider);
-
-  return clientsAsync.when(
-    data: (clients) {
-      var filtered = clients;
-
-      // Filter by search query
-      if (searchQuery.isNotEmpty) {
-        final query = searchQuery.toLowerCase();
-        filtered = filtered.where((c) {
-          return c.fullName.toLowerCase().contains(query);
-        }).toList();
-      }
-
-      // Filter by client type
-      if (typeFilter != null) {
-        filtered = filtered.where((c) => c.clientType == typeFilter).toList();
-      }
-
-      return filtered;
-    },
-    loading: () => [],
-    error: (_, __) => [],
-  );
-});
 
 // ==================== Online-Only Client Providers ====================
 
@@ -247,6 +175,22 @@ final onlineClientSearchQueryProvider = StateProvider<String>((ref) => '');
 
 /// Online clients pagination state
 final onlineClientPageProvider = StateProvider<int>((ref) => 1);
+
+/// Assigned clients search query state
+final assignedClientSearchQueryProvider = StateProvider<String>((ref) => '');
+
+/// Assigned clients pagination state
+final assignedClientPageProvider = StateProvider<int>((ref) => 1);
+
+/// Assigned clients response metadata (totalItems, totalPages)
+final assignedClientsMetaProvider = Provider<ClientsResponse?>((ref) {
+  final asyncValue = ref.watch(assignedClientsProvider);
+  return asyncValue.when(
+    data: (response) => response,
+    loading: () => null,
+    error: (_, __) => null,
+  );
+});
 
 /// Online clients response metadata (totalItems, totalPages)
 final onlineClientsMetaProvider = Provider<ClientsResponse?>((ref) {
@@ -258,19 +202,13 @@ final onlineClientsMetaProvider = Provider<ClientsResponse?>((ref) {
   );
 });
 
-/// Online clients - fetches clients from REST API with area-based filtering
-/// This is used for "All Clients" mode to search beyond territory-filtered PowerSync data
-/// Area filtering rules:
-/// - Admin: No filtering (see all clients)
-/// - Assistant Area Manager: No filtering (see all clients)
-/// - Area Manager: Filter by assigned municipalities
-/// - Caravan/Tele: Filter by assigned municipalities
+/// Online clients - fetches ALL clients from REST API without area-based filtering
+/// This is used for "All Clients" mode to search the entire client database
+/// NO territory filtering - simple SELECT * with LIMIT/OFFSET pagination
 final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(onlineClientSearchQueryProvider);
   final page = ref.watch(onlineClientPageProvider);
-  final userRole = ref.watch(currentUserRoleProvider);
-  final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
 
   // Must be online to fetch all clients
   if (!isOnline) {
@@ -278,37 +216,17 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     throw Exception('Device is offline. Please connect to the internet to search all clients.');
   }
 
-  // Determine municipality IDs based on user role
-  List<String>? municipalityIds;
-  final shouldFilterByArea = switch (userRole) {
-    UserRole.admin || UserRole.assistantAreaManager => false,
-    UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
-  };
-
-  if (shouldFilterByArea) {
-    // Extract municipality IDs from assigned municipalities
-    municipalityIds = assignedMunicipalitiesAsync.when(
-      data: (ids) => ids.isNotEmpty ? ids : null,
-      loading: () => null,
-      error: (_, __) => null,
-    );
-
-    debugPrint('onlineClientsProvider: User role $userRole - filtering by ${municipalityIds?.length ?? 0} municipalities');
-  } else {
-    debugPrint('onlineClientsProvider: User role $userRole - no area filtering');
-  }
-
   try {
-    debugPrint('onlineClientsProvider: Fetching clients from online API...');
+    debugPrint('onlineClientsProvider: Fetching ALL clients from online API (no area filtering)...');
     debugPrint('onlineClientsProvider: Search query: "$searchQuery", Page: $page');
 
     final clientApi = ref.watch(clientApiServiceProvider);
 
     final response = await clientApi.fetchClients(
       page: page,
-      perPage: 50,
+      perPage: 10, // Paginate 10 items per page
       search: searchQuery.isNotEmpty ? searchQuery : null,
-      municipalityIds: municipalityIds,
+      municipalityIds: null, // NO AREA FILTERING - fetch all clients
     );
 
     debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
@@ -318,6 +236,116 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     rethrow;
   }
 });
+
+/// Assigned clients - Uses Hive cache with API refresh in background
+/// This is used for "Assigned Clients" mode to show clients in user's territory
+///
+/// Strategy:
+/// 1. Load from Hive cache immediately (fast, works offline)
+/// 2. Apply pagination locally
+/// 3. If online, trigger background refresh from API
+/// 4. Update Hive cache when API returns
+final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
+  final isOnline = ref.watch(isOnlineProvider);
+  final searchQuery = ref.watch(assignedClientSearchQueryProvider);
+  final page = ref.watch(assignedClientPageProvider);
+  final hiveService = ref.watch(hiveServiceProvider);
+
+  debugPrint('=== ASSIGNED CLIENTS FETCH ===');
+  debugPrint('Is Online: $isOnline');
+  debugPrint('Search query: "$searchQuery", Page: $page');
+
+  // Initialize Hive if needed
+  if (!hiveService.isInitialized) {
+    await hiveService.init();
+  }
+
+  // Step 1: Load from Hive cache immediately
+  debugPrint('assignedClientsProvider: Loading from Hive cache...');
+  final clientsData = hiveService.getAllClients();
+  var cachedClients = clientsData.map((data) => Client.fromJson(data)).toList();
+
+  debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from Hive cache');
+
+  // Apply search filter locally if needed
+  if (searchQuery.isNotEmpty) {
+    final query = searchQuery.toLowerCase();
+    cachedClients = cachedClients.where((c) => c.fullName.toLowerCase().contains(query)).toList();
+  }
+
+  // Calculate pagination locally
+  const itemsPerPage = 10;
+  final totalItems = cachedClients.length;
+  final totalPages = (totalItems / itemsPerPage).ceil();
+  final startIndex = (page - 1) * itemsPerPage;
+  final endIndex = (startIndex + itemsPerPage).clamp(0, totalItems);
+  final paginatedClients = cachedClients.sublist(startIndex, endIndex);
+
+  debugPrint('assignedClientsProvider: Showing ${paginatedClients.length} of $totalItems clients (page $page of $totalPages) from cache');
+
+  // Step 2: If online, trigger background refresh from API
+  if (isOnline) {
+    // Don't wait - trigger in background
+    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery);
+  }
+
+  // Return cached data immediately
+  debugPrint('=== ASSIGNED CLIENTS FETCH COMPLETE ===');
+  return ClientsResponse(
+    items: paginatedClients,
+    page: page,
+    perPage: itemsPerPage,
+    totalItems: totalItems,
+    totalPages: totalPages,
+  );
+});
+
+/// Background refresh function - fetches from API and updates Hive cache
+void _refreshAssignedClientsFromApi(FutureProviderRef<ClientsResponse> ref, HiveService hiveService, String searchQuery) async {
+  try {
+    debugPrint('assignedClientsProvider: Background refresh from API...');
+    final clientApi = ref.read(clientApiServiceProvider);
+
+    // Fetch all pages from /clients/assigned
+    final allClients = <Client>[];
+    int currentPage = 1;
+    int totalFetched = 0;
+    int totalCount = 0;
+    const int perPage = 100; // Fetch more per page to reduce API calls
+
+    do {
+      final response = await clientApi.fetchAssignedClients(
+        page: currentPage,
+        perPage: perPage,
+        search: searchQuery.isNotEmpty ? searchQuery : null,
+      );
+
+      totalCount = response.totalItems.toInt();
+      final clients = response.items;
+      totalFetched += clients.length;
+      allClients.addAll(clients);
+
+      debugPrint('assignedClientsProvider: Background refresh - Fetched page $currentPage - ${clients.length} clients (total: $totalFetched/$totalCount)');
+
+      currentPage++;
+    } while (totalFetched < totalCount);
+
+    // Update Hive cache
+    if (allClients.isNotEmpty) {
+      for (final client in allClients) {
+        final clientJson = client.toJson();
+        final clientId = client.id;
+        if (clientJson != null && clientId != null) {
+          await hiveService.saveClient(clientId, clientJson);
+        }
+      }
+      debugPrint('assignedClientsProvider: Background refresh - Cached ${allClients.length} clients to Hive');
+    }
+  } catch (e) {
+    debugPrint('assignedClientsProvider: Background refresh failed - $e');
+    // Silently fail - UI will continue using cached data
+  }
+}
 
 /// Provider for user's assigned municipality IDs
 /// Fetches and caches the user's assigned municipalities from the backend
@@ -349,11 +377,11 @@ final selectedClientProvider = Provider<Client?>((ref) {
   final clientId = ref.watch(selectedClientIdProvider);
   if (clientId == null) return null;
 
-  final clientsAsync = ref.watch(clientsProvider);
+  final clientsAsync = ref.watch(assignedClientsProvider);
   return clientsAsync.when(
-    data: (clients) {
+    data: (response) {
       try {
-        return clients.firstWhere((c) => c.id == clientId);
+        return response.items.firstWhere((c) => c.id == clientId);
       } catch (_) {
         return null;
       }
@@ -545,13 +573,13 @@ final missedVisitsFilterProvider = StateProvider<MissedVisitPriority?>((ref) {
 
 /// Compute missed visits from clients and touchpoints
 final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
-  final clientsAsync = ref.watch(clientsProvider);
+  final clientsAsync = ref.watch(assignedClientsProvider);
 
   return clientsAsync.when(
-    data: (clients) {
+    data: (response) {
       final missedVisits = <MissedVisit>[];
 
-      for (final client in clients) {
+      for (final client in response.items) {
         // Get the next expected touchpoint
         final nextTouchpointNum = client.completedTouchpoints + 1;
         if (nextTouchpointNum > 7) continue; // All touchpoints completed

@@ -15,8 +15,8 @@ import '../../features/agencies/presentation/pages/add_prospect_agency_page.dart
 import '../../features/agencies/presentation/pages/agency_detail_page.dart';
 import '../../features/groups/presentation/pages/group_detail_page.dart';
 import '../../features/itineraries/presentation/pages/itinerary_detail_page.dart';
-import '../../features/clients/presentation/pages/edit_client_page.dart';
-import '../../features/clients/presentation/pages/add_prospect_client_page.dart';
+import '../../features/clients/presentation/widgets/edit_client_form_v2.dart';
+import '../../features/clients/presentation/pages/add_client_page.dart';
 import '../../features/itinerary/presentation/pages/itinerary_page.dart';
 import '../../features/my_day/presentation/pages/my_day_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
@@ -27,7 +27,7 @@ import '../../features/calculator/presentation/pages/loan_calculator_page.dart';
 import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../shared/widgets/main_shell.dart';
-import '../../services/auth/auth_service.dart';
+import '../../shared/providers/app_providers.dart' show authNotifierProvider;
 // import '../../services/auth/secure_storage_service.dart'; // PIN functionality disabled
 
 // Auth state provider - derives from AuthNotifier
@@ -206,6 +206,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(
+        path: '/clients/add',
+        builder: (context, state) => const AddClientPage(),
+      ),
+      GoRoute(
         path: '/clients/:id',
         builder: (context, state) {
           final clientId = state.pathParameters['id']!;
@@ -216,12 +220,51 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/clients/:id/edit',
         builder: (context, state) {
           final clientId = state.pathParameters['id']!;
-          return EditClientPage(clientId: clientId);
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              title: const Text('Edit Client'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  tooltip: 'Delete Client',
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Client'),
+                        content: const Text('Are you sure you want to delete this client?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && context.mounted) {
+                      // Handle delete - you may want to add a callback or navigate
+                      context.pop();
+                    }
+                  },
+                ),
+              ],
+            ),
+            body: EditClientFormV2(
+              clientId: clientId,
+              onSave: (savedClient) {
+                // Return to client detail after saving
+                context.pop();
+                return true;
+              },
+            ),
+          );
         },
-      ),
-      GoRoute(
-        path: '/clients/add',
-        builder: (context, state) => const AddProspectClientPage(),
       ),
 
       // Agency routes

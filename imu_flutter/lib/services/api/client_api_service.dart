@@ -103,6 +103,83 @@ class ClientApiService {
     }
   }
 
+  /// Fetch assigned clients from the REST API with area-based filtering
+  /// Uses the /api/clients/assigned endpoint which automatically filters
+  /// by the user's assigned territories
+  Future<ClientsResponse> fetchAssignedClients({
+    int page = 1,
+    int perPage = 20,
+    String? search,
+    String? clientType,
+  }) async {
+    try {
+      debugPrint('[CLIENT-API] Fetching ASSIGNED clients from REST API...');
+      debugPrint('[CLIENT-API] page=$page, perPage=$perPage, search=$search');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('[CLIENT-API] ERROR: No access token available');
+        throw ApiException(message: 'Not authenticated - Please login again');
+      }
+
+      debugPrint('[CLIENT-API] Making API request to /clients/assigned');
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/clients/assigned',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        queryParameters: {
+          'page': page,
+          'perPage': perPage,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (clientType != null && clientType.isNotEmpty) 'client_type': clientType,
+        },
+      );
+
+      debugPrint('[CLIENT-API] Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>? ?? [];
+        final totalItems = data['totalItems'] as int? ?? 0;
+        final totalPages = data['totalPages'] as int? ?? 0;
+
+        debugPrint('[CLIENT-API] Got ${items.length} assigned clients from API (page $page of $totalPages, total: $totalItems)');
+
+        final clients = items.map((item) {
+          final clientData = item as Map<String, dynamic>;
+          return Client.fromRow(clientData);
+        }).toList();
+
+        return ClientsResponse(
+          items: clients,
+          page: page,
+          perPage: perPage,
+          totalItems: totalItems,
+          totalPages: totalPages,
+        );
+      } else {
+        debugPrint('[CLIENT-API] ERROR: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch assigned clients: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('[CLIENT-API] DioException - ${e.message}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('[CLIENT-API] Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch assigned clients',
+        originalError: e,
+      );
+    }
+  }
+
   /// Search unassigned clients (clients without caravan_id)
   Future<List<Client>> searchUnassignedClients({
     int page = 1,
@@ -535,6 +612,129 @@ class ClientApiService {
       debugPrint('ClientApiService: Unexpected error - $e');
       throw ApiException(
         message: 'Failed to release loan',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Add an address to a client
+  Future<Address?> addAddress(String clientId, Address address) async {
+    try {
+      debugPrint('ClientApiService: Adding address for client $clientId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ClientApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final requestData = {
+        'type': address.type.name,
+        'street': address.street,
+        if (address.barangay != null) 'barangay': address.barangay,
+        'city': address.city,
+        if (address.province != null) 'province': address.province,
+        if (address.postalCode != null) 'postal_code': address.postalCode,
+        'is_primary': address.isPrimary,
+        if (address.latitude != null) 'latitude': address.latitude,
+        if (address.longitude != null) 'longitude': address.longitude,
+      };
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/clients/$clientId/addresses',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: requestData,
+      );
+
+      if (response.statusCode == 201) {
+        final addressData = response.data as Map<String, dynamic>;
+        debugPrint('ClientApiService: Address added successfully');
+        return Address.fromJson(addressData);
+      } else {
+        debugPrint('ClientApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to add address: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ClientApiService: DioException - ${e.message}');
+      debugPrint('ClientApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'add address',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'clientId': clientId},
+      );
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ClientApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to add address',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Add a phone number to a client
+  Future<PhoneNumber?> addPhoneNumber(String clientId, PhoneNumber phone) async {
+    try {
+      debugPrint('ClientApiService: Adding phone number for client $clientId...');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ClientApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final requestData = {
+        'type': phone.type.name,
+        'number': phone.number,
+        if (phone.label != null) 'label': phone.label,
+        'is_primary': phone.isPrimary,
+      };
+
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/clients/$clientId/phones',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: requestData,
+      );
+
+      if (response.statusCode == 201) {
+        final phoneData = response.data as Map<String, dynamic>;
+        debugPrint('ClientApiService: Phone number added successfully');
+        return PhoneNumber.fromJson(phoneData);
+      } else {
+        debugPrint('ClientApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to add phone number: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ClientApiService: DioException - ${e.message}');
+      debugPrint('ClientApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'add phone number',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {'clientId': clientId},
+      );
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ClientApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to add phone number',
         originalError: e,
       );
     }

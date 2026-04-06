@@ -214,7 +214,7 @@ class _PinEntryPageState extends ConsumerState<PinEntryPage> {
             if (connector != null) {
               logDebug('PowerSync connector found, connecting in background...');
               // Connect to PowerSync in background without blocking
-              PowerSyncService.connect(connector: connector).then((_) {
+              PowerSyncService.connect(connector).then((_) {
                 logDebug('PowerSync connected successfully');
                 // Wait for initial sync in background (non-blocking)
                 PowerSyncService.waitForInitialSync(

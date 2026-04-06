@@ -425,6 +425,84 @@ class TouchpointApiService {
       );
     }
   }
+
+  /// Bulk create touchpoints
+  /// Returns a map with 'created', 'errors', 'totalCount', 'successCount', 'errorCount'
+  Future<Map<String, dynamic>> createBulkTouchpoints({
+    required List<Map<String, dynamic>> touchpoints,
+    double? sharedGpsLat,
+    double? sharedGpsLng,
+    String? sharedGpsAddress,
+  }) async {
+    try {
+      debugPrint('TouchpointApiService: Creating ${touchpoints.length} touchpoints in bulk...');
+
+      // Get the access token
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('TouchpointApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      // Prepare request data
+      final requestData = {
+        'touchpoints': touchpoints,
+        if (sharedGpsLat != null) 'gps_lat': sharedGpsLat,
+        if (sharedGpsLng != null) 'gps_lng': sharedGpsLng,
+        if (sharedGpsAddress != null) 'gps_address': sharedGpsAddress,
+      };
+
+      // Make the API request
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/touchpoints/bulk',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: requestData,
+      );
+
+      if (response.statusCode == 201) {
+        final data = response.data as Map<String, dynamic>;
+        debugPrint('TouchpointApiService: Bulk create successful - ${data['successCount']}/${data['totalCount']} created');
+        return data;
+      } else {
+        debugPrint('TouchpointApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to create bulk touchpoints: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('TouchpointApiService: DioException - ${e.message}');
+      debugPrint('TouchpointApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'bulk create touchpoints',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'touchpointCount': touchpoints.length,
+        },
+      );
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('TouchpointApiService: Unexpected error - $e');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'bulk create touchpoints',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'touchpointCount': touchpoints.length,
+        },
+      );
+      throw ApiException(
+        message: 'Failed to create bulk touchpoints',
+        originalError: e,
+      );
+    }
+  }
 }
 
 /// Model for next touchpoint info response

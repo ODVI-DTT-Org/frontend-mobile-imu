@@ -7,13 +7,24 @@ import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
-import '../../features/clients/data/models/client_model.dart';
+import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointPattern, TouchpointType;
 import '../../models/client_status.dart';
 import '../../services/api/my_day_api_service.dart';
-import '../../services/api/itinerary_api_service.dart';
+import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
 import '../../services/api/api_exception.dart';
+import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/sync/powersync_service.dart';
-import '../../shared/providers/app_providers.dart';
+import '../../shared/providers/app_providers.dart' show
+    assignedClientsProvider,
+    onlineClientsProvider,
+    assignedClientSearchQueryProvider,
+    assignedClientPageProvider,
+    onlineClientSearchQueryProvider,
+    onlineClientPageProvider,
+    isOnlineProvider,
+    currentUserRoleProvider,
+    assignedMunicipalitiesProvider,
+    clientTouchpointsSyncProvider;
 
 /// Reusable client selector modal for adding clients to itinerary
 /// Used by both ItineraryPage and MyDayPage
@@ -59,15 +70,22 @@ class ClientSelectorModal extends ConsumerStatefulWidget {
 class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   final _searchController = TextEditingController();
   final _searchDebounce = Debounce(milliseconds: 300);
-  List<Client> _allClients = [];
   List<Client> _clients = [];
   List<Client> _filteredClients = [];
   Set<String> _addingClientIds = {};
+  Set<String> _addedClientIds = {}; // Track clients that have been added
   bool _isLoading = true;
   String? _error;
   String _clientFilter = 'assigned'; // 'assigned' or 'all'
 
-  // NEW: Status tracking state
+  // Pagination state
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  bool _isLoadingMore = false;
+  bool _hasMorePages = true;
+
+  // Status tracking state
   Map<String, ClientStatus> _clientStatuses = {};
   bool _isLoadingStatuses = true;
   bool _hasStatusError = false;
@@ -88,151 +106,179 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   void _onSearchChanged() {
-    _searchDebounce.run(_filterClients);
+    _searchDebounce.run(() {
+      setState(() {
+        _currentPage = 1; // Reset to first page on search
+      });
+
+      // Update search query provider
+      final query = _searchController.text;
+      if (_clientFilter == 'assigned') {
+        ref.read(assignedClientSearchQueryProvider.notifier).state = query;
+        ref.read(assignedClientPageProvider.notifier).state = 1;
+        ref.invalidate(assignedClientsProvider);
+      } else {
+        // For 'all' mode, use online pagination providers
+        ref.read(onlineClientSearchQueryProvider.notifier).state = query;
+        ref.read(onlineClientPageProvider.notifier).state = 1;
+        ref.invalidate(onlineClientsProvider);
+      }
+    });
   }
 
-  Future<void> _loadClients() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _loadClients({bool append = false}) async {
+    if (!append) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _isLoadingMore = true;
+      });
+    }
 
     try {
-      // Wait for clients to be loaded
-      List<Client> clients = [];
-      int retries = 0;
+      // Load clients from provider based on filter
+      // Use ref.read() instead of ref.watch() since we're in a method, not build()
+      final clientsAsync = _clientFilter == 'assigned'
+          ? ref.read(assignedClientsProvider)
+          : ref.read(onlineClientsProvider);
 
-      while (clients.isEmpty && retries < 10) {
-        final clientsAsync = ref.read(clientsProvider);
+      clientsAsync.when(
+        data: (data) {
+          // Both providers return ClientsResponse
+          final response = data as ClientsResponse;
+          final clients = response.items;
 
-        clientsAsync.when(
-          data: (data) {
-            clients = data;
-          },
-          loading: () {
-            // Still loading, wait a bit
-          },
-          error: (error, _) {
-            if (mounted) {
-              setState(() {
-                _error = error.toString();
-                _isLoading = false;
-              });
-            }
-            return;
-          },
-        );
+          // Get today's itinerary to filter out already added clients
+          final itineraryAsync = ref.read(todayItineraryProvider);
+          final today = DateTime.now();
 
-        if (clients.isEmpty) {
-          await Future.delayed(const Duration(milliseconds: 200));
-          retries++;
-        } else {
-          break;
-        }
-      }
+          Set<String> existingClientIds = {};
+          itineraryAsync.when(
+            data: (items) {
+              existingClientIds = items
+                  .where((item) => item.scheduledDate.year == today.year &&
+                                 item.scheduledDate.month == today.month &&
+                                 item.scheduledDate.day == today.day)
+                  .map((item) => item.clientId)
+                  .toSet();
+            },
+            loading: () {},
+            error: (_, __) {},
+          );
 
-      // Get today's itinerary to filter out already added clients
-      final itineraryAsync = ref.read(todayItineraryProvider);
-      final today = DateTime.now();
+          // Filter out clients already in today's itinerary
+          final filteredClients = clients.where((client) => !existingClientIds.contains(client.id)).toList();
 
-      Set<String> existingClientIds = {};
-      itineraryAsync.when(
-        data: (items) {
-          existingClientIds = items
-              .where((item) => item.scheduledDate.year == today.year &&
-                             item.scheduledDate.month == today.month &&
-                             item.scheduledDate.day == today.day)
-              .map((item) => item.clientId)
-              .toSet();
+          if (mounted) {
+            setState(() {
+              if (append) {
+                // Append new clients to existing list
+                _clients.addAll(clients);
+                _filteredClients.addAll(filteredClients);
+              } else {
+                // Replace list with new data
+                _clients = clients;
+                _filteredClients = filteredClients;
+              }
+              _totalPages = response.totalPages;
+              _totalItems = response.totalItems;
+              _hasMorePages = _currentPage < _totalPages;
+              _isLoading = false;
+              _isLoadingMore = false;
+            });
+          }
         },
-        loading: () {},
-        error: (_, __) {},
+        loading: () {
+          // Still loading - don't update state if we're appending
+          if (!append && mounted) {
+            setState(() {
+              _isLoading = true;
+            });
+          }
+        },
+        error: (error, _) {
+          if (mounted) {
+            setState(() {
+              _error = error.toString();
+              _isLoading = false;
+              _isLoadingMore = false;
+            });
+          }
+        },
       );
-
-      // Filter out clients already in today's itinerary
-      _allClients = clients.where((client) => !existingClientIds.contains(client.id)).toList();
-
-      // Apply filter (assigned vs all)
-      _applyClientFilter();
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = e.toString();
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
   }
 
   void _applyClientFilter() {
-    if (_clientFilter == 'all') {
-      _clients = _allClients;
-    } else {
-      // For 'assigned', filter by assigned municipalities
-      final userRole = ref.read(currentUserRoleProvider);
-      final shouldFilterByArea = switch (userRole) {
-        UserRole.admin || UserRole.assistantAreaManager => false,
-        UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
-      };
+    // Reset pagination and reload from appropriate provider
+    setState(() {
+      _currentPage = 1;
+      _hasMorePages = true;
+    });
 
-      if (shouldFilterByArea) {
-        // Get assigned municipalities and filter clients
-        // Use ref.read instead of ref.watch since we're not in build method
-        final assignedMunicipalitiesAsync = ref.read(assignedMunicipalitiesProvider);
-        assignedMunicipalitiesAsync.when(
-          data: (municipalityIds) {
-            if (municipalityIds.isEmpty) {
-              // User has no assigned municipalities - show no clients
-              _clients = [];
-            } else {
-              _clients = _allClients.where((client) {
-                // Construct municipality ID from client's province and municipality
-                final clientMunicipalityId = client.province != null && client.municipality != null
-                    ? '${client.province}-${client.municipality}'
-                    : null;
-                return clientMunicipalityId != null && municipalityIds.contains(clientMunicipalityId);
-              }).toList();
-            }
-            _filterClients();
-          },
-          loading: () {
-            // While loading assigned areas, show no clients (not all clients)
-            _clients = [];
-            _filterClients();
-          },
-          error: (_, __) {
-            // On error loading assigned areas, show no clients (not all clients)
-            _clients = [];
-            _filterClients();
-          },
-        );
-        return;
+    Future.microtask(() {
+      if (!mounted) return;
+
+      if (_clientFilter == 'assigned') {
+        ref.read(assignedClientPageProvider.notifier).state = 1;
+        ref.invalidate(assignedClientsProvider);
       } else {
-        // Admin and Assistant Area Manager see all clients
-        _clients = _allClients;
+        // For 'all' mode, use online pagination providers
+        ref.read(onlineClientPageProvider.notifier).state = 1;
+        ref.invalidate(onlineClientsProvider);
+      }
+    });
+  }
+
+  Future<void> _loadMoreClients() async {
+    if (_isLoadingMore || !_hasMorePages) return;
+
+    setState(() {
+      _currentPage++;
+      _isLoadingMore = true;
+    });
+
+    try {
+      if (_clientFilter == 'assigned') {
+        ref.read(assignedClientPageProvider.notifier).state = _currentPage;
+        ref.invalidate(assignedClientsProvider);
+        await _loadClients(append: true);
+      } else {
+        // For 'all' mode, use online pagination providers
+        ref.read(onlineClientPageProvider.notifier).state = _currentPage;
+        ref.invalidate(onlineClientsProvider);
+        await _loadClients(append: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _currentPage--;
+          _isLoadingMore = false;
+        });
       }
     }
-    _filterClients(); // Apply search filter
   }
 
   void _filterClients() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredClients = _clients;
-      } else {
-        _filteredClients = _clients.where((client) {
-          final fullName = '${client.firstName} ${client.lastName} ${client.middleName ?? ''}'.toLowerCase();
-          final email = (client.email ?? '').toLowerCase();
-          return fullName.contains(query) || email.contains(query);
-        }).toList();
-      }
-    });
+    // Search is now handled by the provider - just clear search
+    if (_clientFilter == 'assigned') {
+      ref.read(assignedClientSearchQueryProvider.notifier).state = '';
+      ref.invalidate(assignedClientsProvider);
+    } else {
+      ref.read(onlineClientSearchQueryProvider.notifier).state = '';
+      ref.invalidate(onlineClientsProvider);
+    }
   }
 
   List<Client> get _displayableClients {
@@ -401,19 +447,19 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
             ? '${client.firstName} ${client.lastName} added to Today'
             : '${client.firstName} ${client.lastName} added to ${_formatDateShort(customDate)}');
 
-        // Remove client from list
+        // Mark client as added (disable button, show "Added" status)
+        // Don't remove from list - keep modal open for adding more clients
         setState(() {
-          _clients.remove(client);
-          _filterClients();
+          if (client.id != null) {
+            _addedClientIds.add(client.id!); // Use ! to assert non-null after check
+          }
         });
 
-        // Close modal immediately
-        if (mounted) Navigator.pop(context);
+        // Trigger parent refresh immediately
+        widget.onClientAdded();
 
-        // Trigger parent refresh after modal closes
-        Future.delayed(const Duration(milliseconds: 100), () {
-          widget.onClientAdded();
-        });
+        // Keep modal open - don't close it
+        // This allows users to add multiple clients without reopening
       }
     } catch (e) {
       if (mounted) {
@@ -639,106 +685,128 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       expand: false,
-      builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey[200]!),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('EEEE, MMMM d').format(widget.selectedDate),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.x),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            // Search bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search clients...',
-                  prefixIcon: const Icon(LucideIcons.search, size: 20),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(LucideIcons.x, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            _filterClients();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-              ),
-            ),
-            // Filter toggle
-            if (widget.showAssignedFilter)
+      builder: (context, scrollController) {
+        // Add scroll listener for pagination
+        scrollController.addListener(() {
+          if (scrollController.position.pixels >=
+              scrollController.position.maxScrollExtent - 200) {
+            _loadMoreClients();
+          }
+        });
+
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[200]!),
+                  ),
+                ),
                 child: Row(
                   children: [
-                    _buildFilterChip('Assigned', 'assigned'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('All Clients', 'all'),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.x),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ],
                 ),
               ),
-            // Client list
-            Expanded(
-              child: _buildClientList(scrollController),
-            ),
-          ],
-        ),
-      ),
+              // Search bar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search clients...',
+                    prefixIcon: const Icon(LucideIcons.search, size: 20),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(LucideIcons.x, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              _filterClients();
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+              // Filter toggle
+              if (widget.showAssignedFilter)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      _buildFilterChip('Assigned', 'assigned'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('All Clients', 'all'),
+                    ],
+                  ),
+                ),
+              // Client count indicator
+              if (_totalItems > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(
+                    'Showing ${_displayableClients.length} of $_totalItems clients',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              // Client list
+              Expanded(
+                child: _buildClientList(scrollController),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -805,10 +873,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     if (_displayableClients.isEmpty) {
       // Check if user has no assigned municipalities
-      final userRole = ref.read(currentUserRoleProvider);
+      final UserRole userRole = ref.read(currentUserRoleProvider);
       final shouldFilterByArea = switch (userRole) {
         UserRole.admin || UserRole.assistantAreaManager => false,
         UserRole.areaManager || UserRole.caravan || UserRole.tele => true,
+        _ => false, // Fallback for any other roles
       };
 
       final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
@@ -859,8 +928,35 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _displayableClients.length,
+      itemCount: _displayableClients.length + (_hasMorePages || _isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        // Load more indicator at the bottom
+        if (index == _displayableClients.length) {
+          if (_isLoadingMore) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          if (!_hasMorePages && _displayableClients.isNotEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: Text(
+                  'Showing all $_totalItems clients',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }
+
         final client = _displayableClients[index];
         final isAdding = _addingClientIds.contains(client.id);
         final status = _clientStatuses[client.id];
@@ -929,20 +1025,20 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                         Expanded(
                           child: _buildActionButton(
                             icon: LucideIcons.calendar,
-                            label: 'Add to Today',
+                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add to Today',
                             isPrimary: true,
                             isLoading: isAdding,
-                            onTap: () => _addClientToItinerary(client),
+                            onTap: client.id != null && _addedClientIds.contains(client.id!) ? null : () => _addClientToItinerary(client),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildActionButton(
                             icon: LucideIcons.calendarClock,
-                            label: 'Add with Date',
+                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add with Date',
                             isPrimary: false,
                             isLoading: isAdding,
-                            onTap: () => _showDatePicker(client),
+                            onTap: client.id != null && _addedClientIds.contains(client.id) ? null : () => _showDatePicker(client),
                           ),
                         ),
                       ],

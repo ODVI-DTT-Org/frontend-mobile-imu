@@ -5,6 +5,8 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
+import '../../../psgc/data/models/psgc_models.dart';
+import '../../../psgc/data/repositories/psgc_repository.dart';
 
 /// Edit Client Form Widget - Aligned with Database Schema
 ///
@@ -62,11 +64,16 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
   final _udiController = TextEditingController();
   final _remarksController = TextEditingController();
 
-  // Location controllers
-  final _regionController = TextEditingController();
-  final _provinceController = TextEditingController();
-  final _municipalityController = TextEditingController();
-  final _barangayController = TextEditingController();
+  // Location dropdown values
+  PsgcRegion? _selectedRegion;
+  PsgcProvince? _selectedProvince;
+  PsgcMunicipality? _selectedMunicipality;
+  PsgcBarangay? _selectedBarangay;
+
+  List<PsgcRegion> _regions = [];
+  List<PsgcProvince> _provinces = [];
+  List<PsgcMunicipality> _municipalities = [];
+  List<PsgcBarangay> _barangays = [];
 
   // Dropdown values
   String _productType = 'SSS Pensioner';
@@ -113,10 +120,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     _panController.dispose();
     _udiController.dispose();
     _remarksController.dispose();
-    _regionController.dispose();
-    _provinceController.dispose();
-    _municipalityController.dispose();
-    _barangayController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -125,6 +128,10 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     setState(() => _isLoading = true);
 
     try {
+      // Load PSGC data first
+      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final regions = await psgcRepository.getRegions();
+
       if (widget.initialClient != null) {
         _client = widget.initialClient;
       } else {
@@ -150,8 +157,42 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
       }
 
       if (_client != null && mounted) {
-        _populateForm();
-        setState(() => _isLoading = false);
+        setState(() {
+          _regions = regions;
+        });
+
+        // Load provinces if region is set
+        if (_client!.region != null && _client!.region!.isNotEmpty) {
+          final provinces = await psgcRepository.getProvincesByRegion(_client!.region!);
+          if (mounted) {
+            setState(() {
+              _provinces = provinces;
+            });
+
+            // Load municipalities if province is set
+            if (_client!.province != null && _client!.province!.isNotEmpty) {
+              final municipalities = await psgcRepository.getMunicipalitiesByProvince(_client!.province!);
+              if (mounted) {
+                setState(() {
+                  _municipalities = municipalities;
+                });
+
+                // Load barangays if municipality is set - AWAIT the result
+                if (_client!.municipality != null && _client!.municipality!.isNotEmpty) {
+                  await _loadBarangays(_client!.municipality!);
+                }
+              }
+            }
+          }
+        }
+
+        // Now populate form fields AFTER all location data is loaded
+        if (mounted) {
+          setState(() {
+            _populateFormFields();
+            _isLoading = false;
+          });
+        }
       } else {
         if (mounted) {
           setState(() => _isLoading = false);
@@ -167,52 +208,108 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     }
   }
 
-  void _populateForm() {
+  Future<void> _loadBarangays(String municipality) async {
+    try {
+      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final barangays = await psgcRepository.getBarangaysByMunicipality(municipality);
+      if (mounted) {
+        setState(() {
+          _barangays = barangays;
+        });
+      }
+    } catch (e) {
+      debugPrint('[EditClientFormV2] Error loading barangays: $e');
+    }
+  }
+
+  void _populateFormFields() {
     if (_client == null) return;
 
-    setState(() {
-      // Basic info
-      _firstNameController.text = _client!.firstName;
-      _middleNameController.text = _client!.middleName ?? '';
-      _lastNameController.text = _client!.lastName;
-      _birthDate = _client!.birthDate;
+    // Basic info
+    _firstNameController.text = _client!.firstName;
+    _middleNameController.text = _client!.middleName ?? '';
+    _lastNameController.text = _client!.lastName;
+    _birthDate = _client!.birthDate;
 
-      // Contact info
-      _emailController.text = _client!.email ?? '';
-      _phoneController.text = _client!.phone ?? '';
-      _facebookController.text = _client!.facebookLink ?? '';
+    // Contact info
+    _emailController.text = _client!.email ?? '';
+    _phoneController.text = _client!.phone ?? '';
+    _facebookController.text = _client!.facebookLink ?? '';
 
-      // Employment info
-      _agencyNameController.text = _client!.agencyName ?? '';
-      _departmentController.text = _client!.department ?? '';
-      _positionController.text = _client!.position ?? '';
-      _employmentStatusController.text = _client!.employmentStatus ?? '';
-      _payrollDateController.text = _client!.payrollDate ?? '';
-      _tenureController.text = _client!.tenure?.toString() ?? '';
+    // Employment info
+    _agencyNameController.text = _client!.agencyName ?? '';
+    _departmentController.text = _client!.department ?? '';
+    _positionController.text = _client!.position ?? '';
+    _employmentStatusController.text = _client!.employmentStatus ?? '';
+    _payrollDateController.text = _client!.payrollDate ?? '';
+    _tenureController.text = _client!.tenure?.toString() ?? '';
 
-      // Product info
-      _productType = _getProductTypeLabel(_client!.productType);
-      _pensionType = _getPensionTypeLabel(_client!.pensionType);
-      _marketType = _client!.marketType != null
-          ? _getMarketTypeLabel(_client!.marketType!)
-          : 'Residential';
-      _clientType = _client!.clientType.name.toUpperCase();
+    // Product info
+    _productType = _getProductTypeLabel(_client!.productType);
+    _pensionType = _getPensionTypeLabel(_client!.pensionType);
+    _marketType = _client!.marketType != null
+        ? _getMarketTypeLabel(_client!.marketType!)
+        : 'Residential';
+    _clientType = _client!.clientType.name.toUpperCase();
 
-      // UDI
-      _udiController.text = _client!.udi ?? '';
+    // UDI
+    _udiController.text = _client!.udi ?? '';
 
-      // Location
-      _regionController.text = _client!.region ?? '';
-      _provinceController.text = _client!.province ?? '';
-      _municipalityController.text = _client!.municipality ?? '';
-      _barangayController.text = _client!.barangay ?? '';
+    // Location - Find and set dropdown values
+    if (_client!.region != null && _client!.region!.isNotEmpty) {
+      _selectedRegion = _regions.firstWhere(
+        (r) => r.name == _client!.region || r.code == _client!.region,
+        orElse: () => _regions.first,
+      );
+    }
 
-      // PAN
-      _panController.text = _client!.pan ?? '';
+    if (_client!.province != null && _client!.province!.isNotEmpty) {
+      try {
+        final foundProvince = _provinces.firstWhere(
+          (p) => p.name == _client!.province,
+          orElse: () => _provinces.first,
+        );
+        _selectedProvince = foundProvince;
+      } catch (e) {
+        if (_provinces.isNotEmpty) {
+          _selectedProvince = _provinces.first;
+        }
+      }
+    }
 
-      // Remarks
-      _remarksController.text = _client!.remarks ?? '';
-    });
+    if (_client!.municipality != null && _client!.municipality!.isNotEmpty) {
+      try {
+        final foundMunicipality = _municipalities.firstWhere(
+          (m) => m.name == _client!.municipality || m.displayName == _client!.municipality,
+          orElse: () => _municipalities.first,
+        );
+        _selectedMunicipality = foundMunicipality;
+      } catch (e) {
+        if (_municipalities.isNotEmpty) {
+          _selectedMunicipality = _municipalities.first;
+        }
+      }
+    }
+
+    if (_client!.barangay != null && _client!.barangay!.isNotEmpty) {
+      try {
+        final foundBarangay = _barangays.firstWhere(
+          (b) => b.barangay == _client!.barangay,
+          orElse: () => _barangays.first,
+        );
+        _selectedBarangay = foundBarangay;
+      } catch (e) {
+        if (_barangays.isNotEmpty) {
+          _selectedBarangay = _barangays.first;
+        }
+      }
+    }
+
+    // PAN
+    _panController.text = _client!.pan ?? '';
+
+    // Remarks
+    _remarksController.text = _client!.remarks ?? '';
   }
 
   String _getProductTypeLabel(ProductType type) {
@@ -316,18 +413,10 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         udi: _udiController.text.trim().isEmpty
             ? null
             : _udiController.text.trim(),
-        region: _regionController.text.trim().isEmpty
-            ? null
-            : _regionController.text.trim(),
-        province: _provinceController.text.trim().isEmpty
-            ? null
-            : _provinceController.text.trim(),
-        municipality: _municipalityController.text.trim().isEmpty
-            ? null
-            : _municipalityController.text.trim(),
-        barangay: _barangayController.text.trim().isEmpty
-            ? null
-            : _barangayController.text.trim(),
+        region: _selectedRegion?.name,
+        province: _selectedProvince?.name,
+        municipality: _selectedMunicipality?.name,
+        barangay: _selectedBarangay?.barangay,
         createdAt: _client?.createdAt,
         updatedAt: DateTime.now(),
         touchpoints: _client?.touchpoints ?? [],
@@ -608,7 +697,7 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
           // UDI Section
           _buildSectionHeader(
             title: 'Unified ID (UDI)',
-            icon: LucideIcons.idCard,
+            icon: LucideIcons.creditCard,
             sectionKey: 'udi',
             color: colorScheme.primary,
           ),
@@ -1112,60 +1201,127 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _regionController,
-                decoration: const InputDecoration(
-                  labelText: 'Region',
-                  hintText: 'e.g., NCR, Region I',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _provinceController,
-                decoration: const InputDecoration(
-                  labelText: 'Province',
-                  hintText: 'e.g., Metro Manila',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
+        // Region Dropdown
+        DropdownButtonFormField<PsgcRegion>(
+          value: _selectedRegion,
+          decoration: const InputDecoration(
+            labelText: 'Region *',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _regions.map((region) {
+            return DropdownMenuItem<PsgcRegion>(
+              value: region,
+              child: Text('${region.name} (${region.code})'),
+            );
+          }).toList(),
+          onChanged: (region) async {
+            setState(() {
+              _selectedRegion = region;
+              _selectedProvince = null;
+              _selectedMunicipality = null;
+              _selectedBarangay = null;
+              _provinces = [];
+              _municipalities = [];
+              _barangays = [];
+            });
+
+            if (region != null) {
+              final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+              final provinces = await psgcRepository.getProvincesByRegion(region.name);
+              if (mounted) {
+                setState(() {
+                  _provinces = provinces;
+                });
+              }
+            }
+          },
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _municipalityController,
-                decoration: const InputDecoration(
-                  labelText: 'Municipality',
-                  hintText: 'e.g., Cebu City',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _barangayController,
-                decoration: const InputDecoration(
-                  labelText: 'Barangay',
-                  hintText: 'e.g., Luz',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
+
+        // Province Dropdown
+        DropdownButtonFormField<PsgcProvince>(
+          value: _selectedProvince,
+          decoration: const InputDecoration(
+            labelText: 'Province *',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _provinces.map((province) {
+            return DropdownMenuItem<PsgcProvince>(
+              value: province,
+              child: Text(province.name),
+            );
+          }).toList(),
+          onChanged: (province) async {
+            setState(() {
+              _selectedProvince = province;
+              _selectedMunicipality = null;
+              _selectedBarangay = null;
+              _municipalities = [];
+              _barangays = [];
+            });
+
+            if (province != null) {
+              final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+              final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
+              if (mounted) {
+                setState(() {
+                  _municipalities = municipalities;
+                });
+              }
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Municipality Dropdown
+        DropdownButtonFormField<PsgcMunicipality>(
+          value: _selectedMunicipality,
+          decoration: const InputDecoration(
+            labelText: 'Municipality/City *',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _municipalities.map((municipality) {
+            return DropdownMenuItem<PsgcMunicipality>(
+              value: municipality,
+              child: Text(municipality.displayName),
+            );
+          }).toList(),
+          onChanged: (municipality) async {
+            setState(() {
+              _selectedMunicipality = municipality;
+              _selectedBarangay = null;
+              _barangays = [];
+            });
+
+            if (municipality != null) {
+              await _loadBarangays(municipality.name);
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Barangay Dropdown
+        DropdownButtonFormField<PsgcBarangay>(
+          value: _selectedBarangay,
+          decoration: const InputDecoration(
+            labelText: 'Barangay *',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _barangays.map((barangay) {
+            return DropdownMenuItem<PsgcBarangay>(
+              value: barangay,
+              child: Text(barangay.barangay),
+            );
+          }).toList(),
+          onChanged: (barangay) {
+            setState(() {
+              _selectedBarangay = barangay;
+            });
+          },
         ),
       ],
     );

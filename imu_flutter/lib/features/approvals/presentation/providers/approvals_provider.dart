@@ -50,7 +50,8 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
   final ApprovalsApiService _apiService;
 
   ApprovalsNotifier(this._apiService) : super(const ApprovalsState()) {
-    loadPendingApprovals();
+    // Don't auto-load - let the UI trigger loading when needed
+    // This prevents 403 errors for users without approvals permissions
   }
 
   Future<void> loadPendingApprovals() async {
@@ -67,7 +68,20 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
         counts: counts,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      // Check if it's a permission error (403)
+      final errorStr = e.toString();
+      if (errorStr.contains('403') || errorStr.contains('Insufficient permissions')) {
+        // Silently return empty state for users without permissions
+        state = state.copyWith(
+          pendingApprovals: [],
+          allApprovals: [],
+          isLoading: false,
+          counts: const {},
+          error: null,
+        );
+      } else {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
     }
   }
 

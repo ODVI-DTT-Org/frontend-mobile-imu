@@ -10,11 +10,17 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 /// Pending Approvals Page
 /// Shows all pending approvals for the current field agent
-class PendingApprovalsPage extends ConsumerWidget {
+class PendingApprovalsPage extends HookConsumerWidget {
   const PendingApprovalsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Load approvals on first mount
+    useEffect(() {
+      ref.read(approvalsProvider.notifier).loadPendingApprovals();
+      return null;
+    }, []);
+
     final approvalsState = ref.watch(approvalsProvider);
 
     return Scaffold(

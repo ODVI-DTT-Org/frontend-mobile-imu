@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/location/geolocation_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
+import '../../../../services/api/touchpoint_api_service.dart';
 import '../../data/models/my_day_client.dart';
+import '../../../../features/clients/data/models/client_model.dart' hide TimeOfDay;
 
 /// Bottom sheet for bulk time-in of multiple clients
 class MultipleTimeInSheet extends ConsumerStatefulWidget {
@@ -47,10 +50,18 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
   final GeolocationService _geoService = GeolocationService();
   final Set<String> _selectedClientIds = {};
   bool _isLoading = false;
+  bool _isSubmitting = false;
   String? _capturedAddress;
   String? _capturedTimestamp;
   bool _locationCaptured = false;
   String? _locationError;
+  Position? _capturedPosition;
+
+  // Touchpoint form fields
+  final _reasonController = TextEditingController();
+  final _remarksController = TextEditingController();
+  TouchpointStatus _selectedStatus = TouchpointStatus.interested;
+  String? _selectedReason;
 
   @override
   void initState() {
@@ -59,6 +70,13 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _captureLocation();
     });
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    _remarksController.dispose();
+    super.dispose();
   }
 
   @override
@@ -169,6 +187,94 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
             ),
           ),
 
+          // Touchpoint details section
+          if (_locationCaptured) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Touchpoint Details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Reason dropdown
+                  DropdownButtonFormField<String>(
+                    value: _selectedReason,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason *',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    ),
+                    items: _getAvailableReasons(widget.clients).map((reason) {
+                      return DropdownMenuItem<String>(
+                        value: reason,
+                        child: Text(reason),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedReason = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Status selection
+                  Text(
+                    'Status',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: TouchpointStatus.values.map((status) {
+                      final isSelected = _selectedStatus == status;
+                      return FilterChip(
+                        label: Text(_getStatusLabel(status)),
+                        selected: isSelected,
+                        onSelected: (bool selected) {
+                          setState(() {
+                            _selectedStatus = status;
+                          });
+                          HapticUtils.lightImpact();
+                        },
+                        selectedColor: _getStatusColor(status).withOpacity(0.2),
+                        checkmarkColor: _getStatusColor(status),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Remarks field
+                  TextField(
+                    controller: _remarksController,
+                    decoration: const InputDecoration(
+                      labelText: 'Remarks',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Bulk time-in button
           Container(
             padding: const EdgeInsets.all(16),
@@ -192,8 +298,8 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: _canSubmit ? _handleBulkTimeIn : null,
-                  child: _isLoading
+                  onPressed: _canSubmit && !_isSubmitting ? _handleBulkTouchpointSubmit : null,
+                  child: _isLoading || _isSubmitting
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -202,7 +308,7 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : Text('TIME IN ${_selectedClientIds.length} CLIENTS'),
+                      : Text('SUBMIT ${_selectedClientIds.length} TOUCHPOINT${_selectedClientIds.length > 1 ? 'S' : ''}'),
                 ),
               ),
             ),
@@ -485,7 +591,7 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
     );
   }
 
-  bool get _canSubmit => _selectedClientIds.isNotEmpty && _locationCaptured;
+  bool get _canSubmit => _selectedClientIds.isNotEmpty && _locationCaptured && _selectedReason != null;
 
   void _toggleClient(String clientId) {
     HapticUtils.lightImpact();
@@ -574,6 +680,7 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
         _locationError = null;
         _capturedAddress = address ?? '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
         _capturedTimestamp = formattedTime;
+        _capturedPosition = position;
       });
     } catch (e) {
       setState(() {
@@ -622,13 +729,191 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
     );
   }
 
-  void _handleBulkTimeIn() {
-    HapticUtils.success();
-    widget.onBulkTimeIn(
-      _selectedClientIds.toList(),
-      _capturedAddress,
-      _capturedTimestamp ?? DateTime.now().toIso8601String(),
-    );
-    Navigator.pop(context);
+  Future<void> _handleBulkTouchpointSubmit() async {
+    if (_selectedReason == null || _capturedPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a reason and ensure location is captured'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    HapticUtils.mediumImpact();
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final touchpointApi = ref.read(touchpointApiServiceProvider);
+
+      // Get today's date in YYYY-MM-DD format
+      final now = DateTime.now();
+      final todayDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      // Build touchpoints array from selected clients
+      final touchpoints = widget.clients
+          .where((client) => _selectedClientIds.contains(client.id))
+          .map((client) {
+            final nextTouchpointNumber = client.touchpointNumber;
+            final touchpointType = TouchpointPattern.getType(nextTouchpointNumber);
+
+            return {
+              'client_id': client.id,
+              'touchpoint_number': nextTouchpointNumber,
+              'type': touchpointType.apiValue,
+              'reason': TouchpointReason.values
+                  .firstWhere((r) => r.name == _selectedReason,
+                      orElse: () => TouchpointReason.interested)
+                  .apiValue,
+              'status': _selectedStatus.apiValue,
+              if (_remarksController.text.trim().isNotEmpty)
+                'remarks': _remarksController.text.trim(),
+              'date': todayDate,
+              // GPS fields will be added as shared GPS in the bulk API call
+            };
+          }).toList();
+
+      // Call bulk API
+      final result = await touchpointApi.createBulkTouchpoints(
+        touchpoints: touchpoints,
+        sharedGpsLat: _capturedPosition!.latitude,
+        sharedGpsLng: _capturedPosition!.longitude,
+        sharedGpsAddress: _capturedAddress,
+      );
+
+      final successCount = result['successCount'] as int? ?? 0;
+      final errorCount = result['errorCount'] as int? ?? 0;
+      final errors = result['errors'] as List<dynamic>? ?? [];
+
+      if (mounted) {
+        HapticUtils.success();
+
+        if (successCount > 0) {
+          // Call the callback with the submitted client IDs
+          widget.onBulkTimeIn(
+            _selectedClientIds.toList(),
+            _capturedAddress,
+            _capturedTimestamp ?? DateTime.now().toIso8601String(),
+          );
+
+          Navigator.pop(context);
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Successfully submitted $successCount touchpoint${successCount > 1 ? 's' : ''}'),
+              backgroundColor: const Color(0xFF22C55E),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+
+        // Show errors if any
+        if (errorCount > 0) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$errorCount touchpoint${errorCount > 1 ? 's' : ''} failed to submit'),
+                  backgroundColor: const Color(0xFFEF4444),
+                  duration: const Duration(seconds: 3),
+                  action: SnackBarAction(
+                    label: 'View',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      // Show error details dialog
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Submission Errors'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: errors.length,
+                              itemBuilder: (context, index) {
+                                final error = errors[index] as Map<String, dynamic>;
+                                final clientId = error['clientId'] as String?;
+                                final errorMessage = error['error'] as String?;
+                                final client = widget.clients.firstWhere(
+                                  (c) => c.id == clientId,
+                                  orElse: () => widget.clients.first,
+                                );
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Text('• ${client.fullName}: $errorMessage'),
+                                );
+                              },
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            }
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit touchpoints: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  /// Get available touchpoint reasons based on the clients
+  List<String> _getAvailableReasons(List<MyDayClient> clients) {
+    return TouchpointReason.values.map((r) => r.apiValue).toList();
+  }
+
+  /// Get display label for touchpoint status
+  String _getStatusLabel(TouchpointStatus status) {
+    switch (status) {
+      case TouchpointStatus.interested:
+        return 'Interested';
+      case TouchpointStatus.undecided:
+        return 'Undecided';
+      case TouchpointStatus.notInterested:
+        return 'Not Interested';
+      case TouchpointStatus.completed:
+        return 'Completed';
+    }
+  }
+
+  /// Get color for touchpoint status
+  Color _getStatusColor(TouchpointStatus status) {
+    switch (status) {
+      case TouchpointStatus.interested:
+        return const Color(0xFF22C55E); // Green
+      case TouchpointStatus.undecided:
+        return const Color(0xFFF59E0B); // Orange
+      case TouchpointStatus.notInterested:
+        return const Color(0xFFEF4444); // Red
+      case TouchpointStatus.completed:
+        return const Color(0xFF3B82F6); // Blue
+    }
   }
 }

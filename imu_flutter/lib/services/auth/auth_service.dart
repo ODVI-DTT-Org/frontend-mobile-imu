@@ -139,8 +139,11 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   IMUPowerSyncConnector? _powerSyncConnector;
+  Future<void> Function()? _onLoginSuccess;
 
-  AuthNotifier(this._authService) : super(AuthState.initial());
+  AuthNotifier(this._authService, {Future<void> Function()? onLoginSuccess})
+      : _onLoginSuccess = onLoginSuccess,
+        super(AuthState.initial());
 
   /// Check current authentication status
   Future<void> checkAuthStatus() async {
@@ -191,6 +194,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           user: user,
           isLoading: false,
         );
+        // Still trigger initial sync callback even if PowerSync fails
+        _onLoginSuccess?.call();
         return true; // Login succeeds even if PowerSync fails
       }
 
@@ -199,6 +204,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: user,
         isLoading: false,
       );
+
+      // Trigger initial sync after successful login and PowerSync connection
+      _onLoginSuccess?.call();
+
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -241,11 +250,5 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-/// Provider for authentication state
-final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  final notifier = AuthNotifier(authService);
-  // Check auth status on initialization
-  notifier.checkAuthStatus();
-  return notifier;
-});
+// Note: authNotifierProvider is now defined in app_providers.dart
+// to allow access to other providers for initial sync callback

@@ -187,8 +187,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
   void _onAddNewVisit() {
     HapticUtils.lightImpact();
-    // Navigate to client selection or add visit flow
-    context.push('/clients');
+    // Navigate to add prospect client page
+    context.push('/clients/add');
   }
 
   void _showRecordVisitOptions(BuildContext context) {
