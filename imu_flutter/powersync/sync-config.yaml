@@ -35,7 +35,7 @@ streams:
   clients:
     auto_subscribe: true
     queries:
-      - SELECT *
+      - SELECT c.*
         FROM clients c
         WHERE EXISTS (
           SELECT 1
