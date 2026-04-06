@@ -86,19 +86,15 @@ class EnhancedSyncLoadingState {
   }
 }
 
-/// Tables to sync with display names
+/// Tables to sync with display names (aligned with current sync rules)
 const Map<String, String> _tableDisplayNames = {
-  'clients': 'Clients',
-  'addresses': 'Addresses',
-  'phone_numbers': 'Phone Numbers',
-  'touchpoints': 'Touchpoints',
-  'itineraries': 'Itineraries',
-  'user_profiles': 'User Profiles',
-  'user_locations': 'User Locations',
-  'approvals': 'Approvals',
   'psgc': 'PSGC (Locations)',
   'touchpoint_reasons': 'Touchpoint Reasons',
-  'error_logs': 'Error Logs',
+  'user_locations': 'User Locations',
+  'clients': 'Clients',
+  'touchpoints': 'Touchpoints',
+  'itineraries': 'Itineraries',
+  'approvals': 'Approvals',
 };
 
 /// Enhanced sync loading state notifier
