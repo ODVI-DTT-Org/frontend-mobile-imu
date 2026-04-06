@@ -16,6 +16,7 @@ class ClientCard extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool isSelected;
   final bool isMultiSelectMode;
+  final int? totalTouchpoints; // Optional: total touchpoints (default 7)
 
   const ClientCard({
     super.key,
@@ -25,6 +26,7 @@ class ClientCard extends StatelessWidget {
     this.onLongPress,
     this.isSelected = false,
     this.isMultiSelectMode = false,
+    this.totalTouchpoints = 7,
   });
 
   @override
@@ -54,6 +56,9 @@ class ClientCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Touchpoint progress badge
+            _buildTouchpointProgressBadge(),
+            const SizedBox(height: 8),
             // Selection checkmark indicator and Previous touchpoint badge row
             Row(
               children: [
@@ -98,17 +103,57 @@ class ClientCard extends StatelessWidget {
                 color: Color(0xFF0F172A),
               ),
             ),
-            // Previous reason
+            // Previous reason with status
             if (client.previousTouchpointReason != null && client.previousTouchpointReason!.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                client.previousTouchpointReason!,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Icon(
+                    LucideIcons.messageCircle,
+                    size: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      client.previousTouchpointReason!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Status indicator if available (from previousTouchpointType)
+                  if (client.previousTouchpointType != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: client.previousTouchpointType == 'visit'
+                            ? Colors.blue.withOpacity(0.1)
+                            : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: client.previousTouchpointType == 'visit'
+                              ? Colors.blue.withOpacity(0.3)
+                              : Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        client.previousTouchpointType == 'visit' ? 'Visit' : 'Call',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: client.previousTouchpointType == 'visit'
+                              ? Colors.blue
+                              : Colors.orange,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
             // Notes
@@ -205,6 +250,92 @@ class ClientCard extends StatelessWidget {
         ),
       ),
       child: cardContent,
+    );
+  }
+
+  Widget _buildTouchpointProgressBadge() {
+    final completedCount = client.previousTouchpointNumber ?? 0;
+    final totalCount = totalTouchpoints ?? 7;
+
+    // Determine next touchpoint type based on touchpoint pattern
+    // Pattern: 1=Visit, 2=Call, 3=Call, 4=Visit, 5=Call, 6=Call, 7=Visit
+    String nextType;
+    Color badgeColor;
+    IconData badgeIcon;
+
+    if (completedCount >= totalCount) {
+      // All touchpoints completed
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(LucideIcons.checkCircle, size: 12, color: Colors.green),
+            const SizedBox(width: 4),
+            Text(
+              '$totalCount/$totalCount • Completed',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.green,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Calculate next touchpoint type (1-indexed, so next is completedCount + 1)
+    final nextNumber = completedCount + 1;
+    switch (nextNumber) {
+      case 1:
+      case 4:
+      case 7:
+        nextType = 'Visit';
+        badgeColor = Colors.blue;
+        badgeIcon = LucideIcons.mapPin;
+        break;
+      case 2:
+      case 3:
+      case 5:
+      case 6:
+        nextType = 'Call';
+        badgeColor = Colors.orange;
+        badgeIcon = LucideIcons.phone;
+        break;
+      default:
+        nextType = 'Touchpoint';
+        badgeColor = Colors.grey;
+        badgeIcon = LucideIcons.circle;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: badgeColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(badgeIcon, size: 12, color: badgeColor),
+          const SizedBox(width: 4),
+          Text(
+            '$completedCount/$totalCount • $nextType',
+            style: TextStyle(
+              fontSize: 11,
+              color: badgeColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

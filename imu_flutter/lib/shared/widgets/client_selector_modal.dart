@@ -26,6 +26,9 @@ import '../../shared/providers/app_providers.dart' show
     assignedMunicipalitiesProvider,
     clientTouchpointsSyncProvider,
     myDayApiServiceProvider;
+import 'client/touchpoint_progress_badge.dart';
+import 'client/touchpoint_status_badge.dart';
+import 'client/client_status_badge.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
 /// Used by both ItineraryPage and MyDayPage
@@ -434,34 +437,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     }
   }
 
-  Widget _buildBadge(String label, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      margin: const EdgeInsets.only(right: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool _canAddToItinerary(Client client, ClientStatus? status, TouchpointType nextType) {
+  bool _canAddToItinerary(Client client, ClientStatus? status, TouchpointType? nextType) {
     // Check loan released (client.loanReleased is already available from API data)
     if (client.loanReleased) return false;
 
@@ -477,7 +453,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return true;
   }
 
-  String _getDisableReason(Client client, ClientStatus? status, TouchpointType nextType) {
+  String _getDisableReason(Client client, ClientStatus? status, TouchpointType? nextType) {
     // client.loanReleased is already available from API data
     if (client.loanReleased) return 'Loan released - cannot add';
     if (status?.inItinerary == true) return 'Already added today';
@@ -488,6 +464,22 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     }
 
     return '';
+  }
+
+  String _getActionButtonLabel(Client client, ClientStatus? status, bool isPrimary) {
+    // If already added to this session
+    if (client.id != null && _addedClientIds.contains(client.id)) {
+      return 'Added';
+    }
+
+    // Check if client can be added
+    if (!_canAddToItinerary(client, status, client.nextTouchpointType)) {
+      // Return the disable reason as label
+      return _getDisableReason(client, status, client.nextTouchpointType);
+    }
+
+    // Default label
+    return isPrimary ? 'Add to Today' : 'Add with Date';
   }
 
   Future<void> _showDatePicker(Client client) async {
@@ -563,9 +555,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final totalPages = _totalPages(meta);
         final totalItems = _totalItems(meta);
 
-        // Filter out clients already in today's itinerary
-        final filteredClients = clients.where((client) => !existingClientIds.contains(client.id)).toList();
-        final displayableClients = _getDisplayableClients(filteredClients);
+        // Don't filter out clients - show all with status badges
+        // Only hide loan released clients from the list
+        final displayableClients = _getDisplayableClients(clients);
 
         // Load client statuses after clients are loaded
         if (_clientStatuses.isEmpty || _clientStatuses.length != clients.length) {
@@ -1015,18 +1007,28 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     client.email!,
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
+                // Touchpoint progress and status badges
                 Wrap(
-                  spacing: 4,
+                  spacing: 6,
+                  runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
-                    // Use client.loanReleased directly from client data
-                    if (client.loanReleased)
-                      _buildBadge('Loan Released', Colors.red, LucideIcons.ban),
-                    // Keep the "Already added" badge from _clientStatuses
-                    if (status?.inItinerary == true)
-                      _buildBadge('Already added', Colors.orange, LucideIcons.calendarCheck),
-                    // Touchpoint history badge uses ref.watch, so it updates reactively
-                    _buildNextTouchpointBadge(client.id),
+                    TouchpointProgressBadge(client: client),
+                    TouchpointStatusBadge(client: client),
+                  ],
+                ),
+                // Overall status badges (Already added, Call Touchpoint, etc.)
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.start,
+                  children: [
+                    // Client status badge (shows "Already added", "Call Touchpoint", etc.)
+                    ClientStatusBadge(
+                      client: client,
+                      status: status,
+                      currentUserRole: ref.watch(currentUserRoleProvider),
+                    ),
                   ],
                 ),
               ],
@@ -1053,20 +1055,24 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                         Expanded(
                           child: _buildActionButton(
                             icon: LucideIcons.calendar,
-                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add to Today',
+                            label: _getActionButtonLabel(client, status, true),
                             isPrimary: true,
                             isLoading: isAdding,
-                            onTap: client.id != null && _addedClientIds.contains(client.id) ? null : () => _addClientToItinerary(client),
+                            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
+                                ? () => _addClientToItinerary(client)
+                                : null,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildActionButton(
                             icon: LucideIcons.calendarClock,
-                            label: client.id != null && _addedClientIds.contains(client.id) ? 'Added' : 'Add with Date',
+                            label: _getActionButtonLabel(client, status, false),
                             isPrimary: false,
                             isLoading: isAdding,
-                            onTap: client.id != null && _addedClientIds.contains(client.id) ? null : () => _showDatePicker(client),
+                            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
+                                ? () => _showDatePicker(client)
+                                : null,
                           ),
                         ),
                       ],
@@ -1153,27 +1159,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
-  Widget _buildNextTouchpointBadge(String? clientId) {
-    if (clientId == null) return const SizedBox.shrink();
-
-    // Get touchpoints for this client
-    final touchpointsAsync = ref.watch(clientTouchpointsSyncProvider);
-    final touchpoints = touchpointsAsync.valueOrNull ?? [];
-    final clientTouchpoints = touchpoints.where((t) => t.clientId == clientId).toList();
-    final nextTouchpoint = clientTouchpoints.length;
-
-    if (nextTouchpoint >= 7) return const SizedBox.shrink(); // All touchpoints done
-
-    final nextType = TouchpointPattern.getType(nextTouchpoint + 1);
-    final isCall = nextType == TouchpointType.call;
-
-    return _buildBadge(
-      'Next: ${_getTouchpointOrdinal(nextTouchpoint + 1)} ${nextType.name}',
-      isCall ? Colors.orange : Colors.green,
-      isCall ? LucideIcons.phone : LucideIcons.mapPin,
-    );
-  }
-
   Widget _buildActionButton({
     required IconData icon,
     required String label,
@@ -1182,12 +1167,14 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     VoidCallback? onTap,
   }) {
     final isDisabled = onTap == null && !isLoading;
+    // Use smaller font for disabled buttons with longer text
+    final fontSize = isDisabled && label.length > 20 ? 10.0 : 12.0;
 
     return InkWell(
       onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: isDisabled && label.length > 20 ? 8 : 12, vertical: 8),
         decoration: BoxDecoration(
           color: isLoading
               ? Colors.grey.shade200
@@ -1215,7 +1202,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   ),
                 ),
               )
-            else
+            else if (!isDisabled || label.length <= 20)
               Icon(
                 icon,
                 size: 14,
@@ -1223,11 +1210,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     ? Colors.grey.shade500
                     : (isPrimary ? Colors.white : const Color(0xFF0F172A)),
               ),
-            const SizedBox(width: 6),
+            if (!isDisabled || label.length <= 20) const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: fontSize,
                 fontWeight: FontWeight.w500,
                 color: isLoading
                     ? Colors.grey.shade500
@@ -1237,6 +1224,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                             ? Colors.white
                             : const Color(0xFF0F172A),
               ),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

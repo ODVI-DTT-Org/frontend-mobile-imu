@@ -28,12 +28,14 @@ import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../shared/widgets/main_shell.dart';
 import '../../shared/providers/app_providers.dart' show authNotifierProvider;
+import '../../services/auth/auth_service.dart' show AuthState;
 // import '../../services/auth/secure_storage_service.dart'; // PIN functionality disabled
 
-// Auth state provider - derives from AuthNotifier
-final authStateProvider = Provider<bool>((ref) {
+// Auth state provider - watches full AuthState (including isLoading)
+// This is critical for token persistence - router must wait for initialization to complete
+final authStateProvider = Provider<AuthState>((ref) {
   final authState = ref.watch(authNotifierProvider);
-  return authState.isAuthenticated;
+  return authState;
 });
 
 // PIN FUNCTIONALITY DISABLED - Commenting out to focus on core authentication
@@ -83,7 +85,9 @@ final authStateProvider = Provider<bool>((ref) {
 
 // Router provider
 final routerProvider = Provider<GoRouter>((ref) {
-  final isAuthenticated = ref.watch(authStateProvider);
+  final authState = ref.watch(authStateProvider);
+  final isAuth = authState.isAuthenticated;
+  final isLoading = authState.isLoading;
 
   // PIN FUNCTIONALITY DISABLED - Focus on core JWT authentication
   // final hasPin = ref.watch(hasPinProvider);
@@ -91,7 +95,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
     redirect: (context, state) {
-      final isAuth = isAuthenticated;
+      // CRITICAL: Wait for auth initialization to complete before redirecting
+      // This fixes the token persistence bug where router redirects to /login
+      // before checkAuthStatus() completes loading tokens from storage
+      if (isLoading) {
+        return null; // Still initializing - wait for completion
+      }
+
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/forgot-password') ||
           // PIN SETUP/ENTRY DISABLED

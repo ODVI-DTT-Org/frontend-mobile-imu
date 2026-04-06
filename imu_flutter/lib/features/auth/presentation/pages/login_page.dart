@@ -29,6 +29,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _canLoginOffline = false;
   Duration? _gracePeriodRemaining;
 
+  // Flag to ensure listener is only created once
+  bool _listenerInitialized = false;
+
   @override
   void initState() {
     super.initState();
@@ -105,21 +108,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final authState = ref.watch(authNotifierProvider);
     final isOnline = ref.watch(isOnlineProvider);
 
-    // Listen to auth state changes for error handling and initial sync
-    ref.listen<AuthState>(authNotifierProvider, (prev, next) {
-      // Handle errors
-      if (next.error != null && next.error != prev?.error) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            // Use top-positioned toast instead of bottom SnackBar
-            showToast(next.error!);
-            // Clear error after showing toast
-            ref.read(authNotifierProvider.notifier).clearError();
-          }
-        });
-      }
-
-    });
+    // Listen to auth state changes for error handling (only create listener once)
+    if (!_listenerInitialized) {
+      _listenerInitialized = true;
+      ref.listen<AuthState>(authNotifierProvider, (prev, next) {
+        // Handle errors
+        if (next.error != null && next.error != prev?.error) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              // Use top-positioned toast instead of bottom SnackBar
+              showToast(next.error!);
+              // Clear error after showing toast
+              ref.read(authNotifierProvider.notifier).clearError();
+            }
+          });
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,

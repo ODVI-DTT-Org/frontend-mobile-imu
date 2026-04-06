@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../features/clients/data/models/client_model.dart';
+import 'touchpoint_progress_badge.dart';
+import 'touchpoint_status_badge.dart';
 
 /// Reusable client list tile with enhanced details display
 ///
 /// Shows:
 /// - Client name
+/// - Touchpoint progress badge (e.g., "2/7 • Call")
+/// - Touchpoint status badge (e.g., "Follow-up - Interested")
 /// - Location/address
 /// - Touchpoint summary (e.g., "3rd Call - 2 days ago")
 /// - Touchpoint reason
@@ -19,6 +23,8 @@ class ClientListTile extends StatelessWidget {
   final bool showNewBadge;
   final bool showTouchpointSummary;
   final bool showLocation;
+  final bool showProgressBadge;
+  final bool showStatusBadge;
 
   const ClientListTile({
     super.key,
@@ -29,6 +35,8 @@ class ClientListTile extends StatelessWidget {
     this.showNewBadge = true,
     this.showTouchpointSummary = true,
     this.showLocation = true,
+    this.showProgressBadge = true,
+    this.showStatusBadge = true,
   });
 
   @override
@@ -54,6 +62,19 @@ class ClientListTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Touchpoint progress and status badges
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.start,
+            children: [
+              if (showProgressBadge)
+                TouchpointProgressBadge(client: client),
+              if (showStatusBadge)
+                TouchpointStatusBadge(client: client),
+            ],
+          ),
+          // Location and touchpoint details
           if (showLocation && primaryAddress != null)
             _buildLocation(primaryAddress),
           if (showTouchpointSummary && lastTouchpoint != null)
