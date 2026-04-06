@@ -158,11 +158,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Check current authentication status
   Future<void> checkAuthStatus() async {
     debugPrint('[AUTH-NOTIFIER] checkAuthStatus() START');
+
+    // CRITICAL FIX: Always set isLoading: true FIRST, before any async operations
+    // This prevents race condition where router might check state before loading is set
     if (!mounted) return;
-    if (!mounted) {
-      debugPrint('[AUTH-NOTIFIER] Setting isLoading: true');
-      state = state.copyWith(isLoading: true);
-    }
+    debugPrint('[AUTH-NOTIFIER] Setting isLoading: true');
+    state = state.copyWith(isLoading: true);
 
     try {
       debugPrint('[AUTH-NOTIFIER] Calling _authService.initialize()...');
@@ -181,11 +182,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: _authService.currentUser,
         isLoading: false,
       );
-      debugPrint('[AUTH-NOTIFIER] checkAuthStatus() END');
+      debugPrint('[AUTH-NOTIFIER] checkAuthStatus() END - SUCCESS');
     } catch (e) {
       debugPrint('[AUTH-NOTIFIER] checkAuthStatus() ERROR: $e');
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint('[AUTH-NOTIFIER] checkAuthStatus() END - ERROR');
     }
   }
 
