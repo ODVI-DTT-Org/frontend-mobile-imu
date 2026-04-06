@@ -452,7 +452,14 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
             }
           }
         } else {
-          throw Exception('Failed to update client - client not found');
+          // Null result means approval is required (caravan/tele users)
+          debugPrint('[EditClientFormV2] Client edit requires approval');
+          if (mounted) {
+            _showSuccessSnackBar('Client edit submitted for approval');
+            if (widget.isModal) {
+              Navigator.of(context).pop(true);
+            }
+          }
         }
       } else {
         debugPrint('[EditClientFormV2] Offline - saving to local storage only');

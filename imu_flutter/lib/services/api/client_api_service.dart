@@ -404,8 +404,20 @@ class ClientApiService {
         data: requestData,
       );
 
-      if (response.statusCode == 201) {
-        final clientData = response.data as Map<String, dynamic>;
+      // Handle successful response (could be 201 for direct creation or 200 for approval)
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final responseData = response.data as Map<String, dynamic>;
+
+        // Check if approval is required (for caravan/tele users)
+        if (responseData['requires_approval'] == true) {
+          debugPrint('ClientApiService: Client creation requires approval');
+          // Return null to indicate approval is needed
+          // The caller should check for this and show appropriate message
+          return null;
+        }
+
+        // Direct creation (admin users)
+        final clientData = responseData;
         debugPrint('ClientApiService: Client created successfully: ${clientData['first_name']} ${clientData['last_name']}');
         return Client.fromRow(clientData);
       } else {
@@ -496,7 +508,15 @@ class ClientApiService {
 
       if (response.statusCode == 200) {
         final clientData = response.data as Map<String, dynamic>;
-        debugPrint('ClientApiService: Client updated successfully: ${clientData['first_name']} ${clientData['last_name']}');
+
+        // Check if approval is required (caravan/tele users)
+        if (clientData['requires_approval'] == true) {
+          debugPrint('ClientApiService: Client edit requires approval');
+          return null; // Indicates approval needed
+        }
+
+        // Admin users get full client data
+        debugPrint('ClientApiService: Client updated successfully: ${clientData['first_name'] ?? 'N/A'} ${clientData['last_name'] ?? 'N/A'}');
         return Client.fromRow(clientData);
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');

@@ -758,7 +758,22 @@ class Touchpoint {
 
     // Helper to get value from either snake_case or camelCase
     T? getValue<T>(String snakeCase, String camelCase) {
-      return (json[snakeCase] ?? json[camelCase]) as T?;
+      final value = json[snakeCase] ?? json[camelCase];
+      if (value == null) return null;
+      // Handle int type conversion - value might already be int or might be String
+      if (T == int && value is String) {
+        return int.tryParse(value) as T?;
+      }
+      if (T == int && value is int) {
+        return value as T;
+      }
+      if (T == double && value is String) {
+        return double.tryParse(value) as T?;
+      }
+      if (T == double && value is double) {
+        return value as T;
+      }
+      return value as T?;
     }
 
     return Touchpoint(
@@ -766,17 +781,17 @@ class Touchpoint {
       clientId: getValue<String>('client_id', 'clientId') ?? '',
       userId: getValue<String>('user_id', 'userId') ?? getValue<String>('agent_id', 'agentId'),
       touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? 1,
-      type: TouchpointType.fromApi(getValue<String>('type', 'type') ?? 'VISIT'),
+      type: TouchpointType.fromApi(getValue<String>('touchpoint_type', 'touchpointType') ?? getValue<String>('type', 'type') ?? 'VISIT'),
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
       address: getValue<String>('address', 'address'),
       timeArrival: parseTime(getValue<String>('time_arrival', 'timeArrival')),
       timeDeparture: parseTime(getValue<String>('time_departure', 'timeDeparture')),
-      odometerArrival: getValue<String>('odometer_start', 'odometerArrival'),
-      odometerDeparture: getValue<String>('odometer_end', 'odometerDeparture'),
+      odometerArrival: getValue<String>('odometer_arrival', 'odometerArrival'),
+      odometerDeparture: getValue<String>('odometer_departure', 'odometerDeparture'),
       reason: TouchpointReason.fromApi(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
       status: TouchpointStatus.fromApi(getValue<String>('status', 'status') ?? 'INTERESTED'),
       nextVisitDate: parseDateTime(getValue<String>('next_visit_date', 'nextVisitDate')),
-      remarks: getValue<String>('notes', 'remarks'),
+      remarks: getValue<String>('notes', 'remarks') ?? getValue<String>('remarks', 'remarks'),
       photoPath: getValue<String>('photo_url', 'photoUrl') ?? getValue<String>('photo_path', 'photoPath'),
       audioPath: getValue<String>('audio_url', 'audioUrl') ?? getValue<String>('audio_path', 'audioPath'),
       latitude: getValue<double>('latitude', 'latitude'),

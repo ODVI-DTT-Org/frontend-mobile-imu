@@ -242,6 +242,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         final result = await clientApi.createClient(newClient);
 
         if (result != null) {
+          // Admin direct creation - client created immediately
           debugPrint('[AddClientPage] Client created successfully');
           // Save to local storage
           if (result.id != null) {
@@ -253,7 +254,12 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             context.pop(true);
           }
         } else {
-          throw Exception('Failed to create client');
+          // Caravan/Tele - approval required
+          debugPrint('[AddClientPage] Client creation requires approval');
+          if (mounted) {
+            _showSuccessSnackBar('Client submitted for approval');
+            context.pop(true);
+          }
         }
       } else {
         debugPrint('[AddClientPage] Offline - saving to local storage only');
