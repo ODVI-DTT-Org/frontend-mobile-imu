@@ -114,7 +114,7 @@ class AuthState {
 
   factory AuthState.initial() => const AuthState(
     isAuthenticated: false,
-    isLoading: false,
+    isLoading: true,  // Start in loading state to prevent premature router redirect
   );
 
   AuthState copyWith({
