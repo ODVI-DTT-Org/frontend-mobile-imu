@@ -1314,7 +1314,7 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
           items: _barangays.map((barangay) {
             return DropdownMenuItem<PsgcBarangay>(
               value: barangay,
-              child: Text(barangay.barangay),
+              child: Text(barangay.barangay ?? 'Unknown'),
             );
           }).toList(),
           onChanged: (barangay) {

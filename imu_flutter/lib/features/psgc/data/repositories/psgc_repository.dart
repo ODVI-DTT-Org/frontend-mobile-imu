@@ -10,75 +10,120 @@ class PsgcRepository {
   PsgcRepository(this._db);
 
   /// Get all regions
+  /// Note: PowerSync syncs a single 'psgc' table, so we derive regions from it
   Future<List<PsgcRegion>> getRegions() async {
-    final results = await _db.getAll('SELECT * FROM psgc_regions ORDER BY name');
-    return results.map((row) => PsgcRegion.fromJson(row)).toList();
+    final results = await _db.getAll(
+      'SELECT DISTINCT region as name, region as code FROM psgc ORDER BY region',
+    );
+    return results.map((row) => PsgcRegion(
+      name: row['region'] as String,
+      code: row['region'] as String,
+    )).toList();
   }
 
   /// Get provinces by region
   Future<List<PsgcProvince>> getProvincesByRegion(String region) async {
     final results = await _db.getAll(
-      'SELECT * FROM psgc_provinces WHERE region = ? ORDER BY name',
+      'SELECT DISTINCT province as name, province as code, region FROM psgc WHERE region = ? ORDER BY province',
       [region],
     );
-    return results.map((row) => PsgcProvince.fromJson(row)).toList();
+    return results.map((row) => PsgcProvince(
+      name: row['province'] as String,
+      code: row['province'] as String,
+      region: row['region'] as String,
+    )).toList();
   }
 
   /// Get all provinces
   Future<List<PsgcProvince>> getAllProvinces() async {
-    final results = await _db.getAll('SELECT * FROM psgc_provinces ORDER BY region, name');
-    return results.map((row) => PsgcProvince.fromJson(row)).toList();
+    final results = await _db.getAll(
+      'SELECT DISTINCT province as name, province as code, region FROM psgc ORDER BY region, province',
+    );
+    return results.map((row) => PsgcProvince(
+      name: row['province'] as String,
+      code: row['province'] as String,
+      region: row['region'] as String,
+    )).toList();
   }
 
   /// Get municipalities/cities by province
   Future<List<PsgcMunicipality>> getMunicipalitiesByProvince(String province) async {
     final results = await _db.getAll(
-      'SELECT * FROM psgc_municipalities WHERE province = ? ORDER BY name',
+      'SELECT DISTINCT mun_city as name, mun_city as displayName, province as province, region FROM psgc WHERE province = ? ORDER BY mun_city',
       [province],
     );
-    return results.map((row) => PsgcMunicipality.fromJson(row)).toList();
+    return results.map((row) => PsgcMunicipality(
+      name: row['mun_city'] as String,
+      displayName: row['mun_city'] as String,
+      province: row['province'] as String,
+      region: row['region'] as String,
+    )).toList();
   }
 
   /// Get all municipalities
   Future<List<PsgcMunicipality>> getAllMunicipalities() async {
     final results = await _db.getAll(
-      'SELECT * FROM psgc_municipalities ORDER BY region, province, name',
+      'SELECT DISTINCT mun_city as name, mun_city as displayName, province as province, region FROM psgc ORDER BY region, province, mun_city',
     );
-    return results.map((row) => PsgcMunicipality.fromJson(row)).toList();
+    return results.map((row) => PsgcMunicipality(
+      name: row['mun_city'] as String,
+      displayName: row['mun_city'] as String,
+      province: row['province'] as String,
+      region: row['region'] as String,
+    )).toList();
   }
 
   /// Get barangays by municipality
   Future<List<PsgcBarangay>> getBarangaysByMunicipality(String municipality) async {
     final results = await _db.getAll(
-      'SELECT id, region, province, mun_city as municipality, barangay, zip_code, pin_location FROM psgc_barangays WHERE mun_city = ? ORDER BY barangay',
+      'SELECT id, region, province, mun_city as municipality, barangay, zip_code FROM psgc WHERE mun_city = ? ORDER BY barangay',
       [municipality],
     );
-    return results.map((row) => PsgcBarangay.fromJson(row)).toList();
+    return results.map((row) => PsgcBarangay(
+      id: row['id'] as String,
+      region: row['region'] as String?,
+      province: row['province'] as String?,
+      municipality: row['mun_city'] as String?,
+      barangay: row['barangay'] as String?,
+      zipCode: row['zip_code'] as String?,
+    )).toList();
   }
 
   /// Get all barangays
   Future<List<PsgcBarangay>> getAllBarangays() async {
     final results = await _db.getAll(
-      'SELECT id, region, province, mun_city as municipality, barangay, zip_code, pin_location FROM psgc_barangays ORDER BY region, province, mun_city, barangay',
+      'SELECT id, region, province, mun_city as municipality, barangay, zip_code FROM psgc ORDER BY region, province, mun_city, barangay',
     );
-    return results.map((row) => PsgcBarangay.fromJson(row)).toList();
+    return results.map((row) => PsgcBarangay(
+      id: row['id'] as String,
+      region: row['region'] as String?,
+      province: row['province'] as String?,
+      municipality: row['mun_city'] as String?,
+      barangay: row['barangay'] as String?,
+      zipCode: row['zip_code'] as String?,
+    )).toList();
   }
 
   /// Search municipalities by name (for autocomplete)
   Future<List<PsgcMunicipality>> searchMunicipalities(String query) async {
     final searchQuery = '%${query.toLowerCase()}%';
     final results = await _db.getAll(
-      "SELECT * FROM psgc_municipalities WHERE LOWER(name) LIKE ? ORDER BY name LIMIT 20",
+      "SELECT DISTINCT mun_city as name, mun_city as displayName, province, region FROM psgc WHERE LOWER(mun_city) LIKE ? ORDER BY mun_city LIMIT 20",
       [searchQuery],
     );
-    return results.map((row) => PsgcMunicipality.fromJson(row)).toList();
+    return results.map((row) => PsgcMunicipality(
+      name: row['mun_city'] as String,
+      displayName: row['mun_city'] as String,
+      province: row['province'] as String,
+      region: row['region'] as String,
+    )).toList();
   }
 
   /// Search barangays by name (for autocomplete)
   Future<List<PsgcBarangay>> searchBarangays(String query, {String? municipality}) async {
     final searchQuery = '%${query.toLowerCase()}%';
     List<Object?> params = [searchQuery];
-    String sql = "SELECT id, region, province, mun_city as municipality, barangay, zip_code, pin_location FROM psgc_barangays WHERE LOWER(barangay) LIKE ?";
+    String sql = "SELECT id, region, province, mun_city as municipality, barangay, zip_code FROM psgc WHERE LOWER(barangay) LIKE ?";
 
     if (municipality != null) {
       sql += " AND mun_city = ?";
@@ -88,7 +133,14 @@ class PsgcRepository {
     sql += " ORDER BY barangay LIMIT 20";
 
     final results = await _db.getAll(sql, params);
-    return results.map((row) => PsgcBarangay.fromJson(row)).toList();
+    return results.map((row) => PsgcBarangay(
+      id: row['id'] as String,
+      region: row['region'] as String?,
+      province: row['province'] as String?,
+      municipality: row['mun_city'] as String?,
+      barangay: row['barangay'] as String?,
+      zipCode: row['zip_code'] as String?,
+    )).toList();
   }
 }
 

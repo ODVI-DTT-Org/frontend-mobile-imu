@@ -106,7 +106,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   void _onSearchChanged() {
-    _searchDebounce.run(() {
+    _searchDebounce.run(() async {
       setState(() {
         _currentPage = 1; // Reset to first page on search
       });
@@ -117,11 +117,17 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         ref.read(assignedClientSearchQueryProvider.notifier).state = query;
         ref.read(assignedClientPageProvider.notifier).state = 1;
         ref.invalidate(assignedClientsProvider);
+        // Wait for provider to refresh, then load clients
+        await Future.delayed(const Duration(milliseconds: 100));
+        _loadClients();
       } else {
         // For 'all' mode, use online pagination providers
         ref.read(onlineClientSearchQueryProvider.notifier).state = query;
         ref.read(onlineClientPageProvider.notifier).state = 1;
         ref.invalidate(onlineClientsProvider);
+        // Wait for provider to refresh, then load clients
+        await Future.delayed(const Duration(milliseconds: 100));
+        _loadClients();
       }
     });
   }
@@ -227,16 +233,22 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       _hasMorePages = true;
     });
 
-    Future.microtask(() {
+    Future.microtask(() async {
       if (!mounted) return;
 
       if (_clientFilter == 'assigned') {
         ref.read(assignedClientPageProvider.notifier).state = 1;
         ref.invalidate(assignedClientsProvider);
+        // Wait for provider to refresh, then load clients
+        await Future.delayed(const Duration(milliseconds: 100));
+        _loadClients();
       } else {
         // For 'all' mode, use online pagination providers
         ref.read(onlineClientPageProvider.notifier).state = 1;
         ref.invalidate(onlineClientsProvider);
+        // Wait for provider to refresh, then load clients
+        await Future.delayed(const Duration(milliseconds: 100));
+        _loadClients();
       }
     });
   }
@@ -271,14 +283,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   void _filterClients() {
-    // Search is now handled by the provider - just clear search
-    if (_clientFilter == 'assigned') {
-      ref.read(assignedClientSearchQueryProvider.notifier).state = '';
-      ref.invalidate(assignedClientsProvider);
-    } else {
-      ref.read(onlineClientSearchQueryProvider.notifier).state = '';
-      ref.invalidate(onlineClientsProvider);
-    }
+    // Clear search and reload clients
+    _searchController.clear();
+    _applyClientFilter();
   }
 
   List<Client> get _displayableClients {

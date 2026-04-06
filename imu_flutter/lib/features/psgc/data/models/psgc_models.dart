@@ -1,33 +1,27 @@
 /// PSGC (Philippine Standard Geographic Code) models
 ///
-/// Matches views from migration 010:
-/// - psgc_regions
-/// - psgc_provinces
-/// - psgc_municipalities
-/// - psgc_barangays
+/// Note: These models now derive data from the single 'psgc' table synced by PowerSync
+/// instead of separate view tables. The single table has: id, region, province, mun_city_kind, mun_city, barangay, zip_code
 
 /// Region model
 class PsgcRegion {
-  final String id;
   final String name;
   final String code;
 
   PsgcRegion({
-    required this.id,
     required this.name,
     required this.code,
   });
 
+  // For backward compatibility with fromJson
   factory PsgcRegion.fromJson(Map<String, dynamic> json) {
     return PsgcRegion(
-      id: json['id'].toString(),
-      name: json['name'] ?? '',
-      code: json['code'] ?? '',
+      name: json['name'] ?? json['region'] ?? '',
+      code: json['code'] ?? json['region'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
     'name': name,
     'code': code,
   };
@@ -35,104 +29,99 @@ class PsgcRegion {
 
 /// Province model
 class PsgcProvince {
-  final String id;
-  final String region;
   final String name;
-  final String kind;
-  final bool isCity;
+  final String code;
+  final String region;
+  final String? kind;
+  final bool? isCity;
 
   PsgcProvince({
-    required this.id,
-    required this.region,
     required this.name,
-    required this.kind,
-    required this.isCity,
+    required this.code,
+    required this.region,
+    this.kind,
+    this.isCity,
   });
 
+  // For backward compatibility with fromJson
   factory PsgcProvince.fromJson(Map<String, dynamic> json) {
     return PsgcProvince(
-      id: json['id'].toString(),
+      name: json['name'] ?? json['province'] ?? '',
+      code: json['code'] ?? json['province'] ?? '',
       region: json['region'] ?? '',
-      name: json['name'] ?? '',
-      kind: json['kind'] ?? '',
-      isCity: json['is_city'] == true || json['is_city'] == 1,
+      kind: json['kind'],
+      isCity: json['is_city'],
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'region': region,
     'name': name,
-    'kind': kind,
-    'is_city': isCity,
+    'code': code,
+    'region': region,
+    if (kind != null) 'kind': kind,
+    if (isCity != null) 'is_city': isCity,
   };
 }
 
 /// Municipality/City model
 class PsgcMunicipality {
-  final String id;
-  final String region;
-  final String province;
   final String name;
-  final String kind; // 'mun' or 'city'
-  final bool isCity;
+  final String displayName;
+  final String province;
+  final String region;
+  final String? kind;
+  final bool? isCity;
 
   PsgcMunicipality({
-    required this.id,
-    required this.region,
-    required this.province,
     required this.name,
-    required this.kind,
-    required this.isCity,
+    required this.displayName,
+    required this.province,
+    required this.region,
+    this.kind,
+    this.isCity,
   });
 
+  // For backward compatibility with fromJson
   factory PsgcMunicipality.fromJson(Map<String, dynamic> json) {
+    final name = json['name'] ?? json['mun_city'] ?? '';
     return PsgcMunicipality(
-      id: json['id'].toString(),
-      region: json['region'] ?? '',
+      name: name,
+      displayName: json['display_name'] ?? json['displayName'] ?? name,
       province: json['province'] ?? '',
-      name: json['name'] ?? '',
-      kind: json['kind'] ?? '',
-      isCity: json['is_city'] == true || json['is_city'] == 1,
+      region: json['region'] ?? '',
+      kind: json['kind'],
+      isCity: json['is_city'],
     );
   }
 
-  /// Get display name (with City/Municipality suffix)
-  String get displayName {
-    if (isCity) {
-      return '$name City';
-    }
-    return name;
-  }
-
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'region': region,
-    'province': province,
     'name': name,
-    'kind': kind,
-    'is_city': isCity,
+    'display_name': displayName,
+    'province': province,
+    'region': region,
+    if (kind != null) 'kind': kind,
+    if (isCity != null) 'is_city': isCity,
   };
 }
 
 /// Barangay model
 class PsgcBarangay {
   final String id;
-  final String region;
-  final String province;
-  final String municipality;
-  final String barangay;
-  final String? municipalityKind; // NEW: mun_city_kind from database (e.g., 'Municipality', 'City')
+  final String? region;
+  final String? province;
+  final String? municipality;
+  final String? barangay;
+  final String? municipalityKind;
   final String? zipCode;
   final Map<String, dynamic>? pinLocation;
 
   PsgcBarangay({
     required this.id,
-    required this.region,
-    required this.province,
-    required this.municipality,
-    required this.barangay,
-    this.municipalityKind, // NEW
+    this.region,
+    this.province,
+    this.municipality,
+    this.barangay,
+    this.municipalityKind,
     this.zipCode,
     this.pinLocation,
   });
@@ -140,11 +129,11 @@ class PsgcBarangay {
   factory PsgcBarangay.fromJson(Map<String, dynamic> json) {
     return PsgcBarangay(
       id: json['id'].toString(),
-      region: json['region'] ?? '',
-      province: json['province'] ?? '',
-      municipality: json['municipality'] ?? '',
-      barangay: json['barangay'] ?? '',
-      municipalityKind: json['municipality_kind'] ?? json['kind'], // NEW
+      region: json['region'],
+      province: json['province'],
+      municipality: json['municipality'],
+      barangay: json['barangay'],
+      municipalityKind: json['municipality_kind'] ?? json['mun_city_kind'],
       zipCode: json['zip_code'],
       pinLocation: json['pin_location'],
     );
@@ -152,18 +141,18 @@ class PsgcBarangay {
 
   /// Get full address string
   String get fullAddress {
-    final parts = [barangay, municipality, province, region];
+    final parts = [barangay, municipality, province, region].whereType<String>();
     return parts.where((p) => p.isNotEmpty).join(', ');
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'region': region,
-    'province': province,
-    'municipality': municipality,
-    'barangay': barangay,
-    'municipality_kind': municipalityKind, // NEW
-    'zip_code': zipCode,
-    'pin_location': pinLocation,
+    if (region != null) 'region': region,
+    if (province != null) 'province': province,
+    if (municipality != null) 'municipality': municipality,
+    if (barangay != null) 'barangay': barangay,
+    if (municipalityKind != null) 'municipality_kind': municipalityKind,
+    if (zipCode != null) 'zip_code': zipCode,
+    if (pinLocation != null) 'pin_location': pinLocation,
   };
 }
