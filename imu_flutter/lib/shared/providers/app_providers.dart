@@ -6,6 +6,7 @@ export '../../services/api/touchpoint_api_service.dart' show touchpointApiServic
 export '../../services/api/attendance_api_service.dart' show attendanceApiServiceProvider;
 export '../../services/api/my_day_api_service.dart' show myDayApiServiceProvider;
 export '../../services/api/approvals_api_service.dart' show approvalsApiServiceProvider;
+export '../../services/api/bulk_delete_api_service.dart' show bulkDeleteApiServiceProvider;
 // Re-export background sync providers
 export '../../services/api/background_sync_service.dart' show backgroundSyncServiceProvider, backgroundSyncStatusProvider, BackgroundSyncStatus, BackgroundSyncService;
 // Re-export auth providers
