@@ -1066,6 +1066,28 @@ class _VisitCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Touchpoint info badges
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.start,
+                  children: [
+                    // Next touchpoint badge (from ItineraryItem)
+                    if (visit.touchpointNumber != null && visit.touchpointType != null)
+                      _buildNextTouchpointBadge(
+                        visit.touchpointNumber!,
+                        visit.touchpointType!,
+                      ),
+                    // Previous touchpoint badge (from ItineraryItem)
+                    if (visit.previousTouchpointNumber != null)
+                      PreviousTouchpointBadge(
+                        touchpointNumber: visit.previousTouchpointNumber,
+                        touchpointType: visit.previousTouchpointType,
+                        touchpointReason: visit.previousTouchpointReason,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 // Previous touchpoint badge and date row
                 Row(
                   children: [
@@ -1241,6 +1263,39 @@ class _VisitCard extends StatelessWidget {
         .split('_')
         .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
         .join(' ');
+  }
+
+  Widget _buildNextTouchpointBadge(int touchpointNumber, String touchpointType) {
+    final isVisit = touchpointType.toLowerCase() == 'visit';
+    final badgeColor = isVisit ? const Color(0xFF3B82F6) : const Color(0xFF22C55E);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: badgeColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isVisit ? LucideIcons.mapPin : LucideIcons.phone,
+            size: 12,
+            color: badgeColor,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$touchpointNumber/7 • ${isVisit ? 'Visit' : 'Call'}',
+            style: TextStyle(
+              fontSize: 11,
+              color: badgeColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
