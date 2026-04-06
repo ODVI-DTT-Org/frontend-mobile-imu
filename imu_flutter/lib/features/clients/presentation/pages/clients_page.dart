@@ -396,72 +396,159 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         body: SafeArea(
           child: Column(
             children: [
-              // Header skeleton
+              // Header (always visible)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 16),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 32 : 17,
+                  vertical: 16,
+                ),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        Container(
-                          width: 60,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(4),
+                        // Back button
+                        GestureDetector(
+                          onTap: () {
+                            HapticUtils.lightImpact();
+                            context.go('/home');
+                          },
+                          child: Row(
+                            children: [
+                              Icon(
+                                LucideIcons.chevronLeft,
+                                size: 20,
+                                color: const Color(0xFF0F172A),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Home',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const Spacer(),
-                        Container(
-                          width: 80,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(8),
+                        // Title
+                        Text(
+                          _showAssignedClientsOnly ? 'Assigned Clients' : 'All Clients',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
+                        const Spacer(),
+                        const SizedBox(width: 50),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    // Search bar skeleton
-                    Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    const SizedBox(height: 12),
+                    // Toggle between Assigned Clients and All Clients
+                    Row(
+                      children: [
+                        _buildFilterToggle('Assigned Clients', _showAssignedClientsOnly, () {
+                          HapticUtils.lightImpact();
+                          setState(() {
+                            _showAssignedClientsOnly = true;
+                            _currentPage = 1;
+                            _searchQuery = '';
+                            _searchController.clear();
+                          });
+                          // Defer provider updates until after build cycle
+                          Future.microtask(() {
+                            if (!mounted) return;
+                            // Invalidate online provider when switching back to Assigned Clients
+                            ref.invalidate(onlineClientsProvider);
+                          });
+                        }),
+                        const SizedBox(width: 8),
+                        _buildFilterToggle('All Clients', !_showAssignedClientsOnly, () {
+                          HapticUtils.lightImpact();
+                          // Check if online before switching to All Clients
+                          final isOnlineNow = ref.read(isOnlineProvider);
+                          if (!isOnlineNow) {
+                            showToast('Cannot search all clients while offline');
+                            return;
+                          }
+                          setState(() {
+                            _showAssignedClientsOnly = false;
+                            _currentPage = 1;
+                            _searchQuery = '';
+                            _searchController.clear();
+                          });
+                          // Defer provider updates until after build cycle
+                          Future.microtask(() {
+                            if (!mounted) return;
+                            // Reset online search and page to first page when switching
+                            ref.read(onlineClientSearchQueryProvider.notifier).state = '';
+                            ref.read(onlineClientPageProvider.notifier).state = 1;
+                          });
+                        }),
+                      ],
                     ),
+                    // Show online indicator when in All Clients mode
+                    if (!_showAssignedClientsOnly)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              LucideIcons.globe,
+                              size: 12,
+                              color: Colors.green.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Searching all clients in database',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
-              // Filter chips skeleton
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+
+              const SizedBox(height: 12),
+
+              // Search Bar (always visible)
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search clients...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    prefixIcon: Icon(LucideIcons.search, color: Colors.grey.shade400, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(LucideIcons.x, color: Colors.grey.shade400, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ],
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
-              // List skeleton
+
+              const SizedBox(height: 12),
+
+              // Client list skeleton (only the list shows skeleton)
               const Expanded(
                 child: ClientListSkeleton(itemCount: 7),
               ),

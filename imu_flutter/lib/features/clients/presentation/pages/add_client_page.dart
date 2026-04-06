@@ -14,7 +14,6 @@ import '../../../psgc/data/repositories/psgc_repository.dart';
 /// Uses direct columns instead of nested lists:
 /// - region, province, municipality, barangay (direct fields)
 /// - phone (single field instead of phoneNumbers list)
-/// - udi field added
 /// - All fields match the database schema
 class AddClientPage extends ConsumerStatefulWidget {
   const AddClientPage({super.key});
@@ -46,7 +45,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   final _payrollDateController = TextEditingController();
   final _tenureController = TextEditingController();
   final _panController = TextEditingController();
-  final _udiController = TextEditingController();
   final _remarksController = TextEditingController();
 
   // Location dropdown values
@@ -59,6 +57,11 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   List<PsgcProvince> _provinces = [];
   List<PsgcMunicipality> _municipalities = [];
   List<PsgcBarangay> _barangays = [];
+
+  // Loading states for cascading dropdowns
+  bool _isLoadingProvinces = false;
+  bool _isLoadingMunicipalities = false;
+  bool _isLoadingBarangays = false;
 
   // Dropdown values
   String _productType = 'SSS Pensioner';
@@ -76,7 +79,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     'employment': false,
     'product': true,
     'location': true,
-    'udi': false,
     'remarks': false,
   };
 
@@ -103,7 +105,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     _payrollDateController.dispose();
     _tenureController.dispose();
     _panController.dispose();
-    _udiController.dispose();
     _remarksController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -139,10 +140,14 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
       if (mounted) {
         setState(() {
           _barangays = barangays;
+          _isLoadingBarangays = false;
         });
       }
     } catch (e) {
       debugPrint('[AddClientPage] Error loading barangays: $e');
+      if (mounted) {
+        setState(() => _isLoadingBarangays = false);
+      }
     }
   }
 
@@ -212,9 +217,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         pan: _panController.text.trim().isEmpty
             ? null
             : _panController.text.trim(),
-        udi: _udiController.text.trim().isEmpty
-            ? null
-            : _udiController.text.trim(),
         region: _selectedRegion?.name,
         province: _selectedProvince?.name,
         municipality: _selectedMunicipality?.name,
@@ -473,18 +475,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             ),
             const SizedBox(height: 12),
             _buildLocationSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // UDI Section
-            _buildSectionHeader(
-              title: 'Unified ID (UDI)',
-              icon: LucideIcons.creditCard,
-              sectionKey: 'udi',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildUDISection(colorScheme),
 
             const SizedBox(height: 24),
 
@@ -972,15 +962,22 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         // Region Dropdown
         DropdownButtonFormField<PsgcRegion>(
           value: _selectedRegion,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Region *',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
             isDense: true,
+            suffixIcon: _regions.isEmpty
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
           ),
           items: _regions.map((region) {
             return DropdownMenuItem<PsgcRegion>(
               value: region,
-              child: Text('${region.name} (${region.code})'),
+              child: Text(region.name),
             );
           }).toList(),
           onChanged: (region) async {
@@ -992,15 +989,26 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
               _provinces = [];
               _municipalities = [];
               _barangays = [];
+              _isLoadingProvinces = region != null;
             });
 
             if (region != null) {
-              final psgcRepository = await ref.read(psgcRepositoryProvider.future);
-              final provinces = await psgcRepository.getProvincesByRegion(region.name);
-              if (mounted) {
-                setState(() {
-                  _provinces = provinces;
-                });
+              try {
+                final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                final provinces = await psgcRepository.getProvincesByRegion(region.name);
+                if (mounted) {
+                  setState(() {
+                    _provinces = provinces;
+                    _isLoadingProvinces = false;
+                  });
+                }
+              } catch (e) {
+                if (mounted) {
+                  setState(() => _isLoadingProvinces = false);
+                }
+                if (mounted) {
+                  _showErrorDialog('Failed to load provinces', e);
+                }
               }
             }
           },
@@ -1008,106 +1016,169 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         const SizedBox(height: 16),
 
         // Province Dropdown
-        DropdownButtonFormField<PsgcProvince>(
-          value: _selectedProvince,
-          decoration: const InputDecoration(
-            labelText: 'Province *',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          items: _provinces.map((province) {
-            return DropdownMenuItem<PsgcProvince>(
-              value: province,
-              child: Text(province.name),
-            );
-          }).toList(),
-          onChanged: (province) async {
-            setState(() {
-              _selectedProvince = province;
-              _selectedMunicipality = null;
-              _selectedBarangay = null;
-              _municipalities = [];
-              _barangays = [];
-            });
+        IgnorePointer(
+          ignoring: _selectedRegion == null || _isLoadingProvinces,
+          child: DropdownButtonFormField<PsgcProvince>(
+            value: _selectedProvince,
+            decoration: InputDecoration(
+              labelText: 'Province *',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: _selectedRegion == null,
+              fillColor: _selectedRegion == null ? Colors.grey.shade100 : null,
+              suffixIcon: _isLoadingProvinces
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              hintText: _selectedRegion == null ? 'Select region first' : null,
+            ),
+            items: _provinces.isEmpty && _selectedRegion != null && !_isLoadingProvinces
+                ? [
+                    const DropdownMenuItem<PsgcProvince>(
+                      value: null,
+                      enabled: false,
+                      child: Text('No provinces available', style: TextStyle(color: Colors.grey)),
+                    ),
+                  ]
+                : _provinces.map((province) {
+                    return DropdownMenuItem<PsgcProvince>(
+                      value: province,
+                      child: Text(province.name),
+                    );
+                  }).toList(),
+            onChanged: _selectedRegion == null
+                ? null
+                : (province) async {
+                    setState(() {
+                      _selectedProvince = province;
+                      _selectedMunicipality = null;
+                      _selectedBarangay = null;
+                      _municipalities = [];
+                      _barangays = [];
+                      _isLoadingMunicipalities = province != null;
+                    });
 
-            if (province != null) {
-              final psgcRepository = await ref.read(psgcRepositoryProvider.future);
-              final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
-              if (mounted) {
-                setState(() {
-                  _municipalities = municipalities;
-                });
-              }
-            }
-          },
+                    if (province != null) {
+                      try {
+                        final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                        final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
+                        if (mounted) {
+                          setState(() {
+                            _municipalities = municipalities;
+                            _isLoadingMunicipalities = false;
+                          });
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setState(() => _isLoadingMunicipalities = false);
+                        }
+                        if (mounted) {
+                          _showErrorDialog('Failed to load municipalities', e);
+                        }
+                      }
+                    }
+                  },
+          ),
         ),
         const SizedBox(height: 16),
 
         // Municipality Dropdown
-        DropdownButtonFormField<PsgcMunicipality>(
-          value: _selectedMunicipality,
-          decoration: const InputDecoration(
-            labelText: 'Municipality/City *',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          items: _municipalities.map((municipality) {
-            return DropdownMenuItem<PsgcMunicipality>(
-              value: municipality,
-              child: Text(municipality.displayName),
-            );
-          }).toList(),
-          onChanged: (municipality) async {
-            setState(() {
-              _selectedMunicipality = municipality;
-              _selectedBarangay = null;
-              _barangays = [];
-            });
+        IgnorePointer(
+          ignoring: _selectedProvince == null || _isLoadingMunicipalities,
+          child: DropdownButtonFormField<PsgcMunicipality>(
+            value: _selectedMunicipality,
+            decoration: InputDecoration(
+              labelText: 'Municipality/City *',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: _selectedProvince == null,
+              fillColor: _selectedProvince == null ? Colors.grey.shade100 : null,
+              suffixIcon: _isLoadingMunicipalities
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              hintText: _selectedProvince == null ? 'Select province first' : null,
+            ),
+            items: _municipalities.isEmpty && _selectedProvince != null && !_isLoadingMunicipalities
+                ? [
+                    const DropdownMenuItem<PsgcMunicipality>(
+                      value: null,
+                      enabled: false,
+                      child: Text('No municipalities available', style: TextStyle(color: Colors.grey)),
+                    ),
+                  ]
+                : _municipalities.map((municipality) {
+                    return DropdownMenuItem<PsgcMunicipality>(
+                      value: municipality,
+                      child: Text(municipality.displayName),
+                    );
+                  }).toList(),
+            onChanged: _selectedProvince == null
+                ? null
+                : (municipality) async {
+                    setState(() {
+                      _selectedMunicipality = municipality;
+                      _selectedBarangay = null;
+                      _barangays = [];
+                      _isLoadingBarangays = municipality != null;
+                    });
 
-            if (municipality != null) {
-              await _loadBarangays(municipality.name);
-            }
-          },
+                    if (municipality != null) {
+                      await _loadBarangays(municipality.name);
+                    }
+                  },
+          ),
         ),
         const SizedBox(height: 16),
 
         // Barangay Dropdown
-        DropdownButtonFormField<PsgcBarangay>(
-          value: _selectedBarangay,
-          decoration: const InputDecoration(
-            labelText: 'Barangay *',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          items: _barangays.map((barangay) {
-            return DropdownMenuItem<PsgcBarangay>(
-              value: barangay,
-              child: Text(barangay.barangay ?? 'Unknown'),
-            );
-          }).toList(),
-          onChanged: (barangay) {
-            setState(() {
-              _selectedBarangay = barangay;
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUDISection(ColorScheme colorScheme) {
-    if (!_expandedSections['udi']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _udiController,
-          decoration: const InputDecoration(
-            labelText: 'Unified ID (UDI)',
-            hintText: 'Enter UDI',
-            border: OutlineInputBorder(),
-            isDense: true,
+        IgnorePointer(
+          ignoring: _selectedMunicipality == null || _isLoadingBarangays,
+          child: DropdownButtonFormField<PsgcBarangay>(
+            value: _selectedBarangay,
+            decoration: InputDecoration(
+              labelText: 'Barangay *',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: _selectedMunicipality == null,
+              fillColor: _selectedMunicipality == null ? Colors.grey.shade100 : null,
+              suffixIcon: _isLoadingBarangays
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              hintText: _selectedMunicipality == null ? 'Select municipality first' : null,
+            ),
+            items: _barangays.isEmpty && _selectedMunicipality != null && !_isLoadingBarangays
+                ? [
+                    const DropdownMenuItem<PsgcBarangay>(
+                      value: null,
+                      enabled: false,
+                      child: Text('No barangays available', style: TextStyle(color: Colors.grey)),
+                    ),
+                  ]
+                : _barangays.map((barangay) {
+                    return DropdownMenuItem<PsgcBarangay>(
+                      value: barangay,
+                      child: Text(barangay.barangay ?? 'Unknown'),
+                    );
+                  }).toList(),
+            onChanged: _selectedMunicipality == null
+                ? null
+                : (barangay) {
+                    HapticUtils.lightImpact();
+                    setState(() {
+                      _selectedBarangay = barangay;
+                    });
+                  },
           ),
         ),
       ],
