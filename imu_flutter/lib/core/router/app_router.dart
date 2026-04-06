@@ -95,12 +95,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
     redirect: (context, state) {
+      debugPrint('[ROUTER] redirect called: location=${state.matchedLocation}, isLoading=$isLoading, isAuthenticated=$isAuth');
+
       // CRITICAL: Wait for auth initialization to complete before redirecting
       // This fixes the token persistence bug where router redirects to /login
       // before checkAuthStatus() completes loading tokens from storage
       if (isLoading) {
+        debugPrint('[ROUTER] Waiting for initialization (isLoading=true)');
         return null; // Still initializing - wait for completion
       }
+
+      debugPrint('[ROUTER] Initialization complete, isLoading=$isLoading, isAuthenticated=$isAuth');
 
       final isAuthRoute = state.matchedLocation.startsWith('/login') ||
           state.matchedLocation.startsWith('/forgot-password') ||
@@ -119,9 +124,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!isAuth) {
         // Trying to access protected route -> go to login
         if (!isAuthRoute) {
+          debugPrint('[ROUTER] Not authenticated, redirecting to /login');
           return '/login';
         }
         // Let user stay on auth routes (forgot-password, login)
+        debugPrint('[ROUTER] On auth route, staying put');
         return null;
       }
 

@@ -157,23 +157,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Check current authentication status
   Future<void> checkAuthStatus() async {
+    debugPrint('[AUTH-NOTIFIER] checkAuthStatus() START');
     if (!mounted) return;
-    if (!mounted) state = state.copyWith(isLoading: true);
+    if (!mounted) {
+      debugPrint('[AUTH-NOTIFIER] Setting isLoading: true');
+      state = state.copyWith(isLoading: true);
+    }
 
     try {
+      debugPrint('[AUTH-NOTIFIER] Calling _authService.initialize()...');
       await _authService.initialize();
+      debugPrint('[AUTH-NOTIFIER] _authService.initialize() completed');
 
       // PIN FUNCTIONALITY DISABLED - Only check JWT token validity
       // Consider authenticated if JWT token is valid
       final isAuth = _authService.isAuthenticated;
+      debugPrint('[AUTH-NOTIFIER] isAuthenticated: $isAuth');
 
       if (!mounted) return;
+      debugPrint('[AUTH-NOTIFIER] Setting final state: isAuthenticated=$isAuth, isLoading=false');
       state = state.copyWith(
         isAuthenticated: isAuth,
         user: _authService.currentUser,
         isLoading: false,
       );
+      debugPrint('[AUTH-NOTIFIER] checkAuthStatus() END');
     } catch (e) {
+      debugPrint('[AUTH-NOTIFIER] checkAuthStatus() ERROR: $e');
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }

@@ -88,6 +88,8 @@ final authServiceProvider = Provider<AuthService>((ref) {
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
 
+  debugPrint('[AUTH-PROVIDER] Creating authNotifierProvider...');
+
   // Create initial sync callback that triggers assigned clients sync
   Future<void> onLoginSuccess() async {
     try {
@@ -105,9 +107,13 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
 
   final notifier = AuthNotifier(authService, onLoginSuccess: onLoginSuccess);
 
+  debugPrint('[AUTH-PROVIDER] Calling checkAuthStatus() (without await)...');
   // Check auth status on initialization
+  // NOTE: This is called WITHOUT await, so it runs in the background
+  // The provider returns immediately, potentially before tokens are loaded
   notifier.checkAuthStatus();
 
+  debugPrint('[AUTH-PROVIDER] Provider created and returned (checkAuthStatus may still be running)');
   return notifier;
 });
 
