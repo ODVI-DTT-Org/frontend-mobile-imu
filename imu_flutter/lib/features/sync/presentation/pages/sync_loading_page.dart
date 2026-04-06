@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:powersync/powersync.dart' hide Column, SyncStatus;
+import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -137,21 +139,24 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     );
 
     // CRITICAL: Check if we have local data FIRST before trying PowerSync
+    logDebug('[SyncLoadingPage] 🔍 Checking for local data before attempting PowerSync...');
     final hasLocalData = await _checkForLocalData();
 
     if (hasLocalData) {
-      logDebug('[SyncLoadingPage] Local data found, skipping PowerSync connection');
+      logDebug('[SyncLoadingPage] ✅ Local data found! Skipping PowerSync connection, using local data.');
       state = state.copyWith(
         isInitializing: false,
         isSyncing: false,
         isConnected: false,  // Not connected, but we have local data
         syncComplete: true,
         progress: 1.0,
-        currentStep: 'Using local data',
+        currentStep: 'Using local data (PowerSync will sync in background)',
       );
       // Navigation handled by widget
       return;
     }
+
+    logDebug('[SyncLoadingPage] ❌ No local data found. Will attempt PowerSync connection...');
 
     // Check if already synced recently
     final lastSync = await _preferencesService.getLastSyncTime();
@@ -181,16 +186,47 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   /// Check if we have any local data in the database
   Future<bool> _checkForLocalData() async {
     try {
-      // Check if clients table has any data
-      final result = await _powerSyncDb.getAll('SELECT COUNT(*) as count FROM clients');
-      final clientCount = result.first['count'] as int;
+      logDebug('[LOCAL-DATA-CHECK] Checking for local data in both PowerSync AND Hive storage...');
 
-      logDebug('[SyncLoadingPage] Local clients found: $clientCount');
+      // Check PowerSync database for clients
+      final powerSyncResult = await _powerSyncDb.getAll('SELECT COUNT(*) as count FROM clients');
+      final powerSyncClientCount = powerSyncResult.first['count'] as int;
+      logDebug('[LOCAL-DATA-CHECK] PowerSync clients: $powerSyncClientCount');
 
-      // If we have ANY local clients, consider it as having local data
-      return clientCount > 0;
+      // Check Hive storage for clients (REST API sync)
+      int hiveClientCount = 0;
+      try {
+        await Hive.initFlutter();
+        final clientsBox = await Hive.openBox<String>('clients');
+        hiveClientCount = clientsBox.length;
+        logDebug('[LOCAL-DATA-CHECK] Hive clients: $hiveClientCount');
+      } catch (e) {
+        logWarning('[LOCAL-DATA-CHECK] Failed to check Hive storage: $e');
+      }
+
+      final totalClientCount = powerSyncClientCount + hiveClientCount;
+      logDebug('[LOCAL-DATA-CHECK] Total local clients: $totalClientCount');
+
+      // If we have ANY local clients (from either source), consider it as having local data
+      final hasData = totalClientCount > 0;
+
+      logDebug('[LOCAL-DATA-CHECK] Has local data: $hasData');
+
+      if (hasData) {
+        // Also check when data was last synced
+        final lastSync = await _preferencesService.getLastSyncTime();
+        if (lastSync != null) {
+          final syncAge = DateTime.now().difference(lastSync);
+          logDebug('[LOCAL-DATA-CHECK] Last sync: ${syncAge.inMinutes} minutes ago');
+        } else {
+          logDebug('[LOCAL-DATA-CHECK] No previous sync time recorded');
+        }
+      }
+
+      return hasData;
     } catch (e) {
-      logWarning('[SyncLoadingPage] Failed to check for local data: $e');
+      logError('[LOCAL-DATA-CHECK] Failed to check for local data', e);
+      logDebug('[LOCAL-DATA-CHECK] Error details: ${e.toString()}');
       return false;
     }
   }

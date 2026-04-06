@@ -226,8 +226,24 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               color: Color(0xFF0F172A),
                             ),
                           ),
-                          const Spacer(),
-                          const SizedBox(width: 50),
+                          const SizedBox(width: 12),
+                          // Add Client icon button
+                          InkWell(
+                            onTap: _showAddClientModal,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                LucideIcons.plus,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -349,24 +365,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                       ? _buildEmptyState()
                       : Column(
                           children: [
-                            // Add Client button (always visible when there are clients)
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17, vertical: 8),
-                              alignment: Alignment.centerRight,
-                              child: ElevatedButton.icon(
-                                onPressed: _showAddClientModal,
-                                icon: const Icon(LucideIcons.plus, size: 18),
-                                label: const Text('Add Client'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0F172A),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
                             // Client list
                             Expanded(
                               child: RefreshIndicator(
@@ -838,22 +836,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 : 'Try a different search term',
             style: TextStyle(color: Colors.grey.shade500),
           ),
-          if (_searchQuery.isEmpty) ...[
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _showAddClientModal,
-              icon: const Icon(LucideIcons.plus, size: 18),
-              label: const Text('Add Client'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
