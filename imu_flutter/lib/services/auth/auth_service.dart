@@ -140,13 +140,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   IMUPowerSyncConnector? _powerSyncConnector;
   Future<void> Function()? _onLoginSuccess;
+  bool _disposed = false;
 
   AuthNotifier(this._authService, {Future<void> Function()? onLoginSuccess})
       : _onLoginSuccess = onLoginSuccess,
         super(AuthState.initial());
 
+  /// Check if the notifier is still mounted (not disposed)
+  bool get mounted => !_disposed;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Check current authentication status
   Future<void> checkAuthStatus() async {
+    if (!mounted) return;
+
     state = state.copyWith(isLoading: true);
     try {
       await _authService.initialize();
@@ -155,18 +167,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Consider authenticated if JWT token is valid
       final isAuth = _authService.isAuthenticated;
 
+      if (!mounted) return;
       state = state.copyWith(
         isAuthenticated: isAuth,
         user: _authService.currentUser,
         isLoading: false,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   /// Login with email and password
   Future<bool> login(String email, String password, {bool rememberMe = false}) async {
+    if (!mounted) return false;
+
     state = state.copyWith(isLoading: true, error: null);
     try {
       final user = await _authService.login(email, password, rememberMe: rememberMe);
@@ -188,6 +204,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // Log the error but DON'T fail the login
         // PowerSync sync errors are non-critical - app can still function
         logError('PowerSync connection failed (app will continue without sync)', e);
+        if (!mounted) return false;
         // Store the error for display but don't set loading to false yet
         state = state.copyWith(
           isAuthenticated: true,
@@ -199,6 +216,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return true; // Login succeeds even if PowerSync fails
       }
 
+      if (!mounted) return false;
       state = state.copyWith(
         isAuthenticated: true,
         user: user,
@@ -210,6 +228,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return true;
     } catch (e) {
+      if (!mounted) return false;
       state = state.copyWith(isLoading: false, error: e.toString());
       return false;
     }
@@ -217,6 +236,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Logout current user
   Future<void> logout() async {
+    if (!mounted) return;
+
     state = state.copyWith(isLoading: true);
 
     // Disconnect from PowerSync
@@ -228,24 +249,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
 
     await _authService.logout();
+    if (!mounted) return;
     state = AuthState.initial();
   }
 
   /// Refresh authentication
   Future<void> refresh() async {
+    if (!mounted) return;
+
     try {
       await _authService.refreshToken();
+      if (!mounted) return;
       state = state.copyWith(
         isAuthenticated: _authService.isAuthenticated,
         user: _authService.currentUser,
       );
     } catch (e) {
+      if (!mounted) return;
       state = AuthState.initial();
     }
   }
 
   /// Clear any error message
   void clearError() {
+    if (!mounted) return;
     state = state.copyWith(error: null);
   }
 }
