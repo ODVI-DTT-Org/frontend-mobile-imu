@@ -7,16 +7,28 @@ import '../../../features/clients/data/models/client_model.dart';
 class TouchpointProgressBadge extends StatelessWidget {
   final Client client;
   final bool showCompletedLabel;
+  final int? touchpointCount;  // NEW: Optional pre-fetched count
 
   const TouchpointProgressBadge({
     super.key,
     required this.client,
     this.showCompletedLabel = true,
+    this.touchpointCount,  // NEW
   });
+
+  /// Internal getter that uses provided count or falls back to client.touchpoints.length
+  int get _displayedCount => touchpointCount ?? client.completedTouchpoints;
+
+  /// Calculate next touchpoint type based on displayed count
+  TouchpointType? get _nextTouchpointType {
+    final next = _displayedCount;
+    if (next >= 7) return null;
+    return TouchpointPattern.types[next];
+  }
 
   @override
   Widget build(BuildContext context) {
-    final completedCount = client.completedTouchpoints;
+    final completedCount = _displayedCount;
     final totalCount = 7;
 
     // All touchpoints completed
@@ -31,8 +43,7 @@ class TouchpointProgressBadge extends StatelessWidget {
     }
 
     // Get next touchpoint type
-    final nextType = client.nextTouchpointType;
-    final nextNumber = completedCount + 1;
+    final nextType = _nextTouchpointType;
 
     return _buildBadge(
       label: '$completedCount/$totalCount • ${nextType?.name ?? 'Touchpoint'}',
