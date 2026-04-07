@@ -338,7 +338,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         showDialog(
           context: context,
           builder: (context) => TouchpointValidationDialog(
-            userRole: userRole,
             attemptedNumber: touchpointNumber,
             attemptedType: touchpointType,
             onConfirm: () => Navigator.of(context).pop(),

@@ -275,7 +275,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         showDialog(
           context: context,
           builder: (context) => TouchpointValidationDialog(
-            userRole: userRole,
             attemptedNumber: touchpointNumber,
             attemptedType: touchpointType,
             onConfirm: () => Navigator.of(context).pop(),

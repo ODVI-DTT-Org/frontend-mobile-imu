@@ -739,7 +739,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         showDialog(
           context: context,
           builder: (context) => TouchpointValidationDialog(
-            userRole: userRole,
             attemptedNumber: nextNumber,
             attemptedType: nextType,
             onConfirm: () => Navigator.of(context).pop(),
