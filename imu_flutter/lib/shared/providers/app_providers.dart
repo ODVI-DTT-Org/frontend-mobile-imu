@@ -254,8 +254,9 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 /// Strategy:
 /// 1. Load from Hive cache immediately (fast, works offline)
 /// 2. Apply pagination locally
-/// 3. If online, trigger background refresh from API
-/// 4. Update Hive cache when API returns
+/// 3. If cache is empty AND online, fetch immediately from API (not background)
+/// 4. If cache has data AND online, trigger background refresh from API
+/// 5. Update Hive cache when API returns
 final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
@@ -278,6 +279,45 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
   debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from Hive cache');
 
+  // Step 2: If cache is empty AND online, fetch immediately from API (not background)
+  // This ensures data is loaded even if background refresh fails or is skipped
+  if (cachedClients.isEmpty && isOnline) {
+    debugPrint('assignedClientsProvider: Cache empty and online - fetching IMMEDIATELY from API...');
+    try {
+      final clientApi = ref.read(clientApiServiceProvider);
+      final response = await clientApi.fetchAssignedClients(
+        page: 1,
+        perPage: 100,
+        search: searchQuery.isNotEmpty ? searchQuery : null,
+      );
+
+      final fetchedClients = response.items;
+      debugPrint('assignedClientsProvider: Immediate fetch - Got ${fetchedClients.length} clients from API');
+
+      // Update Hive cache with fetched data
+      if (fetchedClients.isNotEmpty) {
+        for (final client in fetchedClients) {
+          final clientJson = client.toJson();
+          final clientId = client.id;
+          if (clientJson != null && clientId != null) {
+            await hiveService.saveClient(clientId, clientJson);
+          }
+        }
+        debugPrint('assignedClientsProvider: Immediate fetch - Cached ${fetchedClients.length} clients to Hive');
+
+        // Update cached clients with fetched data
+        cachedClients = fetchedClients;
+      }
+    } catch (e) {
+      debugPrint('assignedClientsProvider: Immediate fetch failed - $e');
+      // Fall back to empty cache - UI will show empty state
+    }
+  } else if (isOnline) {
+    // Step 3: If cache has data AND online, trigger background refresh from API
+    // Don't wait - trigger in background
+    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery);
+  }
+
   // Apply search filter locally if needed
   if (searchQuery.isNotEmpty) {
     final query = searchQuery.toLowerCase();
@@ -293,12 +333,6 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final paginatedClients = cachedClients.sublist(startIndex, endIndex);
 
   debugPrint('assignedClientsProvider: Showing ${paginatedClients.length} of $totalItems clients (page $page of $totalPages) from cache');
-
-  // Step 2: If online, trigger background refresh from API
-  if (isOnline) {
-    // Don't wait - trigger in background
-    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery);
-  }
 
   // Return cached data immediately
   debugPrint('=== ASSIGNED CLIENTS FETCH COMPLETE ===');
