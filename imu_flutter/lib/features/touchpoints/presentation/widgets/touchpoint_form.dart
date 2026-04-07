@@ -13,6 +13,7 @@ import '../../../clients/data/models/client_model.dart' hide TimeOfDay;
 import '../../../../app.dart' show showToast;
 import '../../../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
 import '../../../my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
+import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 
 class TouchpointFormModal extends ConsumerStatefulWidget {
   final String clientId;
@@ -985,48 +986,22 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     return error is String ? error : 'An error occurred. Please try again.';
   }
 
-  /// Show sequence validation error dialog
+  /// Show sequence validation error dialog using TouchpointValidationDialog
   void _showSequenceValidationError(validation) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Invalid Touchpoint Type'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(validation.error ?? 'Invalid touchpoint sequence'),
-            const SizedBox(height: 16),
-            const Text(
-              'Expected Sequence:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ...TouchpointValidationService.getSequenceDisplay().map((item) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Text('• $item'),
-              );
-            }),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
+      builder: (context) => TouchpointValidationDialog(
+        attemptedNumber: widget.touchpointNumber,
+        attemptedType: widget.touchpointType == 'Visit'
+            ? TouchpointType.visit
+            : TouchpointType.call,
+        onConfirm: () {
+          Navigator.pop(context);
+          // Close the form modal as well
+          Navigator.pop(context);
+        },
       ),
-    ).then((_) {
-      // Close the form modal as well
-      Navigator.pop(context);
-    });
+    );
   }
 }
 

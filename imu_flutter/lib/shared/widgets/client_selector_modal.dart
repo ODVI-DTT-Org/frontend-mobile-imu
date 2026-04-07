@@ -14,6 +14,7 @@ import '../../services/api/itinerary_api_service.dart' show todayItineraryProvid
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/sync/powersync_service.dart';
+import '../../services/filter_preferences_service.dart';
 import '../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     onlineClientsProvider,
@@ -25,6 +26,7 @@ import '../../shared/providers/app_providers.dart' show
     currentUserRoleProvider,
     assignedMunicipalitiesProvider,
     clientTouchpointsSyncProvider,
+    clientTouchpointCountsProvider,
     myDayApiServiceProvider;
 import 'client/touchpoint_progress_badge.dart';
 import 'client/touchpoint_status_badge.dart';
@@ -88,10 +90,27 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   bool _isLoadingStatuses = true;
   bool _hasStatusError = false;
 
+  // Filter state for province/municipality
+  String? _selectedProvince;
+  String? _selectedMunicipality;
+  final _filterPreferencesService = FilterPreferencesService();
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadFilterPreferences();
+  }
+
+  Future<void> _loadFilterPreferences() async {
+    final province = _filterPreferencesService.getProvince();
+    final municipality = _filterPreferencesService.getMunicipality();
+    if (mounted) {
+      setState(() {
+        _selectedProvince = province?.isNotEmpty == true ? province : null;
+        _selectedMunicipality = municipality?.isNotEmpty == true ? municipality : null;
+      });
+    }
   }
 
   @override
@@ -387,6 +406,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
         // Invalidate todayItineraryProvider to refresh the itinerary
         ref.invalidate(todayItineraryProvider);
+
+        // Invalidate clientTouchpointCountsProvider to refresh touchpoint counts
+        ref.invalidate(clientTouchpointCountsProvider);
       }
     } catch (e) {
       if (mounted) {
@@ -567,6 +589,76 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
+  /// Clear all filters (province, municipality)
+  Future<void> _clearAllFilters() async {
+    HapticUtils.lightImpact();
+    await _filterPreferencesService.clearAll();
+    if (mounted) {
+      setState(() {
+        _selectedProvince = null;
+        _selectedMunicipality = null;
+      });
+    }
+  }
+
+  /// Remove a specific filter
+  Future<void> _removeFilter(String filterType) async {
+    HapticUtils.lightImpact();
+    if (filterType == 'province') {
+      await _filterPreferencesService.setProvince(null);
+      if (mounted) {
+        setState(() {
+          _selectedProvince = null;
+          _selectedMunicipality = null; // Clear municipality when province changes
+        });
+      }
+    } else if (filterType == 'municipality') {
+      await _filterPreferencesService.setMunicipality(null);
+      if (mounted) {
+        setState(() {
+          _selectedMunicipality = null;
+        });
+      }
+    }
+  }
+
+  /// Build removable filter chip
+  Widget _buildRemovableFilterChip({
+    required String label,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF0F172A).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(
+              LucideIcons.x,
+              size: 14,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch today's itinerary to filter out already-added clients
@@ -586,6 +678,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       loading: () => <String>{},
       error: (_, __) => <String>{},
     );
+
+    // Watch touchpoint counts for badges
+    final touchpointCountsAsync = ref.watch(clientTouchpointCountsProvider);
 
     // Choose provider based on mode (Assigned Clients vs All Clients)
     final clientsAsync = _clientFilter == 'assigned'
@@ -712,6 +807,58 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                         ],
                       ),
                     ),
+                  // Active filter chips (province/municipality)
+                  if (_selectedProvince != null || _selectedMunicipality != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (_selectedProvince != null)
+                            _buildRemovableFilterChip(
+                              label: _selectedProvince!,
+                              onRemove: () => _removeFilter('province'),
+                            ),
+                          if (_selectedMunicipality != null)
+                            _buildRemovableFilterChip(
+                              label: _selectedMunicipality!,
+                              onRemove: () => _removeFilter('municipality'),
+                            ),
+                          // Clear All button
+                          GestureDetector(
+                            onTap: _clearAllFilters,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    LucideIcons.x,
+                                    size: 14,
+                                    color: Colors.red,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'Clear All',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   // Client count indicator
                   if (totalItems > 0)
                     Container(
@@ -770,7 +917,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     ),
                   // Client list
                   Expanded(
-                    child: _buildClientList(displayableClients, totalItems),
+                    child: _buildClientList(displayableClients, totalItems, touchpointCountsAsync),
                   ),
                 ],
               ),
@@ -925,7 +1072,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
-  Widget _buildClientList(List<Client> displayableClients, int totalItems) {
+  Widget _buildClientList(
+    List<Client> displayableClients,
+    int totalItems,
+    AsyncValue<Map<String, int>> touchpointCountsAsync,
+  ) {
     // Show skeleton loading while fetching client statuses
     if (_isLoadingStatuses && !_hasStatusError) {
       return ListView.builder(
@@ -1073,7 +1224,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
-                    TouchpointProgressBadge(client: client),
+                    TouchpointProgressBadge(
+                      client: client,
+                      touchpointCount: touchpointCountsAsync.valueOrNull?[client.id],
+                    ),
                     TouchpointStatusBadge(client: client),
                   ],
                 ),
