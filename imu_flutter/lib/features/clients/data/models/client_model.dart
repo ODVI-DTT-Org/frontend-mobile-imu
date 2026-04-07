@@ -75,7 +75,9 @@ class Client {
     this.loanReleasedAt,
   });
 
-  String get fullName => '$firstName ${middleName != null ? '$middleName ' : ''}$lastName';
+  /// Returns client name in "LastName, FirstName MiddleName" format
+  /// Example: "Delos Santos, Juan Miguel"
+  String get fullName => '$lastName, $firstName${middleName != null ? ' $middleName' : ''}';
 
   String get fullAddress {
     final parts = <String>[];
