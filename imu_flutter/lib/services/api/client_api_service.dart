@@ -354,6 +354,78 @@ class ClientApiService {
     }
   }
 
+  /// Fetch multiple clients by their IDs
+  /// Used for batch fetching client data with touchpoint info
+  Future<ClientsResponse> fetchClientsByIds(List<String> clientIds) async {
+    if (clientIds.isEmpty) {
+      return ClientsResponse(items: [], page: 1, perPage: 0, totalItems: 0, totalPages: 0);
+    }
+
+    try {
+      debugPrint('ClientApiService: Fetching ${clientIds.length} clients by IDs...');
+
+      // Get the access token
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('ClientApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      // Make the API request with IDs as query parameter
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/clients',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        queryParameters: {
+          'ids': clientIds.join(','),
+        },
+      );
+
+      debugPrint('ClientApiService: Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final items = data['items'] as List<dynamic>? ?? [];
+        final totalItems = data['totalItems'] as int? ?? items.length;
+
+        debugPrint('ClientApiService: Got ${items.length} clients by IDs');
+
+        final clients = items.map((item) {
+          final clientData = item as Map<String, dynamic>;
+          return Client.fromRow(clientData);
+        }).toList();
+
+        return ClientsResponse(
+          items: clients,
+          page: 1,
+          perPage: clients.length,
+          totalItems: totalItems,
+          totalPages: 1,
+        );
+      } else {
+        debugPrint('ClientApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch clients by IDs: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('ClientApiService: DioException - ${e.message}');
+      debugPrint('ClientApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('ClientApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch clients by IDs',
+        originalError: e,
+      );
+    }
+  }
+
   /// Create a new client
   Future<Client?> createClient(Client client) async {
     try {
