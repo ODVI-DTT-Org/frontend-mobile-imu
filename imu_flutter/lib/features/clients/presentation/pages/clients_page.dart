@@ -17,10 +17,14 @@ import '../../../../shared/providers/app_providers.dart' show
     onlineClientPageProvider,
     isOnlineProvider,
     assignedMunicipalitiesProvider,
-    currentUserRoleProvider;
+    currentUserRoleProvider,
+    locationFilterProvider;
 import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
 import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
 import '../../../../shared/widgets/client/client_status_badge.dart';
+import '../../../../shared/widgets/location_filter_icon.dart';
+import '../../../../shared/widgets/location_filter_chips.dart';
+import '../../../../shared/widgets/location_filter_bottom_sheet.dart';
 import '../../../../models/client_status.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
@@ -150,6 +154,20 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         showToast('Failed to add to My Day: $e');
       }
     }
+  }
+
+  void _showLocationFilterBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => LocationFilterBottomSheet(
+        onApply: (filter) {
+          ref.read(locationFilterProvider.notifier).state = filter;
+          ref.invalidate(assignedClientsProvider);
+        },
+      ),
+    );
   }
 
   @override
@@ -328,15 +346,22 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                       hintText: 'Search clients...',
                       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                       prefixIcon: Icon(LucideIcons.search, color: Colors.grey.shade400, size: 20),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_searchQuery.isNotEmpty)
+                            IconButton(
                               icon: Icon(LucideIcons.x, color: Colors.grey.shade400, size: 18),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');
                               },
-                            )
-                          : null,
+                            ),
+                          LocationFilterIcon(
+                            onTap: () => _showLocationFilterBottomSheet(context),
+                          ),
+                        ],
+                      ),
                       filled: true,
                       fillColor: Colors.grey.shade100,
                       border: OutlineInputBorder(
@@ -347,6 +372,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                     ),
                   ),
                 ),
+
+                // Active filter chips
+                const LocationFilterChips(),
 
                 const SizedBox(height: 12),
 
