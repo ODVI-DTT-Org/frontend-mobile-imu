@@ -7,7 +7,7 @@ import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
-import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointPattern, TouchpointType;
+import '../../features/clients/data/models/client_model.dart' show Address, Client, ClientType, TouchpointPattern, TouchpointType;
 import '../../models/client_status.dart';
 import '../../services/api/my_day_api_service.dart';
 import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
@@ -415,6 +415,25 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return '${months[date.month - 1]} ${date.day}';
   }
 
+  String _formatAddress(Address address) {
+    final parts = <String>[];
+
+    if (address.street != null && address.street!.isNotEmpty) {
+      parts.add(address.street!);
+    }
+    if (address.barangay != null && address.barangay!.isNotEmpty) {
+      parts.add(address.barangay!);
+    }
+    if (address.city != null && address.city!.isNotEmpty) {
+      parts.add(address.city!);
+    }
+    if (address.province != null && address.province!.isNotEmpty) {
+      parts.add(address.province!);
+    }
+
+    return parts.isNotEmpty ? parts.join(', ') : 'No address';
+  }
+
   String _getTouchpointOrdinal(int number) {
     if (number >= 11 && number <= 13) return 'th';
     switch (number % 10) {
@@ -438,8 +457,20 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   bool _canAddToItinerary(Client client, ClientStatus? status, TouchpointType? nextType) {
-    // Check loan released (client.loanReleased is already available from API data)
-    if (client.loanReleased) return false;
+    // Check if client was visited today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    bool visitedToday = false;
+    if (client.touchpoints.isNotEmpty) {
+      final lastTouchpoint = client.touchpoints.last;
+      final lastTouchpointDate = DateTime(
+        lastTouchpoint.date.year,
+        lastTouchpoint.date.month,
+        lastTouchpoint.date.day,
+      );
+      visitedToday = lastTouchpointDate.isAtSameMomentAs(today);
+    }
+    if (visitedToday) return false;
 
     // Check already in today's itinerary (from _clientStatuses)
     if (status?.inItinerary == true) return false;
@@ -450,12 +481,26 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       return false;
     }
 
+    // Loan released - can still add for follow-up, so return true
     return true;
   }
 
   String _getDisableReason(Client client, ClientStatus? status, TouchpointType? nextType) {
-    // client.loanReleased is already available from API data
-    if (client.loanReleased) return 'Loan released - cannot add';
+    // Check if client was visited today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    bool visitedToday = false;
+    if (client.touchpoints.isNotEmpty) {
+      final lastTouchpoint = client.touchpoints.last;
+      final lastTouchpointDate = DateTime(
+        lastTouchpoint.date.year,
+        lastTouchpoint.date.month,
+        lastTouchpoint.date.day,
+      );
+      visitedToday = lastTouchpointDate.isAtSameMomentAs(today);
+    }
+    if (visitedToday) return 'Visited today - cannot add';
+
     if (status?.inItinerary == true) return 'Already added today';
 
     final userRole = ref.read(currentUserRoleProvider);
@@ -980,33 +1025,48 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
-          child: ExpansionTile(
-            leading: CircleAvatar(
-              backgroundColor: client.clientType == ClientType.existing
-                  ? Colors.green.shade100
-                  : Colors.blue.shade100,
-              child: Text(
-                '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
-                style: TextStyle(
-                  color: client.clientType == ClientType.existing
-                      ? Colors.green.shade700
-                      : Colors.blue.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            title: Text(
-              '${client.firstName} ${client.lastName}',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-            subtitle: Column(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (client.email != null && client.email!.isNotEmpty)
-                  Text(
-                    client.email!,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
+                // Client info row with avatar
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: client.clientType == ClientType.existing
+                          ? Colors.green.shade100
+                          : Colors.blue.shade100,
+                      child: Text(
+                        '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
+                        style: TextStyle(
+                          color: client.clientType == ClientType.existing
+                              ? Colors.green.shade700
+                              : Colors.blue.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${client.firstName} ${client.lastName}',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          ),
+                          if (client.addresses.isNotEmpty)
+                            Text(
+                              _formatAddress(client.addresses.first),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 // Touchpoint progress and status badges
                 Wrap(
                   spacing: 6,
@@ -1031,56 +1091,47 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     ),
                   ],
                 ),
-              ],
-            ),
-            trailing: Icon(LucideIcons.chevronDown),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
+                const SizedBox(height: 12),
+                // Touchpoint history preview
+                Text(
+                  'Touchpoint History',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Action buttons row
+                Row(
                   children: [
-                    // Touchpoint history preview
-                    Text(
-                      'Touchpoint History',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: LucideIcons.calendar,
+                        label: _getActionButtonLabel(client, status, true),
+                        isPrimary: true,
+                        isLoading: isAdding,
+                        onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
+                            ? () => _addClientToItinerary(client)
+                            : null,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    // Action buttons row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: LucideIcons.calendar,
-                            label: _getActionButtonLabel(client, status, true),
-                            isPrimary: true,
-                            isLoading: isAdding,
-                            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
-                                ? () => _addClientToItinerary(client)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: LucideIcons.calendarClock,
-                            label: _getActionButtonLabel(client, status, false),
-                            isPrimary: false,
-                            isLoading: isAdding,
-                            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
-                                ? () => _showDatePicker(client)
-                                : null,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: LucideIcons.calendarClock,
+                        label: _getActionButtonLabel(client, status, false),
+                        isPrimary: false,
+                        isLoading: isAdding,
+                        onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
+                            ? () => _showDatePicker(client)
+                            : null,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
