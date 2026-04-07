@@ -395,8 +395,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       if (mounted) {
         HapticUtils.success();
         showToast(customDate == null
-            ? '${client.firstName} ${client.lastName} added to Today'
-            : '${client.firstName} ${client.lastName} added to ${_formatDateShort(customDate)}');
+            ? '${client.fullName} added to Today'
+            : '${client.fullName} added to ${_formatDateShort(customDate)}');
 
         // Mark client as added (disable button, show "Added" status)
         setState(() {
@@ -1232,7 +1232,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${client.firstName} ${client.lastName}',
+                            client.fullName,
                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                           ),
                           if (client.addresses.isNotEmpty)
