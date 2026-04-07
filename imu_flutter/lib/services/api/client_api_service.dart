@@ -111,6 +111,8 @@ class ClientApiService {
     int perPage = 20,
     String? search,
     String? clientType,
+    String? province,
+    String? municipality,
   }) async {
     try {
       debugPrint('[CLIENT-API] Fetching ASSIGNED clients from REST API...');
@@ -136,6 +138,8 @@ class ClientApiService {
           'perPage': perPage,
           if (search != null && search.isNotEmpty) 'search': search,
           if (clientType != null && clientType.isNotEmpty) 'client_type': clientType,
+          if (province != null && province.isNotEmpty) 'province': province,
+          if (municipality != null && municipality.isNotEmpty) 'municipality': municipality,
         },
       );
 
