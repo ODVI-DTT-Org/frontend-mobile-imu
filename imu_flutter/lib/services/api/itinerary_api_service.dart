@@ -58,16 +58,18 @@ class ItineraryItem {
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) {
     // Handle client name from expand object or from flat fields
+    // Using "LastName, FirstName MiddleName" format for consistency
     String clientName = '';
     if (json['expand'] != null && json['expand']['client_id'] != null) {
       final client = json['expand']['client_id'] as Map<String, dynamic>;
-      final firstName = client['first_name'] ?? '';
       final lastName = client['last_name'] ?? '';
-      clientName = '$firstName $lastName'.trim();
+      final firstName = client['first_name'] ?? '';
+      final middleName = client['middle_name'] ?? '';
+      clientName = '$lastName, $firstName${middleName.isNotEmpty ? ' $middleName' : ''}'.trim();
     } else if (json['client_first_name'] != null || json['client_last_name'] != null) {
-      final firstName = json['client_first_name'] ?? '';
       final lastName = json['client_last_name'] ?? '';
-      clientName = '$firstName $lastName'.trim();
+      final firstName = json['client_first_name'] ?? '';
+      clientName = '$lastName, $firstName'.trim();
     } else if (json['client_name'] != null) {
       clientName = json['client_name'];
     }
