@@ -27,6 +27,11 @@ export './app_providers.dart' show currentUserRoleProvider;
 // Re-export area filter providers
 export '../../services/area/area_filter_service.dart' show
   areaFilterServiceProvider;
+// Re-export location filter providers
+export 'location_filter_providers.dart' show
+  locationFilterProvider,
+  assignedAreasProvider,
+  AssignedAreas;
 // Re-export touchpoint count provider
 export '../../services/touchpoint/touchpoint_count_service.dart' show
   touchpointCountServiceProvider;
