@@ -27,6 +27,9 @@ export './app_providers.dart' show currentUserRoleProvider;
 // Re-export area filter providers
 export '../../services/area/area_filter_service.dart' show
   areaFilterServiceProvider;
+// Re-export touchpoint count provider
+export '../../services/touchpoint/touchpoint_count_service.dart' show
+  touchpointCountServiceProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -56,6 +59,7 @@ import '../../services/api/my_day_api_service.dart';
 import '../../services/api/approvals_api_service.dart';
 import '../../services/api/groups_api_service.dart';
 import '../../services/sync/powersync_service.dart';
+import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/area/area_filter_service.dart';
 
 // ==================== Service Providers ====================
@@ -446,6 +450,34 @@ final clientTouchpointsSyncProvider = FutureProvider.autoDispose<List<Touchpoint
   }
 
   return touchpoints.map((row) => Touchpoint.fromRow(row)).toList();
+});
+
+/// Touchpoint counts for multiple clients from PowerSync (with API fallback)
+/// Returns Map<String, int> where key is client_id and value is touchpoint count
+/// Used by ClientListTile and ClientSelectorModal to display accurate progress badges
+///
+/// Cache: 5-minute TTL auto-refresh
+/// Invalidation: Automatically refreshes when client list changes
+/// Fallback: API call when PowerSync query fails (only when online)
+final clientTouchpointCountsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
+  // Determine which client provider is currently active
+  final clientsAsync = ref.watch(assignedClientsProvider);
+
+  // Extract client IDs from the clients list
+  final clientIds = clientsAsync.when(
+    data: (response) => response.items
+        .map((client) => client.id!)
+        .where((id) => id.isNotEmpty)
+        .toList(),
+    loading: () => <String>[],
+    error: (_, __) => <String>[],
+  );
+
+  if (clientIds.isEmpty) return {};
+
+  // Use service to fetch counts
+  final service = ref.watch(touchpointCountServiceProvider);
+  return await service.fetchCounts(clientIds);
 });
 
 // ==================== Sync Providers ====================
