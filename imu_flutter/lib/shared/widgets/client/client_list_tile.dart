@@ -25,6 +25,7 @@ class ClientListTile extends StatelessWidget {
   final bool showLocation;
   final bool showProgressBadge;
   final bool showStatusBadge;
+  final int? touchpointCount;  // NEW: Optional pre-fetched count
 
   const ClientListTile({
     super.key,
@@ -37,6 +38,7 @@ class ClientListTile extends StatelessWidget {
     this.showLocation = true,
     this.showProgressBadge = true,
     this.showStatusBadge = true,
+    this.touchpointCount,  // NEW
   });
 
   @override
@@ -69,7 +71,10 @@ class ClientListTile extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.start,
             children: [
               if (showProgressBadge)
-                TouchpointProgressBadge(client: client),
+                TouchpointProgressBadge(
+                  client: client,
+                  touchpointCount: touchpointCount,  // NEW
+                ),
               if (showStatusBadge)
                 TouchpointStatusBadge(client: client),
             ],
