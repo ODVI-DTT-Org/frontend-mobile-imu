@@ -11,11 +11,15 @@ import '../../../../shared/widgets/action_bottom_sheet.dart';
 import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
+import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
-import '../../../../shared/providers/app_providers.dart' show bulkDeleteApiServiceProvider;
+import '../../../../shared/providers/app_providers.dart' show
+    bulkDeleteApiServiceProvider,
+    authNotifierProvider;
+import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';
@@ -320,6 +324,26 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     if (!validation.isValid) {
       if (mounted) {
         _showValidationError(validation, client.fullName);
+      }
+      return;
+    }
+
+    // RBAC: Check if user can create this touchpoint number based on their role
+    final authState = ref.watch(authNotifierProvider);
+    final userRole = authState.user?.role;
+
+    if (userRole == null || !isValidTouchpointNumberForRole(touchpointNumber, userRole)) {
+      // User's role doesn't allow this touchpoint number
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => TouchpointValidationDialog(
+            userRole: userRole,
+            attemptedNumber: touchpointNumber,
+            attemptedType: touchpointType,
+            onConfirm: () => Navigator.of(context).pop(),
+          ),
+        );
       }
       return;
     }

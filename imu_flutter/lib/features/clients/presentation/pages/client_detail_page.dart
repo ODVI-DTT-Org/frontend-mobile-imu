@@ -18,6 +18,7 @@ import '../../../../shared/providers/app_providers.dart' show
     authNotifierProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
+import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
@@ -735,7 +736,15 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (userRole == null || !isValidTouchpointNumberForRole(nextNumber, userRole)) {
       // User's role doesn't allow this touchpoint number
       if (mounted) {
-        PermissionDeniedDialog.show(context);
+        showDialog(
+          context: context,
+          builder: (context) => TouchpointValidationDialog(
+            userRole: userRole,
+            attemptedNumber: nextNumber,
+            attemptedType: nextType,
+            onConfirm: () => Navigator.of(context).pop(),
+          ),
+        );
       }
       return;
     }

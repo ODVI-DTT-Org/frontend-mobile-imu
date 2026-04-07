@@ -18,8 +18,12 @@ import '../../../../services/api/itinerary_api_service.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
-import '../../../../shared/providers/app_providers.dart' show bulkDeleteApiServiceProvider;
+import '../../../../shared/providers/app_providers.dart' show
+    bulkDeleteApiServiceProvider,
+    authNotifierProvider;
+import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
+import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
 import '../../../../services/maps/map_service.dart';
@@ -257,6 +261,26 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     if (!validation.isValid) {
       if (mounted) {
         _showValidationError(validation, visit.clientName);
+      }
+      return;
+    }
+
+    // RBAC: Check if user can create this touchpoint number based on their role
+    final authState = ref.watch(authNotifierProvider);
+    final userRole = authState.user?.role;
+
+    if (userRole == null || !isValidTouchpointNumberForRole(touchpointNumber, userRole)) {
+      // User's role doesn't allow this touchpoint number
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => TouchpointValidationDialog(
+            userRole: userRole,
+            attemptedNumber: touchpointNumber,
+            attemptedType: touchpointType,
+            onConfirm: () => Navigator.of(context).pop(),
+          ),
+        );
       }
       return;
     }
