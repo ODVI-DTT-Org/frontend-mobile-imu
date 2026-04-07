@@ -66,6 +66,7 @@ import '../../services/api/groups_api_service.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/area/area_filter_service.dart';
+import 'location_filter_providers.dart' show locationFilterProvider;
 
 // ==================== Service Providers ====================
 
@@ -266,11 +267,13 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
   final page = ref.watch(assignedClientPageProvider);
+  final locationFilter = ref.watch(locationFilterProvider);
   final hiveService = ref.watch(hiveServiceProvider);
 
   debugPrint('=== ASSIGNED CLIENTS FETCH ===');
   debugPrint('Is Online: $isOnline');
   debugPrint('Search query: "$searchQuery", Page: $page');
+  debugPrint('Location filter: ${locationFilter.toQueryParams()}');
 
   // Initialize Hive if needed
   if (!hiveService.isInitialized) {
@@ -294,6 +297,8 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
         page: 1,
         perPage: 100,
         search: searchQuery.isNotEmpty ? searchQuery : null,
+        province: locationFilter.province,
+        municipality: locationFilter.municipalities?.join(','),
       );
 
       final fetchedClients = response.items;
