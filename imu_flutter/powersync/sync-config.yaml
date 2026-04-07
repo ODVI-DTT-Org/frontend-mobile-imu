@@ -31,20 +31,11 @@ streams:
         FROM user_locations ul
         WHERE ul.user_id = auth.user_id() AND ul.deleted_at IS NULL
 
-  # Client data - STRICT territory-based filtering for ALL users
+  # Client data - Sync user's own clients
   clients:
     auto_subscribe: true
     queries:
-      - SELECT c.*
-        FROM clients c
-        WHERE EXISTS (
-          SELECT 1
-          FROM user_locations ul
-          WHERE ul.user_id = auth.user_id()
-            AND ul.deleted_at IS NULL
-            AND ul.province = c.province
-            AND ul.municipality = c.municipality
-        )
+      - SELECT * FROM clients WHERE user_id = auth.user_id()
 
   # Touchpoints - All touchpoints
   touchpoints:
