@@ -27,10 +27,14 @@ import '../../shared/providers/app_providers.dart' show
     assignedMunicipalitiesProvider,
     clientTouchpointsSyncProvider,
     clientTouchpointCountsProvider,
-    myDayApiServiceProvider;
+    myDayApiServiceProvider,
+    locationFilterProvider;
 import 'client/touchpoint_progress_badge.dart';
 import 'client/touchpoint_status_badge.dart';
 import 'client/client_status_badge.dart';
+import 'location_filter_icon.dart';
+import 'location_filter_chips.dart';
+import 'location_filter_bottom_sheet.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
 /// Used by both ItineraryPage and MyDayPage
@@ -659,6 +663,20 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
+  void _showLocationFilterBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => LocationFilterBottomSheet(
+        onApply: (filter) {
+          ref.read(locationFilterProvider.notifier).state = filter;
+          _applyClientFilter();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch today's itinerary to filter out already-added clients
@@ -778,15 +796,22 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       decoration: InputDecoration(
                         hintText: 'Search clients...',
                         prefixIcon: const Icon(LucideIcons.search, size: 20),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_searchController.text.isNotEmpty)
+                              IconButton(
                                 icon: const Icon(LucideIcons.x, size: 18),
                                 onPressed: () {
                                   _searchController.clear();
                                   _filterClients();
                                 },
-                              )
-                            : null,
+                              ),
+                            LocationFilterIcon(
+                              onTap: () => _showLocationFilterBottomSheet(context),
+                            ),
+                          ],
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -795,6 +820,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       ),
                     ),
                   ),
+
+                  // Active filter chips (using new widget)
+                  const LocationFilterChips(),
                   // Filter toggle
                   if (widget.showAssignedFilter)
                     Container(
