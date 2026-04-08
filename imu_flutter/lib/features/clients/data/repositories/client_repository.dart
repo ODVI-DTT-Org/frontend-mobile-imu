@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
+import 'package:imu_flutter/services/search/fuzzy_search_service.dart';
 import '../../../../core/utils/logger.dart';
 
 /// Repository for client CRUD operations using PowerSync
@@ -81,6 +82,24 @@ class ClientRepository {
       return results.map(Client.fromRow).toList();
     } catch (e) {
       logError('Error searching clients', e);
+      return [];
+    }
+  }
+
+  /// Search assigned clients using fuzzy name matching (offline)
+  /// Uses FuzzySearchService for typo-tolerant local search
+  Future<List<Client>> searchAssignedClients(String searchQuery) async {
+    try {
+      // Get all assigned clients from local storage
+      final db = await PowerSyncService.database;
+      final results = await db.getAll('SELECT * FROM clients');
+      final allClients = results.map(Client.fromRow).toList();
+
+      // Use fuzzy search for offline matching
+      final fuzzyService = FuzzySearchService(allClients);
+      return fuzzyService.searchByName(searchQuery);
+    } catch (e) {
+      logError('Error searching assigned clients', e);
       return [];
     }
   }

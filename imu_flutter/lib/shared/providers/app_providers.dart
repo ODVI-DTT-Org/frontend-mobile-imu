@@ -38,6 +38,7 @@ export '../../services/touchpoint/touchpoint_count_service.dart' show
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../../services/search/fuzzy_search_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:collection/collection.dart';
@@ -362,11 +363,12 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     debugPrint('assignedClientsProvider: After location filter - ${cachedClients.length} clients');
   }
 
-  // Apply search filter locally if needed
+  // Apply fuzzy search filter locally if needed
   if (searchQuery.isNotEmpty) {
-    final query = searchQuery.toLowerCase();
-    cachedClients = cachedClients.where((c) => c.fullName.toLowerCase().contains(query)).toList();
-    debugPrint('assignedClientsProvider: After search filter - ${cachedClients.length} clients');
+    debugPrint('assignedClientsProvider: Applying fuzzy search for query: "$searchQuery"');
+    final fuzzyService = FuzzySearchService(cachedClients);
+    cachedClients = fuzzyService.searchByName(searchQuery);
+    debugPrint('assignedClientsProvider: After fuzzy search filter - ${cachedClients.length} clients');
   }
 
   // Calculate pagination locally
