@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'address_model.dart';
-import 'phone_number_model.dart';
+import 'address_model.dart' as addr;
+import 'phone_number_model.dart' as ph;
 
 /// Client data model for IMU app
 /// Aligned with database schema - uses direct columns instead of nested lists
@@ -33,8 +33,8 @@ class Client {
   final String? municipality; // Municipality from PSGC
   final String? barangay; // Barangay from PSGC
   final String? udi; // Unified ID
-  final List<Address> addresses; // Multiple addresses
-  final List<PhoneNumber> phoneNumbers; // Multiple phone numbers
+  final List<addr.Address> addresses; // Multiple addresses
+  final List<ph.PhoneNumber> phoneNumbers; // Multiple phone numbers
   final List<Touchpoint> touchpoints;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -122,18 +122,18 @@ class Client {
   }
 
   /// Get primary address with fallback to legacy fields
-  Address? get primaryAddress {
+  addr.Address? get primaryAddress {
     if (addresses.isNotEmpty) {
       final primary = addresses.where((a) => a.isPrimary).firstOrNull;
       if (primary != null) return primary;
     }
     // Fallback to legacy fields
     if (region != null || province != null || municipality != null || barangay != null) {
-      return Address(
+      return addr.Address(
         id: 'legacy_${id}',
         clientId: id ?? '',
         psgcId: psgcId ?? 0,
-        label: AddressLabel.home,
+        label: addr.AddressLabel.home,
         streetAddress: '',
         postalCode: null,
         latitude: null,
@@ -151,17 +151,17 @@ class Client {
   }
 
   /// Get primary phone with fallback to legacy field
-  PhoneNumber? get primaryPhone {
+  ph.PhoneNumber? get primaryPhone {
     if (phoneNumbers.isNotEmpty) {
       final primary = phoneNumbers.where((p) => p.isPrimary).firstOrNull;
       if (primary != null) return primary;
     }
     // Fallback to legacy field
     if (phone != null && phone!.isNotEmpty) {
-      return PhoneNumber(
+      return ph.PhoneNumber(
         id: 'legacy_${id}',
         clientId: id ?? '',
-        label: PhoneLabel.mobile,
+        label: ph.PhoneLabel.mobile,
         number: phone!,
         isPrimary: true,
         createdAt: DateTime.now(),
@@ -200,8 +200,8 @@ class Client {
     String? municipality,
     String? barangay,
     String? udi,
-    List<Address>? addresses,
-    List<PhoneNumber>? phoneNumbers,
+    List<addr.Address>? addresses,
+    List<ph.PhoneNumber>? phoneNumbers,
     List<Touchpoint>? touchpoints,
     DateTime? createdAt,
     DateTime? updatedAt,
