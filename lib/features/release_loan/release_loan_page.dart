@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:imu_flutter/models/release_model.dart';
 import 'package:imu_flutter/models/visit_model.dart';
+import 'package:imu_flutter/models/touchpoint_model_v2.dart';
 import 'package:imu_flutter/widgets/release_form_widget.dart';
 import 'package:imu_flutter/widgets/visit_form_widget.dart';
 import 'package:imu_flutter/services/api/release_api_service.dart';
 import 'package:imu_flutter/services/api/visit_api_service.dart';
+import 'package:imu_flutter/services/api/touchpoint_v2_api_service.dart';
 import 'package:imu_flutter/core/utils/haptic_utils.dart';
+import 'package:uuid/uuid.dart';
 
 /// Release Loan Page - Two-step process: Record Visit → Create Release
 class ReleaseLoanPage extends ConsumerStatefulWidget {
@@ -38,10 +41,49 @@ class _ReleaseLoanPageState extends ConsumerState<ReleaseLoanPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Create visit via API with type 'release_loan'
+      // Step 1: Create visit via API with type 'release_loan'
       final releaseVisit = visit.copyWith(type: 'release_loan');
-      final service = ref.read(visitApiServiceProvider);
-      final createdVisit = await service.createVisit(releaseVisit);
+      final visitService = ref.read(visitApiServiceProvider);
+      final createdVisit = await visitService.createVisit(releaseVisit);
+
+      // Step 2: Fetch existing touchpoints for this client to determine next number
+      final touchpointService = ref.read(touchpointV2ApiServiceProvider);
+      final existingTouchpoints = await touchpointService.fetchTouchpoints(
+        clientId: widget.clientId,
+      );
+
+      // Step 3: Calculate next touchpoint number
+      final nextTouchpointNumber = existingTouchpoints.length + 1;
+
+      if (nextTouchpointNumber > 7) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          HapticUtils.error();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Maximum touchpoints (7) already reached for this client'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 4: Create touchpoint linking to the visit
+      final touchpoint = TouchpointV2(
+        id: const Uuid().v4(),
+        clientId: widget.clientId,
+        userId: createdVisit.userId,
+        visitId: createdVisit.id,
+        callId: null,
+        touchpointNumber: nextTouchpointNumber,
+        type: 'Visit',
+        rejectionReason: null,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await touchpointService.createTouchpoint(touchpoint);
 
       if (mounted) {
         setState(() {

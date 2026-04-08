@@ -175,7 +175,7 @@ class CallApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
-      final response = await _dio.put(
+      final response = await _dio.patch(
         '${AppConfig.postgresApiUrl}/calls/$id',
         options: Options(
           headers: {
@@ -186,7 +186,7 @@ class CallApiService {
         data: updates,
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 206) {
         final callData = response.data as Map<String, dynamic>;
         debugPrint('CallApiService: Call updated');
         return Call.fromRow(callData);

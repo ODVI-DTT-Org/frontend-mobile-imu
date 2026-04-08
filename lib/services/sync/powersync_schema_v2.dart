@@ -1,4 +1,5 @@
 import 'package:powersync/powersync.dart';
+import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 
 /// PowerSync database schema V2 with normalized touchpoints
 ///
@@ -7,6 +8,11 @@ import 'package:powersync/powersync.dart';
 /// - calls table: Phone call touchpoints
 /// - releases table: Loan release applications
 /// - Updated touchpoints table: Now references visits/calls via foreign keys
+///
+/// Sync Rules:
+/// - User-based data isolation: All queries filter by user_id
+/// - Upload/download handlers for offline-first architecture
+/// - Conflict resolution: Last-write-wins with timestamp comparison
 const Schema powerSyncSchemaV2 = Schema([
   // ==================== CLIENT DATA ====================
   Table('clients', [
@@ -306,4 +312,280 @@ class PowerSyncQueries {
     SELECT COUNT(*) as count FROM releases
     WHERE status = 'pending'
   ''';
+}
+
+/// Sync configuration for PowerSync
+///
+/// Defines upload and download handlers for offline-first synchronization
+class PowerSyncSyncConfiguration {
+  final JwtAuthService authService;
+
+  PowerSyncSyncConfiguration({required this.authService});
+
+  /// Get current user ID for filtering
+  String? get currentUserId => authService.userId;
+
+  /// Upload pending changes to the server
+  ///
+  /// This handles:
+  /// - New visits/calls/releases created offline
+  /// - Updates to existing records
+  /// - Deletions
+  Future<void> uploadPendingChanges(
+    Map<String, dynamic> batch,
+    Future<void> Function(String) uploadData,
+  ) async {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    // Filter batch to only include user's own data
+    final userBatch = {
+      'visits': _filterByUserId(batch['visits'] as List<dynamic>?, userId),
+      'calls': _filterByUserId(batch['calls'] as List<dynamic>?, userId),
+      'releases': _filterByUserId(batch['releases'] as List<dynamic>?, userId),
+      'touchpoints': _filterByUserId(batch['touchpoints'] as List<dynamic>?, userId),
+    };
+
+    // Upload each type
+    for (final entry in userBatch.entries) {
+      if (entry.value != null && (entry.value as List).isNotEmpty) {
+        await uploadData(entry.key);
+      }
+    }
+  }
+
+  /// Filter records by user_id
+  List<dynamic>? _filterByUserId(List<dynamic>? records, String userId) {
+    if (records == null) return null;
+    return records.where((record) {
+      final recordMap = record as Map<String, dynamic>;
+      return recordMap['user_id'] == userId;
+    }).toList();
+  }
+
+  /// Generate WHERE clause for user-based filtering
+  String get userFilterClause {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+    return 'user_id = \'$userId\'';
+  }
+
+  /// Conflict resolution strategy
+  ///
+  /// Uses last-write-wins based on updated_at timestamp
+  Map<String, dynamic> resolveConflict(
+    Map<String, dynamic> localRecord,
+    Map<String, dynamic> remoteRecord,
+  ) {
+    final localUpdatedAt = DateTime.parse(localRecord['updated_at'] as String);
+    final remoteUpdatedAt = DateTime.parse(remoteRecord['updated_at'] as String);
+
+    // Return the record with the most recent update
+    if (remoteUpdatedAt.isAfter(localUpdatedAt)) {
+      return remoteRecord;
+    } else {
+      return localRecord;
+    }
+  }
+
+  /// Validate record before sync
+  ///
+  /// Ensures data integrity before upload/download
+  bool validateRecord(String table, Map<String, dynamic> record) {
+    // Common validation
+    if (!record.containsKey('id') || record['id'] == null) {
+      return false;
+    }
+
+    if (!record.containsKey('user_id') || record['user_id'] == null) {
+      return false;
+    }
+
+    // Table-specific validation
+    switch (table) {
+      case 'visits':
+        return _validateVisit(record);
+      case 'calls':
+        return _validateCall(record);
+      case 'releases':
+        return _validateRelease(record);
+      case 'touchpoints':
+        return _validateTouchpoint(record);
+      default:
+        return true;
+    }
+  }
+
+  bool _validateVisit(Map<String, dynamic> record) {
+    final clientId = record['client_id'];
+    final type = record['type'];
+
+    return clientId != null &&
+           clientId.toString().isNotEmpty &&
+           (type == 'regular_visit' || type == 'release_loan');
+  }
+
+  bool _validateCall(Map<String, dynamic> record) {
+    final clientId = record['client_id'];
+    final phoneNumber = record['phone_number'];
+
+    return clientId != null &&
+           clientId.toString().isNotEmpty &&
+           phoneNumber != null &&
+           phoneNumber.toString().isNotEmpty;
+  }
+
+  bool _validateRelease(Map<String, dynamic> record) {
+    final clientId = record['client_id'];
+    final visitId = record['visit_id'];
+    final amount = record['amount'];
+    final productType = record['product_type'];
+
+    return clientId != null &&
+           clientId.toString().isNotEmpty &&
+           visitId != null &&
+           visitId.toString().isNotEmpty &&
+           amount != null &&
+           (amount is num) &&
+           (amount as num) > 0 &&
+           productType != null &&
+           ['PUSU', 'LIKA', 'SUB2K'].contains(productType);
+  }
+
+  bool _validateTouchpoint(Map<String, dynamic> record) {
+    final clientId = record['client_id'];
+    final touchpointNumber = record['touchpoint_number'];
+    final type = record['type'];
+
+    final hasValidForeignKey =
+        (record['visit_id'] != null && record['visit_id'].toString().isNotEmpty) ||
+        (record['call_id'] != null && record['call_id'].toString().isNotEmpty);
+
+    return clientId != null &&
+           clientId.toString().isNotEmpty &&
+           touchpointNumber != null &&
+           touchpointNumber is int &&
+           touchpointNumber >= 1 &&
+           touchpointNumber <= 7 &&
+           type != null &&
+           ['Visit', 'Call'].contains(type) &&
+           hasValidForeignKey;
+  }
+
+  /// Get sync status for UI display
+  Future<Map<String, int>> getSyncStatus() async {
+    // This would query the local database for pending changes
+    // Implementation depends on PowerSync's internal tables
+    return {
+      'pendingUploads': 0,
+      'pendingDownloads': 0,
+      'lastSyncAt': DateTime.now().millisecondsSinceEpoch,
+    };
+  }
+
+  /// Force full sync
+  ///
+  /// Useful for troubleshooting or after data recovery
+  Future<void> forceFullSync() async {
+    // Implementation would trigger a complete data reload
+    // This is a placeholder for the actual implementation
+  }
+}
+
+/// Sync rules for data isolation and access control
+///
+/// These rules ensure:
+/// - Users can only see their own data
+/// - Managers can see their area's data
+/// - Admins can see all data
+class SyncRules {
+  /// Generate WHERE clause for user's data access
+  static String getUserDataFilter(String? userRole, String userId) {
+    switch (userRole) {
+      case 'admin':
+        // Admins can see all data
+        return '1=1';
+      case 'area_manager':
+      case 'assistant_area_manager':
+        // Managers can see their area's data (simplified)
+        // In production, this would join with user_locations table
+        return 'user_id IN (SELECT id FROM user_profiles WHERE area_manager_id = \'$userId\')';
+      default:
+        // Regular users can only see their own data
+        return 'user_id = \'$userId\'';
+    }
+  }
+
+  /// Check if user can modify a record
+  static bool canModifyRecord(String? userRole, String recordUserId, String currentUserId) {
+    switch (userRole) {
+      case 'admin':
+        return true;
+      case 'area_manager':
+      case 'assistant_area_manager':
+        // Managers can modify records in their area
+        // Simplified check - in production, check area assignment
+        return true;
+      default:
+        // Users can only modify their own records
+        return recordUserId == currentUserId;
+    }
+  }
+
+  /// Check if user can delete a record
+  static bool canDeleteRecord(String? userRole, String recordUserId, String currentUserId) {
+    // Same rules as modification
+    return canModifyRecord(userRole, recordUserId, currentUserId);
+  }
+}
+
+/// Data retention policies
+///
+/// Defines how long to keep different types of data
+class DataRetentionPolicies {
+  /// Retention period for visit records (days)
+  static const int visitRetentionDays = 365;
+
+  /// Retention period for call records (days)
+  static const int callRetentionDays = 365;
+
+  /// Retention period for release records (days)
+  static const int releaseRetentionDays = 1825; // 5 years
+
+  /// Retention period for touchpoint records (days)
+  static const int touchpointRetentionDays = 365;
+
+  /// Clean up old records
+  ///
+  /// Should be called periodically (e.g., weekly)
+  static Future<void> cleanupOldRecords() async {
+    // Implementation would delete records older than retention period
+    // This is a placeholder for the actual implementation
+  }
+
+  /// Check if a record should be retained
+  static bool shouldRetainRecord(String table, DateTime recordDate) {
+    final retentionDays = _getRetentionDays(table);
+    final cutoffDate = DateTime.now().subtract(Duration(days: retentionDays));
+    return recordDate.isAfter(cutoffDate);
+  }
+
+  static int _getRetentionDays(String table) {
+    switch (table) {
+      case 'visits':
+        return visitRetentionDays;
+      case 'calls':
+        return callRetentionDays;
+      case 'releases':
+        return releaseRetentionDays;
+      case 'touchpoints':
+        return touchpointRetentionDays;
+      default:
+        return 365;
+    }
+  }
 }

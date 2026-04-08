@@ -1,3 +1,5 @@
+import '../core/utils/date_utils.dart';
+
 class Visit {
   final String id;
   final String clientId;
@@ -78,24 +80,88 @@ class Visit {
   }
 
   factory Visit.fromRow(Map<String, dynamic> row) {
+    // Validate required fields
+    final id = row['id']?.toString();
+    if (id == null || id.isEmpty) {
+      throw ArgumentError('Visit: id is required and cannot be empty');
+    }
+
+    final clientId = row['client_id']?.toString();
+    if (clientId == null || clientId.isEmpty) {
+      throw ArgumentError('Visit: client_id is required and cannot be empty');
+    }
+
+    final userId = row['user_id']?.toString();
+    if (userId == null || userId.isEmpty) {
+      throw ArgumentError('Visit: user_id is required and cannot be empty');
+    }
+
+    // Validate type enum
+    final type = row['type']?.toString() ?? 'regular_visit';
+    if (type != 'regular_visit' && type != 'release_loan') {
+      throw ArgumentError('Visit: type must be "regular_visit" or "release_loan", got: $type');
+    }
+
+    // Parse dates safely
+    final createdAt = DateUtils.safeParse(row['created_at']);
+    if (createdAt == null) {
+      throw ArgumentError('Visit: created_at is required and must be a valid date');
+    }
+
+    final updatedAt = DateUtils.safeParse(row['updated_at']);
+    if (updatedAt == null) {
+      throw ArgumentError('Visit: updated_at is required and must be a valid date');
+    }
+
+    // Parse optional dates
+    final timeIn = DateUtils.safeParse(row['time_in']);
+    final timeOut = DateUtils.safeParse(row['time_out']);
+
+    // Parse optional coordinates safely
+    double? latitude;
+    if (row['latitude'] != null) {
+      if (row['latitude'] is num) {
+        latitude = (row['latitude'] as num).toDouble();
+      } else if (row['latitude'] is String) {
+        latitude = double.tryParse(row['latitude'] as String);
+      }
+    }
+
+    double? longitude;
+    if (row['longitude'] != null) {
+      if (row['longitude'] is num) {
+        longitude = (row['longitude'] as num).toDouble();
+      } else if (row['longitude'] is String) {
+        longitude = double.tryParse(row['longitude'] as String);
+      }
+    }
+
+    // Validate coordinate ranges if present
+    if (latitude != null && (latitude < -90 || latitude > 90)) {
+      throw ArgumentError('Visit: latitude must be between -90 and 90, got: $latitude');
+    }
+    if (longitude != null && (longitude < -180 || longitude > 180)) {
+      throw ArgumentError('Visit: longitude must be between -180 and 180, got: $longitude');
+    }
+
     return Visit(
-      id: row['id'] as String,
-      clientId: row['client_id'] as String,
-      userId: row['user_id'] as String,
-      type: row['type'] as String? ?? 'regular_visit',
-      timeIn: row['time_in'] != null ? DateTime.parse(row['time_in'] as String) : null,
-      timeOut: row['time_out'] != null ? DateTime.parse(row['time_out'] as String) : null,
-      odometerArrival: row['odometer_arrival'] as String?,
-      odometerDeparture: row['odometer_departure'] as String?,
-      photoUrl: row['photo_url'] as String?,
-      notes: row['notes'] as String?,
-      reason: row['reason'] as String?,
-      status: row['status'] as String?,
-      address: row['address'] as String?,
-      latitude: row['latitude'] as double?,
-      longitude: row['longitude'] as double?,
-      createdAt: DateTime.parse(row['created_at'] as String),
-      updatedAt: DateTime.parse(row['updated_at'] as String),
+      id: id,
+      clientId: clientId,
+      userId: userId,
+      type: type,
+      timeIn: timeIn,
+      timeOut: timeOut,
+      odometerArrival: row['odometer_arrival']?.toString(),
+      odometerDeparture: row['odometer_departure']?.toString(),
+      photoUrl: row['photo_url']?.toString(),
+      notes: row['notes']?.toString(),
+      reason: row['reason']?.toString(),
+      status: row['status']?.toString(),
+      address: row['address']?.toString(),
+      latitude: latitude,
+      longitude: longitude,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -105,8 +171,8 @@ class Visit {
       'client_id': clientId,
       'user_id': userId,
       'type': type,
-      'time_in': timeIn?.toIso8601String(),
-      'time_out': timeOut?.toIso8601String(),
+      'time_in': DateUtils.toIso8601String(timeIn),
+      'time_out': DateUtils.toIso8601String(timeOut),
       'odometer_arrival': odometerArrival,
       'odometer_departure': odometerDeparture,
       'photo_url': photoUrl,

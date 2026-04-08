@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:imu_flutter/models/visit_model.dart';
 import 'package:imu_flutter/models/call_model.dart';
+import 'package:imu_flutter/models/touchpoint_model_v2.dart';
 import 'package:imu_flutter/widgets/visit_form_widget.dart';
 import 'package:imu_flutter/widgets/call_form_widget.dart';
 import 'package:imu_flutter/services/api/visit_api_service.dart';
 import 'package:imu_flutter/services/api/call_api_service.dart';
+import 'package:imu_flutter/services/api/touchpoint_v2_api_service.dart';
 import 'package:imu_flutter/core/utils/haptic_utils.dart';
+import 'package:uuid/uuid.dart';
 
 /// Record Touchpoint Page - Allows users to create visit or call touchpoints
 class RecordTouchpointPage extends ConsumerStatefulWidget {
@@ -43,14 +46,55 @@ class _RecordTouchpointPageState extends ConsumerState<RecordTouchpointPage>
     setState(() => _isLoading = true);
 
     try {
-      // Create visit via API
-      final service = ref.read(visitApiServiceProvider);
-      final createdVisit = await service.createVisit(visit);
+      // Step 1: Create visit via API
+      final visitService = ref.read(visitApiServiceProvider);
+      final createdVisit = await visitService.createVisit(visit);
+
+      // Step 2: Fetch existing touchpoints for this client to determine next number
+      final touchpointService = ref.read(touchpointV2ApiServiceProvider);
+      final existingTouchpoints = await touchpointService.fetchTouchpoints(
+        clientId: widget.clientId,
+      );
+
+      // Step 3: Calculate next touchpoint number
+      final nextTouchpointNumber = existingTouchpoints.length + 1;
+
+      if (nextTouchpointNumber > 7) {
+        if (mounted) {
+          HapticUtils.error();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Maximum touchpoints (7) already reached for this client'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 4: Create touchpoint linking to the visit
+      final touchpoint = TouchpointV2(
+        id: const Uuid().v4(),
+        clientId: widget.clientId,
+        userId: createdVisit.userId,
+        visitId: createdVisit.id,
+        callId: null,
+        touchpointNumber: nextTouchpointNumber,
+        type: 'Visit',
+        rejectionReason: null,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await touchpointService.createTouchpoint(touchpoint);
 
       if (mounted) {
         HapticUtils.success();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Visit recorded successfully')),
+          SnackBar(
+            content: Text('Visit recorded successfully (Touchpoint $nextTouchpointNumber/7)'),
+            duration: const Duration(seconds: 2),
+          ),
         );
         Navigator.of(context).pop(createdVisit);
       }
@@ -72,14 +116,55 @@ class _RecordTouchpointPageState extends ConsumerState<RecordTouchpointPage>
     setState(() => _isLoading = true);
 
     try {
-      // Create call via API
-      final service = ref.read(callApiServiceProvider);
-      final createdCall = await service.createCall(call);
+      // Step 1: Create call via API
+      final callService = ref.read(callApiServiceProvider);
+      final createdCall = await callService.createCall(call);
+
+      // Step 2: Fetch existing touchpoints for this client to determine next number
+      final touchpointService = ref.read(touchpointV2ApiServiceProvider);
+      final existingTouchpoints = await touchpointService.fetchTouchpoints(
+        clientId: widget.clientId,
+      );
+
+      // Step 3: Calculate next touchpoint number
+      final nextTouchpointNumber = existingTouchpoints.length + 1;
+
+      if (nextTouchpointNumber > 7) {
+        if (mounted) {
+          HapticUtils.error();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Maximum touchpoints (7) already reached for this client'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 4: Create touchpoint linking to the call
+      final touchpoint = TouchpointV2(
+        id: const Uuid().v4(),
+        clientId: widget.clientId,
+        userId: createdCall.userId,
+        visitId: null,
+        callId: createdCall.id,
+        touchpointNumber: nextTouchpointNumber,
+        type: 'Call',
+        rejectionReason: null,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await touchpointService.createTouchpoint(touchpoint);
 
       if (mounted) {
         HapticUtils.success();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Call recorded successfully')),
+          SnackBar(
+            content: Text('Call recorded successfully (Touchpoint $nextTouchpointNumber/7)'),
+            duration: const Duration(seconds: 2),
+          ),
         );
         Navigator.of(context).pop(createdCall);
       }

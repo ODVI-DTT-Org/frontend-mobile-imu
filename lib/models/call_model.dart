@@ -1,3 +1,5 @@
+import '../core/utils/date_utils.dart';
+
 class Call {
   final String id;
   final String clientId;
@@ -54,18 +56,74 @@ class Call {
   }
 
   factory Call.fromRow(Map<String, dynamic> row) {
+    // Validate required fields
+    final id = row['id']?.toString();
+    if (id == null || id.isEmpty) {
+      throw ArgumentError('Call: id is required and cannot be empty');
+    }
+
+    final clientId = row['client_id']?.toString();
+    if (clientId == null || clientId.isEmpty) {
+      throw ArgumentError('Call: client_id is required and cannot be empty');
+    }
+
+    final userId = row['user_id']?.toString();
+    if (userId == null || userId.isEmpty) {
+      throw ArgumentError('Call: user_id is required and cannot be empty');
+    }
+
+    final phoneNumber = row['phone_number']?.toString();
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      throw ArgumentError('Call: phone_number is required and cannot be empty');
+    }
+
+    // Validate phone number format (basic validation)
+    if (!RegExp(r'^[\d\+\-\(\)\s]+$').hasMatch(phoneNumber)) {
+      throw ArgumentError('Call: phone_number contains invalid characters: $phoneNumber');
+    }
+
+    // Parse dates safely
+    final createdAt = DateUtils.safeParse(row['created_at']);
+    if (createdAt == null) {
+      throw ArgumentError('Call: created_at is required and must be a valid date');
+    }
+
+    final updatedAt = DateUtils.safeParse(row['updated_at']);
+    if (updatedAt == null) {
+      throw ArgumentError('Call: updated_at is required and must be a valid date');
+    }
+
+    // Parse optional date
+    final dialTime = DateUtils.safeParse(row['dial_time']);
+
+    // Parse duration safely
+    int? duration;
+    if (row['duration'] != null) {
+      if (row['duration'] is int) {
+        duration = row['duration'] as int;
+        if (duration < 0) {
+          throw ArgumentError('Call: duration cannot be negative, got: $duration');
+        }
+      } else if (row['duration'] is String) {
+        duration = int.tryParse(row['duration'] as String);
+        if (duration != null && duration < 0) {
+          throw ArgumentError('Call: duration cannot be negative, got: $duration');
+        }
+      }
+    }
+
     return Call(
-      id: row['id'] as String,
-      clientId: row['client_id'] as String,
-      userId: row['user_id'] as String,
-      phoneNumber: row['phone_number'] as String,
-      dialTime: row['dial_time'] != null ? DateTime.parse(row['dial_time'] as String) : null,
-      duration: row['duration'] as int?,
-      notes: row['notes'] as String?,
-      reason: row['reason'] as String?,
-      status: row['status'] as String?,
-      createdAt: DateTime.parse(row['created_at'] as String),
-      updatedAt: DateTime.parse(row['updated_at'] as String),
+      id: id,
+      clientId: clientId,
+      userId: userId,
+      phoneNumber: phoneNumber,
+      dialTime: dialTime,
+      duration: duration,
+      notes: row['notes']?.toString(),
+      reason: row['reason']?.toString(),
+      status: row['status']?.toString(),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -75,7 +133,7 @@ class Call {
       'client_id': clientId,
       'user_id': userId,
       'phone_number': phoneNumber,
-      'dial_time': dialTime?.toIso8601String(),
+      'dial_time': DateUtils.toIso8601String(dialTime),
       'duration': duration,
       'notes': notes,
       'reason': reason,

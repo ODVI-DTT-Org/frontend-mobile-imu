@@ -177,7 +177,7 @@ class VisitApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
-      final response = await _dio.put(
+      final response = await _dio.patch(
         '${AppConfig.postgresApiUrl}/visits/$id',
         options: Options(
           headers: {
@@ -188,7 +188,7 @@ class VisitApiService {
         data: updates,
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 206) {
         final visitData = response.data as Map<String, dynamic>;
         debugPrint('VisitApiService: Visit updated');
         return Visit.fromRow(visitData);

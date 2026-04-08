@@ -181,7 +181,7 @@ class ReleaseApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
-      final response = await _dio.put(
+      final response = await _dio.patch(
         '${AppConfig.postgresApiUrl}/releases/$id',
         options: Options(
           headers: {
@@ -192,7 +192,7 @@ class ReleaseApiService {
         data: updates,
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 206) {
         final releaseData = response.data as Map<String, dynamic>;
         debugPrint('ReleaseApiService: Release updated');
         return Release.fromRow(releaseData);

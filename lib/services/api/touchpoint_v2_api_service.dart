@@ -175,7 +175,7 @@ class TouchpointV2ApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
-      final response = await _dio.put(
+      final response = await _dio.patch(
         '${AppConfig.postgresApiUrl}/touchpoints/$id',
         options: Options(
           headers: {
@@ -186,7 +186,7 @@ class TouchpointV2ApiService {
         data: updates,
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 206) {
         final touchpointData = response.data as Map<String, dynamic>;
         debugPrint('TouchpointV2ApiService: Touchpoint updated');
         return TouchpointV2.fromRow(touchpointData);
