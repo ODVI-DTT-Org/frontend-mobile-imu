@@ -24,7 +24,7 @@ import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';
-import '../widgets/client_card.dart';
+import '../../../../shared/widgets/client/client_list_card.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
@@ -865,13 +865,24 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             ...clients.map(
               (client) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 4),
-                child: ClientCard(
-                  client: client,
+                child: ClientListCard.fromMyDayClient(
+                  myDayClient: client,
+                  clientId: client.clientId,
+                  fullName: client.fullName,
+                  location: client.location,
+                  touchpointNumber: client.touchpointNumber,
+                  touchpointType: client.touchpointType,
+                  previousTouchpointNumber: client.previousTouchpointNumber,
+                  previousTouchpointReason: client.previousTouchpointReason,
+                  previousTouchpointType: client.previousTouchpointType,
+                  previousTouchpointDate: client.previousTouchpointDate,
                   onTap: () => _onClientTap(client),
                   onRemove: () => _confirmRemoveClient(client),
                   onLongPress: () => _onClientLongPress(client),
                   isSelected: _isClientSelected(client.id),
                   isMultiSelectMode: _isMultiSelectMode,
+                  enableSwipeToDismiss: true,
+                  showInMyDayBadge: true,
                 ),
               ),
             ),

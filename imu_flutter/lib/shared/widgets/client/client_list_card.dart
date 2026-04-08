@@ -14,6 +14,8 @@ import '../../../services/api/itinerary_api_service.dart';
 ///
 /// Provides consistent client display with multi-select support,
 /// matching the design of the Clients page reference implementation.
+///
+/// Can work with both Client model and MyDayClient through override parameters.
 class ClientListCard extends ConsumerWidget {
   final Client client;
   final VoidCallback? onTap;
@@ -25,6 +27,13 @@ class ClientListCard extends ConsumerWidget {
   final bool showInMyDayBadge;
   final int? touchpointCount;
   final String? scheduledDate;
+
+  // Override parameters for MyDayClient compatibility
+  final String? overrideFullName;
+  final String? overrideFullAddress;
+  final List<Touchpoint>? overrideTouchpoints;
+  final bool? overrideLoanReleased;
+  final String? overrideUdi;
 
   const ClientListCard({
     super.key,
@@ -38,14 +47,98 @@ class ClientListCard extends ConsumerWidget {
     this.showInMyDayBadge = false,
     this.touchpointCount,
     this.scheduledDate,
+    this.overrideFullName,
+    this.overrideFullAddress,
+    this.overrideTouchpoints,
+    this.overrideLoanReleased,
+    this.overrideUdi,
   });
+
+  /// Factory constructor for MyDayClient compatibility
+  factory ClientListCard.fromMyDayClient({
+    required dynamic myDayClient,
+    required String clientId,
+    required String fullName,
+    required String? location,
+    int? touchpointNumber,
+    String? touchpointType,
+    int? previousTouchpointNumber,
+    String? previousTouchpointReason,
+    String? previousTouchpointType,
+    DateTime? previousTouchpointDate,
+    VoidCallback? onTap,
+    VoidCallback? onLongPress,
+    VoidCallback? onRemove,
+    bool isSelected = false,
+    bool isMultiSelectMode = false,
+    bool enableSwipeToDismiss = true,
+    bool showInMyDayBadge = true,
+    int? touchpointCount,
+    String? scheduledDate,
+  }) {
+    // Create a minimal Client object with required fields
+    final client = Client(
+      id: clientId,
+      firstName: '', // Will be overridden
+      middleName: null,
+      lastName: '', // Will be overridden
+      clientType: ClientType.existing,
+      productType: ProductType.private,
+      pensionType: PensionType.private,
+      createdAt: DateTime.now(),
+    );
+
+    // Create synthetic touchpoints list if previous touchpoint exists
+    List<Touchpoint>? syntheticTouchpoints;
+    if (previousTouchpointNumber != null) {
+      syntheticTouchpoints = [
+        Touchpoint(
+          id: '',
+          clientId: clientId,
+          touchpointNumber: previousTouchpointNumber!,
+          type: touchpointType?.toLowerCase() == 'visit'
+              ? TouchpointType.visit
+              : TouchpointType.call,
+          date: previousTouchpointDate ?? DateTime.now(),
+          reason: TouchpointReason.interested, // Default reason
+          status: TouchpointStatus.interested,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    }
+
+    return ClientListCard(
+      client: client,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      onRemove: onRemove,
+      isSelected: isSelected,
+      isMultiSelectMode: isMultiSelectMode,
+      enableSwipeToDismiss: enableSwipeToDismiss,
+      showInMyDayBadge: showInMyDayBadge,
+      touchpointCount: touchpointCount,
+      scheduledDate: scheduledDate,
+      overrideFullName: fullName,
+      overrideFullAddress: location,
+      overrideTouchpoints: syntheticTouchpoints,
+      overrideLoanReleased: false,
+      overrideUdi: null,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final latestTouchpoint = client.touchpoints.isNotEmpty
-        ? client.touchpoints.last
+    // Use override parameters if provided, otherwise use client properties
+    final effectiveFullName = overrideFullName ?? client.fullName;
+    final effectiveFullAddress = overrideFullAddress ?? client.fullAddress;
+    final effectiveTouchpoints = overrideTouchpoints ?? client.touchpoints;
+    final effectiveLoanReleased = overrideLoanReleased ?? client.loanReleased;
+    final effectiveUdi = overrideUdi ?? client.udi;
+
+    final latestTouchpoint = effectiveTouchpoints.isNotEmpty
+        ? effectiveTouchpoints.last
         : null;
-    final isFirstTime = client.touchpoints.isEmpty;
+    final isFirstTime = effectiveTouchpoints.isEmpty;
 
     // Check if client is in today's itinerary
     final todayItineraryAsync = ref.watch(todayItineraryProvider);
@@ -188,7 +281,7 @@ class ClientListCard extends ConsumerWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  client.fullName,
+                                  effectiveFullName,
                                   style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
@@ -251,7 +344,7 @@ class ClientListCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     // Loan Released badge (if applicable)
-                    if (client.loanReleased && client.udi != null)
+                    if (effectiveLoanReleased && effectiveUdi != null)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -269,7 +362,7 @@ class ClientListCard extends ConsumerWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Loan Released: ${client.udi}',
+                              'Loan Released: $effectiveUdi',
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
@@ -291,7 +384,7 @@ class ClientListCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            client.fullAddress ?? 'No address',
+                            effectiveFullAddress ?? 'No address',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
