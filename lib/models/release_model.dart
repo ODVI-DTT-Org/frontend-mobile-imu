@@ -117,6 +117,8 @@ class Release {
   final double amount;
   final String? approvalNotes;
   final String status; // pending | approved | rejected | disbursed
+  final String? approvedBy;
+  final DateTime? approvedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -130,6 +132,8 @@ class Release {
     required this.amount,
     this.approvalNotes,
     required this.status,
+    this.approvedBy,
+    this.approvedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -144,6 +148,8 @@ class Release {
     double? amount,
     String? approvalNotes,
     String? status,
+    String? approvedBy,
+    DateTime? approvedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -157,6 +163,8 @@ class Release {
       amount: amount ?? this.amount,
       approvalNotes: approvalNotes ?? this.approvalNotes,
       status: status ?? this.status,
+      approvedBy: approvedBy ?? this.approvedBy,
+      approvedAt: approvedAt ?? this.approvedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -232,6 +240,10 @@ class Release {
       throw ArgumentError('Release: updated_at is required and must be a valid date');
     }
 
+    // Parse optional audit fields
+    final approvedBy = row['approved_by']?.toString();
+    final approvedAt = DateUtils.safeParse(row['approved_at']);
+
     return Release(
       id: id,
       clientId: clientId,
@@ -242,6 +254,8 @@ class Release {
       amount: amount,
       approvalNotes: row['approval_notes']?.toString(),
       status: status,
+      approvedBy: approvedBy,
+      approvedAt: approvedAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -258,6 +272,8 @@ class Release {
       'amount': amount,
       'approval_notes': approvalNotes,
       'status': status,
+      'approved_by': approvedBy,
+      'approved_at': DateUtils.toIso8601String(approvedAt),
     };
   }
 

@@ -103,24 +103,13 @@ class TouchpointV2 {
       throw ArgumentError('TouchpointV2: updated_at is required and must be a valid date');
     }
 
-    // Validate that either visitId or callId is set, but not both
+    // Parse optional foreign keys (allow null for creation before linking)
     final visitId = row['visit_id']?.toString();
     final callId = row['call_id']?.toString();
 
+    // Validate that both are not set at the same time
     if (visitId != null && callId != null) {
       throw ArgumentError('TouchpointV2: cannot have both visit_id and call_id set');
-    }
-
-    if (visitId == null && callId == null) {
-      throw ArgumentError('TouchpointV2: must have either visit_id or call_id set');
-    }
-
-    // Validate type matches the foreign key
-    if (type == 'Visit' && visitId == null) {
-      throw ArgumentError('TouchpointV2: type is "Visit" but visit_id is null');
-    }
-    if (type == 'Call' && callId == null) {
-      throw ArgumentError('TouchpointV2: type is "Call" but call_id is null');
     }
 
     return TouchpointV2(

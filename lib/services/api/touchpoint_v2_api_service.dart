@@ -45,7 +45,11 @@ class TouchpointV2ApiService {
       );
 
       if (response.statusCode == 200) {
-        final items = response.data as List<dynamic>? ?? [];
+        // Parse paginated response with items field
+        final responseData = response.data as Map<String, dynamic>?;
+        final items = responseData?['items'] as List<dynamic>? ??
+                     response.data as List<dynamic>? ??
+                     [];
         debugPrint('TouchpointV2ApiService: Got ${items.length} touchpoints from API');
 
         return items.map((item) {
