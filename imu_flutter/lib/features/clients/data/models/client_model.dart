@@ -130,7 +130,7 @@ class Client {
     // Fallback to legacy fields
     if (region != null || province != null || municipality != null || barangay != null) {
       return addr.Address(
-        id: 'legacy_${id}',
+        id: 'legacy_$id',
         clientId: id ?? '',
         psgcId: psgcId ?? 0,
         label: addr.AddressLabel.home,
@@ -159,7 +159,7 @@ class Client {
     // Fallback to legacy field
     if (phone != null && phone!.isNotEmpty) {
       return ph.PhoneNumber(
-        id: 'legacy_${id}',
+        id: 'legacy_$id',
         clientId: id ?? '',
         label: ph.PhoneLabel.mobile,
         number: phone!,
