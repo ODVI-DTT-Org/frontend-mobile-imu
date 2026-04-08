@@ -15,7 +15,8 @@ import '../../../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     isOnlineProvider,
     touchpointApiServiceProvider,
-    authNotifierProvider;
+    authNotifierProvider,
+    powerSyncDatabaseProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
@@ -23,8 +24,17 @@ import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart';
+import '../../../clients/data/models/address_model.dart';
+import '../../../clients/data/models/phone_number_model.dart';
+import '../../../clients/data/repositories/address_repository.dart';
+import '../../../clients/data/repositories/phone_number_repository.dart';
 import '../../../clients/presentation/widgets/edit_client_form_v2.dart';
+import '../../../clients/presentation/widgets/contact_info_section.dart';
+import '../../../clients/presentation/widgets/add_address_modal.dart';
+import '../../../clients/presentation/widgets/add_phone_modal.dart';
+import '../../../clients/presentation/widgets/address_selection_modal.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+import 'package:powersync/powersync.dart';
 
 // Client detail provider
 final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
@@ -80,6 +90,18 @@ final clientTouchpointsProvider = FutureProvider.family<List<Touchpoint>, String
   }
 });
 
+// Address repository provider
+final addressRepositoryProvider = Provider<AddressRepository>((ref) {
+  final db = ref.watch(powerSyncDatabaseProvider);
+  return PowerSyncAddressRepository(db);
+});
+
+// Phone number repository provider
+final phoneNumberRepositoryProvider = Provider<PhoneNumberRepository>((ref) {
+  final db = ref.watch(powerSyncDatabaseProvider);
+  return PowerSyncPhoneNumberRepository(db);
+});
+
 class ClientDetailPage extends ConsumerStatefulWidget {
   final String clientId;
 
@@ -115,13 +137,11 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
       // Try loading from Hive first
       var clientData = _hiveService.getClient(widget.clientId);
-      if (clientData != null && mounted) {
+      Client? client;
+
+      if (clientData != null) {
         try {
-          setState(() {
-            _client = Client.fromJson(clientData);
-            _isLoading = false;
-          });
-          return;
+          client = Client.fromJson(clientData);
         } catch (e, stack) {
           debugPrint('Error parsing client data: $e\n$stack');
           // Continue to API fetch
@@ -129,28 +149,48 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       }
 
       // If Hive doesn't have client or parsing failed, try fetching from API
-      final isOnline = ref.read(isOnlineProvider);
-      if (isOnline && mounted) {
-        try {
-          final clientApi = ref.read(clientApiServiceProvider);
-          final client = await clientApi.fetchClient(widget.clientId);
-          if (client != null && mounted) {
-            setState(() {
-              _client = client;
-              _isLoading = false;
-            });
-            return;
+      if (client == null) {
+        final isOnline = ref.read(isOnlineProvider);
+        if (isOnline) {
+          try {
+            final clientApi = ref.read(clientApiServiceProvider);
+            client = await clientApi.fetchClient(widget.clientId);
+          } catch (e, stack) {
+            debugPrint('Error fetching client from API: $e\n$stack');
+            // Continue to error state
           }
-        } catch (e, stack) {
-          debugPrint('Error fetching client from API: $e\n$stack');
-          // Continue to error state
         }
       }
 
-      // Client not found
+      // Load addresses and phone numbers from PowerSync
+      if (client != null) {
+        try {
+          final addressRepo = ref.read(addressRepositoryProvider);
+          final phoneRepo = ref.read(phoneNumberRepositoryProvider);
+
+          final addresses = await addressRepo.getAddresses(widget.clientId);
+          final phoneNumbers = await phoneRepo.getPhoneNumbers(widget.clientId);
+
+          // Update client with addresses and phone numbers
+          client = client.copyWith(
+            addresses: addresses,
+            phoneNumbers: phoneNumbers,
+          );
+        } catch (e, stack) {
+          debugPrint('Error loading addresses/phones from PowerSync: $e\n$stack');
+          // Continue without addresses/phones
+        }
+      }
+
       if (mounted) {
-        setState(() => _isLoading = false);
-        _showNotFoundError();
+        setState(() {
+          _client = client;
+          _isLoading = false;
+        });
+
+        if (client == null) {
+          _showNotFoundError();
+        }
       }
     } catch (e, stack) {
       debugPrint('Error in _loadClient: $e\n$stack');
@@ -484,6 +524,317 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (result == true) {
       _loadClient();
       ref.invalidate(assignedClientsProvider);
+    }
+  }
+
+  Future<void> _viewAddresses() async {
+    HapticUtils.lightImpact();
+    final addressRepo = ref.read(addressRepositoryProvider);
+
+    // Load addresses from PowerSync
+    final addresses = await addressRepo.getAddresses(widget.clientId);
+
+    if (!mounted) return;
+
+    // Show addresses modal
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            AppBar(
+              title: Text('Addresses (${addresses.length})'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: addresses.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.mapPin, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text('No addresses', style: TextStyle(color: Colors.grey[600])),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: addresses.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final address = addresses[index];
+                        return _buildAddressListTile(address, addressRepo);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // Reload client to refresh UI
+    _loadClient();
+  }
+
+  Widget _buildAddressListTile(Address address, AddressRepository repo) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: address.isPrimary ? Colors.blue.shade300 : Colors.grey.shade300!,
+          width: address.isPrimary ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (address.label != AddressLabel.home)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(address.label.displayName, style: const TextStyle(fontSize: 11)),
+                ),
+              if (address.isPrimary) ...[
+                if (address.label != AddressLabel.home) const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.star, size: 12, color: Colors.blue),
+                      SizedBox(width: 4),
+                      Text('Primary', style: TextStyle(fontSize: 11, color: Colors.blue)),
+                    ],
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (!address.isPrimary)
+                IconButton(
+                  icon: const Icon(Icons.star, size: 18),
+                  onPressed: () async {
+                    await repo.setPrimary(address.id);
+                    if (mounted) {
+                      Navigator.pop(context);
+                      _viewAddresses(); // Refresh
+                    }
+                  },
+                  tooltip: 'Set as Primary',
+                ),
+            ],
+          ),
+          if (address.streetAddress != null && address.streetAddress!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(address.streetAddress!, style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
+          const SizedBox(height: 4),
+          Text(address.fullAddress, style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+          if (address.postalCode != null && address.postalCode!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(address.postalCode!, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addAddress() async {
+    HapticUtils.lightImpact();
+    final addressRepo = ref.read(addressRepositoryProvider);
+
+    final result = await showDialog<Address>(
+      context: context,
+      builder: (context) => AddAddressModal(
+        clientId: widget.clientId,
+        onSubmit: (clientId, data) async {
+          return await addressRepo.createAddress(clientId, data);
+        },
+      ),
+    );
+
+    if (result != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Address added')),
+        );
+      }
+      _loadClient();
+    }
+  }
+
+  Future<void> _viewPhoneNumbers() async {
+    HapticUtils.lightImpact();
+    final phoneRepo = ref.read(phoneNumberRepositoryProvider);
+
+    // Load phone numbers from PowerSync
+    final phoneNumbers = await phoneRepo.getPhoneNumbers(widget.clientId);
+
+    if (!mounted) return;
+
+    // Show phone numbers modal
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            AppBar(
+              title: Text('Phone Numbers (${phoneNumbers.length})'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: phoneNumbers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.phone, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text('No phone numbers', style: TextStyle(color: Colors.grey[600])),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: phoneNumbers.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final phone = phoneNumbers[index];
+                        return _buildPhoneNumberListTile(phone, phoneRepo);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // Reload client to refresh UI
+    _loadClient();
+  }
+
+  Widget _buildPhoneNumberListTile(PhoneNumber phone, PhoneNumberRepository repo) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: phone.isPrimary ? Colors.blue.shade300 : Colors.grey.shade300!,
+          width: phone.isPrimary ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            phone.label == PhoneLabel.mobile
+                ? LucideIcons.smartphone
+                : phone.label == PhoneLabel.home
+                    ? LucideIcons.phone
+                    : LucideIcons.phoneCall,
+            size: 20,
+            color: Colors.grey[700],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(phone.displayNumber, style: const TextStyle(fontWeight: FontWeight.w500)),
+                if (phone.label != PhoneLabel.mobile)
+                  Text(phone.label.displayName, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              ],
+            ),
+          ),
+          if (phone.isPrimary)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, size: 12, color: Colors.blue),
+                  SizedBox(width: 4),
+                  Text('Primary', style: TextStyle(fontSize: 11, color: Colors.blue)),
+                ],
+              ),
+            ),
+          if (!phone.isPrimary)
+            IconButton(
+              icon: const Icon(Icons.star, size: 18),
+              onPressed: () async {
+                await repo.setPrimary(phone.id);
+                if (mounted) {
+                  Navigator.pop(context);
+                  _viewPhoneNumbers(); // Refresh
+                }
+              },
+              tooltip: 'Set as Primary',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addPhoneNumber() async {
+    HapticUtils.lightImpact();
+    final phoneRepo = ref.read(phoneNumberRepositoryProvider);
+
+    final result = await showDialog<PhoneNumber>(
+      context: context,
+      builder: (context) => AddPhoneModal(
+        clientId: widget.clientId,
+        onSubmit: (clientId, data) async {
+          return await phoneRepo.createPhoneNumber(clientId, data);
+        },
+      ),
+    );
+
+    if (result != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Phone number added')),
+        );
+      }
+      _loadClient();
     }
   }
 
@@ -1215,78 +1566,54 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Contact Section
-            _Section(title: 'Contact Information'),
+            // Contact Section with Address and Phone Numbers
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ..._client!.phoneNumbers.map((phone) => _InfoRow(
-                        icon: LucideIcons.phone,
-                        label: phone.label ?? 'Phone',
-                        value: phone.number,
-                        trailing: IconButton(
-                          icon: const Icon(LucideIcons.phoneCall, size: 18),
-                          onPressed: () => _callClient(phone.number),
-                        ),
-                      )),
-                  if (_client!.email != null)
-                    _InfoRow(
-                      icon: LucideIcons.mail,
-                      label: 'Email',
-                      value: _client!.email!,
-                    ),
-                  if (_client!.facebookLink != null)
-                    _InfoRow(
-                      icon: LucideIcons.facebook,
-                      label: 'Facebook',
-                      value: _client!.facebookLink!,
-                    ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: ContactInfoSection(
+                client: _client!,
+                onViewAddresses: _viewAddresses,
+                onViewPhoneNumbers: _viewPhoneNumbers,
+                onAddAddress: _addAddress,
+                onAddPhoneNumber: _addPhoneNumber,
               ),
             ),
 
-            // Address Section
-            if (_client!.addresses.isNotEmpty) ...[
-              _Section(title: 'Addresses'),
+            // Map view for client location (if addresses with coordinates exist)
+            if (_client!.addresses.any((a) => a.latitude != null && a.longitude != null))
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: _client!.addresses.map((address) => _InfoRow(
-                        icon: LucideIcons.mapPin,
-                        label: address.isPrimary ? 'Primary' : 'Address',
-                        value: address.fullAddress,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (address.latitude != null && address.longitude != null)
-                              IconButton(
-                                icon: const Icon(LucideIcons.map, size: 18),
-                                onPressed: () => _showMapForAddress(address),
-                              ),
-                            IconButton(
-                              icon: const Icon(LucideIcons.navigation, size: 18),
-                              onPressed: () => _navigateToAddress(address.fullAddress),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SizedBox(
+                  height: 200,
+                  child: ClientMapView(
+                    clients: [_client!],
+                    showControls: false,
+                    showSearch: false,
+                  ),
                 ),
               ),
 
-              // Map view for client location
-              if (_client!.addresses.any((a) => a.latitude != null && a.longitude != null))
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: SizedBox(
-                    height: 200,
-                    child: ClientMapView(
-                      clients: [_client!],
-                      showControls: false,
-                      showSearch: false,
-                    ),
-                  ),
+            // Legacy contact fields (email, Facebook) - keep for compatibility
+            if (_client!.email != null || _client!.facebookLink != null) ...[
+              _Section(title: 'Other Contact Information'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    if (_client!.email != null)
+                      _InfoRow(
+                        icon: LucideIcons.mail,
+                        label: 'Email',
+                        value: _client!.email!,
+                      ),
+                    if (_client!.facebookLink != null)
+                      _InfoRow(
+                        icon: LucideIcons.facebook,
+                        label: 'Facebook',
+                        value: _client!.facebookLink!,
+                      ),
+                  ],
                 ),
+              ),
             ],
 
             // Pension Info Section
