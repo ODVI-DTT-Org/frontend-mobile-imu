@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../app.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/utils/loading_helper.dart';
@@ -259,6 +260,12 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             value: 'edit',
           ),
           ActionOption(
+            icon: LucideIcons.navigation,
+            title: 'Navigate',
+            description: 'Open navigation to client address',
+            value: 'navigate',
+          ),
+          ActionOption(
             icon: LucideIcons.dollarSign,
             title: 'Release Loan',
             description: 'Mark loan as released',
@@ -293,6 +300,9 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           break;
         case 'history':
           await _viewHistory(client);
+          break;
+        case 'navigate':
+          await _navigateToClient(client);
           break;
       }
     }
@@ -433,6 +443,43 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         clientId: client.clientId,
         clientName: client.fullName,
       );
+    }
+  }
+
+  Future<void> _navigateToClient(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    final address = client.location;
+    if (address == null || address.isEmpty) {
+      if (mounted) {
+        showToast('No address available for this client');
+      }
+      return;
+    }
+
+    try {
+      // Open Google Maps with the address
+      final Uri mapUri = Uri(
+        scheme: 'https',
+        host: 'www.google.com',
+        path: '/maps/search/',
+        queryParameters: {
+          'api': '1',
+          'query': address,
+        },
+      );
+
+      if (await canLaunchUrl(mapUri)) {
+        await launchUrl(mapUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          showToast('Could not open maps application');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showToast('Failed to open navigation: $e');
+      }
     }
   }
 
