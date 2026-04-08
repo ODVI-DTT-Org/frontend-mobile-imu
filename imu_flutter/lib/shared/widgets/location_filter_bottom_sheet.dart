@@ -22,6 +22,29 @@ class _LocationFilterBottomSheetState extends ConsumerState<LocationFilterBottom
   bool _selectAllMunicipalities = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Initialize with current filter state from provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentFilter = ref.read(locationFilterProvider);
+      if (mounted) {
+        setState(() {
+          _selectedProvince = currentFilter.province;
+          if (currentFilter.municipalities == null) {
+            // "All Municipalities" selected
+            _selectAllMunicipalities = true;
+            _selectedMunicipalities = {};
+          } else {
+            // Specific municipalities selected
+            _selectAllMunicipalities = false;
+            _selectedMunicipalities = currentFilter.municipalities!.toSet();
+          }
+        });
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final assignedAreasAsync = ref.watch(assignedAreasProvider);
 
@@ -166,7 +189,11 @@ class _ProvinceSection extends StatelessWidget {
       initiallyExpanded: true,
       children: provinces.map((province) {
         return RadioListTile<String>(
-          title: Text(province),
+          title: Text(
+            province,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           value: province,
           groupValue: selectedProvince,
           onChanged: (value) {
@@ -210,7 +237,11 @@ class _MunicipalitySection extends StatelessWidget {
         ),
         ...municipalities.map((municipality) {
           return CheckboxListTile(
-            title: Text(municipality),
+            title: Text(
+              municipality,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: selectedMunicipalities.contains(municipality) && !selectAll,
             onChanged: (_) => onMunicipalityToggle(municipality),
           );

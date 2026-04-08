@@ -66,6 +66,7 @@ import '../../services/api/groups_api_service.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/area/area_filter_service.dart';
+import '../models/location_filter.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 
 // ==================== Service Providers ====================
@@ -219,13 +220,14 @@ final onlineClientsMetaProvider = Provider<ClientsResponse?>((ref) {
   );
 });
 
-/// Online clients - fetches ALL clients from REST API without area-based filtering
+/// Online clients - fetches clients from REST API with optional location filtering
 /// This is used for "All Clients" mode to search the entire client database
-/// NO territory filtering - simple SELECT * with LIMIT/OFFSET pagination
+/// Supports location filtering via municipality params
 final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(onlineClientSearchQueryProvider);
   final page = ref.watch(onlineClientPageProvider);
+  final locationFilter = ref.watch(locationFilterProvider);
 
   // Must be online to fetch all clients
   if (!isOnline) {
@@ -234,16 +236,29 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   }
 
   try {
-    debugPrint('onlineClientsProvider: Fetching ALL clients from online API (no area filtering)...');
+    debugPrint('onlineClientsProvider: Fetching clients from online API...');
     debugPrint('onlineClientsProvider: Search query: "$searchQuery", Page: $page');
+    debugPrint('onlineClientsProvider: Location filter: ${locationFilter.toQueryParams()}');
 
     final clientApi = ref.watch(clientApiServiceProvider);
+
+    // Convert location filter to municipality IDs list
+    // Format: "PROVINCE-MUNICIPALITY" (e.g., "PANGASINAN-DAGUPAN CITY")
+    List<String>? municipalityIds;
+    if (locationFilter.hasFilter && locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
+      municipalityIds = locationFilter.municipalities!.map((municipality) {
+        // Create ID in format: PROVINCE-MUNICIPALITY
+        final province = locationFilter.province ?? '';
+        return '$province-$municipality';
+      }).toList();
+      debugPrint('onlineClientsProvider: Converted to municipality IDs: $municipalityIds');
+    }
 
     final response = await clientApi.fetchClients(
       page: page,
       perPage: 10, // Paginate 10 items per page
       search: searchQuery.isNotEmpty ? searchQuery : null,
-      municipalityIds: null, // NO AREA FILTERING - fetch all clients
+      municipalityIds: municipalityIds,
     );
 
     debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
@@ -325,13 +340,33 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   } else if (isOnline) {
     // Step 3: If cache has data AND online, trigger background refresh from API
     // Don't wait - trigger in background
-    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery);
+    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery, locationFilter);
+  }
+
+  // Apply location filter locally if needed
+  if (locationFilter.hasFilter) {
+    debugPrint('assignedClientsProvider: Applying location filter locally - province: ${locationFilter.province}, municipalities: ${locationFilter.municipalities}');
+    cachedClients = cachedClients.where((c) {
+      // Check if client's province matches filter
+      if (locationFilter.province != null && c.province != locationFilter.province) {
+        return false;
+      }
+      // Check if client's municipality matches filter (if specified)
+      if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
+        if (!locationFilter.municipalities!.contains(c.municipality)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+    debugPrint('assignedClientsProvider: After location filter - ${cachedClients.length} clients');
   }
 
   // Apply search filter locally if needed
   if (searchQuery.isNotEmpty) {
     final query = searchQuery.toLowerCase();
     cachedClients = cachedClients.where((c) => c.fullName.toLowerCase().contains(query)).toList();
+    debugPrint('assignedClientsProvider: After search filter - ${cachedClients.length} clients');
   }
 
   // Calculate pagination locally
@@ -356,9 +391,17 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 });
 
 /// Background refresh function - fetches from API and updates Hive cache
-void _refreshAssignedClientsFromApi(FutureProviderRef<ClientsResponse> ref, HiveService hiveService, String searchQuery) async {
+/// Includes location filter support for province/municipality filtering
+void _refreshAssignedClientsFromApi(
+  FutureProviderRef<ClientsResponse> ref,
+  HiveService hiveService,
+  String searchQuery,
+  LocationFilter locationFilter,
+) async {
   try {
     debugPrint('assignedClientsProvider: Background refresh from API...');
+    debugPrint('assignedClientsProvider: Background refresh - Location filter: ${locationFilter.toQueryParams()}');
+
     final clientApi = ref.read(clientApiServiceProvider);
 
     // Fetch all pages from /clients/assigned
@@ -373,6 +416,8 @@ void _refreshAssignedClientsFromApi(FutureProviderRef<ClientsResponse> ref, Hive
         page: currentPage,
         perPage: perPage,
         search: searchQuery.isNotEmpty ? searchQuery : null,
+        province: locationFilter.province,
+        municipality: locationFilter.municipalities?.join(','),
       );
 
       totalCount = response.totalItems.toInt();

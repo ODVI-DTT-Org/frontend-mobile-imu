@@ -555,23 +555,34 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
   Widget _buildHeader(BuildContext context, EnhancedSyncLoadingState syncState) {
     return Column(
       children: [
-        // Logo/Icon
+        // Logo
         Center(
-          child: Container(
+          child: Image.asset(
+            'assets/images/imu_logo_optimized.webp',
             width: 80,
             height: 80,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Status Icon (below logo)
+        Center(
+          child: Container(
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: _getStatusColor(syncState).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               _getStatusIcon(syncState),
               color: _getStatusColor(syncState),
-              size: 40,
+              size: 24,
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
         // Title
         Text(

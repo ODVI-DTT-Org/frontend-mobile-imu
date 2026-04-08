@@ -202,18 +202,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                 // Logo
                 Center(
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.map_outlined,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                  child: Image.asset(
+                    'assets/images/imu_logo_optimized.webp',
+                    width: 120,
+                    height: 120,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 const SizedBox(height: 24),
