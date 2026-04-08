@@ -66,21 +66,21 @@ class AddressListTile extends StatelessWidget {
                           context,
                           icon: LucideIcons.star,
                           tooltip: 'Set as Primary',
-                          onPressed: onSetPrimary,
+                          onPressed: onSetPrimary!,
                         ),
                       if (onEdit != null)
                         _buildActionButton(
                           context,
                           icon: LucideIcons.pencil,
                           tooltip: 'Edit',
-                          onPressed: onEdit,
+                          onPressed: onEdit!,
                         ),
                       if (onDelete != null)
                         _buildActionButton(
                           context,
                           icon: LucideIcons.trash2,
                           tooltip: 'Delete',
-                          onPressed: onDelete,
+                          onPressed: onDelete!,
                           isDestructive: true,
                         ),
                     ],
