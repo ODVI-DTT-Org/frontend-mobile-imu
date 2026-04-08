@@ -11,7 +11,7 @@ import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
 import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
-import '../../../../shared/widgets/previous_touchpoint_badge.dart';
+import '../../../../shared/widgets/client/client_list_card.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/itinerary_api_service.dart';
@@ -886,8 +886,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                           return GestureDetector(
                             onLongPress: () => _onVisitLongPress(visit),
                             onTap: () => _onVisitTap(visit),
-                            child: _VisitCard(
-                              visit: visit,
+                            child: ClientListCard.fromItineraryItem(
+                              itineraryItem: visit,
+                              onTap: () => _onVisitTap(visit),
+                              onLongPress: () => _onVisitLongPress(visit),
                               isSelected: _isVisitSelected(visit.id),
                               isMultiSelectMode: true,
                             ),
@@ -907,8 +909,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                             await _onVisitTap(visit);
                           },
                           onLongPress: () => _onVisitLongPress(visit),
-                          child: _VisitCard(
-                            visit: visit,
+                          child: ClientListCard.fromItineraryItem(
+                            itineraryItem: visit,
+                            onTap: () => _onVisitTap(visit),
+                            onLongPress: () => _onVisitLongPress(visit),
                             isSelected: _isVisitSelected(visit.id),
                             isMultiSelectMode: false,
                           ),

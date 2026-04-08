@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
 import '../../../features/clients/data/models/client_model.dart';
 import '../../../features/clients/data/models/touchpoint_validation_model.dart';
+import '../../../features/itinerary/data/models/itinerary_item.dart';
 import 'touchpoint_progress_badge.dart';
 import 'touchpoint_status_badge.dart';
 import 'client_status_badge.dart';
@@ -120,6 +122,69 @@ class ClientListCard extends ConsumerWidget {
       scheduledDate: scheduledDate,
       overrideFullName: fullName,
       overrideFullAddress: location,
+      overrideTouchpoints: syntheticTouchpoints,
+      overrideLoanReleased: false,
+      overrideUdi: null,
+    );
+  }
+
+  /// Factory constructor for ItineraryItem compatibility
+  factory ClientListCard.fromItineraryItem({
+    required ItineraryItem itineraryItem,
+    VoidCallback? onTap,
+    VoidCallback? onLongPress,
+    VoidCallback? onRemove,
+    bool isSelected = false,
+    bool isMultiSelectMode = false,
+    bool enableSwipeToDismiss = false,
+    bool showInMyDayBadge = false,
+    int? touchpointCount,
+    String? scheduledDate,
+  }) {
+    // Create a minimal Client object with required fields
+    final client = Client(
+      id: itineraryItem.clientId,
+      firstName: '', // Will be overridden
+      middleName: null,
+      lastName: '', // Will be overridden
+      clientType: ClientType.existing,
+      productType: ProductType.private,
+      pensionType: PensionType.private,
+      createdAt: DateTime.now(),
+    );
+
+    // Create synthetic touchpoints list if previous touchpoint exists
+    List<Touchpoint>? syntheticTouchpoints;
+    if (itineraryItem.previousTouchpointNumber != null) {
+      syntheticTouchpoints = [
+        Touchpoint(
+          id: '',
+          clientId: itineraryItem.clientId,
+          touchpointNumber: itineraryItem.previousTouchpointNumber!,
+          type: itineraryItem.previousTouchpointType?.toLowerCase() == 'visit'
+              ? TouchpointType.visit
+              : TouchpointType.call,
+          date: itineraryItem.previousTouchpointDate ?? DateTime.now(),
+          reason: TouchpointReason.interested, // Default reason
+          status: TouchpointStatus.interested,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    }
+
+    return ClientListCard(
+      client: client,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      onRemove: onRemove,
+      isSelected: isSelected,
+      isMultiSelectMode: isMultiSelectMode,
+      enableSwipeToDismiss: enableSwipeToDismiss,
+      showInMyDayBadge: showInMyDayBadge,
+      touchpointCount: touchpointCount,
+      scheduledDate: scheduledDate ?? DateFormat('MMM d, yyyy').format(itineraryItem.scheduledDate),
+      overrideFullName: itineraryItem.clientName,
+      overrideFullAddress: itineraryItem.address,
       overrideTouchpoints: syntheticTouchpoints,
       overrideLoanReleased: false,
       overrideUdi: null,
