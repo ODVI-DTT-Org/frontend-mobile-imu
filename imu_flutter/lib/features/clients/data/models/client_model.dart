@@ -22,6 +22,11 @@ class Client {
   final MarketType? marketType;
   final ProductType productType;
   final PensionType pensionType;
+  // Raw string values from database (preserves original data when enum parsing fails)
+  final String? clientTypeRaw;
+  final String? marketTypeRaw;
+  final String? productTypeRaw;
+  final String? pensionTypeRaw;
   final String? pan;
   final String? email;
   final String? facebookLink;
@@ -60,6 +65,10 @@ class Client {
     this.marketType,
     required this.productType,
     required this.pensionType,
+    this.clientTypeRaw,
+    this.marketTypeRaw,
+    this.productTypeRaw,
+    this.pensionTypeRaw,
     this.pan,
     this.email,
     this.facebookLink,
@@ -81,9 +90,13 @@ class Client {
     this.loanReleasedAt,
   });
 
-  /// Returns client name in "LastName, FirstName MiddleName" format
-  /// Example: "Delos Santos, Juan Miguel"
-  String get fullName => '$lastName, $firstName${middleName != null ? ' $middleName' : ''}';
+  String get fullName {
+    final firstMiddle = <String>[firstName];
+    if (middleName != null && middleName!.isNotEmpty) {
+      firstMiddle.add(middleName!);
+    }
+    return '$lastName, ${firstMiddle.join(' ')}';
+  }
 
   String get fullAddress {
     final parts = <String>[];
@@ -106,6 +119,75 @@ class Client {
   }
 
   int get completedTouchpoints => touchpoints.length;
+
+  /// Display product type - shows raw value if available, otherwise enum value
+  String get productTypeDisplay {
+    if (productTypeRaw != null && productTypeRaw!.isNotEmpty) {
+      // Check if raw value matches known enum
+      final rawLower = productTypeRaw!.toLowerCase();
+      final enumMatch = ProductType.values.any((e) => e.name.toLowerCase() == rawLower);
+      if (!enumMatch) {
+        // Raw value is unknown, return it as-is
+        return productTypeRaw!;
+      }
+    }
+    // Use enum value
+    return switch (productType) {
+      ProductType.sssPensioner => 'SSS Pensioner',
+      ProductType.gsisPensioner => 'GSIS Pensioner',
+      ProductType.private => 'Private',
+    };
+  }
+
+  /// Display pension type - shows raw value if available, otherwise enum value
+  String get pensionTypeDisplay {
+    if (pensionTypeRaw != null && pensionTypeRaw!.isNotEmpty) {
+      // Check if raw value matches known enum
+      final rawLower = pensionTypeRaw!.toLowerCase();
+      final enumMatch = PensionType.values.any((e) => e.name.toLowerCase() == rawLower);
+      if (!enumMatch) {
+        // Raw value is unknown, return it as-is
+        return pensionTypeRaw!;
+      }
+    }
+    // Use enum value
+    return pensionType.name.toUpperCase();
+  }
+
+  /// Display market type - shows raw value if available, otherwise enum value
+  String? get marketTypeDisplay {
+    if (marketType == null) return null;
+    if (marketTypeRaw != null && marketTypeRaw!.isNotEmpty) {
+      // Check if raw value matches known enum
+      final rawLower = marketTypeRaw!.toLowerCase();
+      final enumMatch = MarketType.values.any((e) => e.name.toLowerCase() == rawLower);
+      if (!enumMatch) {
+        // Raw value is unknown, return it as-is
+        return marketTypeRaw!;
+      }
+    }
+    // Use enum value
+    return switch (marketType!) {
+      MarketType.residential => 'Residential',
+      MarketType.commercial => 'Commercial',
+      MarketType.industrial => 'Industrial',
+    };
+  }
+
+  /// Display client type - shows raw value if available, otherwise enum value
+  String get clientTypeDisplay {
+    if (clientTypeRaw != null && clientTypeRaw!.isNotEmpty) {
+      // Check if raw value matches known enum
+      final rawLower = clientTypeRaw!.toLowerCase();
+      final enumMatch = ClientType.values.any((e) => e.name.toLowerCase() == rawLower);
+      if (!enumMatch) {
+        // Raw value is unknown, return it as-is
+        return clientTypeRaw!;
+      }
+    }
+    // Use enum value
+    return clientType.name.toUpperCase();
+  }
 
   TouchpointType? get nextTouchpointType {
     final next = completedTouchpoints;
@@ -189,6 +271,10 @@ class Client {
     MarketType? marketType,
     ProductType? productType,
     PensionType? pensionType,
+    String? clientTypeRaw,
+    String? marketTypeRaw,
+    String? productTypeRaw,
+    String? pensionTypeRaw,
     String? pan,
     String? email,
     String? facebookLink,
@@ -227,6 +313,10 @@ class Client {
       marketType: marketType ?? this.marketType,
       productType: productType ?? this.productType,
       pensionType: pensionType ?? this.pensionType,
+      clientTypeRaw: clientTypeRaw ?? this.clientTypeRaw,
+      marketTypeRaw: marketTypeRaw ?? this.marketTypeRaw,
+      productTypeRaw: productTypeRaw ?? this.productTypeRaw,
+      pensionTypeRaw: pensionTypeRaw ?? this.pensionTypeRaw,
       pan: pan ?? this.pan,
       email: email ?? this.email,
       facebookLink: facebookLink ?? this.facebookLink,
@@ -300,6 +390,55 @@ class Client {
     return false;
   }
 
+  /// Parse ClientType from string, return null if unknown (no default)
+  static ClientType _parseClientType(dynamic value) {
+    if (value == null) return ClientType.potential;
+    final str = value.toString().toLowerCase();
+    return ClientType.values.firstWhere(
+      (e) => e.name.toLowerCase() == str,
+      orElse: () => ClientType.potential,
+    );
+  }
+
+  /// Parse MarketType from string, return null if unknown (no default)
+  static MarketType? _parseMarketType(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString().toLowerCase();
+    try {
+      return MarketType.values.firstWhere(
+        (e) => e.name.toLowerCase() == str,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Parse ProductType from string, return null if unknown (no default)
+  static ProductType _parseProductType(dynamic value) {
+    if (value == null) return ProductType.sssPensioner;
+    final str = value.toString().toLowerCase();
+    try {
+      return ProductType.values.firstWhere(
+        (e) => e.name.toLowerCase() == str,
+      );
+    } catch (_) {
+      return ProductType.sssPensioner; // Fallback for new clients
+    }
+  }
+
+  /// Parse PensionType from string, return null if unknown (no default)
+  static PensionType _parsePensionType(dynamic value) {
+    if (value == null) return PensionType.none;
+    final str = value.toString().toLowerCase();
+    try {
+      return PensionType.values.firstWhere(
+        (e) => e.name.toLowerCase() == str,
+      );
+    } catch (_) {
+      return PensionType.none;
+    }
+  }
+
   factory Client.fromJson(Map<String, dynamic> json) {
     return Client(
       id: json['id'] ?? '',
@@ -317,24 +456,14 @@ class Client {
           : (json['birth_date'] != null ? DateTime.parse(json['birth_date']) : null),
       phone: json['phone'] ?? json['contactNumber'] ?? json['phone_number'],
       remarks: json['remarks'],
-      clientType: ClientType.values.firstWhere(
-        (e) => e.name == json['clientType'] || e.name == json['client_type'],
-        orElse: () => ClientType.potential,
-      ),
-      marketType: json['marketType'] != null || json['market_type'] != null
-          ? MarketType.values.firstWhere(
-              (e) => e.name == (json['marketType'] ?? json['market_type']),
-              orElse: () => MarketType.residential,
-            )
-          : null,
-      productType: ProductType.values.firstWhere(
-        (e) => e.name == json['productType'] || e.name == json['product_type'],
-        orElse: () => ProductType.sssPensioner,
-      ),
-      pensionType: PensionType.values.firstWhere(
-        (e) => e.name == json['pensionType'] || e.name == json['pension_type'],
-        orElse: () => PensionType.none,
-      ),
+      clientType: _parseClientType(json['clientType'] ?? json['client_type']),
+      marketType: _parseMarketType(json['marketType'] ?? json['market_type']),
+      productType: _parseProductType(json['productType'] ?? json['product_type']),
+      pensionType: _parsePensionType(json['pensionType'] ?? json['pension_type']),
+      clientTypeRaw: json['clientType'] ?? json['client_type'],
+      marketTypeRaw: json['marketType'] ?? json['market_type'],
+      productTypeRaw: json['productType'] ?? json['product_type'],
+      pensionTypeRaw: json['pensionType'] ?? json['pension_type'],
       pan: json['pan'],
       email: json['email'],
       facebookLink: json['facebookLink'] ?? json['facebook_link'],
@@ -363,19 +492,10 @@ class Client {
 
   /// Create Client from PowerSync/PostgreSQL row (snake_case column names)
   factory Client.fromRow(Map<String, dynamic> row) {
-    // Helper to parse ProductType from backend values
-    ProductType parseProductType(String? value) {
-      if (value == null) return ProductType.sssPensioner;
-      final upper = value.toUpperCase();
-      if (upper == 'PENSION_LOAN' || upper == 'SSS_PENSION_LOAN') {
-        return ProductType.sssPensioner;
-      } else if (upper == 'GSIS_PENSION_LOAN') {
-        return ProductType.gsisPensioner;
-      } else if (upper == 'CASH_LOAN' || upper == 'PRIVATE') {
-        return ProductType.private;
-      }
-      return ProductType.sssPensioner;
-    }
+    final clientTypeRaw = row['client_type'] as String?;
+    final marketTypeRaw = row['market_type'] as String?;
+    final productTypeRaw = row['product_type'] as String?;
+    final pensionTypeRaw = row['pension_type'] as String?;
 
     return Client(
       id: row['id'] as String,
@@ -391,23 +511,14 @@ class Client {
       employmentStatus: row['employment_status'] as String?,
       payrollDate: row['payroll_date'] as String?,
       tenure: row['tenure'] as int?,
-      clientType: ClientType.values.firstWhere(
-        (e) => e.name.toUpperCase() == (row['client_type'] as String?)?.toUpperCase(),
-        orElse: () => ClientType.potential,
-      ),
-      productType: parseProductType(row['product_type'] as String?),
-      marketType: row['market_type'] != null
-          ? MarketType.values.firstWhere(
-              (e) => e.name.toUpperCase() == (row['market_type'] as String).toUpperCase(),
-              orElse: () => MarketType.residential,
-            )
-          : null,
-      pensionType: row['pension_type'] != null
-          ? PensionType.values.firstWhere(
-              (e) => e.name.toUpperCase() == (row['pension_type'] as String).toUpperCase(),
-              orElse: () => PensionType.none,
-            )
-          : PensionType.none,
+      clientType: _parseClientType(clientTypeRaw),
+      marketType: _parseMarketType(marketTypeRaw),
+      productType: _parseProductType(productTypeRaw),
+      pensionType: _parsePensionType(pensionTypeRaw),
+      clientTypeRaw: clientTypeRaw,
+      marketTypeRaw: marketTypeRaw,
+      productTypeRaw: productTypeRaw,
+      pensionTypeRaw: pensionTypeRaw,
       pan: row['pan'] as String?,
       facebookLink: row['facebook_link'] as String?,
       remarks: row['remarks'] as String?,
@@ -579,14 +690,18 @@ class Touchpoint {
   final String? userId; // The user (caravan/tele) who created this touchpoint (was agentId)
   final int touchpointNumber; // 1-7
   final TouchpointType type;
+  final TouchpointReason reason;
+  final TouchpointStatus status; // New: status field (Interested, Undecided, Not Interested, Completed)
+  // Raw string values from database (preserves original data when enum parsing fails)
+  final String? typeRaw;
+  final String? reasonRaw;
+  final String? statusRaw;
   final DateTime date;
   final String? address;
   final TimeOfDay? timeArrival;
   final TimeOfDay? timeDeparture;
   final String? odometerArrival;
   final String? odometerDeparture;
-  final TouchpointReason reason;
-  final TouchpointStatus status; // New: status field (Interested, Undecided, Not Interested, Completed)
   final DateTime? nextVisitDate;
   final String? remarks;
   final String? photoPath;
@@ -615,14 +730,17 @@ class Touchpoint {
     this.userId,
     required this.touchpointNumber,
     required this.type,
+    required this.reason,
+    this.status = TouchpointStatus.interested, // Default status
+    this.typeRaw,
+    this.reasonRaw,
+    this.statusRaw,
     required this.date,
     this.address,
     this.timeArrival,
     this.timeDeparture,
     this.odometerArrival,
     this.odometerDeparture,
-    required this.reason,
-    this.status = TouchpointStatus.interested, // Default status
     this.nextVisitDate,
     this.remarks,
     this.photoPath,
@@ -657,14 +775,17 @@ class Touchpoint {
     String? agentId, // Legacy parameter name for backward compatibility
     int? touchpointNumber,
     TouchpointType? type,
+    TouchpointReason? reason,
+    TouchpointStatus? status,
+    String? typeRaw,
+    String? reasonRaw,
+    String? statusRaw,
     DateTime? date,
     String? address,
     TimeOfDay? timeArrival,
     TimeOfDay? timeDeparture,
     String? odometerArrival,
     String? odometerDeparture,
-    TouchpointReason? reason,
-    TouchpointStatus? status,
     DateTime? nextVisitDate,
     String? remarks,
     String? photoPath,
@@ -689,14 +810,17 @@ class Touchpoint {
       userId: userId ?? agentId ?? this.userId, // Support both parameter names
       touchpointNumber: touchpointNumber ?? this.touchpointNumber,
       type: type ?? this.type,
+      reason: reason ?? this.reason,
+      status: status ?? this.status,
+      typeRaw: typeRaw ?? this.typeRaw,
+      reasonRaw: reasonRaw ?? this.reasonRaw,
+      statusRaw: statusRaw ?? this.statusRaw,
       date: date ?? this.date,
       address: address ?? this.address,
       timeArrival: timeArrival ?? this.timeArrival,
       timeDeparture: timeDeparture ?? this.timeDeparture,
       odometerArrival: odometerArrival ?? this.odometerArrival,
       odometerDeparture: odometerDeparture ?? this.odometerDeparture,
-      reason: reason ?? this.reason,
-      status: status ?? this.status,
       nextVisitDate: nextVisitDate ?? this.nextVisitDate,
       remarks: remarks ?? this.remarks,
       photoPath: photoPath ?? this.photoPath,
@@ -825,20 +949,28 @@ class Touchpoint {
       return value as T?;
     }
 
+    // Capture raw values before parsing
+    final typeRaw = getValue<String>('touchpoint_type', 'touchpointType') ?? getValue<String>('type', 'type');
+    final reasonRaw = getValue<String>('reason', 'reason');
+    final statusRaw = getValue<String>('status', 'status');
+
     return Touchpoint(
       id: json['id'] ?? '',
       clientId: getValue<String>('client_id', 'clientId') ?? '',
       userId: getValue<String>('user_id', 'userId') ?? getValue<String>('agent_id', 'agentId'),
       touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? 1,
-      type: TouchpointType.fromApi(getValue<String>('touchpoint_type', 'touchpointType') ?? getValue<String>('type', 'type') ?? 'VISIT'),
+      type: TouchpointType.fromApi(typeRaw ?? 'VISIT'),
+      reason: TouchpointReason.fromApi(reasonRaw ?? 'INTERESTED'),
+      status: TouchpointStatus.fromApi(statusRaw ?? 'INTERESTED'),
+      typeRaw: typeRaw,
+      reasonRaw: reasonRaw,
+      statusRaw: statusRaw,
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
       address: getValue<String>('address', 'address'),
       timeArrival: parseTime(getValue<String>('time_arrival', 'timeArrival')),
       timeDeparture: parseTime(getValue<String>('time_departure', 'timeDeparture')),
       odometerArrival: getValue<String>('odometer_arrival', 'odometerArrival'),
       odometerDeparture: getValue<String>('odometer_departure', 'odometerDeparture'),
-      reason: TouchpointReason.fromApi(getValue<String>('reason', 'reason') ?? 'INTERESTED'),
-      status: TouchpointStatus.fromApi(getValue<String>('status', 'status') ?? 'INTERESTED'),
       nextVisitDate: parseDateTime(getValue<String>('next_visit_date', 'nextVisitDate')),
       remarks: getValue<String>('notes', 'remarks') ?? getValue<String>('remarks', 'remarks'),
       photoPath: getValue<String>('photo_url', 'photoUrl') ?? getValue<String>('photo_path', 'photoPath'),
@@ -892,19 +1024,27 @@ class Touchpoint {
       return null;
     }
 
+    // Capture raw values before parsing
+    final typeRaw = row['type'] as String?;
+    final reasonRaw = row['reason'] as String?;
+    final statusRaw = row['status'] as String?;
+
     return Touchpoint(
       id: row['id'] as String,
       clientId: row['client_id'] as String,
       userId: row['user_id'] as String?,
       touchpointNumber: row['touchpoint_number'] as int,
-      type: row['type'] == 'Visit' ? TouchpointType.visit : TouchpointType.call,
+      type: TouchpointType.fromApi(typeRaw ?? 'VISIT'),
+      reason: TouchpointReason.fromApi(reasonRaw ?? 'INTERESTED'),
+      status: TouchpointStatus.fromApi(statusRaw ?? 'Interested'),
+      typeRaw: typeRaw,
+      reasonRaw: reasonRaw,
+      statusRaw: statusRaw,
       date: row['date'] != null
           ? DateTime.parse(row['date'] as String)
           : DateTime.now(),
       timeArrival: parseTime(row['time_arrival']),
       timeDeparture: parseTime(row['time_departure']),
-      reason: TouchpointReason.fromApi(row['reason'] as String? ?? 'INTERESTED'),
-      status: TouchpointStatus.fromApi(row['status'] as String? ?? 'Interested'),
       remarks: row['notes'] as String?,
       photoPath: row['photo_path'] as String?,
       audioPath: row['audio_path'] as String?,
