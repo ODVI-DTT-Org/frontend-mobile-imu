@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'address_model.dart' as addr;
+import 'phone_number_model.dart' as ph;
 
 /// Client data model for IMU app
 /// Aligned with database schema - uses direct columns instead of nested lists
@@ -31,6 +33,8 @@ class Client {
   final String? municipality; // Municipality from PSGC
   final String? barangay; // Barangay from PSGC
   final String? udi; // Unified ID
+  final List<addr.Address> addresses; // Multiple addresses
+  final List<ph.PhoneNumber> phoneNumbers; // Multiple phone numbers
   final List<Touchpoint> touchpoints;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -67,6 +71,8 @@ class Client {
     this.municipality,
     this.barangay,
     this.udi,
+    this.addresses = const [],
+    this.phoneNumbers = const [],
     this.touchpoints = const [],
     required this.createdAt,
     this.updatedAt,
@@ -115,38 +121,54 @@ class Client {
     return municipality == municipalityCode;
   }
 
-  /// Compatibility getter for addresses - returns list with single address from direct fields
-  List<Address> get addresses {
-    if (region == null && province == null && municipality == null && barangay == null) {
-      return [];
+  /// Get primary address with fallback to legacy fields
+  addr.Address? get primaryAddress {
+    if (addresses.isNotEmpty) {
+      final primary = addresses.where((a) => a.isPrimary).firstOrNull;
+      if (primary != null) return primary;
     }
-    return [
-      Address(
-        id: '${id}_primary',
-        street: '', // No street field in new schema
-        barangay: barangay,
-        city: municipality ?? '',
-        province: province,
-        isPrimary: true,
+    // Fallback to legacy fields
+    if (region != null || province != null || municipality != null || barangay != null) {
+      return addr.Address(
+        id: 'legacy_$id',
+        clientId: id ?? '',
+        psgcId: psgcId ?? 0,
+        label: addr.AddressLabel.home,
+        streetAddress: '',
+        postalCode: null,
         latitude: null,
         longitude: null,
-      ),
-    ];
+        isPrimary: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        region: region,
+        province: province,
+        municipality: municipality,
+        barangay: barangay,
+      );
+    }
+    return null;
   }
 
-  /// Compatibility getter for phoneNumbers - returns list with single phone from direct field
-  List<PhoneNumber> get phoneNumbers {
-    if (phone == null || phone!.isEmpty) {
-      return [];
+  /// Get primary phone with fallback to legacy field
+  ph.PhoneNumber? get primaryPhone {
+    if (phoneNumbers.isNotEmpty) {
+      final primary = phoneNumbers.where((p) => p.isPrimary).firstOrNull;
+      if (primary != null) return primary;
     }
-    return [
-      PhoneNumber(
-        id: '${id}_primary',
+    // Fallback to legacy field
+    if (phone != null && phone!.isNotEmpty) {
+      return ph.PhoneNumber(
+        id: 'legacy_$id',
+        clientId: id ?? '',
+        label: ph.PhoneLabel.mobile,
         number: phone!,
-        label: 'Primary',
         isPrimary: true,
-      ),
-    ];
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }
+    return null;
   }
 
   Client copyWith({
@@ -178,6 +200,8 @@ class Client {
     String? municipality,
     String? barangay,
     String? udi,
+    List<addr.Address>? addresses,
+    List<ph.PhoneNumber>? phoneNumbers,
     List<Touchpoint>? touchpoints,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -214,6 +238,8 @@ class Client {
       municipality: municipality ?? this.municipality,
       barangay: barangay ?? this.barangay,
       udi: udi ?? this.udi,
+      addresses: addresses ?? this.addresses,
+      phoneNumbers: phoneNumbers ?? this.phoneNumbers,
       touchpoints: touchpoints ?? this.touchpoints,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
