@@ -8,6 +8,10 @@ class TouchpointV2 {
   final String? callId;
   final int touchpointNumber;
   final String type; // Visit | Call
+  final DateTime? date; // Date of touchpoint
+  final String? status; // Interested, Undecided, Not Interested, Completed
+  final DateTime? nextVisitDate; // Next scheduled visit date
+  final String? notes; // Additional notes
   final String? rejectionReason;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -20,6 +24,10 @@ class TouchpointV2 {
     this.callId,
     required this.touchpointNumber,
     required this.type,
+    this.date,
+    this.status,
+    this.nextVisitDate,
+    this.notes,
     this.rejectionReason,
     required this.createdAt,
     required this.updatedAt,
@@ -33,6 +41,10 @@ class TouchpointV2 {
     String? callId,
     int? touchpointNumber,
     String? type,
+    DateTime? date,
+    String? status,
+    DateTime? nextVisitDate,
+    String? notes,
     String? rejectionReason,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -45,6 +57,10 @@ class TouchpointV2 {
       callId: callId ?? this.callId,
       touchpointNumber: touchpointNumber ?? this.touchpointNumber,
       type: type ?? this.type,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      nextVisitDate: nextVisitDate ?? this.nextVisitDate,
+      notes: notes ?? this.notes,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -112,6 +128,12 @@ class TouchpointV2 {
       throw ArgumentError('TouchpointV2: cannot have both visit_id and call_id set');
     }
 
+    // Parse optional fields
+    final date = DateUtils.safeParse(row['date']);
+    final nextVisitDate = DateUtils.safeParse(row['next_visit_date']);
+    final status = row['status']?.toString();
+    final notes = row['notes']?.toString();
+
     return TouchpointV2(
       id: id,
       clientId: clientId,
@@ -120,6 +142,10 @@ class TouchpointV2 {
       callId: callId,
       touchpointNumber: touchpointNumber,
       type: type,
+      date: date,
+      status: status,
+      nextVisitDate: nextVisitDate,
+      notes: notes,
       rejectionReason: row['rejection_reason']?.toString(),
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -135,6 +161,10 @@ class TouchpointV2 {
       'call_id': callId,
       'touchpoint_number': touchpointNumber,
       'type': type,
+      'date': date?.toIso8601String(),
+      'status': status,
+      'next_visit_date': nextVisitDate?.toIso8601String(),
+      'notes': notes,
       'rejection_reason': rejectionReason,
     };
   }

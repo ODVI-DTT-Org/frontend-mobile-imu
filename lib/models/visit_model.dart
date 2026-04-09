@@ -5,11 +5,11 @@ class Visit {
   final String clientId;
   final String userId;
   final String type; // regular_visit | release_loan
-  final DateTime? timeIn;
-  final DateTime? timeOut;
+  final String? timeArrival;
+  final String? timeDeparture;
   final String? odometerArrival;
   final String? odometerDeparture;
-  final String? photoUrl;
+  final String photoUrl; // REQUIRED by qa2 database
   final String? notes;
   final String? reason;
   final String? status;
@@ -24,11 +24,11 @@ class Visit {
     required this.clientId,
     required this.userId,
     required this.type,
-    this.timeIn,
-    this.timeOut,
+    this.timeArrival,
+    this.timeDeparture,
     this.odometerArrival,
     this.odometerDeparture,
-    this.photoUrl,
+    required this.photoUrl,
     this.notes,
     this.reason,
     this.status,
@@ -44,8 +44,8 @@ class Visit {
     String? clientId,
     String? userId,
     String? type,
-    DateTime? timeIn,
-    DateTime? timeOut,
+    String? timeArrival,
+    String? timeDeparture,
     String? odometerArrival,
     String? odometerDeparture,
     String? photoUrl,
@@ -63,8 +63,8 @@ class Visit {
       clientId: clientId ?? this.clientId,
       userId: userId ?? this.userId,
       type: type ?? this.type,
-      timeIn: timeIn ?? this.timeIn,
-      timeOut: timeOut ?? this.timeOut,
+      timeArrival: timeArrival ?? this.timeArrival,
+      timeDeparture: timeDeparture ?? this.timeDeparture,
       odometerArrival: odometerArrival ?? this.odometerArrival,
       odometerDeparture: odometerDeparture ?? this.odometerDeparture,
       photoUrl: photoUrl ?? this.photoUrl,
@@ -113,9 +113,9 @@ class Visit {
       throw ArgumentError('Visit: updated_at is required and must be a valid date');
     }
 
-    // Parse optional dates
-    final timeIn = DateUtils.safeParse(row['time_in']);
-    final timeOut = DateUtils.safeParse(row['time_out']);
+    // Parse optional time fields (text format, not DateTime)
+    final timeArrival = row['time_arrival']?.toString();
+    final timeDeparture = row['time_departure']?.toString();
 
     // Parse optional coordinates safely
     double? latitude;
@@ -144,16 +144,22 @@ class Visit {
       throw ArgumentError('Visit: longitude must be between -180 and 180, got: $longitude');
     }
 
+    // Validate photo_url (required by qa2 database)
+    final photoUrl = row['photo_url']?.toString();
+    if (photoUrl == null || photoUrl.isEmpty) {
+      throw ArgumentError('Visit: photo_url is required and cannot be empty');
+    }
+
     return Visit(
       id: id,
       clientId: clientId,
       userId: userId,
       type: type,
-      timeIn: timeIn,
-      timeOut: timeOut,
+      timeArrival: timeArrival,
+      timeDeparture: timeDeparture,
       odometerArrival: row['odometer_arrival']?.toString(),
       odometerDeparture: row['odometer_departure']?.toString(),
-      photoUrl: row['photo_url']?.toString(),
+      photoUrl: photoUrl,
       notes: row['notes']?.toString(),
       reason: row['reason']?.toString(),
       status: row['status']?.toString(),
@@ -171,8 +177,8 @@ class Visit {
       'client_id': clientId,
       'user_id': userId,
       'type': type,
-      'time_in': DateUtils.toIso8601String(timeIn),
-      'time_out': DateUtils.toIso8601String(timeOut),
+      'time_arrival': timeArrival,
+      'time_departure': timeDeparture,
       'odometer_arrival': odometerArrival,
       'odometer_departure': odometerDeparture,
       'photo_url': photoUrl,
