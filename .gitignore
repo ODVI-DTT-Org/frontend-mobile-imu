@@ -1,1 +1,54 @@
+# Worktrees
 .worktrees/
+
+# Environment files
+.env
+.env.*
+*.env
+imu_flutter/powersync/.env
+
+# Keystore files - CRITICAL: Never commit these!
+*.keystore
+*.jks
+keystore.*
+*.key
+*.pem
+*.cert
+*.crt
+android/app/release.keystore
+android/app/debug.keystore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+
+# Android/iOS
+ios/Runner.xcworkspace
+ios/Runner.xcodeproj/xcuserdata/
+
+# Logs
+*.log
+
+# Sensitive data
+credentials.json
+secrets/
+google-services.json
+GoogleService-Info.plist
