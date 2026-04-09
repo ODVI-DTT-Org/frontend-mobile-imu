@@ -1,4 +1,7 @@
 import 'package:powersync/powersync.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../../../services/sync/powersync_service.dart' show powerSyncDatabaseProvider;
 import '../models/phone_number_model.dart';
 
 abstract class PhoneNumberRepository {
@@ -41,7 +44,7 @@ class PowerSyncPhoneNumberRepository implements PhoneNumberRepository {
 
   @override
   Future<PhoneNumber> createPhoneNumber(String clientId, Map<String, dynamic> data) async {
-    final id = db.generateUUID();
+    final id = const Uuid().v4();
 
     await db.execute(
       'INSERT INTO phone_numbers (id, client_id, label, number, is_primary) '
@@ -151,3 +154,12 @@ class PowerSyncPhoneNumberRepository implements PhoneNumberRepository {
     return PhoneNumber.fromSyncMap(result);
   }
 }
+
+// Provider for PhoneNumberRepository
+final phoneNumberRepositoryProvider = Provider<PhoneNumberRepository>((ref) {
+  final db = ref.watch(powerSyncDatabaseProvider).value;
+  if (db == null) {
+    throw Exception('PowerSync database not initialized');
+  }
+  return PowerSyncPhoneNumberRepository(db);
+});

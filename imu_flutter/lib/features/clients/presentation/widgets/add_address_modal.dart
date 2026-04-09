@@ -24,7 +24,7 @@ class AddAddressModal extends HookWidget {
     final label = useState<AddressLabel>(initialAddress?.label ?? AddressLabel.home);
     final streetAddress = useTextEditingController(text: initialAddress?.streetAddress ?? '');
     final postalCode = useTextEditingController(text: initialAddress?.postalCode ?? '');
-    final psgcId = useState<String?>(initialAddress?.psgcId);
+    final psgcId = useState<String?>(initialAddress?.psgcId?.toString());
     final latitude = useState<double?>(initialAddress?.latitude);
     final longitude = useState<double?>(initialAddress?.longitude);
     final isPrimary = useState<bool>(initialAddress?.isPrimary ?? false);

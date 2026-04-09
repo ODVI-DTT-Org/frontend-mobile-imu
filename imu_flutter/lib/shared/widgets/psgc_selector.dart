@@ -46,10 +46,10 @@ class PSGCSelector extends HookWidget {
       'Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)',
     ]);
 
-    final provinces = useMemoized(() => {
+    final provinces = useMemoized(() {
       if (selectedRegion.value == null) return <String>[];
       // Mock data - in production, load from database
-      return {
+      final provinceMap = {
         'National Capital Region (NCR)': [
           'Metro Manila',
           'Quezon City',
@@ -63,13 +63,14 @@ class PSGCSelector extends HookWidget {
           'Rizal',
           'Quezon',
         ],
-      }[selectedRegion.value] ?? <String>[];
+      };
+      return provinceMap[selectedRegion.value] ?? <String>[];
     }, [selectedRegion.value]);
 
-    final municipalities = useMemoized(() => {
+    final municipalities = useMemoized(() {
       if (selectedProvince.value == null) return <String>[];
       // Mock data
-      return {
+      final municipalityMap = {
         'Metro Manila': [
           'Manila',
           'Makati',
@@ -83,13 +84,14 @@ class PSGCSelector extends HookWidget {
           'Imus',
           'Dasmariñas City',
         ],
-      }[selectedProvince.value] ?? <String>[];
+      };
+      return municipalityMap[selectedProvince.value] ?? <String>[];
     }, [selectedProvince.value]);
 
-    final barangays = useMemoized(() => {
+    final barangays = useMemoized(() {
       if (selectedMunicipality.value == null) return <String>[];
       // Mock data
-      return {
+      final barangayMap = {
         'Dasmariñas': [
           'Barangay 1',
           'Barangay 2',
@@ -101,7 +103,8 @@ class PSGCSelector extends HookWidget {
           'Bel-Air',
           'San Lorenzo',
         ],
-      }[selectedMunicipality.value] ?? <String>[];
+      };
+      return barangayMap[selectedMunicipality.value] ?? <String>[];
     }, [selectedMunicipality.value]);
 
     return Column(

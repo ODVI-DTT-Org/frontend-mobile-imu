@@ -16,25 +16,27 @@ import '../../../../shared/providers/app_providers.dart' show
     isOnlineProvider,
     touchpointApiServiceProvider,
     authNotifierProvider,
-    powerSyncDatabaseProvider;
+    powerSyncDatabaseProvider,
+    addressRepositoryProvider,
+    phoneNumberRepositoryProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
-import '../../../clients/data/models/client_model.dart';
+import '../../../clients/data/models/client_model.dart' hide Address, PhoneNumber;
 import '../../../clients/data/models/address_model.dart';
 import '../../../clients/data/models/phone_number_model.dart';
-import '../../../clients/data/repositories/address_repository.dart';
-import '../../../clients/data/repositories/phone_number_repository.dart';
+import '../../../clients/data/repositories/address_repository.dart' show AddressRepository;
+import '../../../clients/data/repositories/phone_number_repository.dart' show PhoneNumberRepository;
 import '../../../clients/presentation/widgets/edit_client_form_v2.dart';
 import '../../../clients/presentation/widgets/contact_info_section.dart';
 import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
 import '../../../clients/presentation/widgets/address_selection_modal.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
-import 'package:powersync/powersync.dart';
+import 'package:powersync/powersync.dart' hide Column;
 
 // Client detail provider
 final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
@@ -88,18 +90,6 @@ final clientTouchpointsProvider = FutureProvider.family<List<Touchpoint>, String
     final localTouchpoints = hiveService.getTouchpointsForClient(clientId);
     return localTouchpoints.map((data) => Touchpoint.fromJson(data)).toList();
   }
-});
-
-// Address repository provider
-final addressRepositoryProvider = Provider<AddressRepository>((ref) {
-  final db = ref.watch(powerSyncDatabaseProvider);
-  return PowerSyncAddressRepository(db);
-});
-
-// Phone number repository provider
-final phoneNumberRepositoryProvider = Provider<PhoneNumberRepository>((ref) {
-  final db = ref.watch(powerSyncDatabaseProvider);
-  return PowerSyncPhoneNumberRepository(db);
 });
 
 class ClientDetailPage extends ConsumerStatefulWidget {

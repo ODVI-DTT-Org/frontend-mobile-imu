@@ -35,6 +35,14 @@ export 'location_filter_providers.dart' show
 // Re-export touchpoint count provider
 export '../../services/touchpoint/touchpoint_count_service.dart' show
   touchpointCountServiceProvider;
+// Re-export PowerSync database provider
+export '../../services/sync/powersync_service.dart' show
+  powerSyncDatabaseProvider;
+// Re-export address and phone number repository providers
+export '../../features/clients/data/repositories/address_repository.dart' show
+  addressRepositoryProvider;
+export '../../features/clients/data/repositories/phone_number_repository.dart' show
+  phoneNumberRepositoryProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';

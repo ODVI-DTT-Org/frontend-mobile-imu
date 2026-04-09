@@ -1,4 +1,7 @@
 import 'package:powersync/powersync.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../../../services/sync/powersync_service.dart' show powerSyncDatabaseProvider;
 import '../models/address_model.dart';
 
 abstract class AddressRepository {
@@ -45,7 +48,7 @@ class PowerSyncAddressRepository implements AddressRepository {
 
   @override
   Future<Address> createAddress(String clientId, Map<String, dynamic> data) async {
-    final id = db.generateUUID();
+    final id = const Uuid().v4();
 
     await db.execute(
       'INSERT INTO addresses (id, client_id, psgc_id, label, street_address, postal_code, latitude, longitude, is_primary) '
@@ -168,3 +171,12 @@ class PowerSyncAddressRepository implements AddressRepository {
     return Address.fromSyncMap(result);
   }
 }
+
+// Provider for AddressRepository
+final addressRepositoryProvider = Provider<AddressRepository>((ref) {
+  final db = ref.watch(powerSyncDatabaseProvider).value;
+  if (db == null) {
+    throw Exception('PowerSync database not initialized');
+  }
+  return PowerSyncAddressRepository(db);
+});

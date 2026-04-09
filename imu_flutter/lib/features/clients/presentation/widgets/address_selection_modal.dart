@@ -127,7 +127,7 @@ class AddressSelectionModal extends StatelessWidget {
                                 // Radio indicator
                                 Icon(
                                   isSelected
-                                      ? LucideIcons.circleCheck
+                                      ? LucideIcons.checkCircle
                                       : LucideIcons.circle,
                                   size: 24,
                                   color: isSelected

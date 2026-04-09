@@ -7,7 +7,8 @@ import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
-import '../../features/clients/data/models/client_model.dart' show Address, Client, ClientType, TouchpointPattern, TouchpointType;
+import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointPattern, TouchpointType;
+import '../../features/clients/data/models/address_model.dart' show Address;
 import '../../models/client_status.dart';
 import '../../services/api/my_day_api_service.dart';
 import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
@@ -444,14 +445,14 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   String _formatAddress(Address address) {
     final parts = <String>[];
 
-    if (address.street != null && address.street!.isNotEmpty) {
-      parts.add(address.street!);
+    if (address.streetAddress != null && address.streetAddress!.isNotEmpty) {
+      parts.add(address.streetAddress!);
     }
     if (address.barangay != null && address.barangay!.isNotEmpty) {
       parts.add(address.barangay!);
     }
-    if (address.city != null && address.city!.isNotEmpty) {
-      parts.add(address.city!);
+    if (address.municipality != null && address.municipality!.isNotEmpty) {
+      parts.add(address.municipality!);
     }
     if (address.province != null && address.province!.isNotEmpty) {
       parts.add(address.province!);

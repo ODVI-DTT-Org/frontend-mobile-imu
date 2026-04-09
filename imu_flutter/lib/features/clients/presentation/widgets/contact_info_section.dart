@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
-import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart' hide Address, PhoneNumber;
 import 'package:imu_flutter/features/clients/data/models/address_model.dart';
 import 'package:imu_flutter/features/clients/data/models/phone_number_model.dart';
 
@@ -174,7 +174,8 @@ class ContactInfoSection extends StatelessWidget {
 
   Widget _buildLegacyAddress(BuildContext context) {
     final theme = Theme.of(context);
-    final hasAddress = client.address != null && client.address!.isNotEmpty;
+    final primaryAddress = client.primaryAddress;
+    final hasAddress = primaryAddress != null;
     final hasProvince = client.province != null && client.province!.isNotEmpty;
     final hasMunicipality = client.municipality != null && client.municipality!.isNotEmpty;
     final hasBarangay = client.barangay != null && client.barangay!.isNotEmpty;
@@ -190,9 +191,9 @@ class ContactInfoSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (hasAddress)
+        if (hasAddress && primaryAddress!.streetAddress != null && primaryAddress.streetAddress!.isNotEmpty)
           Text(
-            client.address!,
+            primaryAddress.streetAddress!,
             style: theme.textTheme.bodyMedium,
           ),
         if (hasAddress && (hasProvince || hasMunicipality || hasBarangay))

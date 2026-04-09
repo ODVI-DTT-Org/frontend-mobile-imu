@@ -4,7 +4,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../features/clients/data/models/client_model.dart';
 import '../../../features/clients/data/models/touchpoint_validation_model.dart';
-import '../../../features/itinerary/data/models/itinerary_item.dart';
 import 'touchpoint_progress_badge.dart';
 import 'touchpoint_status_badge.dart';
 import 'client_status_badge.dart';

@@ -26,6 +26,7 @@ import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../services/maps/map_service.dart';
 
 class ItineraryPage extends ConsumerStatefulWidget {
