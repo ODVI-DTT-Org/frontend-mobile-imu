@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../models/client_attribute_filter.dart';
+import '../models/client_filter_options.dart';
 import '../providers/client_filter_options_provider.dart';
+import '../providers/client_attribute_filter_provider.dart';
 import '../../features/clients/data/models/client_model.dart';
 
 class ClientAttributeFilterBottomSheet extends ConsumerStatefulWidget {

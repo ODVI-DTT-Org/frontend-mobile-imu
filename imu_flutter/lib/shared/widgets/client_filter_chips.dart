@@ -36,7 +36,7 @@ class ClientFilterChips extends ConsumerWidget {
       chips.add(_FilterChip(
         label: locationFilter.getDisplayLabel(),
         onRemove: onRemove != null
-            ? () => onRemove!(FilterType.location(locationFilter))
+            ? () => onRemove!(FilterType.location)
             : null,
       ));
     }
