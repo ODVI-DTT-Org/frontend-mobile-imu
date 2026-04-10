@@ -79,7 +79,7 @@ class _ClientAttributeFilterBottomSheetState
           _buildHeader(),
           Expanded(
             child: filterOptionsAsync.when(
-              data: (options) => _buildContent(options),
+              data: (options) => _buildContent(options as ClientFilterOptions),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => _buildErrorState(),
             ),
