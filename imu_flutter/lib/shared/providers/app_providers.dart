@@ -43,6 +43,13 @@ export '../../features/clients/data/repositories/address_repository.dart' show
   addressRepositoryProvider;
 export '../../features/clients/data/repositories/phone_number_repository.dart' show
   phoneNumberRepositoryProvider;
+// Re-export client attribute filter providers
+export 'client_attribute_filter_provider.dart' show
+  clientAttributeFilterProvider,
+  activeFilterCountProvider;
+export 'client_filter_options_provider.dart' show
+  clientFilterOptionsProvider,
+  clientFilterOptionsServiceProvider;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';

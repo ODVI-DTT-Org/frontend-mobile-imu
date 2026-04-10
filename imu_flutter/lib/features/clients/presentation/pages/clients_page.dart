@@ -18,13 +18,16 @@ import '../../../../shared/providers/app_providers.dart' show
     isOnlineProvider,
     assignedMunicipalitiesProvider,
     currentUserRoleProvider,
-    locationFilterProvider;
+    locationFilterProvider,
+    clientAttributeFilterProvider;
 import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
 import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
 import '../../../../shared/widgets/client/client_status_badge.dart';
 import '../../../../shared/widgets/location_filter_icon.dart';
 import '../../../../shared/widgets/location_filter_chips.dart';
 import '../../../../shared/widgets/location_filter_bottom_sheet.dart';
+import '../../../../shared/widgets/client_attribute_filter_bottom_sheet.dart';
+import '../widgets/client_filter_icon_button.dart';
 import '../../../../models/client_status.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
@@ -165,6 +168,25 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         onApply: (filter) {
           ref.read(locationFilterProvider.notifier).state = filter;
           ref.invalidate(assignedClientsProvider);
+        },
+      ),
+    );
+  }
+
+  void _showAttributeFilterBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ClientAttributeFilterBottomSheet(
+        onApply: (filter) {
+          ref.read(clientAttributeFilterProvider.notifier).state = filter;
+          // Invalidate the appropriate provider based on mode
+          if (_showAssignedClientsOnly) {
+            ref.invalidate(assignedClientsProvider);
+          } else {
+            ref.invalidate(onlineClientsProvider);
+          }
         },
       ),
     );
@@ -357,6 +379,10 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                                 setState(() => _searchQuery = '');
                               },
                             ),
+                          ClientFilterIconButton(
+                            showAttributeOnly: true,
+                            onPressed: () => _showAttributeFilterBottomSheet(context),
+                          ),
                           LocationFilterIcon(
                             onTap: () => _showLocationFilterBottomSheet(context),
                           ),
@@ -557,15 +583,26 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                     hintText: 'Search clients...',
                     hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                     prefixIcon: Icon(LucideIcons.search, color: Colors.grey.shade400, size: 20),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_searchQuery.isNotEmpty)
+                          IconButton(
                             icon: Icon(LucideIcons.x, color: Colors.grey.shade400, size: 18),
                             onPressed: () {
                               _searchController.clear();
                               setState(() => _searchQuery = '');
                             },
-                          )
-                        : null,
+                          ),
+                        ClientFilterIconButton(
+                          showAttributeOnly: true,
+                          onPressed: () => _showAttributeFilterBottomSheet(context),
+                        ),
+                        LocationFilterIcon(
+                          onTap: () => _showLocationFilterBottomSheet(context),
+                        ),
+                      ],
+                    ),
                     filled: true,
                     fillColor: Colors.grey.shade100,
                     border: OutlineInputBorder(
