@@ -29,13 +29,17 @@ import '../../shared/providers/app_providers.dart' show
     clientTouchpointsSyncProvider,
     clientTouchpointCountsProvider,
     myDayApiServiceProvider,
-    locationFilterProvider;
+    locationFilterProvider,
+    clientAttributeFilterProvider;
 import 'client/touchpoint_progress_badge.dart';
 import 'client/touchpoint_status_badge.dart';
 import 'client/client_status_badge.dart';
 import 'location_filter_icon.dart';
 import 'location_filter_chips.dart';
+import 'client_filter_chips.dart';
 import 'location_filter_bottom_sheet.dart';
+import 'client_attribute_filter_bottom_sheet.dart';
+import '../../features/clients/presentation/widgets/client_filter_icon_button.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
 /// Used by both ItineraryPage and MyDayPage
@@ -678,6 +682,20 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
+  void _showAttributeFilterBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ClientAttributeFilterBottomSheet(
+        onApply: (filter) {
+          ref.read(clientAttributeFilterProvider.notifier).state = filter;
+          _applyClientFilter();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch today's itinerary to filter out already-added clients
@@ -808,6 +826,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                                   _filterClients();
                                 },
                               ),
+                            ClientFilterIconButton(
+                              showAttributeOnly: true,
+                              onPressed: () => _showAttributeFilterBottomSheet(context),
+                            ),
                             LocationFilterIcon(
                               onTap: () => _showLocationFilterBottomSheet(context),
                             ),
@@ -823,7 +845,34 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   ),
 
                   // Active filter chips (using new widget)
-                  const LocationFilterChips(),
+                  ClientFilterChips(
+                    locationFilter: ref.watch(locationFilterProvider),
+                    attributeFilter: ref.watch(clientAttributeFilterProvider),
+                    onRemove: (filterType) {
+                      // Handle filter removal
+                      if (filterType is FilterType.location) {
+                        ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+                      } else if (filterType is FilterType.clientType) {
+                        final currentFilter = ref.read(clientAttributeFilterProvider);
+                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(clientType: null);
+                      } else if (filterType is FilterType.marketType) {
+                        final currentFilter = ref.read(clientAttributeFilterProvider);
+                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(marketType: null);
+                      } else if (filterType is FilterType.pensionType) {
+                        final currentFilter = ref.read(clientAttributeFilterProvider);
+                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(pensionType: null);
+                      } else if (filterType is FilterType.productType) {
+                        final currentFilter = ref.read(clientAttributeFilterProvider);
+                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(productType: null);
+                      }
+                      _applyClientFilter();
+                    },
+                    onClearAll: () {
+                      ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+                      ref.read(clientAttributeFilterProvider.notifier).state = ClientAttributeFilter.none();
+                      _applyClientFilter();
+                    },
+                  ),
                   // Filter toggle
                   if (widget.showAssignedFilter)
                     Container(
@@ -1025,6 +1074,18 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       decoration: InputDecoration(
                         hintText: 'Search clients...',
                         prefixIcon: const Icon(LucideIcons.search, size: 20),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClientFilterIconButton(
+                              showAttributeOnly: true,
+                              onPressed: () => _showAttributeFilterBottomSheet(context),
+                            ),
+                            LocationFilterIcon(
+                              onTap: () => _showLocationFilterBottomSheet(context),
+                            ),
+                          ],
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.grey[300]!),
