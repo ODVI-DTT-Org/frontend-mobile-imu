@@ -239,11 +239,13 @@ final onlineClientsMetaProvider = Provider<ClientsResponse?>((ref) {
 /// Online clients - fetches clients from REST API with optional location filtering
 /// This is used for "All Clients" mode to search the entire client database
 /// Supports location filtering via municipality params
+/// Supports client attribute filtering (client_type, market_type, pension_type, product_type)
 final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(onlineClientSearchQueryProvider);
   final page = ref.watch(onlineClientPageProvider);
   final locationFilter = ref.watch(locationFilterProvider);
+  final attributeFilter = ref.watch(clientAttributeFilterProvider);
 
   // Must be online to fetch all clients
   if (!isOnline) {
@@ -255,6 +257,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     debugPrint('onlineClientsProvider: Fetching clients from online API...');
     debugPrint('onlineClientsProvider: Search query: "$searchQuery", Page: $page');
     debugPrint('onlineClientsProvider: Location filter: ${locationFilter.toQueryParams()}');
+    debugPrint('onlineClientsProvider: Attribute filter: ${attributeFilter.toQueryParams()}');
 
     final clientApi = ref.watch(clientApiServiceProvider);
 
@@ -270,10 +273,17 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       debugPrint('onlineClientsProvider: Converted to municipality IDs: $municipalityIds');
     }
 
+    // Convert attribute filter to API parameters
+    final queryParams = attributeFilter.toQueryParams();
+
     final response = await clientApi.fetchClients(
       page: page,
       perPage: 10, // Paginate 10 items per page
       search: searchQuery.isNotEmpty ? searchQuery : null,
+      clientType: queryParams['client_type'],
+      marketType: queryParams['market_type'],
+      pensionType: queryParams['pension_type'],
+      productType: queryParams['product_type'],
       municipalityIds: municipalityIds,
     );
 
@@ -299,12 +309,14 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
   final page = ref.watch(assignedClientPageProvider);
   final locationFilter = ref.watch(locationFilterProvider);
+  final attributeFilter = ref.watch(clientAttributeFilterProvider);
   final hiveService = ref.watch(hiveServiceProvider);
 
   debugPrint('=== ASSIGNED CLIENTS FETCH ===');
   debugPrint('Is Online: $isOnline');
   debugPrint('Search query: "$searchQuery", Page: $page');
   debugPrint('Location filter: ${locationFilter.toQueryParams()}');
+  debugPrint('Attribute filter: ${attributeFilter.toQueryParams()}');
 
   // Initialize Hive if needed
   if (!hiveService.isInitialized) {
@@ -324,10 +336,15 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     debugPrint('assignedClientsProvider: Cache empty and online - fetching IMMEDIATELY from API...');
     try {
       final clientApi = ref.read(clientApiServiceProvider);
+      final queryParams = attributeFilter.toQueryParams();
       final response = await clientApi.fetchAssignedClients(
         page: 1,
         perPage: 100,
         search: searchQuery.isNotEmpty ? searchQuery : null,
+        clientType: queryParams['client_type'],
+        marketType: queryParams['market_type'],
+        pensionType: queryParams['pension_type'],
+        productType: queryParams['product_type'],
         province: locationFilter.province,
         municipality: locationFilter.municipalities?.join(','),
       );
@@ -356,7 +373,7 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   } else if (isOnline) {
     // Step 3: If cache has data AND online, trigger background refresh from API
     // Don't wait - trigger in background
-    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery, locationFilter);
+    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery, locationFilter, attributeFilter);
   }
 
   // Apply location filter locally if needed
@@ -376,6 +393,13 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       return true;
     }).toList();
     debugPrint('assignedClientsProvider: After location filter - ${cachedClients.length} clients');
+  }
+
+  // Apply attribute filter locally if needed
+  if (attributeFilter.hasFilter) {
+    debugPrint('assignedClientsProvider: Applying attribute filter locally - ${attributeFilter.toQueryParams()}');
+    cachedClients = cachedClients.where((client) => attributeFilter.matches(client)).toList();
+    debugPrint('assignedClientsProvider: After attribute filter - ${cachedClients.length} clients');
   }
 
   // Apply fuzzy search filter locally if needed
@@ -409,17 +433,21 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
 /// Background refresh function - fetches from API and updates Hive cache
 /// Includes location filter support for province/municipality filtering
+/// Includes client attribute filter support (client_type, market_type, pension_type, product_type)
 void _refreshAssignedClientsFromApi(
   FutureProviderRef<ClientsResponse> ref,
   HiveService hiveService,
   String searchQuery,
   LocationFilter locationFilter,
+  ClientAttributeFilter attributeFilter,
 ) async {
   try {
     debugPrint('assignedClientsProvider: Background refresh from API...');
     debugPrint('assignedClientsProvider: Background refresh - Location filter: ${locationFilter.toQueryParams()}');
+    debugPrint('assignedClientsProvider: Background refresh - Attribute filter: ${attributeFilter.toQueryParams()}');
 
     final clientApi = ref.read(clientApiServiceProvider);
+    final queryParams = attributeFilter.toQueryParams();
 
     // Fetch all pages from /clients/assigned
     final allClients = <Client>[];
@@ -433,6 +461,10 @@ void _refreshAssignedClientsFromApi(
         page: currentPage,
         perPage: perPage,
         search: searchQuery.isNotEmpty ? searchQuery : null,
+        clientType: queryParams['client_type'],
+        marketType: queryParams['market_type'],
+        pensionType: queryParams['pension_type'],
+        productType: queryParams['product_type'],
         province: locationFilter.province,
         municipality: locationFilter.municipalities?.join(','),
       );

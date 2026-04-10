@@ -60,6 +60,7 @@ dependencies:
   flutter_svg: ^2.0.9
   cached_network_image: ^3.3.1
   lucide_icons: ^0.257.0
+  badges: ^3.1.2
 
   # Form handling
   flutter_hooks: ^0.20.4
@@ -105,6 +106,10 @@ flutter:
     - .env.dev
     - .env.qa
     - .env.prod
+    - lib/services/sync/migrations/049_add_full_name_column.sql
+    - lib/services/sync/migrations/049_add_full_name_column_rollback.sql
+    - lib/services/sync/migrations/050_add_filter_indexes.sql
+    - lib/services/sync/migrations/050_add_filter_indexes_rollback.sql
 
   fonts:
     - family: Inter

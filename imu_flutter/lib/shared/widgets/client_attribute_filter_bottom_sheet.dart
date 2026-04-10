@@ -136,7 +136,7 @@ class _ClientAttributeFilterBottomSheetState
           selectedOption: _selectedClientType,
           onOptionSelected: (value) =>
               setState(() => _selectedClientType = value),
-          getLabel: (type) => type.name.toUpperCase(),
+          getLabel: (type) => _formatClientType(type),
         ),
         _FilterSection<MarketType>(
           title: 'Market Type',
@@ -144,8 +144,7 @@ class _ClientAttributeFilterBottomSheetState
           selectedOption: _selectedMarketType,
           onOptionSelected: (value) =>
               setState(() => _selectedMarketType = value),
-          getLabel: (type) =>
-              type.name[0].toUpperCase() + type.name.substring(1),
+          getLabel: (type) => _formatMarketType(type),
         ),
         _FilterSection<PensionType>(
           title: 'Pension Type',
@@ -153,7 +152,7 @@ class _ClientAttributeFilterBottomSheetState
           selectedOption: _selectedPensionType,
           onOptionSelected: (value) =>
               setState(() => _selectedPensionType = value),
-          getLabel: (type) => type.name.toUpperCase(),
+          getLabel: (type) => _formatPensionType(type),
         ),
         _FilterSection<ProductType>(
           title: 'Product Type',
@@ -161,16 +160,7 @@ class _ClientAttributeFilterBottomSheetState
           selectedOption: _selectedProductType,
           onOptionSelected: (value) =>
               setState(() => _selectedProductType = value),
-          getLabel: (type) {
-            switch (type) {
-              case ProductType.sssPensioner:
-                return 'SSS Pensioner';
-              case ProductType.gsisPensioner:
-                return 'GSIS Pensioner';
-              case ProductType.private:
-                return 'Private';
-            }
-          },
+          getLabel: (type) => _formatProductType(type),
         ),
       ],
     );
@@ -260,5 +250,50 @@ class _FilterSection<T> extends StatelessWidget {
         );
       }).toList(),
     );
+  }
+}
+
+// Helper methods to format enum values for consistent display
+String _formatClientType(ClientType type) {
+  switch (type) {
+    case ClientType.potential:
+      return 'Potential';
+    case ClientType.existing:
+      return 'Existing';
+  }
+}
+
+String _formatMarketType(MarketType type) {
+  switch (type) {
+    case MarketType.residential:
+      return 'Residential';
+    case MarketType.commercial:
+      return 'Commercial';
+    case MarketType.industrial:
+      return 'Industrial';
+  }
+}
+
+String _formatPensionType(PensionType type) {
+  switch (type) {
+    case PensionType.sss:
+      return 'SSS';
+    case PensionType.gsis:
+      return 'GSIS';
+    case PensionType.private:
+      return 'Private';
+    case PensionType.none:
+      return 'None';
+  }
+}
+
+String _formatProductType(ProductType type) {
+  switch (type) {
+    case ProductType.sssPensioner:
+      return 'SSS Pensioner';
+    case ProductType.gsisPensioner:
+      return 'GSIS Pensioner';
+    case ProductType.private:
+      return 'Private';
   }
 }

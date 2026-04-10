@@ -100,9 +100,9 @@ void main() {
       final params = filter.toQueryParams();
 
       expect(params['client_type'], 'POTENTIAL');
-      expect(params['market_type'], 'residential');
-      expect(params['pension_type'], 'sss');
-      expect(params['product_type'], 'sssPensioner');
+      expect(params['market_type'], 'RESIDENTIAL');
+      expect(params['pension_type'], 'SSS');
+      expect(params['product_type'], 'SSS_PENSIONER');
     });
 
     test('toQueryParams excludes null values', () {

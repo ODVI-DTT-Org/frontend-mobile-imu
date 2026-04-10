@@ -23,6 +23,9 @@ class ClientApiService {
     int perPage = 20,
     String? search,
     String? clientType,
+    String? marketType,
+    String? pensionType,
+    String? productType,
     List<String>? municipalityIds,
   }) async {
     try {
@@ -56,6 +59,9 @@ class ClientApiService {
           'perPage': perPage,
           if (search != null && search.isNotEmpty) 'search': search,
           if (clientType != null && clientType.isNotEmpty) 'client_type': clientType,
+          if (marketType != null && marketType.isNotEmpty) 'market_type': marketType,
+          if (pensionType != null && pensionType.isNotEmpty) 'pension_type': pensionType,
+          if (productType != null && productType.isNotEmpty) 'product_type': productType,
           if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality_ids': municipalityIds.join(','),
         },
       );
@@ -111,6 +117,9 @@ class ClientApiService {
     int perPage = 20,
     String? search,
     String? clientType,
+    String? marketType,
+    String? pensionType,
+    String? productType,
     String? province,
     String? municipality,
   }) async {
@@ -138,6 +147,9 @@ class ClientApiService {
           'perPage': perPage,
           if (search != null && search.isNotEmpty) 'search': search,
           if (clientType != null && clientType.isNotEmpty) 'client_type': clientType,
+          if (marketType != null && marketType.isNotEmpty) 'market_type': marketType,
+          if (pensionType != null && pensionType.isNotEmpty) 'pension_type': pensionType,
+          if (productType != null && productType.isNotEmpty) 'product_type': productType,
           if (province != null && province.isNotEmpty) 'province': province,
           if (municipality != null && municipality.isNotEmpty) 'municipality': municipality,
         },

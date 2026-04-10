@@ -52,15 +52,30 @@ class ClientAttributeFilter {
       params['client_type'] = clientType!.name.toUpperCase();
     }
     if (marketType != null) {
-      params['market_type'] = marketType!.name;
+      // Convert camelCase to UPPERCASE (residential -> RESIDENTIAL)
+      params['market_type'] = marketType!.name.toUpperCase();
     }
     if (pensionType != null) {
-      params['pension_type'] = pensionType!.name;
+      // Convert camelCase to UPPERCASE (sss -> SSS)
+      params['pension_type'] = pensionType!.name.toUpperCase();
     }
     if (productType != null) {
-      params['product_type'] = productType!.name;
+      // Convert camelCase to UPPERCASE_WITH_UNDERSCORES (sssPensioner -> SSS_PENSIONER)
+      params['product_type'] = _getProductTypeApiValue(productType!);
     }
     return params;
+  }
+
+  /// Convert ProductType enum to API value format
+  String _getProductTypeApiValue(ProductType type) {
+    switch (type) {
+      case ProductType.sssPensioner:
+        return 'SSS_PENSIONER';
+      case ProductType.gsisPensioner:
+        return 'GSIS_PENSIONER';
+      case ProductType.private:
+        return 'PRIVATE';
+    }
   }
 
   ClientAttributeFilter copyWith({

@@ -44,7 +44,7 @@ class ClientFilterChips extends ConsumerWidget {
     // Attribute filter chips
     if (attributeFilter.clientType != null) {
       chips.add(_FilterChip(
-        label: attributeFilter.clientType!.name.toUpperCase(),
+        label: _formatClientType(attributeFilter.clientType!),
         onRemove: onRemove != null
             ? () => onRemove!(FilterType.clientType)
             : null,
@@ -53,8 +53,7 @@ class ClientFilterChips extends ConsumerWidget {
 
     if (attributeFilter.marketType != null) {
       chips.add(_FilterChip(
-        label: attributeFilter.marketType!.name[0].toUpperCase() +
-            attributeFilter.marketType!.name.substring(1),
+        label: _formatMarketType(attributeFilter.marketType!),
         onRemove: onRemove != null
             ? () => onRemove!(FilterType.marketType)
             : null,
@@ -63,7 +62,7 @@ class ClientFilterChips extends ConsumerWidget {
 
     if (attributeFilter.pensionType != null) {
       chips.add(_FilterChip(
-        label: attributeFilter.pensionType!.name.toUpperCase(),
+        label: _formatPensionType(attributeFilter.pensionType!),
         onRemove: onRemove != null
             ? () => onRemove!(FilterType.pensionType)
             : null,
@@ -71,9 +70,8 @@ class ClientFilterChips extends ConsumerWidget {
     }
 
     if (attributeFilter.productType != null) {
-      final label = _getProductTypeLabel(attributeFilter.productType!);
       chips.add(_FilterChip(
-        label: label,
+        label: _formatProductType(attributeFilter.productType!),
         onRemove: onRemove != null
             ? () => onRemove!(FilterType.productType)
             : null,
@@ -100,16 +98,50 @@ class ClientFilterChips extends ConsumerWidget {
       ),
     );
   }
+}
 
-  String _getProductTypeLabel(ProductType type) {
-    switch (type) {
-      case ProductType.sssPensioner:
-        return 'SSS Pensioner';
-      case ProductType.gsisPensioner:
-        return 'GSIS Pensioner';
-      case ProductType.private:
-        return 'Private';
-    }
+// Helper methods to format enum values for consistent display
+String _formatClientType(ClientType type) {
+  switch (type) {
+    case ClientType.potential:
+      return 'Potential';
+    case ClientType.existing:
+      return 'Existing';
+  }
+}
+
+String _formatMarketType(MarketType type) {
+  switch (type) {
+    case MarketType.residential:
+      return 'Residential';
+    case MarketType.commercial:
+      return 'Commercial';
+    case MarketType.industrial:
+      return 'Industrial';
+  }
+}
+
+String _formatPensionType(PensionType type) {
+  switch (type) {
+    case PensionType.sss:
+      return 'SSS';
+    case PensionType.gsis:
+      return 'GSIS';
+    case PensionType.private:
+      return 'Private';
+    case PensionType.none:
+      return 'None';
+  }
+}
+
+String _formatProductType(ProductType type) {
+  switch (type) {
+    case ProductType.sssPensioner:
+      return 'SSS Pensioner';
+    case ProductType.gsisPensioner:
+      return 'GSIS Pensioner';
+    case ProductType.private:
+      return 'Private';
   }
 }
 
