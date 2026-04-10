@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../shared/providers/client_attribute_filter_provider.dart';
+import '../../../../shared/providers/client_attribute_filter_provider.dart';
 
 class ClientFilterIconButton extends ConsumerWidget {
   final VoidCallback onPressed;

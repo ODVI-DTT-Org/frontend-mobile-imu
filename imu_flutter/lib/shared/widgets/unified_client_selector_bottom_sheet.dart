@@ -10,7 +10,7 @@ import 'client_attribute_filter_bottom_sheet.dart';
 import 'location_filter_bottom_sheet.dart';
 import '../providers/client_attribute_filter_provider.dart';
 import '../providers/location_filter_providers.dart';
-import '../features/clients/presentation/widgets/client_filter_icon_button.dart';
+import '../../features/clients/presentation/widgets/client_filter_icon_button.dart';
 
 class UnifiedClientSelectorBottomSheet extends ConsumerStatefulWidget {
   final String context; // 'my_day' or 'itinerary'
@@ -28,7 +28,7 @@ class UnifiedClientSelectorBottomSheet extends ConsumerStatefulWidget {
 }
 
 class _UnifiedClientSelectorBottomSheetState
-    extends ConsumerWidget<UnifiedClientSelectorBottomSheet> {
+    extends ConsumerState<UnifiedClientSelectorBottomSheet> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -39,8 +39,9 @@ class _UnifiedClientSelectorBottomSheetState
   }
 
   void _onSearchChanged(String value) {
-    // Search logic would be implemented here
-    // For now, just update the query state
+    setState(() {
+      _searchQuery = value;
+    });
   }
 
   void _showAttributeFilters() {
@@ -50,6 +51,7 @@ class _UnifiedClientSelectorBottomSheetState
       builder: (context) => ClientAttributeFilterBottomSheet(
         onApply: (filter) {
           ref.read(clientAttributeFilterProvider.notifier).state = filter;
+          setState(() {});
         },
       ),
     );
@@ -62,6 +64,7 @@ class _UnifiedClientSelectorBottomSheetState
       builder: (context) => LocationFilterBottomSheet(
         onApply: (filter) {
           ref.read(locationFilterProvider.notifier).state = filter;
+          setState(() {});
         },
       ),
     );
@@ -71,6 +74,7 @@ class _UnifiedClientSelectorBottomSheetState
     ref.read(clientAttributeFilterProvider.notifier).state =
         ClientAttributeFilter.none();
     ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+    setState(() {});
   }
 
   void _removeFilter(FilterType type) {
@@ -98,6 +102,7 @@ class _UnifiedClientSelectorBottomSheetState
             currentAttrFilter.copyWith(productType: null);
         break;
     }
+    setState(() {});
   }
 
   @override
