@@ -26,6 +26,9 @@ import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../../features/record_forms/presentation/widgets/record_touchpoint_form.dart';
+import '../../../../features/record_forms/presentation/widgets/record_visit_only_form.dart';
+import '../../../../features/record_forms/presentation/widgets/release_loan_form.dart';
 import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../services/maps/map_service.dart';
 
@@ -196,16 +199,22 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             value: 'edit',
           ),
           ActionOption(
-            icon: LucideIcons.dollarSign,
-            title: 'Release Loan',
-            description: 'Mark loan as released',
-            value: 'release',
+            icon: LucideIcons.listChecks,
+            title: 'Record Touchpoint',
+            description: 'Create touchpoint + visit',
+            value: 'touchpoint',
           ),
           ActionOption(
             icon: LucideIcons.mapPin,
-            title: 'Record Visit',
-            description: 'Create a new touchpoint',
-            value: 'visit',
+            title: 'Record Visit Only',
+            description: 'Create visit without touchpoint',
+            value: 'visit_only',
+          ),
+          ActionOption(
+            icon: LucideIcons.dollarSign,
+            title: 'Release Loan',
+            description: 'Record loan release',
+            value: 'release_loan',
           ),
           ActionOption(
             icon: LucideIcons.x,
@@ -219,11 +228,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       if (action == null || action == 'cancel') return;
 
       switch (action) {
-        case 'visit':
-          await _recordVisit(visit);
+        case 'touchpoint':
+          await _handleRecordTouchpoint(visit);
           break;
-        case 'release':
-          await _releaseLoan(visit);
+        case 'visit_only':
+          await _handleRecordVisitOnly(visit);
+          break;
+        case 'release_loan':
+          await _handleReleaseLoan(visit);
           break;
         case 'edit':
           await _editClient(visit);
@@ -322,6 +334,58 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       if (touchpointNumber == 7) {
         _showTouchpointCompletionDialog(visit.clientName);
       }
+    }
+  }
+
+  Future<void> _handleRecordTouchpoint(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordTouchpointForm(
+          client: visit.client,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh itinerary to show updated status
+      ref.invalidate(todayItineraryProvider);
+    }
+  }
+
+  Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordVisitOnlyForm(
+          client: visit.client,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ref.invalidate(todayItineraryProvider);
+    }
+  }
+
+  Future<void> _handleReleaseLoan(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReleaseLoanForm(
+          client: visit.client,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ref.invalidate(todayItineraryProvider);
     }
   }
 
