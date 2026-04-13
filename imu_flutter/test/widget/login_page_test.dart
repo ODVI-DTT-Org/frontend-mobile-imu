@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:imu_flutter/features/auth/presentation/pages/login_page.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
+import 'package:imu_flutter/shared/providers/app_providers.dart' show authNotifierProvider, isOnlineProvider;
 
 import '../mocks/mocks.dart';
 
