@@ -28,6 +28,9 @@ import '../../../../shared/widgets/client/client_list_card.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../record_forms/presentation/widgets/record_touchpoint_form.dart';
+import '../../../record_forms/presentation/widgets/record_visit_only_form.dart';
+import '../../../record_forms/presentation/widgets/release_loan_form.dart';
 
 class MyDayPage extends ConsumerStatefulWidget {
   const MyDayPage({super.key});
@@ -266,16 +269,22 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             value: 'navigate',
           ),
           ActionOption(
-            icon: LucideIcons.dollarSign,
-            title: 'Release Loan',
-            description: 'Mark loan as released',
-            value: 'release',
+            icon: LucideIcons.listChecks,
+            title: 'Record Touchpoint',
+            description: 'Create touchpoint + visit',
+            value: 'touchpoint',
           ),
           ActionOption(
             icon: LucideIcons.mapPin,
-            title: 'Record Visit',
-            description: 'Create a new touchpoint',
-            value: 'visit',
+            title: 'Record Visit Only',
+            description: 'Create visit without touchpoint',
+            value: 'visit_only',
+          ),
+          ActionOption(
+            icon: LucideIcons.dollarSign,
+            title: 'Release Loan',
+            description: 'Record loan release',
+            value: 'release_loan',
           ),
           ActionOption(
             icon: LucideIcons.x,
@@ -289,11 +298,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       if (action == null || action == 'cancel') return;
 
       switch (action) {
-        case 'visit':
-          await _recordVisit(client);
+        case 'touchpoint':
+          await _handleRecordTouchpoint(client);
           break;
-        case 'release':
-          await _releaseLoan(client);
+        case 'visit_only':
+          await _handleRecordVisitOnly(client);
+          break;
+        case 'release_loan':
+          await _handleReleaseLoan(client);
           break;
         case 'edit':
           await _editClient(client);
@@ -386,6 +398,58 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       if (touchpointNumber == 7) {
         _showTouchpointCompletionDialog(client.fullName);
       }
+    }
+  }
+
+  Future<void> _handleRecordTouchpoint(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordTouchpointForm(
+          client: client.client,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh data
+      await ref.read(myDayStateProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> _handleRecordVisitOnly(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordVisitOnlyForm(
+          client: client.client,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      await ref.read(myDayStateProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> _handleReleaseLoan(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReleaseLoanForm(
+          client: client.client,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      await ref.read(myDayStateProvider.notifier).refresh();
     }
   }
 
