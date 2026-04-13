@@ -299,8 +299,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       return;
     }
 
-    // Open the TouchpointForm which handles Time In/Out internally
-    final result = await showTouchpointForm(
+    // Open the TouchpointForm which handles submission internally
+    await showTouchpointForm(
       context: context,
       clientId: visit.clientId,
       touchpointNumber: touchpointNumber,
@@ -308,35 +308,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       clientName: visit.clientName,
       address: visit.address,
     );
-
-    // Handle form submission result
-    if (result != null && mounted) {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Saving touchpoint...',
-        operation: () async {
-          final myDayApiService = ref.read(myDayApiServiceProvider);
-          await myDayApiService.submitVisitForm(visit.clientId, result);
-
-          // Upload selfie if photo was captured
-          if (result['photoPath'] != null) {
-            await myDayApiService.uploadSelfie(visit.clientId, result['photoPath']);
-          }
-
-          // ✅ FIXED: Wait a moment for database transaction to commit before refreshing
-          // This ensures the itinerary status update is visible when we refetch
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          // Refresh itinerary to show updated status
-          ref.invalidate(todayItineraryProvider);
-        },
-      );
-
-      // Check if this was the 7th touchpoint
-      if (touchpointNumber == 7) {
-        _showTouchpointCompletionDialog(visit.clientName);
-      }
-    }
+    // Note: The form submits directly to the API and handles success/error internally
   }
 
   Future<void> _handleRecordTouchpoint(ItineraryItem visit) async {

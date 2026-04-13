@@ -371,8 +371,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       return;
     }
 
-    // Open the TouchpointForm which handles Time In/Out internally
-    final result = await showTouchpointForm(
+    // Open the TouchpointForm which handles submission internally
+    await showTouchpointForm(
       context: context,
       clientId: client.clientId,
       touchpointNumber: touchpointNumber,
@@ -380,27 +380,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       clientName: client.fullName,
       address: client.location,
     );
-
-    // Handle form submission result
-    if (result != null && mounted) {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Saving touchpoint...',
-        operation: () async {
-          await ref.read(myDayStateProvider.notifier).submitVisitForm(client.clientId, result);
-
-          // Upload selfie if photo was captured
-          if (result['photoPath'] != null) {
-            await ref.read(myDayApiServiceProvider).uploadSelfie(client.clientId, result['photoPath']);
-          }
-        },
-      );
-
-      // Check if this was the 7th touchpoint
-      if (touchpointNumber == 7) {
-        _showTouchpointCompletionDialog(client.fullName);
-      }
-    }
+    // Note: The form submits directly to the API and handles success/error internally
   }
 
   Future<void> _handleRecordTouchpoint(MyDayClient client) async {
