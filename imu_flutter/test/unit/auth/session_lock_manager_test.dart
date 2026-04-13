@@ -8,13 +8,15 @@ void main() {
     late SessionService sessionService;
 
     setUp(() {
+      // SessionService is a singleton, don't create new instances
       sessionService = SessionService();
       lockManager = SessionLockManager(sessionService: sessionService);
     });
 
     tearDown(() {
+      // Only dispose lockManager, not the singleton SessionService
       lockManager.dispose();
-      sessionService.dispose();
+      // Note: SessionService is a singleton and will persist across tests
     });
 
     group('Lock State Management', () {
@@ -25,6 +27,8 @@ void main() {
       test('should lock when lock() is called', () {
         lockManager.lock();
         expect(lockManager.isLocked, isTrue);
+        // Cleanup
+        lockManager.unlock();
       });
 
       test('should unlock when unlock() is called', () {
@@ -57,6 +61,8 @@ void main() {
         // Time should be reset (close to 15 minutes, allow 14-15 minutes)
         expect(timeAfter!.inMinutes, greaterThanOrEqualTo(14));
         expect(timeAfter!.inMinutes, lessThanOrEqualTo(15));
+        // Cleanup
+        lockManager.stopMonitoring();
       });
 
       test('should not record activity when locked', () {
@@ -69,6 +75,8 @@ void main() {
 
         // Timer should not be reset when locked
         expect(timeAfter, isNull);
+        // Cleanup
+        lockManager.unlock();
       });
     });
 
@@ -78,6 +86,8 @@ void main() {
         lockManager.startMonitoring();
 
         expect(lockManager.timeUntilLock, isNotNull);
+        // Cleanup
+        lockManager.stopMonitoring();
       });
 
       test('should stop monitoring when stopMonitoring is called', () {
@@ -101,6 +111,8 @@ void main() {
         lockManager.startMonitoring();
 
         expect(lockManager.shouldLock(), isFalse);
+        // Cleanup
+        lockManager.stopMonitoring();
       });
 
       test('should have inactivity lock duration of 15 minutes', () {
@@ -116,6 +128,8 @@ void main() {
 
         // Should not lock
         expect(lockManager.shouldLock(), isFalse);
+        // Cleanup
+        lockManager.stopMonitoring();
       });
     });
 
