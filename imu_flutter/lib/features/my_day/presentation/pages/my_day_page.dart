@@ -19,9 +19,11 @@ import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     bulkDeleteApiServiceProvider,
-    authNotifierProvider;
+    authNotifierProvider,
+    hiveServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
@@ -404,11 +406,20 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _handleRecordTouchpoint(MyDayClient client) async {
     HapticUtils.lightImpact();
 
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(client.clientId);
+    if (clientData == null) {
+      if (mounted) showToast('Client not found');
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RecordTouchpointForm(
-          client: client.client,
+          client: fullClient,
         ),
       ),
     );
@@ -422,11 +433,20 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _handleRecordVisitOnly(MyDayClient client) async {
     HapticUtils.lightImpact();
 
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(client.clientId);
+    if (clientData == null) {
+      if (mounted) showToast('Client not found');
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RecordVisitOnlyForm(
-          client: client.client,
+          client: fullClient,
         ),
       ),
     );
@@ -439,11 +459,20 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _handleReleaseLoan(MyDayClient client) async {
     HapticUtils.lightImpact();
 
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(client.clientId);
+    if (clientData == null) {
+      if (mounted) showToast('Client not found');
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ReleaseLoanForm(
-          client: client.client,
+          client: fullClient,
         ),
       ),
     );

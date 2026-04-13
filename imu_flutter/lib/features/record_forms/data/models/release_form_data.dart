@@ -2,7 +2,7 @@
 
 import 'package:imu_flutter/features/record_forms/data/models/form_data.dart';
 import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_data.dart';
-import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart' show Client;
 
 /// Form data for Release Loan records
 /// Auto-sets reason to newReleaseLoan and status to completed

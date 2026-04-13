@@ -20,9 +20,11 @@ import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     bulkDeleteApiServiceProvider,
-    authNotifierProvider;
+    authNotifierProvider,
+    hiveServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
@@ -340,11 +342,24 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _handleRecordTouchpoint(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(visit.clientId);
+    if (clientData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Client not found')),
+        );
+      }
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RecordTouchpointForm(
-          client: visit.client,
+          client: fullClient,
         ),
       ),
     );
@@ -358,11 +373,24 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(visit.clientId);
+    if (clientData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Client not found')),
+        );
+      }
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RecordVisitOnlyForm(
-          client: visit.client,
+          client: fullClient,
         ),
       ),
     );
@@ -375,11 +403,24 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _handleReleaseLoan(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(visit.clientId);
+    if (clientData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Client not found')),
+        );
+      }
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ReleaseLoanForm(
-          client: visit.client,
+          client: fullClient,
         ),
       ),
     );

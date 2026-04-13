@@ -30,7 +30,7 @@ import '../../features/record_forms/presentation/widgets/record_touchpoint_form.
 import '../../features/record_forms/presentation/widgets/record_visit_only_form.dart';
 import '../../features/record_forms/presentation/widgets/release_loan_form.dart';
 import '../../shared/widgets/main_shell.dart';
-import '../../shared/providers/app_providers.dart' show authNotifierProvider, clientByIdProvider, selectedClientIdProvider;
+import '../../shared/providers/app_providers.dart' show authNotifierProvider, clientByIdProvider;
 import '../../services/auth/auth_service.dart' show AuthState;
 // import '../../services/auth/secure_storage_service.dart'; // PIN functionality disabled
 
@@ -353,111 +353,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/record-touchpoint/:clientId',
         builder: (context, state) {
           final clientId = state.pathParameters['clientId']!;
-          return ProviderScope(
-            overrides: [
-              selectedClientIdProvider.overrideWithValue(clientId),
-            ],
-            child: Consumer(
-              builder: (context, ref, _) {
-                final clientAsync = ref.watch(clientByIdProvider(clientId));
-                return clientAsync.when(
-                  data: (client) => RecordTouchpointForm(client: client),
-                  loading: () => const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (err, stack) => Scaffold(
-                    body: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('Error loading client: $err'),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => context.go('/clients'),
-                            child: const Text('Back to Clients'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
+          return RecordTouchpointFormLoader(clientId: clientId);
         },
       ),
       GoRoute(
         path: '/record-visit-only/:clientId',
         builder: (context, state) {
           final clientId = state.pathParameters['clientId']!;
-          return ProviderScope(
-            overrides: [
-              selectedClientIdProvider.overrideWithValue(clientId),
-            ],
-            child: Consumer(
-              builder: (context, ref, _) {
-                final clientAsync = ref.watch(clientByIdProvider(clientId));
-                return clientAsync.when(
-                  data: (client) => RecordVisitOnlyForm(client: client),
-                  loading: () => const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (err, stack) => Scaffold(
-                    body: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('Error loading client: $err'),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => context.go('/clients'),
-                            child: const Text('Back to Clients'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
+          return RecordVisitOnlyFormLoader(clientId: clientId);
         },
       ),
       GoRoute(
         path: '/release-loan/:clientId',
         builder: (context, state) {
           final clientId = state.pathParameters['clientId']!;
-          return ProviderScope(
-            overrides: [
-              selectedClientIdProvider.overrideWithValue(clientId),
-            ],
-            child: Consumer(
-              builder: (context, ref, _) {
-                final clientAsync = ref.watch(clientByIdProvider(clientId));
-                return clientAsync.when(
-                  data: (client) => ReleaseLoanForm(client: client),
-                  loading: () => const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (err, stack) => Scaffold(
-                    body: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('Error loading client: $err'),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => context.go('/clients'),
-                            child: const Text('Back to Clients'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
+          return ReleaseLoanFormLoader(clientId: clientId);
         },
       ),
 
@@ -488,6 +398,103 @@ class NotFoundPage extends StatelessWidget {
               child: const Text('Go Home'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Form loaders for deep linking
+class RecordTouchpointFormLoader extends ConsumerWidget {
+  final String clientId;
+
+  const RecordTouchpointFormLoader({super.key, required this.clientId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clientAsync = ref.watch(clientByIdProvider(clientId));
+    return clientAsync.when(
+      data: (client) => RecordTouchpointForm(client: client),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, stack) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Error loading client: $err'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.go('/clients'),
+                child: const Text('Back to Clients'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class RecordVisitOnlyFormLoader extends ConsumerWidget {
+  final String clientId;
+
+  const RecordVisitOnlyFormLoader({super.key, required this.clientId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clientAsync = ref.watch(clientByIdProvider(clientId));
+    return clientAsync.when(
+      data: (client) => RecordVisitOnlyForm(client: client),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, stack) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Error loading client: $err'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.go('/clients'),
+                child: const Text('Back to Clients'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ReleaseLoanFormLoader extends ConsumerWidget {
+  final String clientId;
+
+  const ReleaseLoanFormLoader({super.key, required this.clientId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clientAsync = ref.watch(clientByIdProvider(clientId));
+    return clientAsync.when(
+      data: (client) => ReleaseLoanForm(client: client),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, stack) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Error loading client: $err'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.go('/clients'),
+                child: const Text('Back to Clients'),
+              ),
+            ],
+          ),
         ),
       ),
     );

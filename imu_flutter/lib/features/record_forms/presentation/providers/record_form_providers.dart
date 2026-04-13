@@ -5,7 +5,7 @@ import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_da
 import 'package:imu_flutter/features/record_forms/domain/services/touchpoint_calculator_service.dart';
 import 'package:imu_flutter/services/gps/gps_capture_service.dart';
 import 'package:imu_flutter/services/api/touchpoint_api_service.dart';
-import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart' show Client;
 
 // Touchpoint Form State
 class TouchpointFormState {

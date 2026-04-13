@@ -27,7 +27,6 @@ class TouchpointDetailsPanel extends StatelessWidget {
       children: [
         // Reason dropdown
         _buildDropdown(
-          context,
           label: 'Reason',
           value: reason,
           items: TouchpointReason.values,
@@ -39,7 +38,6 @@ class TouchpointDetailsPanel extends StatelessWidget {
 
         // Status dropdown
         _buildDropdown(
-          context,
           label: 'Client Status',
           value: status,
           items: TouchpointStatus.values,
