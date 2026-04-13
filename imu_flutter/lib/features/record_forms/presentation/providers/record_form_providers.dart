@@ -5,6 +5,7 @@ import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_da
 import 'package:imu_flutter/features/record_forms/domain/services/touchpoint_calculator_service.dart';
 import 'package:imu_flutter/services/gps/gps_capture_service.dart';
 import 'package:imu_flutter/services/api/touchpoint_api_service.dart';
+import 'package:imu_flutter/services/api/my_day_api_service.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart' show Client;
 
 // Touchpoint Form State
@@ -162,9 +163,32 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
         gpsAddress: gps.address,
       );
 
-      // TODO: Submit to API (visit + touchpoint)
-      // For now, just simulate success
-      await Future.delayed(const Duration(seconds: 1));
+      // Prepare time strings
+      final timeArrival = updatedData.timeIn != null
+          ? '${updatedData.timeIn!.hour.toString().padLeft(2, '0')}:${updatedData.timeIn!.minute.toString().padLeft(2, '0')}'
+          : null;
+      final timeDeparture = updatedData.calculatedTimeOut != null
+          ? '${updatedData.calculatedTimeOut!.hour.toString().padLeft(2, '0')}:${updatedData.calculatedTimeOut!.minute.toString().padLeft(2, '0')}'
+          : null;
+
+      // Submit to API using completeVisit endpoint
+      final myDayApiService = _ref.read(myDayApiServiceProvider);
+      final result = await myDayApiService.completeVisit(
+        clientId: state.data.client.id!,
+        touchpointNumber: state.touchpointNumber!,
+        type: 'Visit',
+        reason: updatedData.reason?.apiValue ?? 'INTERESTED',
+        status: updatedData.status?.apiValue,
+        address: updatedData.gpsAddress,
+        timeArrival: timeArrival,
+        timeDeparture: timeDeparture,
+        odometerArrival: updatedData.odometerIn,
+        odometerDeparture: updatedData.odometerOut,
+        notes: updatedData.remarks,
+        latitude: updatedData.gpsLatitude,
+        longitude: updatedData.gpsLongitude,
+        photoPath: updatedData.photoPath,
+      );
 
       state = state.copyWith(
         isSubmitting: false,
@@ -205,4 +229,9 @@ final touchpointCalculatorProvider = Provider<TouchpointCalculatorService>((ref)
 // Touchpoint API Service Provider
 final touchpointApiServiceProvider = Provider<TouchpointApiService>((ref) {
   return TouchpointApiService();
+});
+
+// My Day API Service Provider
+final myDayApiServiceProvider = Provider<MyDayApiService>((ref) {
+  return MyDayApiService();
 });

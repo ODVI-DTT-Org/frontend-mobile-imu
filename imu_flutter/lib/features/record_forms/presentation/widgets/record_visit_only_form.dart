@@ -11,6 +11,7 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/in
 import 'package:imu_flutter/features/record_forms/data/models/visit_form_data.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/services/api/my_day_api_service.dart';
 
 class RecordVisitOnlyForm extends ConsumerStatefulWidget {
   final Client client;
@@ -157,13 +158,38 @@ class _RecordVisitOnlyFormState extends ConsumerState<RecordVisitOnlyForm> {
         gpsAddress: gps.address,
       ) as VisitFormData;
 
-      // TODO: Submit to API (visit only)
-      // For now, just simulate success
-      await Future.delayed(const Duration(seconds: 1));
+      // Prepare time strings
+      final timeArrival = _formData.timeIn != null
+          ? '${_formData.timeIn!.hour.toString().padLeft(2, '0')}:${_formData.timeIn!.minute.toString().padLeft(2, '0')}'
+          : null;
+      final timeDeparture = _formData.calculatedTimeOut != null
+          ? '${_formData.calculatedTimeOut!.hour.toString().padLeft(2, '0')}:${_formData.calculatedTimeOut!.minute.toString().padLeft(2, '0')}'
+          : null;
+
+      // Submit to API using submitVisitForm endpoint (visit only, no touchpoint)
+      final myDayApiService = MyDayApiService();
+      final result = await myDayApiService.submitVisitForm(
+        widget.client.id!,
+        {
+          'client_id': widget.client.id!,
+          'type': 'visit_only',
+          'reason': _formData.reason?.apiValue ?? 'CLIENT_NOT_AVAILABLE',
+          'status': _formData.status?.apiValue ?? 'INCOMPLETE',
+          'time_in': timeArrival,
+          'time_out': timeDeparture,
+          'odometer_arrival': _formData.odometerIn,
+          'odometer_departure': _formData.odometerOut,
+          'latitude': _formData.gpsLatitude,
+          'longitude': _formData.gpsLongitude,
+          'address': _formData.gpsAddress,
+          'notes': _formData.remarks,
+          'photo_url': _formData.photoPath,
+        },
+      );
 
       if (mounted) {
         _showSuccessToast('Visit recorded successfully');
-        context.pop();
+        context.pop(true); // Return true to indicate success
       }
     } catch (e) {
       if (mounted) {

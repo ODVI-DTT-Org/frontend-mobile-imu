@@ -11,6 +11,7 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/in
 import 'package:imu_flutter/features/record_forms/data/models/release_form_data.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/services/api/my_day_api_service.dart';
 
 class ReleaseLoanForm extends StatefulWidget {
   final Client client;
@@ -167,13 +168,36 @@ class _ReleaseLoanFormState extends State<ReleaseLoanForm> {
         gpsAddress: gps.address,
       ) as ReleaseFormData;
 
-      // TODO: Submit to API (visit + release)
-      // For now, just simulate success
-      await Future.delayed(const Duration(seconds: 1));
+      // Prepare time strings
+      final timeArrival = _formData.timeIn != null
+          ? '${_formData.timeIn!.hour.toString().padLeft(2, '0')}:${_formData.timeIn!.minute.toString().padLeft(2, '0')}'
+          : null;
+      final timeDeparture = _formData.calculatedTimeOut != null
+          ? '${_formData.calculatedTimeOut!.hour.toString().padLeft(2, '0')}:${_formData.calculatedTimeOut!.minute.toString().padLeft(2, '0')}'
+          : null;
+
+      // Submit to API using completeVisit endpoint with release loan data
+      final myDayApiService = MyDayApiService();
+      final result = await myDayApiService.completeVisit(
+        clientId: widget.client.id!,
+        touchpointNumber: 0, // Release loan doesn't create a touchpoint
+        type: 'release_loan',
+        reason: _formData.reason?.apiValue ?? 'NEW_RELEASE_LOAN',
+        status: _formData.status?.apiValue ?? 'COMPLETED',
+        address: _formData.gpsAddress,
+        timeArrival: timeArrival,
+        timeDeparture: timeDeparture,
+        odometerArrival: _formData.odometerIn,
+        odometerDeparture: _formData.odometerOut,
+        notes: '${_formData.remarks ?? ''}\n\nUDI: ${_formData.udiNumber ?? ''}\nProduct: ${_formData.productType?.apiValue ?? ''}\nLoan: ${_formData.loanType?.apiValue ?? ''}',
+        latitude: _formData.gpsLatitude,
+        longitude: _formData.gpsLongitude,
+        photoPath: _formData.photoPath,
+      );
 
       if (mounted) {
         _showSuccessToast('Release loan submitted');
-        context.pop();
+        context.pop(true); // Return true to indicate success
       }
     } catch (e) {
       if (mounted) {
