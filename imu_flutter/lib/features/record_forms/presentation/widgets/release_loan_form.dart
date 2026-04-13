@@ -181,7 +181,7 @@ class _ReleaseLoanFormState extends State<ReleaseLoanForm> {
       final result = await myDayApiService.completeVisit(
         clientId: widget.client.id!,
         touchpointNumber: 0, // Release loan doesn't create a touchpoint
-        type: 'release_loan',
+        type: 'Visit',
         reason: _formData.reason?.apiValue ?? 'NEW_RELEASE_LOAN',
         status: _formData.status?.apiValue ?? 'COMPLETED',
         address: _formData.gpsAddress,

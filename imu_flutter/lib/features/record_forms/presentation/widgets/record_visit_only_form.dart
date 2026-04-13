@@ -166,25 +166,23 @@ class _RecordVisitOnlyFormState extends ConsumerState<RecordVisitOnlyForm> {
           ? '${_formData.calculatedTimeOut!.hour.toString().padLeft(2, '0')}:${_formData.calculatedTimeOut!.minute.toString().padLeft(2, '0')}'
           : null;
 
-      // Submit to API using submitVisitForm endpoint (visit only, no touchpoint)
+      // Submit to API using completeVisit endpoint (visit only, no touchpoint)
       final myDayApiService = MyDayApiService();
-      final result = await myDayApiService.submitVisitForm(
-        widget.client.id!,
-        {
-          'client_id': widget.client.id!,
-          'type': 'visit_only',
-          'reason': _formData.reason?.apiValue ?? 'CLIENT_NOT_AVAILABLE',
-          'status': _formData.status?.apiValue ?? 'INCOMPLETE',
-          'time_in': timeArrival,
-          'time_out': timeDeparture,
-          'odometer_arrival': _formData.odometerIn,
-          'odometer_departure': _formData.odometerOut,
-          'latitude': _formData.gpsLatitude,
-          'longitude': _formData.gpsLongitude,
-          'address': _formData.gpsAddress,
-          'notes': _formData.remarks,
-          'photo_url': _formData.photoPath,
-        },
+      final result = await myDayApiService.completeVisit(
+        clientId: widget.client.id!,
+        touchpointNumber: 0, // Visit only doesn't create a touchpoint
+        type: 'Visit',
+        reason: _formData.reason?.apiValue ?? 'CLIENT_NOT_AVAILABLE',
+        status: _formData.status?.apiValue ?? 'INCOMPLETE',
+        address: _formData.gpsAddress,
+        timeArrival: timeArrival,
+        timeDeparture: timeDeparture,
+        odometerArrival: _formData.odometerIn,
+        odometerDeparture: _formData.odometerOut,
+        notes: _formData.remarks,
+        latitude: _formData.gpsLatitude,
+        longitude: _formData.gpsLongitude,
+        photoPath: _formData.photoPath,
       );
 
       if (mounted) {
