@@ -1,10 +1,35 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:imu_flutter/services/api/conflict_resolver_service.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
 import '../../mocks/mocks.dart';
 
 void main() {
+  // Register fallback values for mocktail
+  setUpAll(() {
+    registerFallbackValue(Client(
+      id: 'fallback',
+      firstName: 'Fallback',
+      middleName: null,
+      lastName: 'Client',
+      clientType: ClientType.existing,
+      productType: ProductType.private,
+      pensionType: PensionType.private,
+      createdAt: DateTime.now(),
+    ));
+    registerFallbackValue(Touchpoint(
+      id: 'fallback',
+      clientId: 'fallback',
+      touchpointNumber: 1,
+      type: TouchpointType.visit,
+      date: DateTime.now(),
+      reason: TouchpointReason.interested,
+      status: TouchpointStatus.interested,
+      createdAt: DateTime.now(),
+    ));
+  });
+
   late ConflictResolverService conflictResolver;
   late MockHiveService mockHiveService;
   late MockClientApiService mockClientApi;
@@ -16,6 +41,30 @@ void main() {
     mockTouchpointApi = MockTouchpointApiService();
 
     when(() => mockHiveService.isInitialized).thenReturn(true);
+
+    // Mock update methods to return success
+    when(() => mockClientApi.updateClient(any())).thenAnswer((_) async => Client(
+      id: '1',
+      firstName: 'Test',
+      middleName: null,
+      lastName: 'Client',
+      clientType: ClientType.existing,
+      productType: ProductType.private,
+      pensionType: PensionType.private,
+      createdAt: DateTime.now(),
+    ));
+    when(() => mockTouchpointApi.updateTouchpoint(any())).thenAnswer((_) async => Touchpoint(
+      id: 'tp-1',
+      clientId: '1',
+      touchpointNumber: 1,
+      type: TouchpointType.visit,
+      date: DateTime.now(),
+      reason: TouchpointReason.interested,
+      status: TouchpointStatus.interested,
+      createdAt: DateTime.now(),
+    ));
+    when(() => mockHiveService.updateClient(any())).thenAnswer((_) async {});
+    when(() => mockHiveService.updateTouchpoint(any())).thenAnswer((_) async {});
 
     conflictResolver = ConflictResolverService(
       hiveService: mockHiveService,

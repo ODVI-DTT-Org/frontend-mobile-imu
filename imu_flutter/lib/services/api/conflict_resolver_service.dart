@@ -87,7 +87,7 @@ class ConflictResolverService extends ChangeNotifier {
       final localId = localItem['id'] as String?;
       if (localId == null) continue;
 
-      final serverItem = serverItems.firstWhere(
+      final serverItem = serverItems.cast<Map<String, dynamic>>().firstWhere(
         (item) => item['id'] == localId,
         orElse: () => <String, dynamic>{},
       );
