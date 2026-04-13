@@ -2,12 +2,67 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/shared/models/location_filter.dart';
 import 'package:imu_flutter/services/area/area_filter_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvider;
+import 'package:imu_flutter/services/filter_preferences_service.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
-/// Active location filter state
-/// Auto-disposes when navigating away from pages that use it
-final locationFilterProvider = StateProvider<LocationFilter>((ref) {
-  return LocationFilter.none();
+/// Active location filter state with persistence
+/// Loads from SharedPreferences on initialization, saves on change
+final locationFilterProvider = StateNotifierProvider<LocationFilterNotifier, LocationFilter>((ref) {
+  return LocationFilterNotifier();
 });
+
+/// Notifier for location filter with persistence support
+class LocationFilterNotifier extends StateNotifier<LocationFilter> {
+  final FilterPreferencesService _prefs = FilterPreferencesService();
+
+  LocationFilterNotifier() : super(LocationFilter.none()) {
+    _loadFromPreferences();
+  }
+
+  /// Load saved filter from SharedPreferences
+  Future<void> _loadFromPreferences() async {
+    final province = _prefs.getProvince();
+    final municipalities = _prefs.getMunicipalities();
+
+    if (province != null || municipalities.isNotEmpty) {
+      state = LocationFilter(
+        province: province,
+        municipalities: municipalities.isNotEmpty ? municipalities : null,
+      );
+    }
+  }
+
+  /// Update filter and persist to SharedPreferences
+  void updateFilter(LocationFilter newFilter) {
+    state = newFilter;
+    _persistFilter(newFilter);
+  }
+
+  /// Set province and persist
+  void setProvince(String? province) {
+    state = state.copyWith(province: province);
+    _prefs.setProvince(province);
+  }
+
+  /// Set municipalities and persist
+  void setMunicipalities(List<String>? municipalities) {
+    state = state.copyWith(municipalities: municipalities);
+    _prefs.setMunicipalities(municipalities ?? []);
+  }
+
+  /// Clear filter and persist
+  void clear() {
+    state = LocationFilter.none();
+    _prefs.setProvince(null);
+    _prefs.setMunicipalities([]);
+  }
+
+  /// Persist filter to SharedPreferences
+  void _persistFilter(LocationFilter filter) {
+    _prefs.setProvince(filter.province);
+    _prefs.setMunicipalities(filter.municipalities ?? []);
+  }
+}
 
 /// User's assigned areas (provinces and municipalities)
 /// Fetches from AreaFilterService, falls back to API if cache is empty

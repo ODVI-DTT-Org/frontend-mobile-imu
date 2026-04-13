@@ -115,11 +115,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   Future<void> _loadFilterPreferences() async {
     final province = _filterPreferencesService.getProvince();
-    final municipality = _filterPreferencesService.getMunicipality();
+    final municipalities = _filterPreferencesService.getMunicipalities();
     if (mounted) {
       setState(() {
         _selectedProvince = province?.isNotEmpty == true ? province : null;
-        _selectedMunicipality = municipality?.isNotEmpty == true ? municipality : null;
+        _selectedMunicipality = municipalities.isNotEmpty ? municipalities.first : null;
       });
     }
   }
@@ -624,7 +624,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         });
       }
     } else if (filterType == 'municipality') {
-      await _filterPreferencesService.setMunicipality(null);
+      await _filterPreferencesService.setMunicipalities([]);
       if (mounted) {
         setState(() {
           _selectedMunicipality = null;
@@ -677,7 +677,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       backgroundColor: Colors.transparent,
       builder: (context) => LocationFilterBottomSheet(
         onApply: (filter) {
-          ref.read(locationFilterProvider.notifier).state = filter;
+          ref.read(locationFilterProvider.notifier).updateFilter(filter);
           _applyClientFilter();
         },
       ),
@@ -691,7 +691,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       backgroundColor: Colors.transparent,
       builder: (context) => ClientAttributeFilterBottomSheet(
         onApply: (filter) {
-          ref.read(clientAttributeFilterProvider.notifier).state = filter;
+          ref.read(clientAttributeFilterProvider.notifier).updateFilter(filter);
           _applyClientFilter();
         },
       ),
@@ -853,25 +853,21 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     onRemove: (filterType) {
                       // Handle filter removal
                       if (filterType == FilterType.location) {
-                        ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+                        ref.read(locationFilterProvider.notifier).clear();
                       } else if (filterType == FilterType.clientType) {
-                        final currentFilter = ref.read(clientAttributeFilterProvider);
-                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(clientType: null);
+                        ref.read(clientAttributeFilterProvider.notifier).setClientType(null);
                       } else if (filterType == FilterType.marketType) {
-                        final currentFilter = ref.read(clientAttributeFilterProvider);
-                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(marketType: null);
+                        ref.read(clientAttributeFilterProvider.notifier).setMarketType(null);
                       } else if (filterType == FilterType.pensionType) {
-                        final currentFilter = ref.read(clientAttributeFilterProvider);
-                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(pensionType: null);
+                        ref.read(clientAttributeFilterProvider.notifier).setPensionType(null);
                       } else if (filterType == FilterType.productType) {
-                        final currentFilter = ref.read(clientAttributeFilterProvider);
-                        ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(productType: null);
+                        ref.read(clientAttributeFilterProvider.notifier).setProductType(null);
                       }
                       _applyClientFilter();
                     },
                     onClearAll: () {
-                      ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
-                      ref.read(clientAttributeFilterProvider.notifier).state = ClientAttributeFilter.none();
+                      ref.read(locationFilterProvider.notifier).clear();
+                      ref.read(clientAttributeFilterProvider.notifier).clear();
                       _applyClientFilter();
                     },
                   ),

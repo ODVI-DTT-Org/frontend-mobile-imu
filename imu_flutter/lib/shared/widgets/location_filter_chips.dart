@@ -24,12 +24,12 @@ class LocationFilterChips extends ConsumerWidget {
           _buildFilterChip(
             label: locationFilter.getDisplayLabel(),
             onRemove: () {
-              ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+              ref.read(locationFilterProvider.notifier).clear();
             },
           ),
           _buildClearAllChip(
             onClear: () {
-              ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+              ref.read(locationFilterProvider.notifier).clear();
             },
           ),
         ],

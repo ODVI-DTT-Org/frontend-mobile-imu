@@ -166,7 +166,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => LocationFilterBottomSheet(
         onApply: (filter) {
-          ref.read(locationFilterProvider.notifier).state = filter;
+          ref.read(locationFilterProvider.notifier).updateFilter(filter);
           ref.invalidate(assignedClientsProvider);
         },
       ),
@@ -180,7 +180,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => ClientAttributeFilterBottomSheet(
         onApply: (filter) {
-          ref.read(clientAttributeFilterProvider.notifier).state = filter;
+          ref.read(clientAttributeFilterProvider.notifier).updateFilter(filter);
           // Invalidate the appropriate provider based on mode
           if (_showAssignedClientsOnly) {
             ref.invalidate(assignedClientsProvider);

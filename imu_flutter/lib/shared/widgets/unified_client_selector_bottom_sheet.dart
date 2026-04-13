@@ -63,7 +63,7 @@ class _UnifiedClientSelectorBottomSheetState
       isScrollControlled: true,
       builder: (context) => LocationFilterBottomSheet(
         onApply: (filter) {
-          ref.read(locationFilterProvider.notifier).state = filter;
+          ref.read(locationFilterProvider.notifier).updateFilter(filter);
           setState(() {});
         },
       ),
@@ -71,35 +71,27 @@ class _UnifiedClientSelectorBottomSheetState
   }
 
   void _clearAllFilters() {
-    ref.read(clientAttributeFilterProvider.notifier).state =
-        ClientAttributeFilter.none();
-    ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+    ref.read(locationFilterProvider.notifier).clear();
+    ref.read(clientAttributeFilterProvider.notifier).clear();
     setState(() {});
   }
 
   void _removeFilter(FilterType type) {
-    final currentAttrFilter = ref.read(clientAttributeFilterProvider);
-    final currentLocFilter = ref.read(locationFilterProvider);
-
     switch (type) {
       case FilterType.location:
-        ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
+        ref.read(locationFilterProvider.notifier).clear();
         break;
       case FilterType.clientType:
-        ref.read(clientAttributeFilterProvider.notifier).state =
-            currentAttrFilter.copyWith(clientType: null);
+        ref.read(clientAttributeFilterProvider.notifier).setClientType(null);
         break;
       case FilterType.marketType:
-        ref.read(clientAttributeFilterProvider.notifier).state =
-            currentAttrFilter.copyWith(marketType: null);
+        ref.read(clientAttributeFilterProvider.notifier).setMarketType(null);
         break;
       case FilterType.pensionType:
-        ref.read(clientAttributeFilterProvider.notifier).state =
-            currentAttrFilter.copyWith(pensionType: null);
+        ref.read(clientAttributeFilterProvider.notifier).setPensionType(null);
         break;
       case FilterType.productType:
-        ref.read(clientAttributeFilterProvider.notifier).state =
-            currentAttrFilter.copyWith(productType: null);
+        ref.read(clientAttributeFilterProvider.notifier).setProductType(null);
         break;
     }
     setState(() {});
