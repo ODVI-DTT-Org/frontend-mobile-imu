@@ -20,12 +20,17 @@ import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     bulkDeleteApiServiceProvider,
-    authNotifierProvider;
+    authNotifierProvider,
+    hiveServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../../features/record_forms/presentation/widgets/record_touchpoint_form.dart';
+import '../../../../features/record_forms/presentation/widgets/record_visit_only_form.dart';
+import '../../../../features/record_forms/presentation/widgets/release_loan_form.dart';
 import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../services/maps/map_service.dart';
 
@@ -196,16 +201,22 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             value: 'edit',
           ),
           ActionOption(
-            icon: LucideIcons.dollarSign,
-            title: 'Release Loan',
-            description: 'Mark loan as released',
-            value: 'release',
+            icon: LucideIcons.listChecks,
+            title: 'Record Touchpoint',
+            description: 'Create touchpoint + visit',
+            value: 'touchpoint',
           ),
           ActionOption(
             icon: LucideIcons.mapPin,
-            title: 'Record Visit',
-            description: 'Create a new touchpoint',
-            value: 'visit',
+            title: 'Record Visit Only',
+            description: 'Create visit without touchpoint',
+            value: 'visit_only',
+          ),
+          ActionOption(
+            icon: LucideIcons.dollarSign,
+            title: 'Release Loan',
+            description: 'Record loan release',
+            value: 'release_loan',
           ),
           ActionOption(
             icon: LucideIcons.x,
@@ -219,11 +230,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       if (action == null || action == 'cancel') return;
 
       switch (action) {
-        case 'visit':
-          await _recordVisit(visit);
+        case 'touchpoint':
+          await _handleRecordTouchpoint(visit);
           break;
-        case 'release':
-          await _releaseLoan(visit);
+        case 'visit_only':
+          await _handleRecordVisitOnly(visit);
+          break;
+        case 'release_loan':
+          await _handleReleaseLoan(visit);
           break;
         case 'edit':
           await _editClient(visit);
@@ -285,8 +299,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       return;
     }
 
-    // Open the TouchpointForm which handles Time In/Out internally
-    final result = await showTouchpointForm(
+    // Open the TouchpointForm which handles submission internally
+    await showTouchpointForm(
       context: context,
       clientId: visit.clientId,
       touchpointNumber: touchpointNumber,
@@ -294,34 +308,97 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       clientName: visit.clientName,
       address: visit.address,
     );
+    // Note: The form submits directly to the API and handles success/error internally
+  }
 
-    // Handle form submission result
-    if (result != null && mounted) {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Saving touchpoint...',
-        operation: () async {
-          final myDayApiService = ref.read(myDayApiServiceProvider);
-          await myDayApiService.submitVisitForm(visit.clientId, result);
+  Future<void> _handleRecordTouchpoint(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
 
-          // Upload selfie if photo was captured
-          if (result['photoPath'] != null) {
-            await myDayApiService.uploadSelfie(visit.clientId, result['photoPath']);
-          }
-
-          // ✅ FIXED: Wait a moment for database transaction to commit before refreshing
-          // This ensures the itinerary status update is visible when we refetch
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          // Refresh itinerary to show updated status
-          ref.invalidate(todayItineraryProvider);
-        },
-      );
-
-      // Check if this was the 7th touchpoint
-      if (touchpointNumber == 7) {
-        _showTouchpointCompletionDialog(visit.clientName);
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(visit.clientId);
+    if (clientData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Client not found')),
+        );
       }
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordTouchpointForm(
+          client: fullClient,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh itinerary to show updated status
+      ref.invalidate(todayItineraryProvider);
+    }
+  }
+
+  Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
+
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(visit.clientId);
+    if (clientData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Client not found')),
+        );
+      }
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordVisitOnlyForm(
+          client: fullClient,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ref.invalidate(todayItineraryProvider);
+    }
+  }
+
+  Future<void> _handleReleaseLoan(ItineraryItem visit) async {
+    HapticUtils.lightImpact();
+
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(visit.clientId);
+    if (clientData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Client not found')),
+        );
+      }
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReleaseLoanForm(
+          client: fullClient,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ref.invalidate(todayItineraryProvider);
     }
   }
 

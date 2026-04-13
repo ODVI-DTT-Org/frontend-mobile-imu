@@ -62,15 +62,6 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
       state = state.copyWith(error: e.toString());
     }
   }
-
-  Future<void> submitVisitForm(String clientId, Map<String, dynamic> formData) async {
-    try {
-      await _apiService.submitVisitForm(clientId, formData);
-      await loadClients();
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
-  }
 }
 
 /// Provider for My Day state

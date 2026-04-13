@@ -13,12 +13,14 @@ void main() {
     setUp(() {
       mockStorage = MockFlutterSecureStorage();
       tokenManager = TokenManager(secureStorage: mockStorage);
-      
+
       // Set up default mock behaviors
       when(() => mockStorage.write(key: any(named: 'key'), value: any(named: 'value')))
           .thenAnswer((_) async {});
       when(() => mockStorage.delete(key: any(named: 'key')))
           .thenAnswer((_) async {});
+      when(() => mockStorage.read(key: any(named: 'key')))
+          .thenAnswer((_) async => null);
     });
 
     group('Token Storage', () {

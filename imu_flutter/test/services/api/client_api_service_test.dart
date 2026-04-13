@@ -1,8 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:imu_flutter/services/api/client_api_service.dart';
+import 'package:imu_flutter/services/api/api_exception.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/core/config/app_config.dart';
 
 void main() {
+  // Initialize AppConfig before running tests
+  setUpAll(() async {
+    await AppConfig.initialize(environment: 'test');
+  });
+
   late ClientApiService clientApiService;
 
   setUp(() {
@@ -11,23 +18,23 @@ void main() {
 
   group('ClientApiService', () {
     // TODO: Phase 1 - Add PowerSync/Supabase integration tests
-    test('fetchClients returns empty list when no backend integration', () async {
-      // Act
-      final result = await clientApiService.fetchClients();
-
-      // Assert - Currently returns empty list until PowerSync integration
-      expect(result, isEmpty);
+    test('fetchClients throws ApiException when not authenticated', () async {
+      // Act & Assert
+      expect(
+        () => clientApiService.fetchClients(),
+        throwsA(isA<ApiException>()),
+      );
     });
 
-    test('fetchClient returns null when no backend integration', () async {
-      // Act
-      final result = await clientApiService.fetchClient('test-id');
-
-      // Assert - Currently returns null until PowerSync integration
-      expect(result, isNull);
+    test('fetchClient throws ApiException when not authenticated', () async {
+      // Act & Assert
+      expect(
+        () => clientApiService.fetchClient('test-id'),
+        throwsA(isA<ApiException>()),
+      );
     });
 
-    test('createClient returns null when no backend integration', () async {
+    test('createClient throws ApiException when not authenticated', () async {
       // Arrange
       final client = Client(
         id: 'test-id',
@@ -41,14 +48,14 @@ void main() {
         createdAt: DateTime(2024, 1, 1),
       );
 
-      // Act
-      final result = await clientApiService.createClient(client);
-
-      // Assert - Currently returns null until PowerSync integration
-      expect(result, isNull);
+      // Act & Assert
+      expect(
+        () => clientApiService.createClient(client),
+        throwsA(isA<ApiException>()),
+      );
     });
 
-    test('updateClient returns null when no backend integration', () async {
+    test('updateClient throws ApiException when not authenticated', () async {
       // Arrange
       final client = Client(
         id: 'test-id',
@@ -62,16 +69,19 @@ void main() {
         createdAt: DateTime(2024, 1, 1),
       );
 
-      // Act
-      final result = await clientApiService.updateClient(client);
-
-      // Assert - Currently returns null until PowerSync integration
-      expect(result, isNull);
+      // Act & Assert
+      expect(
+        () => clientApiService.updateClient(client),
+        throwsA(isA<ApiException>()),
+      );
     });
 
-    test('deleteClient completes without error', () async {
-      // Act & Assert - Should not throw
-      await clientApiService.deleteClient('test-id');
+    test('deleteClient throws ApiException when not authenticated', () async {
+      // Act & Assert - Should throw ApiException
+      expect(
+        () => clientApiService.deleteClient('test-id'),
+        throwsA(isA<ApiException>()),
+      );
     });
   });
 }

@@ -3,6 +3,7 @@ import 'package:imu_flutter/features/auth/domain/entities/auth_state.dart';
 import 'package:imu_flutter/features/auth/domain/services/auth_coordinator.dart';
 import 'package:imu_flutter/features/auth/domain/repositories/auth_repository.dart';
 import 'package:imu_flutter/features/auth/domain/services/token_manager.dart';
+import 'package:imu_flutter/core/config/app_config.dart';
 
 /// Mock AuthRepository for testing
 class MockAuthRepository implements AuthRepository {
@@ -98,6 +99,11 @@ void main() {
   // Initialize Flutter bindings for tests
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize AppConfig before running tests
+  setUpAll(() async {
+    await AppConfig.initialize(environment: 'test');
+  });
+
   group('AuthCoordinator', () {
     late AuthCoordinator coordinator;
     late MockAuthRepository mockRepository;
@@ -122,34 +128,32 @@ void main() {
         final newState = LoggingInState(email: 'test@example.com', password: 'password123');
         await coordinator.transitionTo(newState);
 
-        // Note: With mock repository, login proceeds automatically to CheckPinSetupState
-        expect(coordinator.currentState.type, AuthStateType.checkPinSetup);
+        // Note: With mock repository, login proceeds automatically to AuthenticatedState
+        expect(coordinator.currentState.type, AuthStateType.authenticated);
       });
 
       test('should track state history', () async {
         final state1 = LoggingInState(email: 'test@example.com', password: 'password123');
-        final state2 = ErrorState(errorMessage: 'test error', errorType: 'test');
 
         // Reset and initialize for this test
         coordinator.reset();
         coordinator.initialize(mockRepository);
 
         await coordinator.transitionTo(state1);
-        await Future.delayed(const Duration(milliseconds: 100)); // Wait for auto-transition
-        // Now transition to error state (valid from CheckPinSetupState)
-        await coordinator.transitionTo(state2);
+        await Future.delayed(const Duration(milliseconds: 100)); // Wait for auto-transition to AuthenticatedState
 
+        // Should have history entries for the transitions
         expect(coordinator.stateHistory.length, greaterThan(0));
       });
 
       test('should limit history to 50 entries', () async {
-        // Use valid transition cycle: NOT_AUTHENTICATED -> LOGGING_IN -> CHECK_PIN_SETUP -> ERROR -> NOT_AUTHENTICATED
+        // Use valid transition cycle: NOT_AUTHENTICATED -> LOGGING_IN -> AUTHENTICATED -> NOT_AUTHENTICATED
         for (int i = 0; i < 60; i++) {
           await coordinator.transitionTo(LoggingInState(email: 'user$i@example.com', password: 'password123'));
-          await Future.delayed(const Duration(milliseconds: 100)); // Wait for auto-transition to CheckPinSetupState
-          await coordinator.transitionTo(ErrorState(errorMessage: 'Test $i', errorType: 'test'));
+          await Future.delayed(const Duration(milliseconds: 100)); // Wait for auto-transition to AuthenticatedState
           // Reset to NOT_AUTHENTICATED to continue the cycle
           coordinator.reset();
+          await Future.delayed(const Duration(milliseconds: 50)); // Wait for reset to complete
           // Reinitialize after reset
           coordinator.initialize(mockRepository);
         }
@@ -199,7 +203,7 @@ void main() {
           return true;
         });
         expect(guardCalled, isTrue);
-        // Note: With mock repo, this will auto-transition to CheckPinSetupState
+        // Note: With mock repo, this will auto-transition to AuthenticatedState
       });
 
       test('should prevent transition when guard returns false', () async {
@@ -218,7 +222,7 @@ void main() {
         });
         // Guard passed and login proceeded
         await Future.delayed(const Duration(milliseconds: 100)); // Wait for auto-transition
-        expect(coordinator.currentState.type, AuthStateType.checkPinSetup);
+        expect(coordinator.currentState.type, AuthStateType.authenticated);
       });
     });
 

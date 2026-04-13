@@ -46,23 +46,6 @@ class Client {
   final bool isStarred;
   final bool loanReleased;
   final DateTime? loanReleasedAt;
-  // Legacy PCNICMS fields
-  final String? extName;
-  final String? fullname;
-  final String? fullAddress;
-  final String? accountCode;
-  final String? accountNumber;
-  final String? rank;
-  final double? monthlyPensionAmount;
-  final double? monthlyPensionGross;
-  final String? atmNumber;
-  final String? applicableRepublicAct;
-  final String? unitCode;
-  final String? pcniAcctCode;
-  final String? dob;
-  final String? gCompany;
-  final String? gStatus;
-  final String? status;
 
   Client({
     required this.id,
@@ -105,23 +88,6 @@ class Client {
     this.isStarred = false,
     this.loanReleased = false,
     this.loanReleasedAt,
-    // Legacy PCNICMS fields
-    this.extName,
-    this.fullname,
-    this.fullAddress,
-    this.accountCode,
-    this.accountNumber,
-    this.rank,
-    this.monthlyPensionAmount,
-    this.monthlyPensionGross,
-    this.atmNumber,
-    this.applicableRepublicAct,
-    this.unitCode,
-    this.pcniAcctCode,
-    this.dob,
-    this.gCompany,
-    this.gStatus,
-    this.status = 'active',
   });
 
   String get fullName {
@@ -132,7 +98,7 @@ class Client {
     return '$lastName, ${firstMiddle.join(' ')}';
   }
 
-  String get computedFullAddress {
+  String get fullAddress {
     final parts = <String>[];
     if (barangay != null && barangay!.isNotEmpty) parts.add(barangay!);
     if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
@@ -328,23 +294,6 @@ class Client {
     bool? isStarred,
     bool? loanReleased,
     DateTime? loanReleasedAt,
-    // Legacy PCNICMS fields
-    String? extName,
-    String? fullname,
-    String? fullAddress,
-    String? accountCode,
-    String? accountNumber,
-    String? rank,
-    double? monthlyPensionAmount,
-    double? monthlyPensionGross,
-    String? atmNumber,
-    String? applicableRepublicAct,
-    String? unitCode,
-    String? pcniAcctCode,
-    String? dob,
-    String? gCompany,
-    String? gStatus,
-    String? status,
   }) {
     return Client(
       id: id ?? this.id,
@@ -387,23 +336,6 @@ class Client {
       isStarred: isStarred ?? this.isStarred,
       loanReleased: loanReleased ?? this.loanReleased,
       loanReleasedAt: loanReleasedAt ?? this.loanReleasedAt,
-      // Legacy PCNICMS fields
-      extName: extName ?? this.extName,
-      fullname: fullname ?? this.fullname,
-      fullAddress: fullAddress ?? this.fullAddress,
-      accountCode: accountCode ?? this.accountCode,
-      accountNumber: accountNumber ?? this.accountNumber,
-      rank: rank ?? this.rank,
-      monthlyPensionAmount: monthlyPensionAmount ?? this.monthlyPensionAmount,
-      monthlyPensionGross: monthlyPensionGross ?? this.monthlyPensionGross,
-      atmNumber: atmNumber ?? this.atmNumber,
-      applicableRepublicAct: applicableRepublicAct ?? this.applicableRepublicAct,
-      unitCode: unitCode ?? this.unitCode,
-      pcniAcctCode: pcniAcctCode ?? this.pcniAcctCode,
-      dob: dob ?? this.dob,
-      gCompany: gCompany ?? this.gCompany,
-      gStatus: gStatus ?? this.gStatus,
-      status: status ?? this.status,
     );
   }
 
@@ -443,32 +375,7 @@ class Client {
       'isStarred': isStarred,
       'loanReleased': loanReleased,
       'loanReleasedAt': loanReleasedAt?.toIso8601String(),
-      // Legacy PCNICMS fields
-      'extName': extName,
-      'fullname': fullname,
-      'fullAddress': fullAddress, // Uses the legacy field, not computedFullAddress
-      'accountCode': accountCode,
-      'accountNumber': accountNumber,
-      'rank': rank,
-      'monthlyPensionAmount': monthlyPensionAmount,
-      'monthlyPensionGross': monthlyPensionGross,
-      'atmNumber': atmNumber,
-      'applicableRepublicAct': applicableRepublicAct,
-      'unitCode': unitCode,
-      'pcniAcctCode': pcniAcctCode,
-      'dob': dob,
-      'gCompany': gCompany,
-      'gStatus': gStatus,
-      'status': status,
     };
-  }
-
-  /// Helper to parse numeric values from various types (num, String)
-  static double? _parseNumeric(dynamic value) {
-    if (value == null) return null;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
   }
 
   /// Helper to parse boolean values from various types (bool, int, String)
@@ -580,23 +487,6 @@ class Client {
       loanReleasedAt: json['loanReleasedAt'] != null
           ? DateTime.parse(json['loanReleasedAt'])
           : (json['loan_released_at'] != null ? DateTime.parse(json['loan_released_at']) : null),
-      // Legacy PCNICMS fields
-      extName: json['extName'] ?? json['ext_name'],
-      fullname: json['fullname'],
-      fullAddress: json['fullAddress'] ?? json['full_address'],
-      accountCode: json['accountCode'] ?? json['account_code'],
-      accountNumber: json['accountNumber'] ?? json['account_number'],
-      rank: json['rank'],
-      monthlyPensionAmount: _parseNumeric(json['monthlyPensionAmount'] ?? json['monthly_pension_amount']),
-      monthlyPensionGross: _parseNumeric(json['monthlyPensionGross'] ?? json['monthly_pension_gross']),
-      atmNumber: json['atmNumber'] ?? json['atm_number'],
-      applicableRepublicAct: json['applicableRepublicAct'] ?? json['applicable_republic_act'],
-      unitCode: json['unitCode'] ?? json['unit_code'],
-      pcniAcctCode: json['pcniAcctCode'] ?? json['pcni_acct_code'],
-      dob: json['dob'],
-      gCompany: json['gCompany'] ?? json['g_company'],
-      gStatus: json['gStatus'] ?? json['g_status'],
-      status: json['status'] ?? 'active',
     );
   }
 
@@ -651,23 +541,6 @@ class Client {
       updatedAt: row['updated_at'] != null
           ? DateTime.parse(row['updated_at'] as String)
           : null,
-      // Legacy PCNICMS fields
-      extName: row['ext_name'] as String?,
-      fullname: row['fullname'] as String?,
-      fullAddress: row['full_address'] as String?,
-      accountCode: row['account_code'] as String?,
-      accountNumber: row['account_number'] as String?,
-      rank: row['rank'] as String?,
-      monthlyPensionAmount: _parseNumeric(row['monthly_pension_amount']),
-      monthlyPensionGross: _parseNumeric(row['monthly_pension_gross']),
-      atmNumber: row['atm_number'] as String?,
-      applicableRepublicAct: row['applicable_republic_act'] as String?,
-      unitCode: row['unit_code'] as String?,
-      pcniAcctCode: row['pcni_acct_code'] as String?,
-      dob: row['dob'] as String?,
-      gCompany: row['g_company'] as String?,
-      gStatus: row['g_status'] as String?,
-      status: row['status'] as String? ?? 'active',
     );
   }
 }

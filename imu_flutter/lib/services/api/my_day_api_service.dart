@@ -511,53 +511,7 @@ class MyDayApiService {
     }
   }
 
-  /// Submit visit form
-  Future<Map<String, dynamic>?> submitVisitForm(String clientId, Map<String, dynamic> formData) async {
-    try {
-      debugPrint('MyDayApiService: Submitting visit form for client $clientId...');
-
-      final token = _authService.accessToken;
-      if (token == null) {
-        debugPrint('MyDayApiService: No access token available');
-        throw ApiException(message: 'Not authenticated');
-      }
-
-      final response = await _dio.post(
-        '${AppConfig.postgresApiUrl}/my-day/visits',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-        data: formData,
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint('MyDayApiService: Visit form submitted successfully');
-        return response.data as Map<String, dynamic>;
-      } else {
-        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
-        throw ApiException(message: 'Failed to submit visit form: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      debugPrint('MyDayApiService: DioException - ${e.message}');
-      debugPrint('MyDayApiService: Response - ${e.response?.data}');
-      throw ApiException(
-        message: 'Network error: ${e.message}',
-        originalError: e,
-      );
-    } catch (e) {
-      debugPrint('MyDayApiService: Unexpected error - $e');
-      throw ApiException(
-        message: 'Failed to submit visit form',
-        originalError: e,
-      );
-    }
-  }
-
   /// Complete visit - unified endpoint that handles touchpoint creation and itinerary completion
-  /// This replaces the separate submitVisitForm + itinerary update calls
   Future<Map<String, dynamic>> completeVisit({
     required String clientId,
     required int touchpointNumber,

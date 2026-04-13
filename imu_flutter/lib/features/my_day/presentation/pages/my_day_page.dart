@@ -19,15 +19,20 @@ import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     bulkDeleteApiServiceProvider,
-    authNotifierProvider;
+    authNotifierProvider,
+    hiveServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../providers/my_day_provider.dart';
 import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../record_forms/presentation/widgets/record_touchpoint_form.dart';
+import '../../../record_forms/presentation/widgets/record_visit_only_form.dart';
+import '../../../record_forms/presentation/widgets/release_loan_form.dart';
 
 class MyDayPage extends ConsumerStatefulWidget {
   const MyDayPage({super.key});
@@ -266,16 +271,22 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             value: 'navigate',
           ),
           ActionOption(
-            icon: LucideIcons.dollarSign,
-            title: 'Release Loan',
-            description: 'Mark loan as released',
-            value: 'release',
+            icon: LucideIcons.listChecks,
+            title: 'Record Touchpoint',
+            description: 'Create touchpoint + visit',
+            value: 'touchpoint',
           ),
           ActionOption(
             icon: LucideIcons.mapPin,
-            title: 'Record Visit',
-            description: 'Create a new touchpoint',
-            value: 'visit',
+            title: 'Record Visit Only',
+            description: 'Create visit without touchpoint',
+            value: 'visit_only',
+          ),
+          ActionOption(
+            icon: LucideIcons.dollarSign,
+            title: 'Release Loan',
+            description: 'Record loan release',
+            value: 'release_loan',
           ),
           ActionOption(
             icon: LucideIcons.x,
@@ -289,11 +300,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       if (action == null || action == 'cancel') return;
 
       switch (action) {
-        case 'visit':
-          await _recordVisit(client);
+        case 'touchpoint':
+          await _handleRecordTouchpoint(client);
           break;
-        case 'release':
-          await _releaseLoan(client);
+        case 'visit_only':
+          await _handleRecordVisitOnly(client);
+          break;
+        case 'release_loan':
+          await _handleReleaseLoan(client);
           break;
         case 'edit':
           await _editClient(client);
@@ -357,8 +371,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       return;
     }
 
-    // Open the TouchpointForm which handles Time In/Out internally
-    final result = await showTouchpointForm(
+    // Open the TouchpointForm which handles submission internally
+    await showTouchpointForm(
       context: context,
       clientId: client.clientId,
       touchpointNumber: touchpointNumber,
@@ -366,26 +380,85 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       clientName: client.fullName,
       address: client.location,
     );
+    // Note: The form submits directly to the API and handles success/error internally
+  }
 
-    // Handle form submission result
-    if (result != null && mounted) {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Saving touchpoint...',
-        operation: () async {
-          await ref.read(myDayStateProvider.notifier).submitVisitForm(client.clientId, result);
+  Future<void> _handleRecordTouchpoint(MyDayClient client) async {
+    HapticUtils.lightImpact();
 
-          // Upload selfie if photo was captured
-          if (result['photoPath'] != null) {
-            await ref.read(myDayApiServiceProvider).uploadSelfie(client.clientId, result['photoPath']);
-          }
-        },
-      );
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(client.clientId);
+    if (clientData == null) {
+      if (mounted) showToast('Client not found');
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
 
-      // Check if this was the 7th touchpoint
-      if (touchpointNumber == 7) {
-        _showTouchpointCompletionDialog(client.fullName);
-      }
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordTouchpointForm(
+          client: fullClient,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh data
+      await ref.read(myDayStateProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> _handleRecordVisitOnly(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(client.clientId);
+    if (clientData == null) {
+      if (mounted) showToast('Client not found');
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordVisitOnlyForm(
+          client: fullClient,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      await ref.read(myDayStateProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> _handleReleaseLoan(MyDayClient client) async {
+    HapticUtils.lightImpact();
+
+    // Fetch full client by ID
+    final hiveService = ref.read(hiveServiceProvider);
+    final clientData = hiveService.getClient(client.clientId);
+    if (clientData == null) {
+      if (mounted) showToast('Client not found');
+      return;
+    }
+    final fullClient = Client.fromJson(clientData);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReleaseLoanForm(
+          client: fullClient,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      await ref.read(myDayStateProvider.notifier).refresh();
     }
   }
 

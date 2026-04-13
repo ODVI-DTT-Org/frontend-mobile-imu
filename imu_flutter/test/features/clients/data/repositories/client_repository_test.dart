@@ -33,7 +33,7 @@ void main() {
         createdAt: DateTime(2024, 1, 1),
       );
 
-      expect(client.fullName, 'John Doe');
+      expect(client.fullName, 'Doe, John');
     });
 
     test('Client can be serialized to JSON', () {

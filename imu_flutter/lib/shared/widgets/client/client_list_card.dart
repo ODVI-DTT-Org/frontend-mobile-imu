@@ -152,9 +152,11 @@ class ClientListCard extends ConsumerWidget {
       createdAt: DateTime.now(),
     );
 
-    // Create synthetic touchpoints list if previous touchpoint exists
+    // Create synthetic touchpoints list
+    // Priority: previous touchpoint > next touchpoint > empty
     List<Touchpoint>? syntheticTouchpoints;
     if (itineraryItem.previousTouchpointNumber != null) {
+      // Show previous completed touchpoint
       syntheticTouchpoints = [
         Touchpoint(
           id: '',
@@ -165,6 +167,22 @@ class ClientListCard extends ConsumerWidget {
               : TouchpointType.call,
           date: itineraryItem.previousTouchpointDate ?? DateTime.now(),
           reason: TouchpointReason.interested, // Default reason
+          status: TouchpointStatus.interested,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    } else if (itineraryItem.touchpointNumber != null) {
+      // Show next touchpoint to record (for first-time clients)
+      syntheticTouchpoints = [
+        Touchpoint(
+          id: '',
+          clientId: itineraryItem.clientId,
+          touchpointNumber: itineraryItem.touchpointNumber!,
+          type: itineraryItem.touchpointType?.toLowerCase() == 'visit'
+              ? TouchpointType.visit
+              : TouchpointType.call,
+          date: DateTime.now(),
+          reason: TouchpointReason.interested,
           status: TouchpointStatus.interested,
           createdAt: DateTime.now(),
         ),

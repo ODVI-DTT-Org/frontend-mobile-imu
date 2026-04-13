@@ -28,7 +28,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            locationFilterProvider.overrideWith((ref) => LocationFilter.none()),
+            locationFilterProvider.overrideWith((ref) => LocationFilterNotifier()),
           ],
           child: MaterialApp(
             home: Scaffold(
@@ -45,10 +45,13 @@ void main() {
     });
 
     testWidgets('should be primary color when filter active', (tester) async {
+      final notifier = LocationFilterNotifier();
+      notifier.updateFilter(LocationFilter(province: 'Pangasinan'));
+
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            locationFilterProvider.overrideWith((ref) => LocationFilter(province: 'Pangasinan')),
+            locationFilterProvider.overrideWith((ref) => notifier),
           ],
           child: MaterialApp(
             home: Scaffold(

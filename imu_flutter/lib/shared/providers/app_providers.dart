@@ -206,6 +206,22 @@ final offlineAuthProvider = Provider<OfflineAuthService>((ref) {
 
 // ==================== Client Providers ====================
 
+/// Client by ID provider - fetches a single client from Hive cache
+/// Used by router for deep linking to client detail pages and forms
+final clientByIdProvider = FutureProvider.family<Client, String>((ref, clientId) async {
+  final hiveService = ref.watch(hiveServiceProvider);
+
+  if (!hiveService.isInitialized) {
+    await hiveService.init();
+  }
+
+  final clientData = hiveService.getClient(clientId);
+  if (clientData == null) {
+    throw Exception('Client not found: $clientId');
+  }
+
+  return Client.fromJson(clientData);
+});
 
 // ==================== Online-Only Client Providers ====================
 
