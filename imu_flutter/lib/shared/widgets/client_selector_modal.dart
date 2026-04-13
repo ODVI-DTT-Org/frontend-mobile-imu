@@ -31,6 +31,8 @@ import '../../shared/providers/app_providers.dart' show
     myDayApiServiceProvider,
     locationFilterProvider,
     clientAttributeFilterProvider;
+import '../models/client_attribute_filter.dart' show ClientAttributeFilter;
+import '../models/location_filter.dart' show LocationFilter;
 import 'client/touchpoint_progress_badge.dart';
 import 'client/touchpoint_status_badge.dart';
 import 'client/client_status_badge.dart';
@@ -850,18 +852,18 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     attributeFilter: ref.watch(clientAttributeFilterProvider),
                     onRemove: (filterType) {
                       // Handle filter removal
-                      if (filterType is FilterType.location) {
+                      if (filterType == FilterType.location) {
                         ref.read(locationFilterProvider.notifier).state = LocationFilter.none();
-                      } else if (filterType is FilterType.clientType) {
+                      } else if (filterType == FilterType.clientType) {
                         final currentFilter = ref.read(clientAttributeFilterProvider);
                         ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(clientType: null);
-                      } else if (filterType is FilterType.marketType) {
+                      } else if (filterType == FilterType.marketType) {
                         final currentFilter = ref.read(clientAttributeFilterProvider);
                         ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(marketType: null);
-                      } else if (filterType is FilterType.pensionType) {
+                      } else if (filterType == FilterType.pensionType) {
                         final currentFilter = ref.read(clientAttributeFilterProvider);
                         ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(pensionType: null);
-                      } else if (filterType is FilterType.productType) {
+                      } else if (filterType == FilterType.productType) {
                         final currentFilter = ref.read(clientAttributeFilterProvider);
                         ref.read(clientAttributeFilterProvider.notifier).state = currentFilter.copyWith(productType: null);
                       }

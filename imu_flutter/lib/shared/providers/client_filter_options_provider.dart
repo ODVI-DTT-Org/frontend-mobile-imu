@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/filter/client_filter_options_service.dart';
 import '../../services/api/client_filter_api_service.dart';
 import '../../services/api/client_api_service.dart';
+import '../models/client_filter_options.dart';
 import 'app_providers.dart' show powerSyncDatabaseProvider, clientApiServiceProvider;
 
 /// Service provider for filter options
@@ -12,6 +13,7 @@ final clientFilterOptionsServiceProvider =
   final powerSync = ref.watch(powerSyncDatabaseProvider).value;
 
   final apiService = ClientFilterApiService();
+  // Service handles null PowerSync - will fall back to API
   return ClientFilterOptionsService(apiService, powerSync);
 });
 

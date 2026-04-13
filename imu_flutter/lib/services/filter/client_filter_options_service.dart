@@ -4,16 +4,23 @@ import '../api/client_filter_api_service.dart';
 import '../../shared/models/client_filter_options.dart';
 import '../../features/clients/data/models/client_model.dart';
 import 'package:flutter/foundation.dart';
+import 'client_filter_exceptions.dart';
 
 class ClientFilterOptionsService {
   final ClientFilterApiService _apiService;
-  final PowerSyncDatabase _powerSync;
+  final PowerSyncDatabase? _powerSync;
 
   ClientFilterOptionsService(this._apiService, this._powerSync);
 
   /// Fetch filter options using PowerSync (offline-first)
   /// Falls back to API only if PowerSync fails or returns empty results
   Future<ClientFilterOptions> fetchOptions() async {
+    // If PowerSync is not available, fall back to API immediately
+    if (_powerSync == null) {
+      debugPrint('[ClientFilterOptionsService] PowerSync not available, using API');
+      return await _apiService.fetchFilterOptions();
+    }
+
     try {
       debugPrint('[ClientFilterOptionsService] Fetching from PowerSync...');
       final options = await _fetchFromPowerSync();
@@ -33,39 +40,54 @@ class ClientFilterOptionsService {
       } else {
         debugPrint('[ClientFilterOptionsService] PowerSync returned empty, falling back to API');
       }
+    } on PowerSyncUnavailableException catch (e) {
+      // Re-throw PowerSync-specific exceptions
+      debugPrint('[ClientFilterOptionsService] PowerSync unavailable: $e');
+      rethrow;
     } catch (e) {
       debugPrint('[ClientFilterOptionsService] PowerSync failed: $e, falling back to API');
     }
 
     // Fallback to API
-    return await _apiService.fetchFilterOptions();
+    try {
+      return await _apiService.fetchFilterOptions();
+    } catch (e) {
+      throw FilterOptionsLoadException(
+        'Failed to load filter options from both PowerSync and API',
+        e,
+      );
+    }
   }
 
   /// Fetch distinct values from PowerSync using separate optimized queries
   Future<ClientFilterOptions> _fetchFromPowerSync() async {
+    if (_powerSync == null) {
+      throw PowerSyncUnavailableException('PowerSync database is not available');
+    }
+
     // Fetch each filter type separately for better performance and NULL handling
-    final clientTypesResult = await _powerSync.getAll('''
+    final clientTypesResult = await _powerSync!.getAll('''
       SELECT DISTINCT client_type
       FROM clients
       WHERE client_type IS NOT NULL
       ORDER BY client_type
     ''');
 
-    final marketTypesResult = await _powerSync.getAll('''
+    final marketTypesResult = await _powerSync!.getAll('''
       SELECT DISTINCT market_type
       FROM clients
       WHERE market_type IS NOT NULL
       ORDER BY market_type
     ''');
 
-    final pensionTypesResult = await _powerSync.getAll('''
+    final pensionTypesResult = await _powerSync!.getAll('''
       SELECT DISTINCT pension_type
       FROM clients
       WHERE pension_type IS NOT NULL
       ORDER BY pension_type
     ''');
 
-    final productTypesResult = await _powerSync.getAll('''
+    final productTypesResult = await _powerSync!.getAll('''
       SELECT DISTINCT product_type
       FROM clients
       WHERE product_type IS NOT NULL

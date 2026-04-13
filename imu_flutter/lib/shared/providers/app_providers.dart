@@ -50,6 +50,9 @@ export 'client_attribute_filter_provider.dart' show
 export 'client_filter_options_provider.dart' show
   clientFilterOptionsProvider,
   clientFilterOptionsServiceProvider;
+// Re-export client filter types
+export '../models/client_attribute_filter.dart' show ClientAttributeFilter;
+export '../../services/filter/client_filter_options_service.dart' show ClientFilterOptions;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -83,7 +86,9 @@ import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/area/area_filter_service.dart';
 import '../models/location_filter.dart';
+import '../models/client_attribute_filter.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
+import 'client_attribute_filter_provider.dart' show clientAttributeFilterProvider;
 
 // ==================== Service Providers ====================
 
