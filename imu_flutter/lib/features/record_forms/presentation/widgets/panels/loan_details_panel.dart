@@ -32,6 +32,7 @@ class LoanDetailsPanel extends StatelessWidget {
       children: [
         // UDI Number
         _buildTextInput(
+          context: context,
           label: 'UDI Number (Release Amount)',
           value: udiNumber,
           hint: 'Enter amount',
@@ -44,6 +45,7 @@ class LoanDetailsPanel extends StatelessWidget {
 
         // Product Type
         _buildDropdown<ProductType>(
+          context: context,
           label: 'Product Type',
           value: productType,
           items: ProductType.values,
@@ -55,6 +57,7 @@ class LoanDetailsPanel extends StatelessWidget {
 
         // Loan Type
         _buildDropdown<LoanType>(
+          context: context,
           label: 'Loan Type',
           value: loanType,
           items: LoanType.values,
