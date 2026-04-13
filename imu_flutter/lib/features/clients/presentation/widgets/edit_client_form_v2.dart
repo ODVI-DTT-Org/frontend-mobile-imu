@@ -63,6 +63,24 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
   final _panController = TextEditingController();
   final _remarksController = TextEditingController();
 
+  // Legacy PCNICMS field controllers
+  final _extNameController = TextEditingController();
+  final _fullnameController = TextEditingController();
+  final _fullAddressController = TextEditingController();
+  final _accountCodeController = TextEditingController();
+  final _accountNumberController = TextEditingController();
+  final _rankController = TextEditingController();
+  final _monthlyPensionAmountController = TextEditingController();
+  final _monthlyPensionGrossController = TextEditingController();
+  final _atmNumberController = TextEditingController();
+  final _applicableRepublicActController = TextEditingController();
+  final _unitCodeController = TextEditingController();
+  final _pcniAcctCodeController = TextEditingController();
+  final _dobController = TextEditingController();
+  final _gCompanyController = TextEditingController();
+  final _gStatusController = TextEditingController();
+  final _statusController = TextEditingController();
+
   // Location dropdown values
   PsgcRegion? _selectedRegion;
   PsgcProvince? _selectedProvince;
@@ -96,6 +114,7 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     'product': true,
     'location': true,
     'remarks': false,
+    'legacy': false,  // Legacy PCNICMS Information
   };
 
   @override
@@ -122,6 +141,25 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     _tenureController.dispose();
     _panController.dispose();
     _remarksController.dispose();
+
+    // Dispose legacy PCNICMS field controllers
+    _extNameController.dispose();
+    _fullnameController.dispose();
+    _fullAddressController.dispose();
+    _accountCodeController.dispose();
+    _accountNumberController.dispose();
+    _rankController.dispose();
+    _monthlyPensionAmountController.dispose();
+    _monthlyPensionGrossController.dispose();
+    _atmNumberController.dispose();
+    _applicableRepublicActController.dispose();
+    _unitCodeController.dispose();
+    _pcniAcctCodeController.dispose();
+    _dobController.dispose();
+    _gCompanyController.dispose();
+    _gStatusController.dispose();
+    _statusController.dispose();
+
     _scrollController.dispose();
     super.dispose();
   }
@@ -313,6 +351,24 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
 
     // Remarks
     _remarksController.text = _client!.remarks ?? '';
+
+    // Legacy PCNICMS fields
+    _extNameController.text = _client!.extName ?? '';
+    _fullnameController.text = _client!.fullname ?? '';
+    _fullAddressController.text = _client!.fullAddress ?? '';
+    _accountCodeController.text = _client!.accountCode ?? '';
+    _accountNumberController.text = _client!.accountNumber ?? '';
+    _rankController.text = _client!.rank ?? '';
+    _monthlyPensionAmountController.text = _client!.monthlyPensionAmount?.toString() ?? '';
+    _monthlyPensionGrossController.text = _client!.monthlyPensionGross?.toString() ?? '';
+    _atmNumberController.text = _client!.atmNumber ?? '';
+    _applicableRepublicActController.text = _client!.applicableRepublicAct ?? '';
+    _unitCodeController.text = _client!.unitCode ?? '';
+    _pcniAcctCodeController.text = _client!.pcniAcctCode ?? '';
+    _dobController.text = _client!.dob ?? '';
+    _gCompanyController.text = _client!.gCompany ?? '';
+    _gStatusController.text = _client!.gStatus ?? '';
+    _statusController.text = _client!.status ?? 'active';
   }
 
   String _getProductTypeLabel(ProductType type) {
@@ -426,6 +482,55 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         agencyId: _client?.agencyId,
         userId: _client?.userId,
         psgcId: _client?.psgcId,
+        // Legacy PCNICMS fields
+        extName: _extNameController.text.trim().isEmpty
+            ? null
+            : _extNameController.text.trim(),
+        fullname: _fullnameController.text.trim().isEmpty
+            ? null
+            : _fullnameController.text.trim(),
+        fullAddress: _fullAddressController.text.trim().isEmpty
+            ? null
+            : _fullAddressController.text.trim(),
+        accountCode: _accountCodeController.text.trim().isEmpty
+            ? null
+            : _accountCodeController.text.trim(),
+        accountNumber: _accountNumberController.text.trim().isEmpty
+            ? null
+            : _accountNumberController.text.trim(),
+        rank: _rankController.text.trim().isEmpty
+            ? null
+            : _rankController.text.trim(),
+        monthlyPensionAmount: _monthlyPensionAmountController.text.trim().isEmpty
+            ? null
+            : double.tryParse(_monthlyPensionAmountController.text.trim()),
+        monthlyPensionGross: _monthlyPensionGrossController.text.trim().isEmpty
+            ? null
+            : double.tryParse(_monthlyPensionGrossController.text.trim()),
+        atmNumber: _atmNumberController.text.trim().isEmpty
+            ? null
+            : _atmNumberController.text.trim(),
+        applicableRepublicAct: _applicableRepublicActController.text.trim().isEmpty
+            ? null
+            : _applicableRepublicActController.text.trim(),
+        unitCode: _unitCodeController.text.trim().isEmpty
+            ? null
+            : _unitCodeController.text.trim(),
+        pcniAcctCode: _pcniAcctCodeController.text.trim().isEmpty
+            ? null
+            : _pcniAcctCodeController.text.trim(),
+        dob: _dobController.text.trim().isEmpty
+            ? null
+            : _dobController.text.trim(),
+        gCompany: _gCompanyController.text.trim().isEmpty
+            ? null
+            : _gCompanyController.text.trim(),
+        gStatus: _gStatusController.text.trim().isEmpty
+            ? null
+            : _gStatusController.text.trim(),
+        status: _statusController.text.trim().isEmpty
+            ? 'active'
+            : _statusController.text.trim(),
       );
 
       debugPrint('[EditClientFormV2] Submitting client edit: ${widget.clientId}');
@@ -710,6 +815,18 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
           ),
           const SizedBox(height: 12),
           _buildRemarksSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Legacy PCNICMS Information Section
+          _buildSectionHeader(
+            title: 'Legacy PCNICMS Information',
+            icon: LucideIcons.database,
+            sectionKey: 'legacy',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildLegacySection(colorScheme),
 
           const SizedBox(height: 32),
 
@@ -1427,6 +1544,237 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         border: OutlineInputBorder(),
       ),
       maxLines: 4,
+    );
+  }
+
+  Widget _buildLegacySection(ColorScheme colorScheme) {
+    if (!_expandedSections['legacy']!) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Name Fields (Legacy)
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _extNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Extension Name',
+                  hintText: 'Jr., Sr., III',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: TextFormField(
+                controller: _fullnameController,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name (Legacy)',
+                  hintText: 'LASTNAME, FIRSTNAME MIDDLENAME',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Address (Legacy)
+        TextFormField(
+          controller: _fullAddressController,
+          decoration: const InputDecoration(
+            labelText: 'Full Address (Legacy)',
+            hintText: 'Complete address from old system',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          maxLines: 2,
+        ),
+        const SizedBox(height: 16),
+
+        // Account Fields
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _accountCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Account Code',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _accountNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'Account Number',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Rank and ATM
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _rankController,
+                decoration: const InputDecoration(
+                  labelText: 'Rank',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _atmNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'ATM Number',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Pension Amounts
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _monthlyPensionAmountController,
+                decoration: const InputDecoration(
+                  labelText: 'Monthly Pension Amount',
+                  prefixText: '₱',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _monthlyPensionGrossController,
+                decoration: const InputDecoration(
+                  labelText: 'Monthly Pension Gross',
+                  prefixText: '₱',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Republic Act and Unit Code
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _applicableRepublicActController,
+                decoration: const InputDecoration(
+                  labelText: 'Applicable Republic Act',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _unitCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Unit Code',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // PCNI Account Code
+        TextFormField(
+          controller: _pcniAcctCodeController,
+          decoration: const InputDecoration(
+            labelText: 'PCNI Account Code',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Date of Birth (Legacy)
+        TextFormField(
+          controller: _dobController,
+          decoration: const InputDecoration(
+            labelText: 'Date of Birth (Legacy)',
+            hintText: 'YYYY-MM-DD',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Government Fields
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _gCompanyController,
+                decoration: const InputDecoration(
+                  labelText: 'G Company',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _gStatusController,
+                decoration: const InputDecoration(
+                  labelText: 'G Status',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Status
+        TextFormField(
+          controller: _statusController,
+          decoration: const InputDecoration(
+            labelText: 'Status',
+            hintText: 'active',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+      ],
     );
   }
 }

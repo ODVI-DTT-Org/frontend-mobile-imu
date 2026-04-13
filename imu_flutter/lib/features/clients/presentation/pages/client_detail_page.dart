@@ -1687,7 +1687,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                       ),
                     if (_client!.fullname != null)
                       _InfoRow(
-                        icon: LucideIcons.identification,
+                        icon: LucideIcons.user,
                         label: 'Full Name',
                         value: _client!.fullname!,
                       ),

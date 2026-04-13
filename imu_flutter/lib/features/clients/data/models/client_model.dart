@@ -132,7 +132,7 @@ class Client {
     return '$lastName, ${firstMiddle.join(' ')}';
   }
 
-  String get fullAddress {
+  String get computedFullAddress {
     final parts = <String>[];
     if (barangay != null && barangay!.isNotEmpty) parts.add(barangay!);
     if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
@@ -446,7 +446,7 @@ class Client {
       // Legacy PCNICMS fields
       'extName': extName,
       'fullname': fullname,
-      'fullAddress': fullAddress,
+      'fullAddress': fullAddress, // Uses the legacy field, not computedFullAddress
       'accountCode': accountCode,
       'accountNumber': accountNumber,
       'rank': rank,
