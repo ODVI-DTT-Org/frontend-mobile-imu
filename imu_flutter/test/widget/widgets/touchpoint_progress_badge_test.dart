@@ -11,7 +11,7 @@ Client createTestClient({int touchpointCount = 0}) {
     firstName: 'Test',
     lastName: 'Client',
     clientType: ClientType.potential,
-    productType: ProductType.sssPensioner,
+    productType: ProductType.pnpPension,
     pensionType: PensionType.sss,
     createdAt: now,
     touchpoints: List.generate(

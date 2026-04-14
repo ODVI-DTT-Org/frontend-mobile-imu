@@ -261,7 +261,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     await _authService.logout();
     if (!mounted) return;
-    state = AuthState.initial();
+    // Fix: Set isLoading: false after logout to prevent login button being disabled
+    state = AuthState.initial().copyWith(isLoading: false);
   }
 
   /// Refresh authentication

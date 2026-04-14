@@ -327,12 +327,15 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     }
     final fullClient = Client.fromJson(clientData);
 
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RecordTouchpointForm(
-          client: fullClient,
-        ),
+    // Show as bottom sheet instead of full screen
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => _RecordTouchpointBottomSheet(
+        client: fullClient,
+        ref: ref,
       ),
     );
 
@@ -358,12 +361,15 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     }
     final fullClient = Client.fromJson(clientData);
 
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RecordVisitOnlyForm(
-          client: fullClient,
-        ),
+    // Show as bottom sheet instead of full screen
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => _RecordVisitOnlyBottomSheet(
+        client: fullClient,
+        ref: ref,
       ),
     );
 
@@ -388,12 +394,15 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     }
     final fullClient = Client.fromJson(clientData);
 
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ReleaseLoanForm(
-          client: fullClient,
-        ),
+    // Show as bottom sheet instead of full screen
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => _ReleaseLoanBottomSheet(
+        client: fullClient,
+        ref: ref,
       ),
     );
 
@@ -757,7 +766,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           children: [
             // Header - centered title (per Figma)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               child: Row(
                 children: [
                   const Spacer(),
@@ -774,28 +783,30 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
               ),
             ),
 
+            const SizedBox(height: 16),
+
             // Tab filter (Tomorrow / Today / Yesterday) with calendar button (per Figma)
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 17),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFF1F5F9), // gray-100
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: _buildTabPill('Tomorrow', 'Tomorrow'),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: _buildTabPill('Today', 'Today'),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: _buildTabPill('Yesterday', 'Yesterday'),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   // Calendar button
                   GestureDetector(
                     onTap: _showCalendarPicker,
@@ -823,7 +834,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             // Selected date indicator (when using calendar)
             if (_selectedCalendarDate != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -834,7 +845,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                         color: Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () {
                         setState(() {
@@ -844,7 +855,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                       },
                       child: Icon(
                         LucideIcons.x,
-                        size: 16,
+                        size: 18,
                         color: Colors.grey.shade500,
                       ),
                     ),
@@ -852,12 +863,12 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                 ),
               ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
             // Multi-select header buttons (shown only in multi-select mode)
             if (_isMultiSelectMode)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: _MultiSelectHeaderButtons(
                   selectedCount: _selectedVisitIds.length,
                   onSubmitVisit: _onBulkSubmitVisit,
@@ -897,6 +908,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                     return PullToRefresh(
                       onRefresh: _handleRefresh,
                       child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         children: [
                           SizedBox(
                             height: MediaQuery.of(context).size.height * 0.4,
@@ -917,7 +929,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                                       color: Colors.grey.shade400,
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 24),
                                   Text(
                                     'No visits scheduled for ${_getSelectedTabLabel()}',
                                     style: TextStyle(
@@ -926,7 +938,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                                       color: Colors.grey.shade700,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 12),
                                   Text(
                                     'Tap the + button to schedule a visit',
                                     style: TextStyle(
@@ -934,7 +946,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                                       color: Colors.grey.shade500,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Text(
                                     'or select a different date',
                                     style: TextStyle(
@@ -954,7 +966,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                   return PullToRefresh(
                     onRefresh: _handleRefresh,
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       itemCount: filteredItems.length,
                       itemBuilder: (context, index) {
                         final visit = filteredItems[index];
@@ -1432,14 +1444,16 @@ class _VisitFormModalState extends State<_VisitFormModal> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _timeArrival = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _timeDeparture = const TimeOfDay(hour: 9, minute: 30);
-  String _productType = 'SSS Pensioner';
+  String _productType = 'BFP ACTIVE';
   String _reason = 'INTERESTED';
   int _touchpoint = 1;
 
   final List<String> _productTypes = [
-    'SSS Pensioner',
-    'GSIS Pensioner',
-    'Private',
+    'BFP ACTIVE',
+    'BFP PENSION',
+    'PNP PENSION',
+    'NAPOLCOM',
+    'BFP STP',
   ];
 
   final List<String> _reasons = [
@@ -2118,6 +2132,276 @@ class _PillButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet wrapper for Record Touchpoint form
+class _RecordTouchpointBottomSheet extends ConsumerStatefulWidget {
+  final Client client;
+  final WidgetRef ref;
+
+  const _RecordTouchpointBottomSheet({
+    required this.client,
+    required this.ref,
+  });
+
+  @override
+  ConsumerState<_RecordTouchpointBottomSheet> createState() => _RecordTouchpointBottomSheetState();
+}
+
+class _RecordTouchpointBottomSheetState extends ConsumerState<_RecordTouchpointBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Record Touchpoint',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.client.fullName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Form content
+          Expanded(
+            child: RecordTouchpointForm(
+              key: ValueKey('touchpoint_form_${widget.client.id}'),
+              client: widget.client,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet wrapper for Record Visit Only form
+class _RecordVisitOnlyBottomSheet extends ConsumerStatefulWidget {
+  final Client client;
+  final WidgetRef ref;
+
+  const _RecordVisitOnlyBottomSheet({
+    required this.client,
+    required this.ref,
+  });
+
+  @override
+  ConsumerState<_RecordVisitOnlyBottomSheet> createState() => _RecordVisitOnlyBottomSheetState();
+}
+
+class _RecordVisitOnlyBottomSheetState extends ConsumerState<_RecordVisitOnlyBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Record Visit Only',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.client.fullName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Form content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: RecordVisitOnlyForm(
+                key: ValueKey('visit_only_form_${widget.client.id}'),
+                client: widget.client,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet wrapper for Release Loan form
+class _ReleaseLoanBottomSheet extends ConsumerStatefulWidget {
+  final Client client;
+  final WidgetRef ref;
+
+  const _ReleaseLoanBottomSheet({
+    required this.client,
+    required this.ref,
+  });
+
+  @override
+  ConsumerState<_ReleaseLoanBottomSheet> createState() => _ReleaseLoanBottomSheetState();
+}
+
+class _ReleaseLoanBottomSheetState extends ConsumerState<_ReleaseLoanBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Release Loan',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.client.fullName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Form content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ReleaseLoanForm(
+                key: ValueKey('release_loan_form_${widget.client.id}'),
+                client: widget.client,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

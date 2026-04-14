@@ -69,12 +69,16 @@ class ClientAttributeFilter {
   /// Convert ProductType enum to API value format
   String _getProductTypeApiValue(ProductType type) {
     switch (type) {
-      case ProductType.sssPensioner:
-        return 'SSS_PENSIONER';
-      case ProductType.gsisPensioner:
-        return 'GSIS_PENSIONER';
-      case ProductType.private:
-        return 'PRIVATE';
+      case ProductType.bfpActive:
+        return 'BFP ACTIVE';
+      case ProductType.bfpPension:
+        return 'BFP PENSION';
+      case ProductType.pnpPension:
+        return 'PNP PENSION';
+      case ProductType.napolcom:
+        return 'NAPOLCOM';
+      case ProductType.bfpStp:
+        return 'BFP STP';
     }
   }
 

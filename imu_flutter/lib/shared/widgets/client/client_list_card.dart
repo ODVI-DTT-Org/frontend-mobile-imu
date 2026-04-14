@@ -84,7 +84,7 @@ class ClientListCard extends ConsumerWidget {
       middleName: null,
       lastName: '', // Will be overridden
       clientType: ClientType.existing,
-      productType: ProductType.private,
+      productType: ProductType.bfpActive,
       pensionType: PensionType.private,
       createdAt: DateTime.now(),
     );
@@ -147,7 +147,7 @@ class ClientListCard extends ConsumerWidget {
       middleName: null,
       lastName: '', // Will be overridden
       clientType: ClientType.existing,
-      productType: ProductType.private,
+      productType: ProductType.bfpActive,
       pensionType: PensionType.private,
       createdAt: DateTime.now(),
     );

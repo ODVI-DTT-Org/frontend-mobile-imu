@@ -469,7 +469,7 @@ class ClientApiService {
         if (client.payrollDate != null) 'payroll_date': client.payrollDate,
         if (client.tenure != null) 'tenure': client.tenure,
         'client_type': client.clientType.name.toUpperCase(),
-        if (client.productType != ProductType.sssPensioner) 'product_type': _getProductTypeValue(client.productType),
+        if (client.productType != ProductType.bfpActive) 'product_type': _getProductTypeValue(client.productType),
         if (client.marketType != null) 'market_type': client.marketType!.name.toUpperCase(),
         'pension_type': client.pensionType.name.toUpperCase(),
         if (client.pan != null) 'pan': client.pan,
@@ -571,7 +571,7 @@ class ClientApiService {
         if (client.payrollDate != null) 'payroll_date': client.payrollDate,
         if (client.tenure != null) 'tenure': client.tenure,
         'client_type': client.clientType.name.toUpperCase(),
-        if (client.productType != ProductType.sssPensioner) 'product_type': _getProductTypeValue(client.productType),
+        if (client.productType != ProductType.bfpActive) 'product_type': _getProductTypeValue(client.productType),
         if (client.marketType != null) 'market_type': client.marketType!.name.toUpperCase(),
         'pension_type': client.pensionType.name.toUpperCase(),
         if (client.pan != null) 'pan': client.pan,
@@ -851,12 +851,16 @@ class ClientApiService {
   /// Helper to convert ProductType enum to API value
   String _getProductTypeValue(ProductType type) {
     switch (type) {
-      case ProductType.sssPensioner:
-        return 'PENSION_LOAN';
-      case ProductType.gsisPensioner:
-        return 'GSIS_PENSION_LOAN';
-      case ProductType.private:
-        return 'CASH_LOAN';
+      case ProductType.bfpActive:
+        return 'BFP ACTIVE';
+      case ProductType.bfpPension:
+        return 'BFP PENSION';
+      case ProductType.pnpPension:
+        return 'PNP PENSION';
+      case ProductType.napolcom:
+        return 'NAPOLCOM';
+      case ProductType.bfpStp:
+        return 'BFP STP';
     }
   }
 }

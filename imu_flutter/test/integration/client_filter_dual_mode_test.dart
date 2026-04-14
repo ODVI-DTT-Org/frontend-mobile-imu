@@ -16,7 +16,7 @@ void main() {
             lastName: 'Doe',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -26,7 +26,7 @@ void main() {
             lastName: 'Smith',
             clientType: ClientType.existing, // Different client type
             marketType: MarketType.residential,
-            productType: ProductType.gsisPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.gsis,
             createdAt: DateTime.now(),
           ),
@@ -36,7 +36,7 @@ void main() {
             lastName: 'Johnson',
             clientType: ClientType.potential,
             marketType: MarketType.commercial, // Different market type
-            productType: ProductType.private,
+            productType: ProductType.bfpActive,
             pensionType: PensionType.private,
             createdAt: DateTime.now(),
           ),
@@ -46,7 +46,7 @@ void main() {
             lastName: 'Williams',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.gsisPensioner, // Different product type
+            productType: ProductType.pnpPension, // Different product type
             pensionType: PensionType.gsis,
             createdAt: DateTime.now(),
           ),
@@ -79,7 +79,7 @@ void main() {
             lastName: 'Match',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -89,7 +89,7 @@ void main() {
             lastName: 'ClientType',
             clientType: ClientType.existing, // Wrong
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -99,7 +99,7 @@ void main() {
             lastName: 'MarketType',
             clientType: ClientType.potential,
             marketType: MarketType.commercial, // Wrong
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -109,7 +109,7 @@ void main() {
             lastName: 'ProductType',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.gsisPensioner, // Wrong
+            productType: ProductType.pnpPension, // Wrong
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -119,7 +119,7 @@ void main() {
             lastName: 'PensionType',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.gsis, // Wrong
             createdAt: DateTime.now(),
           ),
@@ -130,7 +130,7 @@ void main() {
           clientType: ClientType.potential,
           marketType: MarketType.residential,
           pensionType: PensionType.sss,
-          productType: ProductType.sssPensioner,
+          productType: ProductType.pnpPension,
         );
 
         final filtered = testClients.where(filter.matches).toList();
@@ -148,7 +148,7 @@ void main() {
             lastName: 'Doe',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -158,7 +158,7 @@ void main() {
             lastName: 'Smith',
             clientType: ClientType.existing,
             marketType: MarketType.commercial,
-            productType: ProductType.gsisPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.gsis,
             createdAt: DateTime.now(),
           ),
@@ -179,7 +179,7 @@ void main() {
             lastName: 'Doe',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
             addresses: [], // Empty addresses
@@ -201,7 +201,7 @@ void main() {
           clientType: ClientType.potential,
           marketType: MarketType.residential,
           pensionType: PensionType.sss,
-          productType: ProductType.sssPensioner,
+          productType: ProductType.pnpPension,
         );
 
         final params = filter.toQueryParams();
@@ -230,17 +230,17 @@ void main() {
 
       test('converts product type enum values to correct API format', () {
         final sssFilter = ClientAttributeFilter(
-          productType: ProductType.sssPensioner,
+          productType: ProductType.pnpPension,
         );
         expect(sssFilter.toQueryParams()['product_type'], 'SSS_PENSIONER');
 
         final gsisFilter = ClientAttributeFilter(
-          productType: ProductType.gsisPensioner,
+          productType: ProductType.pnpPension,
         );
         expect(gsisFilter.toQueryParams()['product_type'], 'GSIS_PENSIONER');
 
         final privateFilter = ClientAttributeFilter(
-          productType: ProductType.private,
+          productType: ProductType.bfpActive,
         );
         expect(privateFilter.toQueryParams()['product_type'], 'PRIVATE');
       });
@@ -305,7 +305,7 @@ void main() {
           clientType: ClientType.potential,
           marketType: MarketType.residential,
           pensionType: PensionType.sss,
-          productType: ProductType.sssPensioner,
+          productType: ProductType.pnpPension,
         );
         expect(filter4.activeFilterCount, 4);
       });
@@ -384,7 +384,7 @@ void main() {
             lastName: 'Doe',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -410,7 +410,7 @@ void main() {
             lastName: 'Doe',
             clientType: ClientType.potential,
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),
@@ -420,7 +420,7 @@ void main() {
             lastName: 'Smith',
             clientType: ClientType.existing, // Different
             marketType: MarketType.residential,
-            productType: ProductType.sssPensioner,
+            productType: ProductType.pnpPension,
             pensionType: PensionType.sss,
             createdAt: DateTime.now(),
           ),

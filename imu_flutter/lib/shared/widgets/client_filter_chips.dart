@@ -136,12 +136,16 @@ String _formatPensionType(PensionType type) {
 
 String _formatProductType(ProductType type) {
   switch (type) {
-    case ProductType.sssPensioner:
-      return 'SSS Pensioner';
-    case ProductType.gsisPensioner:
-      return 'GSIS Pensioner';
-    case ProductType.private:
-      return 'Private';
+    case ProductType.bfpActive:
+      return 'BFP ACTIVE';
+    case ProductType.bfpPension:
+      return 'BFP PENSION';
+    case ProductType.pnpPension:
+      return 'PNP PENSION';
+    case ProductType.napolcom:
+      return 'NAPOLCOM';
+    case ProductType.bfpStp:
+      return 'BFP STP';
   }
 }
 

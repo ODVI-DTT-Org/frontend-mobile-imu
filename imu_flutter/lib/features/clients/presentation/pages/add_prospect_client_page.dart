@@ -55,7 +55,7 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
   String? _selectedAgency;
   String? _selectedEmploymentStatus;
   String? _selectedPayrollDate;
-  String _selectedProductType = 'SSS Pensioner';
+  String _selectedProductType = 'BFP ACTIVE';
   String _selectedPensionType = 'SSS';
   String _selectedMarketType = 'Residential';
   DateTime? _selectedBirthDate;
@@ -383,14 +383,18 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
 
   ProductType _parseProductType(String value) {
     switch (value.toLowerCase()) {
-      case 'sss pensioner':
-        return ProductType.sssPensioner;
-      case 'gsis pensioner':
-        return ProductType.gsisPensioner;
-      case 'private':
-        return ProductType.private;
+      case 'bfp active':
+        return ProductType.bfpActive;
+      case 'bfp pension':
+        return ProductType.bfpPension;
+      case 'pnp pension':
+        return ProductType.pnpPension;
+      case 'napolcom':
+        return ProductType.napolcom;
+      case 'bfp stp':
+        return ProductType.bfpStp;
       default:
-        return ProductType.sssPensioner;
+        return ProductType.bfpActive;
     }
   }
 
@@ -494,7 +498,7 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
                                   DropdownButtonFormField<String>(
                                     value: _selectedProductType,
                                     decoration: _inputDecoration,
-                                    items: ['SSS Pensioner', 'GSIS Pensioner', 'Private']
+                                    items: ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP']
                                         .map((type) => DropdownMenuItem(
                                               value: type,
                                               child: Text(type),
@@ -505,11 +509,7 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
                                         HapticUtils.lightImpact();
                                         setState(() {
                                           _selectedProductType = value;
-                                          if (value == 'SSS Pensioner') {
-                                            _selectedPensionType = 'SSS';
-                                          } else if (value == 'GSIS Pensioner') {
-                                            _selectedPensionType = 'GSIS';
-                                          }
+                                          // No auto-set for pension type with new product types
                                         });
                                       }
                                     },

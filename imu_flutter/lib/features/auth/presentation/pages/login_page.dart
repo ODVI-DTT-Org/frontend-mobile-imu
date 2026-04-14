@@ -200,13 +200,43 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                   ),
 
-                // Logo
+                // Logo with background opacity across the page
                 Center(
-                  child: Image.asset(
-                    'assets/images/imu_logo_optimized.webp',
-                    width: 120,
-                    height: 120,
-                    fit: BoxFit.contain,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Semi-transparent background overlay
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                      ),
+                      // Logo container
+                      Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/images/imu_logo_updated.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),

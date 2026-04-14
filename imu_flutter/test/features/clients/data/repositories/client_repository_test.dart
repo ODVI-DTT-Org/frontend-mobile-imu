@@ -9,7 +9,7 @@ void main() {
         firstName: 'John',
         lastName: 'Doe',
         clientType: ClientType.potential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime(2024, 1, 1),
       );
@@ -18,7 +18,7 @@ void main() {
       expect(client.firstName, 'John');
       expect(client.lastName, 'Doe');
       expect(client.clientType, ClientType.potential);
-      expect(client.productType, ProductType.sssPensioner);
+      expect(client.productType, ProductType.pnpPension);
       expect(client.pensionType, PensionType.sss);
     });
 
@@ -28,7 +28,7 @@ void main() {
         firstName: 'John',
         lastName: 'Doe',
         clientType: ClientType.potential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime(2024, 1, 1),
       );
@@ -42,7 +42,7 @@ void main() {
         firstName: 'John',
         lastName: 'Doe',
         clientType: ClientType.potential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime(2024, 1, 1),
       );
@@ -77,9 +77,9 @@ void main() {
     });
 
     test('ProductType enum values are correct', () {
-      expect(ProductType.sssPensioner, ProductType.sssPensioner);
-      expect(ProductType.gsisPensioner, ProductType.gsisPensioner);
-      expect(ProductType.private, ProductType.private);
+      expect(ProductType.pnpPension, ProductType.pnpPension);
+      expect(ProductType.pnpPension, ProductType.pnpPension);
+      expect(ProductType.bfpActive, ProductType.bfpActive);
     });
   });
 
