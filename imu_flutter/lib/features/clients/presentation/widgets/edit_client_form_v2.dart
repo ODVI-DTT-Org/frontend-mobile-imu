@@ -431,7 +431,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         loanReleased: _client?.loanReleased ?? false,
         loanReleasedAt: _client?.loanReleasedAt,
         agencyId: _client?.agencyId,
-        userId: _client?.userId,
         psgcId: _client?.psgcId,
       );
 

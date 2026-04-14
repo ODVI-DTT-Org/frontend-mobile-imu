@@ -147,8 +147,8 @@ class ClientRepository {
           id, first_name, last_name, middle_name, birth_date, email, phone,
           agency_name, department, position, employment_status, payroll_date,
           tenure, client_type, product_type, market_type, pension_type, pan,
-          facebook_link, remarks, agency_id, caravan_id, is_starred, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          facebook_link, remarks, agency_id, is_starred, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         [
           id,
           client.firstName,
@@ -171,7 +171,6 @@ class ClientRepository {
           client.facebookLink,
           client.remarks,
           client.agencyId,
-          client.userId,
           client.isStarred ? 1 : 0,
           now,
           now,
@@ -198,7 +197,7 @@ class ClientRepository {
           position = ?, employment_status = ?, payroll_date = ?, tenure = ?,
           client_type = ?, product_type = ?, market_type = ?, pension_type = ?,
           pan = ?, facebook_link = ?, remarks = ?, agency_id = ?,
-          caravan_id = ?, is_starred = ?, updated_at = ?
+          is_starred = ?, updated_at = ?
         WHERE id = ?''',
         [
           client.firstName,
@@ -221,7 +220,6 @@ class ClientRepository {
           client.facebookLink,
           client.remarks,
           client.agencyId,
-          client.userId,
           client.isStarred ? 1 : 0,
           DateTime.now().toIso8601String(),
           client.id,

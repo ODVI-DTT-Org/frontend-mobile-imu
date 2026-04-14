@@ -33,7 +33,6 @@ class Client {
   final String? email;
   final String? facebookLink;
   final String? agencyId;
-  final String? userId; // The user (caravan/tele) who owns this client
   final int? psgcId; // Foreign key to PSGC table (INTEGER in database)
   final String? region; // Region from PSGC (e.g., NCR, Region I)
   final String? province; // Province from PSGC (e.g., Metro Manila, Pangasinan)
@@ -80,7 +79,6 @@ class Client {
     this.email,
     this.facebookLink,
     this.agencyId,
-    this.userId,
     this.psgcId,
     this.region,
     this.province,
@@ -312,7 +310,6 @@ class Client {
     String? email,
     String? facebookLink,
     String? agencyId,
-    String? userId,
     int? psgcId,
     String? region,
     String? province,
@@ -354,7 +351,6 @@ class Client {
       email: email ?? this.email,
       facebookLink: facebookLink ?? this.facebookLink,
       agencyId: agencyId ?? this.agencyId,
-      userId: userId ?? this.userId,
       psgcId: psgcId ?? this.psgcId,
       region: region ?? this.region,
       province: province ?? this.province,
@@ -396,7 +392,6 @@ class Client {
       'email': email,
       'facebookLink': facebookLink,
       'agencyId': agencyId,
-      'userId': userId,
       'psgcId': psgcId,
       'region': region,
       'province': province,
@@ -517,7 +512,6 @@ class Client {
       email: json['email'],
       facebookLink: json['facebookLink'] ?? json['facebook_link'],
       agencyId: json['agencyId'] ?? json['agency_id'],
-      userId: json['userId'] ?? json['user_id'] ?? json['caravanId'] ?? json['caravan_id'],
       psgcId: json['psgcId'] ?? (json['psgc_id'] is int ? json['psgc_id'] : (json['psgc_id'] != null ? int.tryParse(json['psgc_id'].toString()) : null)),
       region: json['region'] ?? json['psgc_region'],
       province: json['province'] ?? json['psgc_province'],
@@ -580,7 +574,6 @@ class Client {
       facebookLink: row['facebook_link'] as String?,
       remarks: row['remarks'] as String?,
       agencyId: row['agency_id'] as String?,
-      userId: row['user_id'] as String? ?? row['caravan_id'] as String?,
       psgcId: row['psgc_id'] as int?,
       region: row['region'] as String?,
       province: row['province'] as String?,

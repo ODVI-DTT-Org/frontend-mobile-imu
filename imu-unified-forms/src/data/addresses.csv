@@ -1,0 +1,12 @@
+AddressID,ClientID,Street,Municipality,Province,IsDefault
+1,1,"Purok 5, Brgy. San Roque","Quezon City","Metro Manila",TRUE
+2,2,"Blk 12 Lot 3, Brgy. Sto. Niño","Caloocan","Metro Manila",TRUE
+3,3,"Zone 2, Brgy. Mabini","Legazpi City","Albay",TRUE
+4,4,"Purok 4, Brgy. Poblacion","San Fernando","Pampanga",TRUE
+5,5,"Brgy. Talisay","Nasugbu","Batangas",TRUE
+6,5,"Purok 6, Brgy. Wawa","Taguig","Metro Manila",FALSE
+7,10,"Brgy. Bagumbayan","Taguig","Metro Manila",TRUE
+8,11,"Zone 5, Brgy. Lapasan","Cagayan de Oro","Misamis Oriental",TRUE
+9,12,"Purok 8, Brgy. Pag-asa","San Jose","Nueva Ecija",TRUE
+10,13,"Brgy. San Miguel","Iloilo City","Iloilo",TRUE
+11,14,"Zone 3, Brgy. Maharlika","Baguio City","Benguet",TRUE

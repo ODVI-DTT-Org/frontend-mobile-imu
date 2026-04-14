@@ -230,7 +230,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         loanReleased: false,
         loanReleasedAt: null,
         agencyId: null,
-        userId: null,
         psgcId: null,
       );
 
