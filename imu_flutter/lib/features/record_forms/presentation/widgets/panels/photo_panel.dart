@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../../core/utils/app_notification.dart';
 
 class PhotoPanel extends StatelessWidget {
   final String? photoPath;
@@ -36,9 +37,7 @@ class PhotoPanel extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to capture photo: $e')),
-        );
+        AppNotification.showError(context, 'Failed to capture photo: $e');
       }
     }
   }

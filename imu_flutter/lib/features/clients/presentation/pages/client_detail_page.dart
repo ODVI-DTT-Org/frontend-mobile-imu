@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/client_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
@@ -431,17 +432,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         },
         onError: (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to delete client: $e')),
-            );
+            AppNotification.showError(context, 'Failed to delete client: $e');
           }
         },
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Client deleted')),
-        );
+        AppNotification.showSuccess(context, 'Client deleted');
         context.pop();
       }
     }
@@ -491,9 +488,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to delete client: $e')),
-                        );
+                        AppNotification.showError(context, 'Failed to delete client: $e');
                       }
                     }
                   }
@@ -671,9 +666,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     if (result != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Address added')),
-        );
+        AppNotification.showSuccess(context, 'Address added');
       }
       _loadClient();
     }
@@ -823,9 +816,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     if (result != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Phone number added')),
-        );
+        AppNotification.showSuccess(context, 'Phone number added');
       }
       _loadClient();
     }
@@ -847,12 +838,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     if (udiNumber == null || udiNumber.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('UDI number is required'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showWarning(context, 'UDI number is required');
       }
       return;
     }
@@ -872,32 +858,20 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Loan release submitted for approval (UDI: ${udiNumber.trim()})'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppNotification.showSuccess(context, 'Loan release submitted for approval (UDI: ${udiNumber.trim()})');
         // Reload client to show updated loan status
         _loadClient();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit loan release: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Failed to submit loan release: $e');
       }
     }
   }
 
   void _callClient(String? phone) {
     if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No phone number available')),
-      );
+      AppNotification.showError(context, 'No phone number available');
       return;
     }
     HapticUtils.lightImpact();
@@ -908,9 +882,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       operation: () async {
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Calling $phone...')),
-          );
+          AppNotification.showNeutral(context, 'Calling $phone...');
         }
       },
     );
@@ -918,9 +890,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   void _navigateToAddress(String? address) {
     if (address == null || address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No address available')),
-      );
+      AppNotification.showError(context, 'No address available');
       return;
     }
     HapticUtils.lightImpact();
@@ -948,9 +918,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open Google Maps: $e')),
-        );
+        AppNotification.showError(context, 'Could not open Google Maps: $e');
       }
     }
   }
@@ -962,18 +930,14 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open Google Maps: $e')),
-        );
+        AppNotification.showError(context, 'Could not open Google Maps: $e');
       }
     }
   }
 
   void _showMapForAddress(Address address) {
     if (address.latitude == null || address.longitude == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location coordinates not available')),
-      );
+      AppNotification.showError(context, 'Location coordinates not available');
       return;
     }
 
@@ -1026,9 +990,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       },
       onError: (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to open navigation: $e')),
-          );
+          AppNotification.showError(context, 'Failed to open navigation: $e');
         }
       },
     );
@@ -1041,12 +1003,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (_client!.loanReleased) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cannot create touchpoints: Loan has been released'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Cannot create touchpoints: Loan has been released');
       }
       return;
     }
@@ -1138,9 +1095,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ErrorService.showError(context, appError);
             } else {
               // Fallback to legacy error display
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to save touchpoint: $e')),
-              );
+              AppNotification.showError(context, 'Failed to save touchpoint: $e');
             }
           }
         },
@@ -1156,12 +1111,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (_client!.loanReleased) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cannot create touchpoints: Loan has been released'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Cannot create touchpoints: Loan has been released');
       }
       return;
     }
@@ -1192,12 +1142,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (_client!.loanReleased) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cannot create visit: Loan has been released'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Cannot create visit: Loan has been released');
       }
       return;
     }
@@ -1228,12 +1173,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (_client!.loanReleased) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Loan has already been released'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showWarning(context, 'Loan has already been released');
       }
       return;
     }
@@ -1568,70 +1508,23 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Action buttons
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey[200]!),
-                ),
-              ),
-              child: Consumer(
-                builder: (context, ref, _) {
-                  final authState = ref.watch(authNotifierProvider);
-                  final userRole = authState.user?.role?.apiValue;
-                  final canReleaseLoan = userRole == 'admin' || userRole == 'caravan' || userRole == 'tele';
-
-                  final isLoanReleased = _client!.loanReleased;
-
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _ActionButton(
-                          icon: LucideIcons.mapPin,
-                          label: 'Navigate',
-                          onTap: () => _navigateToAddress(primaryAddress?.fullAddress),
-                        ),
-                        const SizedBox(width: 8),
-                        _ActionButton(
-                          icon: LucideIcons.clipboardList,
-                          label: 'Record Touchpoint',
-                          onTap: isLoanReleased ? null : _handleRecordTouchpoint,
-                          isPrimary: true,
-                        ),
-                        const SizedBox(width: 8),
-                        _ActionButton(
-                          icon: LucideIcons.userCheck,
-                          label: 'Record Visit Only',
-                          onTap: isLoanReleased ? null : _handleRecordVisitOnly,
-                        ),
-                        const SizedBox(width: 8),
-                        if (canReleaseLoan && !isLoanReleased)
-                          _ActionButton(
-                            icon: LucideIcons.dollarSign,
-                            label: 'Release Loan',
-                            onTap: _handleReleaseLoanBottomSheet,
-                          ),
-                        if (canReleaseLoan && !isLoanReleased)
-                          const SizedBox(width: 8),
-                        _ActionButton(
-                          icon: LucideIcons.pencil,
-                          label: 'Edit',
-                          onTap: isLoanReleased ? null : _editClient,
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+            // Quick Actions Section (always visible at top)
+            _QuickActionsSection(
+              primaryAddress: primaryAddress,
+              isLoanReleased: _client!.loanReleased,
+              onNavigate: () => _navigateToAddress(primaryAddress?.fullAddress),
+              onRecordTouchpoint: _handleRecordTouchpoint,
+              onRecordVisitOnly: _handleRecordVisitOnly,
+              onReleaseLoan: _handleReleaseLoanBottomSheet,
+              onEdit: _editClient,
             ),
 
-            // Personal Info Section
-            _Section(title: 'Personal Information'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            // Expandable Sections
+            // Personal Information
+            _ExpandableSection(
+              title: 'Personal Information',
+              icon: LucideIcons.user,
+              itemCount: _getPersonalInfoCount(),
               child: Column(
                 children: [
                   if (_client!.birthDate != null)
@@ -1668,9 +1561,11 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Contact Section with Address and Phone Numbers
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            // Contact Information (Addresses & Phone Numbers)
+            _ExpandableSection(
+              title: 'Contact Information',
+              icon: LucideIcons.phone,
+              itemCount: _client!.addresses.length + _client!.phoneNumbers.length,
               child: ContactInfoSection(
                 client: _client!,
                 onViewAddresses: _viewAddresses,
@@ -1680,25 +1575,49 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Map view for client location (if addresses with coordinates exist)
+            // Map Preview (always visible if coordinates exist)
             if (_client!.addresses.any((a) => a.latitude != null && a.longitude != null))
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: SizedBox(
-                  height: 200,
-                  child: ClientMapView(
-                    clients: [_client!],
-                    showControls: false,
-                    showSearch: false,
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(LucideIcons.map, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Location',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        height: 180,
+                        child: ClientMapView(
+                          clients: [_client!],
+                          showControls: false,
+                          showSearch: false,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-            // Legacy contact fields (email, Facebook) - keep for compatibility
-            if (_client!.email != null || _client!.facebookLink != null) ...[
-              _Section(title: 'Other Contact Information'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+            // Other Contact Information (email, Facebook)
+            if (_client!.email != null || _client!.facebookLink != null)
+              _ExpandableSection(
+                title: 'Other Contact',
+                icon: LucideIcons.share2,
+                itemCount: (_client!.email != null ? 1 : 0) + (_client!.facebookLink != null ? 1 : 0),
                 child: Column(
                   children: [
                     if (_client!.email != null)
@@ -1716,12 +1635,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                   ],
                 ),
               ),
-            ],
 
-            // Pension Info Section
-            _Section(title: 'Pension Information'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            // Pension Information
+            _ExpandableSection(
+              title: 'Pension Information',
+              icon: LucideIcons.creditCard,
+              itemCount: _getPensionInfoCount(),
               child: Column(
                 children: [
                   _InfoRow(
@@ -1750,38 +1669,41 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               ),
             ),
 
-            // Visit History Section
-            _Section(title: 'Visit History'),
-            if (_client!.touchpoints.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    'No touchpoints yet',
-                    style: TextStyle(color: Colors.grey[500]),
-                  ),
-                ),
-              )
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _client!.touchpoints.length,
-                itemBuilder: (context, index) {
-                  final touchpoint = _client!.touchpoints[index];
-                  return _TouchpointHistoryItem(touchpoint: touchpoint);
-                },
-              ),
+            // Visit History
+            _ExpandableSection(
+              title: 'Visit History',
+              icon: LucideIcons.history,
+              itemCount: _client!.touchpoints.length,
+              initiallyExpanded: _client!.touchpoints.isNotEmpty,
+              child: _client!.touchpoints.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Center(
+                        child: Text(
+                          'No touchpoints yet',
+                          style: TextStyle(color: Colors.grey[500]),
+                        ),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        for (var i = 0; i < _client!.touchpoints.length; i++)
+                          _TouchpointHistoryItem(touchpoint: _client!.touchpoints[i]),
+                      ],
+                    ),
+            ),
 
-            // Remarks Section
-            if (_client!.remarks != null && _client!.remarks!.isNotEmpty) ...[
-              _Section(title: 'Remarks'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(_client!.remarks!),
+            // Remarks
+            if (_client!.remarks != null && _client!.remarks!.isNotEmpty)
+              _ExpandableSection(
+                title: 'Remarks',
+                icon: LucideIcons.messageSquare,
+                itemCount: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(_client!.remarks!),
+                ),
               ),
-            ],
 
             const SizedBox(height: 100), // Bottom padding
           ],
@@ -1822,6 +1744,297 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       case MarketType.industrial:
         return 'Industrial';
     }
+  }
+
+  int _getPersonalInfoCount() {
+    int count = 0;
+    if (_client!.birthDate != null) count++;
+    if (_client!.age > 0) count++;
+    if (_client!.agencyName != null) count++;
+    if (_client!.department != null) count++;
+    if (_client!.position != null) count++;
+    return count;
+  }
+
+  int _getPensionInfoCount() {
+    int count = 2; // Product type and Pension type always present
+    if (_client!.marketType != null) count++;
+    if (_client!.payrollDate != null) count++;
+    return count;
+  }
+}
+
+/// Quick Actions Section - Always visible at top with proper spacing
+class _QuickActionsSection extends ConsumerWidget {
+  final Address? primaryAddress;
+  final bool isLoanReleased;
+  final VoidCallback onNavigate;
+  final VoidCallback onRecordTouchpoint;
+  final VoidCallback onRecordVisitOnly;
+  final VoidCallback onReleaseLoan;
+  final VoidCallback onEdit;
+
+  const _QuickActionsSection({
+    required this.primaryAddress,
+    required this.isLoanReleased,
+    required this.onNavigate,
+    required this.onRecordTouchpoint,
+    required this.onRecordVisitOnly,
+    required this.onReleaseLoan,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authNotifierProvider);
+    final userRole = authState.user?.role?.apiValue;
+    final canReleaseLoan = userRole == 'admin' || userRole == 'caravan' || userRole == 'tele';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[200]!),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _QuickActionButton(
+                icon: LucideIcons.mapPin,
+                label: 'Navigate',
+                onTap: onNavigate,
+              ),
+              _QuickActionButton(
+                icon: LucideIcons.clipboardList,
+                label: 'Record Touchpoint',
+                onTap: isLoanReleased ? null : onRecordTouchpoint,
+                isPrimary: true,
+              ),
+              _QuickActionButton(
+                icon: LucideIcons.userCheck,
+                label: 'Record Visit',
+                onTap: isLoanReleased ? null : onRecordVisitOnly,
+              ),
+              if (canReleaseLoan && !isLoanReleased)
+                _QuickActionButton(
+                  icon: LucideIcons.dollarSign,
+                  label: 'Release Loan',
+                  onTap: onReleaseLoan,
+                  color: Colors.green[600],
+                ),
+              _QuickActionButton(
+                icon: LucideIcons.pencil,
+                label: 'Edit',
+                onTap: isLoanReleased ? null : onEdit,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Quick Action Button with proper spacing and touch targets
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool isPrimary;
+  final Color? color;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.isPrimary = false,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDisabled = onTap == null;
+
+    return GestureDetector(
+      onTap: () {
+        if (isDisabled) return;
+        HapticUtils.lightImpact();
+        onTap!();
+      },
+      child: Container(
+        constraints: const BoxConstraints(
+          minWidth: 80,
+          minHeight: 60,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDisabled
+              ? Colors.grey[100]
+              : (isPrimary ? const Color(0xFF0F172A) : (color ?? Colors.grey[100])),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDisabled
+                ? Colors.grey[200]!
+                : (isPrimary ? const Color(0xFF0F172A) : (color ?? Colors.grey[300])!),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isDisabled
+                  ? Colors.grey[400]
+                  : (isPrimary || color != null ? Colors.white : Colors.grey[700]),
+              size: 20,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDisabled
+                    ? Colors.grey[400]
+                    : (isPrimary || color != null ? Colors.white : Colors.grey[700]),
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Expandable Section with collapsible content
+class _ExpandableSection extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final int itemCount;
+  final Widget child;
+  final bool initiallyExpanded;
+
+  const _ExpandableSection({
+    required this.title,
+    required this.icon,
+    required this.itemCount,
+    required this.child,
+    this.initiallyExpanded = false,
+  });
+
+  @override
+  State<_ExpandableSection> createState() => _ExpandableSectionState();
+}
+
+class _ExpandableSectionState extends State<_ExpandableSection> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: [
+          // Section Header
+          InkWell(
+            onTap: () {
+              HapticUtils.lightImpact();
+              setState(() => _isExpanded = !_isExpanded);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.icon,
+                    size: 18,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${widget.itemCount}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: _isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      LucideIcons.chevronDown,
+                      size: 20,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expandable Content
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _isExpanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: widget.child,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1994,64 +2207,6 @@ class _TouchpointSkeletonItem extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-  final bool isPrimary;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    this.onTap,
-    this.isPrimary = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDisabled = onTap == null;
-
-    return GestureDetector(
-      onTap: () {
-        if (isDisabled) return;
-        HapticUtils.lightImpact();
-        onTap!();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isDisabled
-              ? Colors.grey[300]
-              : (isPrimary ? const Color(0xFF0F172A) : Colors.grey[100]),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isDisabled
-                  ? Colors.grey[500]
-                  : (isPrimary ? Colors.white : Colors.grey[700]),
-              size: 20,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDisabled
-                    ? Colors.grey[500]
-                    : (isPrimary ? Colors.white : Colors.grey[700]),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -2242,12 +2397,7 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
           onPressed: () {
             final udiNumber = _udiController.text.trim();
             if (udiNumber.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('UDI number is required'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              AppNotification.showWarning(context, 'UDI number is required');
               return;
             }
             Navigator.pop(context, {
