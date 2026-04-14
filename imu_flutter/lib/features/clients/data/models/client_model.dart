@@ -45,6 +45,9 @@ class Client {
   final List<Touchpoint> touchpoints;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? createdBy; // User ID of who created the client
+  final String? deletedBy; // User ID of who soft-deleted the client
+  final DateTime? deletedAt; // Soft delete timestamp
   final bool isStarred;
   final bool loanReleased;
   final DateTime? loanReleasedAt;
@@ -89,6 +92,9 @@ class Client {
     this.touchpoints = const [],
     required this.createdAt,
     this.updatedAt,
+    this.createdBy,
+    this.deletedBy,
+    this.deletedAt,
     this.isStarred = false,
     this.loanReleased = false,
     this.loanReleasedAt,
@@ -525,6 +531,11 @@ class Client {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : (json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null),
+      createdBy: json['createdBy'] ?? json['created_by'],
+      deletedBy: json['deletedBy'] ?? json['deleted_by'],
+      deletedAt: json['deletedAt'] != null
+          ? DateTime.parse(json['deletedAt'])
+          : (json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null),
       isStarred: _parseBool(json['isStarred'] ?? json['is_starred']),
       loanReleased: _parseBool(json['loanReleased'] ?? json['loan_released']),
       loanReleasedAt: json['loanReleasedAt'] != null
@@ -586,6 +597,11 @@ class Client {
           : DateTime.now(),
       updatedAt: row['updated_at'] != null
           ? DateTime.parse(row['updated_at'] as String)
+          : null,
+      createdBy: row['created_by'] as String?,
+      deletedBy: row['deleted_by'] as String?,
+      deletedAt: row['deleted_at'] != null
+          ? DateTime.parse(row['deleted_at'] as String)
           : null,
     );
   }
