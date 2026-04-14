@@ -556,7 +556,7 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     if (value == null || value.isEmpty) return null;
     switch (value.toUpperCase()) {
       case 'NEW':
-        return LoanType.new;
+        return LoanType.firstLoan;
       case 'ADDITIONAL':
         return LoanType.additional;
       case 'RENEWAL':

@@ -35,7 +35,7 @@ Client _createTestClient({
     email: '$firstName@example.com',
     clientType: clientType,
     marketType: MarketType.residential,
-    productType: ProductType.sssPensioner,
+    productType: ProductType.pnpPension,
     pensionType: PensionType.sss,
     phoneNumbers: [],
     addresses: [],

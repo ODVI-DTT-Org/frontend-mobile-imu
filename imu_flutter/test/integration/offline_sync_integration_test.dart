@@ -90,7 +90,7 @@ void main() {
           lastName: 'Doe',
           email: 'john@example.com',
           clientType: ClientType.existing,
-          productType: ProductType.sssPensioner,
+          productType: ProductType.pnpPension,
           pensionType: PensionType.sss,
           addresses: [
             Address(

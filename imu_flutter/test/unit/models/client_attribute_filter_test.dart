@@ -45,7 +45,7 @@ void main() {
         lastName: 'Doe',
         clientType: ClientType.potential,
         marketType: MarketType.residential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime.now(),
       );
@@ -65,7 +65,7 @@ void main() {
         lastName: 'Doe',
         clientType: ClientType.existing, // Wrong!
         marketType: MarketType.residential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime.now(),
       );
@@ -81,7 +81,7 @@ void main() {
         firstName: 'John',
         lastName: 'Doe',
         clientType: ClientType.potential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime.now(),
       );
@@ -94,7 +94,7 @@ void main() {
         clientType: ClientType.potential,
         marketType: MarketType.residential,
         pensionType: PensionType.sss,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
       );
 
       final params = filter.toQueryParams();

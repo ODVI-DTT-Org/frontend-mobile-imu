@@ -14,7 +14,7 @@ void main() {
       middleName: null,
       lastName: 'Client',
       clientType: ClientType.existing,
-      productType: ProductType.private,
+      productType: ProductType.bfpActive,
       pensionType: PensionType.private,
       createdAt: DateTime.now(),
     ));
@@ -49,7 +49,7 @@ void main() {
       middleName: null,
       lastName: 'Client',
       clientType: ClientType.existing,
-      productType: ProductType.private,
+      productType: ProductType.bfpActive,
       pensionType: PensionType.private,
       createdAt: DateTime.now(),
     ));

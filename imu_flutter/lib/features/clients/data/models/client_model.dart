@@ -174,7 +174,7 @@ class Client {
     }
     // Use enum value
     return switch (loanType!) {
-      LoanType.new => 'NEW',
+      LoanType.firstLoan => 'NEW',
       LoanType.additional => 'ADDITIONAL',
       LoanType.renewal => 'RENEWAL',
       LoanType.preterm => 'PRETERM',
@@ -618,7 +618,7 @@ enum PensionType {
 }
 
 enum LoanType {
-  new,
+  firstLoan,
   additional,
   renewal,
   preterm,

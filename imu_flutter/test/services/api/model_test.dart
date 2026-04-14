@@ -9,7 +9,7 @@ void main() {
         firstName: 'John',
         lastName: 'Doe',
         clientType: ClientType.potential,
-        productType: ProductType.sssPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.sss,
         createdAt: DateTime(2024, 1, 1),
       );
@@ -19,7 +19,7 @@ void main() {
       expect(client.lastName, equals('Doe'));
       expect(client.fullName, equals('John Doe'));
       expect(client.clientType, equals(ClientType.potential));
-      expect(client.productType, equals(ProductType.sssPensioner));
+      expect(client.productType, equals(ProductType.pnpPension));
       expect(client.pensionType, equals(PensionType.sss));
     });
 
@@ -30,7 +30,7 @@ void main() {
         middleName: 'William',
         lastName: 'Doe',
         clientType: ClientType.existing,
-        productType: ProductType.gsisPensioner,
+        productType: ProductType.pnpPension,
         pensionType: PensionType.gsis,
         createdAt: DateTime(2024, 1, 1),
       );
