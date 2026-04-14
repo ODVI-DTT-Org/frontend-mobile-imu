@@ -558,7 +558,7 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
         // Logo
         Center(
           child: Image.asset(
-            'assets/images/imu_logo_optimized.webp',
+            'assets/images/imu_logo_updated.webp',
             width: 80,
             height: 80,
             fit: BoxFit.contain,

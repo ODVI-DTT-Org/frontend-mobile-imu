@@ -230,7 +230,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ],
                         ),
                         child: Image.asset(
-                          'assets/images/imu_logo_updated.png',
+                          'assets/images/imu_logo_updated.webp',
                           width: 100,
                           height: 100,
                           fit: BoxFit.contain,

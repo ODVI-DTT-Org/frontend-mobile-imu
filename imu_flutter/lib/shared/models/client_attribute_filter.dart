@@ -60,7 +60,7 @@ class ClientAttributeFilter {
       params['pension_type'] = pensionType!.name.toUpperCase();
     }
     if (productType != null) {
-      // Convert camelCase to UPPERCASE_WITH_UNDERSCORES (sssPensioner -> SSS_PENSIONER)
+      // Convert camelCase to UPPERCASE_WITH_UNDERSCORES (pnpPension -> SSS_PENSIONER)
       params['product_type'] = _getProductTypeApiValue(productType!);
     }
     return params;

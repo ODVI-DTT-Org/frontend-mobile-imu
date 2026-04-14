@@ -59,7 +59,7 @@ void main() {
         'firstName': 'John',
         'lastName': 'Doe',
         'clientType': 'potential',
-        'productType': 'sssPensioner',
+        'productType': 'pnpPension',
         'pensionType': 'sss',
         'createdAt': '2024-01-01T00:00:00.000Z',
       };

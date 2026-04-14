@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ],
                   ),
                   child: Image.asset(
-                    'assets/images/imu_logo_optimized.webp',
+                    'assets/images/imu_logo_updated.webp',
                     width: 120,
                     height: 120,
                     fit: BoxFit.contain,
