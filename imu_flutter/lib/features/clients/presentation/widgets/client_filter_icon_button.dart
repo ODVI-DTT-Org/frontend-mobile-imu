@@ -24,7 +24,7 @@ class ClientFilterIconButton extends ConsumerWidget {
     // Determine which icon to show
     IconData icon;
     if (showLocationOnly) {
-      icon = LucideIcons.mapPin;
+      icon = LucideIcons.navigation; // GPS icon
     } else if (showAttributeOnly) {
       icon = LucideIcons.users;
     } else {

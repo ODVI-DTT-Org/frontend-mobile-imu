@@ -55,9 +55,11 @@ class MapFilters {
 
 /// Product type enum (matching client model)
 enum ProductType {
-  sssPensioner,
-  gsisPensioner,
-  private,
+  bfpActive,
+  bfpPension,
+  pnpPension,
+  napolcom,
+  bfpStp,
 }
 
 /// Client type enum

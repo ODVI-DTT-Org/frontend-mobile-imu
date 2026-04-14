@@ -22,11 +22,13 @@ class Client {
   final MarketType? marketType;
   final ProductType productType;
   final PensionType pensionType;
+  final LoanType? loanType;
   // Raw string values from database (preserves original data when enum parsing fails)
   final String? clientTypeRaw;
   final String? marketTypeRaw;
   final String? productTypeRaw;
   final String? pensionTypeRaw;
+  final String? loanTypeRaw;
   final String? pan;
   final String? email;
   final String? facebookLink;
@@ -65,10 +67,12 @@ class Client {
     this.marketType,
     required this.productType,
     required this.pensionType,
+    this.loanType,
     this.clientTypeRaw,
     this.marketTypeRaw,
     this.productTypeRaw,
     this.pensionTypeRaw,
+    this.loanTypeRaw,
     this.pan,
     this.email,
     this.facebookLink,
@@ -133,9 +137,11 @@ class Client {
     }
     // Use enum value
     return switch (productType) {
-      ProductType.sssPensioner => 'SSS Pensioner',
-      ProductType.gsisPensioner => 'GSIS Pensioner',
-      ProductType.private => 'Private',
+      ProductType.bfpActive => 'BFP ACTIVE',
+      ProductType.bfpPension => 'BFP PENSION',
+      ProductType.pnpPension => 'PNP PENSION',
+      ProductType.napolcom => 'NAPOLCOM',
+      ProductType.bfpStp => 'BFP STP',
     };
   }
 
@@ -152,6 +158,27 @@ class Client {
     }
     // Use enum value
     return pensionType.name.toUpperCase();
+  }
+
+  /// Display loan type - shows raw value if available, otherwise enum value
+  String? get loanTypeDisplay {
+    if (loanType == null) return null;
+    if (loanTypeRaw != null && loanTypeRaw!.isNotEmpty) {
+      // Check if raw value matches known enum
+      final rawLower = loanTypeRaw!.toLowerCase();
+      final enumMatch = LoanType.values.any((e) => e.name.toLowerCase() == rawLower);
+      if (!enumMatch) {
+        // Raw value is unknown, return it as-is
+        return loanTypeRaw!;
+      }
+    }
+    // Use enum value
+    return switch (loanType!) {
+      LoanType.new => 'NEW',
+      LoanType.additional => 'ADDITIONAL',
+      LoanType.renewal => 'RENEWAL',
+      LoanType.preterm => 'PRETERM',
+    };
   }
 
   /// Display market type - shows raw value if available, otherwise enum value
@@ -358,6 +385,7 @@ class Client {
       'marketType': marketType?.name,
       'productType': productType.name,
       'pensionType': pensionType.name,
+      'loanType': loanType?.name,
       'pan': pan,
       'email': email,
       'facebookLink': facebookLink,
@@ -415,14 +443,14 @@ class Client {
 
   /// Parse ProductType from string, return null if unknown (no default)
   static ProductType _parseProductType(dynamic value) {
-    if (value == null) return ProductType.sssPensioner;
+    if (value == null) return ProductType.bfpActive;
     final str = value.toString().toLowerCase();
     try {
       return ProductType.values.firstWhere(
         (e) => e.name.toLowerCase() == str,
       );
     } catch (_) {
-      return ProductType.sssPensioner; // Fallback for new clients
+      return ProductType.bfpActive; // Fallback for new clients
     }
   }
 
@@ -436,6 +464,19 @@ class Client {
       );
     } catch (_) {
       return PensionType.none;
+    }
+  }
+
+  /// Parse LoanType from string, return null if unknown (no default)
+  static LoanType? _parseLoanType(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString().toLowerCase();
+    try {
+      return LoanType.values.firstWhere(
+        (e) => e.name.toLowerCase() == str,
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -460,10 +501,12 @@ class Client {
       marketType: _parseMarketType(json['marketType'] ?? json['market_type']),
       productType: _parseProductType(json['productType'] ?? json['product_type']),
       pensionType: _parsePensionType(json['pensionType'] ?? json['pension_type']),
+      loanType: _parseLoanType(json['loanType'] ?? json['loan_type']),
       clientTypeRaw: json['clientType'] ?? json['client_type'],
       marketTypeRaw: json['marketType'] ?? json['market_type'],
       productTypeRaw: json['productType'] ?? json['product_type'],
       pensionTypeRaw: json['pensionType'] ?? json['pension_type'],
+      loanTypeRaw: json['loanType'] ?? json['loan_type'],
       pan: json['pan'],
       email: json['email'],
       facebookLink: json['facebookLink'] ?? json['facebook_link'],
@@ -496,6 +539,7 @@ class Client {
     final marketTypeRaw = row['market_type'] as String?;
     final productTypeRaw = row['product_type'] as String?;
     final pensionTypeRaw = row['pension_type'] as String?;
+    final loanTypeRaw = row['loan_type'] as String?;
 
     return Client(
       id: row['id'] as String,
@@ -515,10 +559,12 @@ class Client {
       marketType: _parseMarketType(marketTypeRaw),
       productType: _parseProductType(productTypeRaw),
       pensionType: _parsePensionType(pensionTypeRaw),
+      loanType: _parseLoanType(loanTypeRaw),
       clientTypeRaw: clientTypeRaw,
       marketTypeRaw: marketTypeRaw,
       productTypeRaw: productTypeRaw,
       pensionTypeRaw: pensionTypeRaw,
+      loanTypeRaw: loanTypeRaw,
       pan: row['pan'] as String?,
       facebookLink: row['facebook_link'] as String?,
       remarks: row['remarks'] as String?,
@@ -557,9 +603,11 @@ enum MarketType {
 }
 
 enum ProductType {
-  sssPensioner,
-  gsisPensioner,
-  private,
+  bfpActive,
+  bfpPension,
+  pnpPension,
+  napolcom,
+  bfpStp,
 }
 
 enum PensionType {
@@ -567,6 +615,13 @@ enum PensionType {
   gsis,
   private,
   none,
+}
+
+enum LoanType {
+  new,
+  additional,
+  renewal,
+  preterm,
 }
 
 enum AddressType {

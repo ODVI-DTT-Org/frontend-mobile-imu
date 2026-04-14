@@ -64,10 +64,11 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   bool _isLoadingBarangays = false;
 
   // Dropdown values
-  String _productType = 'SSS Pensioner';
+  String _productType = 'BFP ACTIVE';
   String _pensionType = 'SSS';
   String _marketType = 'Residential';
   String _clientType = 'POTENTIAL';
+  String? _loanType;
 
   // Date picker
   DateTime? _birthDate;
@@ -212,6 +213,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             : _remarksController.text.trim(),
         productType: _parseProductType(_productType),
         pensionType: _parsePensionType(_pensionType),
+        loanType: _parseLoanType(_loanType),
         marketType: _parseMarketType(_marketType),
         clientType: _parseClientType(_clientType),
         pan: _panController.text.trim().isEmpty
@@ -285,14 +287,18 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
   ProductType _parseProductType(String value) {
     switch (value) {
-      case 'SSS Pensioner':
-        return ProductType.sssPensioner;
-      case 'GSIS Pensioner':
-        return ProductType.gsisPensioner;
-      case 'Private':
-        return ProductType.private;
+      case 'BFP ACTIVE':
+        return ProductType.bfpActive;
+      case 'BFP PENSION':
+        return ProductType.bfpPension;
+      case 'PNP PENSION':
+        return ProductType.pnpPension;
+      case 'NAPOLCOM':
+        return ProductType.napolcom;
+      case 'BFP STP':
+        return ProductType.bfpStp;
       default:
-        return ProductType.sssPensioner;
+        return ProductType.bfpActive;
     }
   }
 
@@ -332,6 +338,22 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         return ClientType.existing;
       default:
         return ClientType.potential;
+    }
+  }
+
+  LoanType? _parseLoanType(String? value) {
+    if (value == null || value.isEmpty) return null;
+    switch (value.toUpperCase()) {
+      case 'NEW':
+        return LoanType.new;
+      case 'ADDITIONAL':
+        return LoanType.additional;
+      case 'RENEWAL':
+        return LoanType.renewal;
+      case 'PRETERM':
+        return LoanType.preterm;
+      default:
+        return null;
     }
   }
 
@@ -871,7 +893,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
-                    items: ['SSS Pensioner', 'GSIS Pensioner', 'Private']
+                    items: const ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP']
                         .map((type) => DropdownMenuItem(
                               value: type,
                               child: Text(type),
@@ -881,11 +903,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                       if (value != null) {
                         HapticUtils.lightImpact();
                         setState(() => _productType = value);
-                        if (value == 'SSS Pensioner') {
-                          _pensionType = 'SSS';
-                        } else if (value == 'GSIS Pensioner') {
-                          _pensionType = 'GSIS';
-                        }
+                        // No auto-set for pension type with new product types
                       }
                     },
                   ),
@@ -952,6 +970,29 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             if (value != null) {
               HapticUtils.lightImpact();
               setState(() => _marketType = value);
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _loanType,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Loan Type',
+            border: OutlineInputBorder(),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          ),
+          items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
+              .map((type) => DropdownMenuItem(
+                    value: type,
+                    child: Text(type),
+                  ))
+              .toList(),
+          onChanged: (value) {
+            if (value != null) {
+              HapticUtils.lightImpact();
+              setState(() => _loanType = value);
             }
           },
         ),

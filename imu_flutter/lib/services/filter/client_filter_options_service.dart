@@ -179,17 +179,20 @@ class ClientFilterOptionsService {
     }
   }
 
-  /// Parse product type from database value (e.g., "SSS_PENSIONER" -> ProductType.sssPensioner)
+  /// Parse product type from database value (e.g., "BFP ACTIVE" -> ProductType.bfpActive)
   ProductType? _parseProductType(String value) {
     try {
-      // Handle special case for underscore conversion
       switch (value.toUpperCase()) {
-        case 'SSS_PENSIONER':
-          return ProductType.sssPensioner;
-        case 'GSIS_PENSIONER':
-          return ProductType.gsisPensioner;
-        case 'PRIVATE':
-          return ProductType.private;
+        case 'BFP ACTIVE':
+          return ProductType.bfpActive;
+        case 'BFP PENSION':
+          return ProductType.bfpPension;
+        case 'PNP PENSION':
+          return ProductType.pnpPension;
+        case 'NAPOLCOM':
+          return ProductType.napolcom;
+        case 'BFP STP':
+          return ProductType.bfpStp;
         default:
           // Try normal parsing as fallback
           return ProductType.values.firstWhere(

@@ -36,6 +36,9 @@ import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
 import '../../../clients/presentation/widgets/address_selection_modal.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../record_forms/presentation/widgets/record_touchpoint_form.dart';
+import '../../../record_forms/presentation/widgets/record_visit_only_form.dart';
+import '../../../record_forms/presentation/widgets/release_loan_form.dart';
 import 'package:powersync/powersync.dart' hide Column;
 
 // Client detail provider
@@ -1145,6 +1148,114 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
   }
 
+  /// Open Record Touchpoint bottom sheet
+  Future<void> _handleRecordTouchpoint() async {
+    if (_client == null) return;
+
+    // Prevent touchpoint creation for loan released clients
+    if (_client!.loanReleased) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot create touchpoints: Loan has been released'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    HapticUtils.lightImpact();
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => _RecordTouchpointBottomSheet(
+        client: _client!,
+      ),
+    );
+
+    if (result == true && mounted) {
+      await _loadClient();
+      ref.invalidate(clientTouchpointsProvider);
+    }
+  }
+
+  /// Open Record Visit Only bottom sheet
+  Future<void> _handleRecordVisitOnly() async {
+    if (_client == null) return;
+
+    // Prevent visit only for loan released clients
+    if (_client!.loanReleased) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot create visit: Loan has been released'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    HapticUtils.lightImpact();
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => _RecordVisitOnlyBottomSheet(
+        client: _client!,
+      ),
+    );
+
+    if (result == true && mounted) {
+      await _loadClient();
+      ref.invalidate(clientTouchpointsProvider);
+    }
+  }
+
+  /// Open Release Loan bottom sheet
+  Future<void> _handleReleaseLoanBottomSheet() async {
+    if (_client == null) return;
+
+    // Prevent release loan if already released
+    if (_client!.loanReleased) {
+      if (mounted) {
+        HapticUtils.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Loan has already been released'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    HapticUtils.lightImpact();
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => _ReleaseLoanBottomSheet(
+        client: _client!,
+      ),
+    );
+
+    if (result == true && mounted) {
+      await _loadClient();
+      ref.invalidate(clientTouchpointsProvider);
+    }
+  }
+
   /// Show dialog when all 7 touchpoints are completed
   Future<void> _showTouchpointCompletionDialog() async {
     return showDialog(
@@ -1474,43 +1585,44 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
                   final isLoanReleased = _client!.loanReleased;
 
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: _ActionButton(
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _ActionButton(
                           icon: LucideIcons.mapPin,
                           label: 'Navigate',
                           onTap: () => _navigateToAddress(primaryAddress?.fullAddress),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _ActionButton(
-                          icon: LucideIcons.plusCircle,
-                          label: 'Visit',
-                          onTap: isLoanReleased ? null : _startTouchpoint,
+                        const SizedBox(width: 8),
+                        _ActionButton(
+                          icon: LucideIcons.clipboardList,
+                          label: 'Record Touchpoint',
+                          onTap: isLoanReleased ? null : _handleRecordTouchpoint,
                           isPrimary: true,
                         ),
-                      ),
-                      if (canReleaseLoan && !isLoanReleased) ...[
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: _ActionButton(
+                        _ActionButton(
+                          icon: LucideIcons.userCheck,
+                          label: 'Record Visit Only',
+                          onTap: isLoanReleased ? null : _handleRecordVisitOnly,
+                        ),
+                        const SizedBox(width: 8),
+                        if (canReleaseLoan && !isLoanReleased)
+                          _ActionButton(
                             icon: LucideIcons.dollarSign,
                             label: 'Release Loan',
-                            onTap: _handleLoanRelease,
+                            onTap: _handleReleaseLoanBottomSheet,
                           ),
-                        ),
-                      ],
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _ActionButton(
+                        if (canReleaseLoan && !isLoanReleased)
+                          const SizedBox(width: 8),
+                        _ActionButton(
                           icon: LucideIcons.pencil,
                           label: 'Edit',
                           onTap: isLoanReleased ? null : _editClient,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1688,12 +1800,16 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   String _getProductTypeLabel(ProductType type) {
     switch (type) {
-      case ProductType.sssPensioner:
-        return 'SSS Pensioner';
-      case ProductType.gsisPensioner:
-        return 'GSIS Pensioner';
-      case ProductType.private:
-        return 'Private';
+      case ProductType.bfpActive:
+        return 'BFP ACTIVE';
+      case ProductType.bfpPension:
+        return 'BFP PENSION';
+      case ProductType.pnpPension:
+        return 'PNP PENSION';
+      case ProductType.napolcom:
+        return 'NAPOLCOM';
+      case ProductType.bfpStp:
+        return 'BFP STP';
     }
   }
 
@@ -2147,6 +2263,264 @@ class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
           child: const Text('Submit Request'),
         ),
       ],
+    );
+  }
+}
+
+/// Bottom sheet wrapper for Record Touchpoint form
+class _RecordTouchpointBottomSheet extends ConsumerStatefulWidget {
+  final Client client;
+
+  const _RecordTouchpointBottomSheet({
+    required this.client,
+  });
+
+  @override
+  ConsumerState<_RecordTouchpointBottomSheet> createState() => _RecordTouchpointBottomSheetState();
+}
+
+class _RecordTouchpointBottomSheetState extends ConsumerState<_RecordTouchpointBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header with client name and close button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Record Touchpoint',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.client.fullName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Form content
+          Expanded(
+            child: RecordTouchpointForm(
+              key: ValueKey('touchpoint_form_${widget.client.id}'),
+              client: widget.client,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet wrapper for Record Visit Only form
+class _RecordVisitOnlyBottomSheet extends ConsumerStatefulWidget {
+  final Client client;
+
+  const _RecordVisitOnlyBottomSheet({
+    required this.client,
+  });
+
+  @override
+  ConsumerState<_RecordVisitOnlyBottomSheet> createState() => _RecordVisitOnlyBottomSheetState();
+}
+
+class _RecordVisitOnlyBottomSheetState extends ConsumerState<_RecordVisitOnlyBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header with client name and close button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Record Visit Only',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.client.fullName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Form content
+          Expanded(
+            child: RecordVisitOnlyForm(
+              key: ValueKey('visit_only_form_${widget.client.id}'),
+              client: widget.client,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet wrapper for Release Loan form
+class _ReleaseLoanBottomSheet extends ConsumerStatefulWidget {
+  final Client client;
+
+  const _ReleaseLoanBottomSheet({
+    required this.client,
+  });
+
+  @override
+  ConsumerState<_ReleaseLoanBottomSheet> createState() => _ReleaseLoanBottomSheetState();
+}
+
+class _ReleaseLoanBottomSheetState extends ConsumerState<_ReleaseLoanBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header with client name and close button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Release Loan',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.client.fullName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Form content
+          Expanded(
+            child: ReleaseLoanForm(
+              key: ValueKey('release_loan_form_${widget.client.id}'),
+              client: widget.client,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
