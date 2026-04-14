@@ -28,6 +28,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('product_type'),
     Column.text('market_type'),
     Column.text('pension_type'),
+    Column.text('loan_type'), // NEW: Loan type field
     Column.text('pan'),
     Column.text('facebook_link'),
     Column.text('remarks'),
@@ -41,6 +42,12 @@ const Schema _powerSyncSchema = Schema([
     Column.integer('loan_released'),
     Column.text('udi'),
     Column.text('full_address'),
+    // Audit fields - NEW
+    Column.text('created_by'), // User ID of who created the client
+    Column.text('deleted_by'), // User ID of who soft-deleted the client
+    Column.text('deleted_at'), // Soft delete timestamp
+    Column.text('created_at'), // Creation timestamp
+    Column.text('updated_at'), // Update timestamp
   ]),
   Table('addresses', [
     Column.text('client_id'),
