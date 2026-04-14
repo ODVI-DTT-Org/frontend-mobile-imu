@@ -31,11 +31,11 @@ streams:
         FROM user_locations ul
         WHERE ul.user_id = auth.user_id() AND ul.deleted_at IS NULL
 
-  # Client data - Sync user's own clients
+  # Client data - Sync all clients (user_id removed from clients table)
   clients:
     auto_subscribe: true
     queries:
-      - SELECT * FROM clients WHERE user_id = auth.user_id()
+      - SELECT * FROM clients WHERE deleted_at IS NULL
 
   # Touchpoints - All touchpoints
   touchpoints:
@@ -61,7 +61,7 @@ streams:
         FROM approvals a
         WHERE a.status = 'pending'
 
-  # Addresses - for clients assigned to user
+  # Addresses - for clients assigned to user via area assignments
   addresses:
     auto_subscribe: true
     queries:
@@ -70,24 +70,20 @@ streams:
         LEFT JOIN psgc p ON a.psgc_id = p.id
         WHERE a.deleted_at IS NULL
           AND a.client_id IN (
-            SELECT id FROM clients WHERE user_id = auth.user_id()
-              UNION
             SELECT c.id FROM clients c
-            JOIN area_assignments aa ON aa.municipality = c.municipality
-            WHERE aa.user_id = auth.user_id() AND aa.deleted_at IS NULL
+            JOIN user_locations ul ON ul.municipality = c.municipality
+            WHERE ul.user_id = auth.user_id() AND ul.deleted_at IS NULL
           )
 
-  # Phone numbers - for clients assigned to user
+  # Phone numbers - for clients assigned to user via area assignments
   phone_numbers:
     auto_subscribe: true
     queries:
       - SELECT * FROM phone_numbers
         WHERE deleted_at IS NULL
           AND client_id IN (
-            SELECT id FROM clients WHERE user_id = auth.user_id()
-            UNION
             SELECT c.id FROM clients c
-            JOIN area_assignments aa ON aa.municipality = c.municipality
-            WHERE aa.user_id = auth.user_id() AND aa.deleted_at IS NULL
+            JOIN user_locations ul ON ul.municipality = c.municipality
+            WHERE ul.user_id = auth.user_id() AND ul.deleted_at IS NULL
           )
 
