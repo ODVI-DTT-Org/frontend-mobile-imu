@@ -231,8 +231,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                         child: Image.asset(
                           'assets/images/imu_logo_updated.webp',
-                          width: 100,
-                          height: 100,
+                          width: 70,
+                          height: 70,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -365,29 +365,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                 ),
 
-                // Debug info (only in development)
-                if (const bool.fromEnvironment('dart.vm.product') == false) ...[
-                  const SizedBox(height: 48),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Debug Info',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Test credentials:\nadmin@imu.local / Admin123!',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[500],
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
