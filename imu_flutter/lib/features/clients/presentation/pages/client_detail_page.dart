@@ -1080,21 +1080,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       return;
     }
 
-    HapticUtils.lightImpact();
-
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-      builder: (context) => _RecordTouchpointBottomSheet(
-        client: _client!,
-      ),
-    );
-
-    if (result == true && mounted) {
-      await _loadClient();
-      ref.invalidate(clientTouchpointsProvider);
+    // TODO: Phase 1 - Implement new compact Record Touchpoint bottom sheet
+    if (mounted) {
+      HapticUtils.error();
+      AppNotification.showError(context, 'Record Touchpoint - Coming soon in Phase 1');
     }
   }
 
