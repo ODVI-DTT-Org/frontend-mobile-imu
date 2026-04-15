@@ -104,10 +104,9 @@ class ReleaseApiService {
   /// Create a complete loan release (visit + release + client update)
   ///
   /// This is a convenience method that orchestrates the full loan release flow:
-  /// 1. Creates a visit record
-  /// 2. Uploads photo (if provided)
-  /// 3. Creates a release record linked to the visit
-  /// 4. Updates the client's loan_released flag
+  /// 1. Creates a visit record with photo upload (single FormData request)
+  /// 2. Creates a release record linked to the visit
+  /// 3. Updates the client's loan_released flag
   ///
   /// Parameters:
   /// - [clientId]: Client ID
@@ -143,15 +142,22 @@ class ReleaseApiService {
     try {
       debugPrint('ReleaseApiService: Creating complete loan release for client $clientId');
 
-      // Step 1: Create visit
+      // Step 1: Create visit with photo upload (single FormData request)
       final visitApiService = VisitApiService(authService: _authService, dio: _dio);
+
+      // Prepare photo file if provided
+      File? photoFile;
+      if (photoPath != null && photoPath.isNotEmpty) {
+        photoFile = File(photoPath);
+      }
+
       final visit = await visitApiService.createVisit(
         clientId: clientId,
         timeIn: timeIn,
         timeOut: timeOut,
         odometerArrival: odometerArrival,
         odometerDeparture: odometerDeparture,
-        photoUrl: null, // Will be updated after photo upload
+        photoFile: photoFile, // Photo uploaded with visit data in single request
         notes: remarks,
         type: 'release_loan',
         latitude: latitude,
@@ -166,19 +172,7 @@ class ReleaseApiService {
 
       final visitId = visit['id'] as String;
 
-      // Step 2: Upload photo if provided
-      String? photoUrl;
-      if (photoPath != null && photoPath.isNotEmpty) {
-        final file = File(photoPath);
-        final uploadApiService = UploadApiService(authService: _authService, dio: _dio);
-        final uploadResult = await uploadApiService.uploadPhoto(file, touchpointId: visitId);
-        if (uploadResult != null) {
-          photoUrl = uploadResult.url;
-          debugPrint('ReleaseApiService: Photo uploaded successfully: $photoUrl');
-        }
-      }
-
-      // Step 3: Create release
+      // Step 2: Create release
       final release = await createRelease(
         clientId: clientId,
         visitId: visitId,
@@ -193,7 +187,7 @@ class ReleaseApiService {
         return null;
       }
 
-      // Step 4: Update client's loan_released flag (existing behavior)
+      // Step 3: Update client's loan_released flag (existing behavior)
       final clientApiService = ClientApiService(authService: _authService, dio: _dio);
       await clientApiService.releaseLoan(clientId);
 

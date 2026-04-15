@@ -28,7 +28,8 @@ class VisitApiService {
   /// - [timeOut]: Visit end time (ISO 8601 string or DateTime)
   /// - [odometerArrival]: Odometer reading at arrival
   /// - [odometerDeparture]: Odometer reading at departure
-  /// - [photoUrl]: Optional uploaded photo URL
+  /// - [photoUrl]: Optional uploaded photo URL (use [photoFile] for FormData upload)
+  /// - [photoFile]: Optional photo file to upload with visit data (single request)
   /// - [notes]: Optional visit notes
   /// - [type]: Visit type ('regular_visit' or 'release_loan')
   /// - [latitude]: Optional GPS latitude
@@ -36,6 +37,9 @@ class VisitApiService {
   /// - [address]: Optional GPS address
   ///
   /// Returns [Map] with visit data, or null if failed
+  ///
+  /// Note: If [photoFile] is provided, it will be uploaded with the visit data
+  /// in a single multipart/form-data request. Otherwise, sends as JSON.
   Future<Map<String, dynamic>?> createVisit({
     required String clientId,
     required String timeIn,
@@ -43,6 +47,7 @@ class VisitApiService {
     required String odometerArrival,
     required String odometerDeparture,
     String? photoUrl,
+    File? photoFile,
     String? notes,
     String? type,
     double? latitude,
@@ -59,32 +64,69 @@ class VisitApiService {
         throw ApiException(message: 'Not authenticated');
       }
 
-      // Prepare request data
-      final data = {
-        'client_id': clientId,
-        'time_in': timeIn,
-        'time_out': timeOut,
-        'odometer_arrival': odometerArrival,
-        'odometer_departure': odometerDeparture,
-        if (photoUrl != null) 'photo_url': photoUrl,
-        if (notes != null) 'notes': notes,
-        if (type != null) 'type': type,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
-        if (address != null) 'address': address,
-      };
+      late final dynamic response;
 
-      // Make the API request
-      final response = await _dio.post(
-        '${AppConfig.postgresApiUrl}/visits',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-        data: data,
-      );
+      // If photo file is provided, use FormData (single request with photo upload)
+      if (photoFile != null) {
+        debugPrint('VisitApiService: Using FormData with photo upload');
+
+        final formData = FormData.fromMap({
+          'client_id': clientId,
+          'time_in': timeIn,
+          'time_out': timeOut,
+          'odometer_arrival': odometerArrival,
+          'odometer_departure': odometerDeparture,
+          if (notes != null) 'notes': notes,
+          if (type != null) 'type': type,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (address != null) 'address': address,
+          'photo': await MultipartFile.fromFile(
+            photoFile.path,
+            filename: photoFile.path.split('/').last.split('\\').last,
+          ),
+        });
+
+        debugPrint('VisitApiService: FormData fields prepared');
+        debugPrint('VisitApiService: Photo file: ${photoFile.path}');
+
+        response = await _dio.post(
+          '${AppConfig.postgresApiUrl}/visits',
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $token',
+              // Don't set Content-Type - Dio sets it automatically with boundary for FormData
+            },
+          ),
+          data: formData,
+        );
+      } else {
+        // Regular JSON request (no photo or photo already uploaded)
+        final data = {
+          'client_id': clientId,
+          'time_in': timeIn,
+          'time_out': timeOut,
+          'odometer_arrival': odometerArrival,
+          'odometer_departure': odometerDeparture,
+          if (photoUrl != null) 'photo_url': photoUrl,
+          if (notes != null) 'notes': notes,
+          if (type != null) 'type': type,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (address != null) 'address': address,
+        };
+
+        response = await _dio.post(
+          '${AppConfig.postgresApiUrl}/visits',
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          ),
+          data: data,
+        );
+      }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final visitData = response.data as Map<String, dynamic>;

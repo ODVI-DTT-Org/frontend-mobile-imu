@@ -1,26 +1,46 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart' hide TimeOfDay;
 import 'package:imu_flutter/features/clients/presentation/widgets/client_action_bottom_sheet.dart';
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/auto_set_badge.dart';
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/odometer_field.dart';
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/time_picker_field.dart';
+import 'package:imu_flutter/shared/providers/app_providers.dart' show
+    releaseApiServiceProvider,
+    uploadApiServiceProvider,
+    visitApiServiceProvider;
+import 'package:imu_flutter/core/utils/app_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
 /// Bottom sheet for recording loan release with product/loan type selection
-class RecordLoanReleaseBottomSheet extends HookWidget {
+/// Self-contained - handles photo upload and API submission internally
+class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
   final Client client;
-  final Future<bool> Function(Map<String, dynamic>) onSubmit;
 
   const RecordLoanReleaseBottomSheet({
     super.key,
     required this.client,
-    required this.onSubmit,
   });
 
+  /// Parse time string to DateTime
+  DateTime? _parseTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return null;
+    final parts = timeString.split(':');
+    if (parts.length != 2) return null;
+    try {
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      return DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, hour, minute);
+    } catch (e) {
+      return null;
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final timeIn = useState<TimeOfDay?>(null);
     final timeOut = useState<TimeOfDay?>(null);
     final odometerArrival = useState<String?>(null);
@@ -45,7 +65,45 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
     }
 
     String formatTimeOfDay(TimeOfDay time) {
-      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+      // Create DateTime with today's date and the TimeOfDay time
+      final now = DateTime.now();
+      final dateTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+      // Return ISO 8601 format string (backend expects this format)
+      return dateTime.toIso8601String();
+    }
+
+    /// Auto-calculate Time Out as Time In + 5 minutes
+    void _autoCalculateTimeOut(TimeOfDay? newTimeIn) {
+      if (newTimeIn != null) {
+        // Convert to total minutes, add 5, then convert back to TimeOfDay
+        final totalMinutes = newTimeIn.hour * 60 + newTimeIn.minute;
+        final newTotalMinutes = totalMinutes + 5; // Add 5 minutes
+        final newHour = (newTotalMinutes ~/ 60) % 24;
+        final newMinute = newTotalMinutes % 60;
+
+        // Create new TimeOfDay with the calculated hour and minute
+        final calculatedTimeOut = TimeOfDay(hour: newHour, minute: newMinute);
+
+        // Update the timeOut state
+        timeOut.value = calculatedTimeOut;
+
+        // Debug print to verify calculation
+        print('Auto-calc Time Out: ${newTimeIn.hour}:${newTimeIn.minute} -> ${calculatedTimeOut.hour}:${calculatedTimeOut.minute}');
+      }
+    }
+
+    /// Auto-calculate Odometer Departure as Arrival + 5km
+    void _autoCalculateOdometerDeparture(String? arrivalValue) {
+      if (arrivalValue != null && arrivalValue.isNotEmpty) {
+        try {
+          final arrivalKm = double.tryParse(arrivalValue);
+          if (arrivalKm != null) {
+            odometerDeparture.value = (arrivalKm + 5).toString();
+          }
+        } catch (e) {
+          // If parsing fails, don't auto-calculate
+        }
+      }
     }
 
     bool canSubmit() {
@@ -54,33 +112,75 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
           odometerArrival.value != null &&
           odometerDeparture.value != null &&
           udiNumber.text.trim().isNotEmpty &&
+          photoPath.value != null &&
           !isSubmitting.value;
     }
 
     Future<void> handleSubmit() async {
-      if (!canSubmit()) return;
+      if (!canSubmit()) {
+        if (photoPath.value == null) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (context.mounted) {
+              AppNotification.showError(context, 'Please capture a photo before submitting');
+            }
+          });
+        }
+        return;
+      }
 
       isSubmitting.value = true;
 
-      final data = <String, dynamic>{
-        'client_id': client.id,
-        'time_in': formatTimeOfDay(timeIn.value!),
-        'time_out': formatTimeOfDay(timeOut.value!),
-        'odometer_arrival': int.parse(odometerArrival.value!),
-        'odometer_departure': int.parse(odometerDeparture.value!),
-        'product_type': productType.value,
-        'loan_type': loanType.value,
-        'udi_number': udiNumber.text.trim(),
-        'remarks': remarks.text.trim(),
-        'photo_path': photoPath.value,
-        'reason': 'New Loan Release',
-        'status': 'Completed',
-      };
-
       try {
-        final success = await onSubmit(data);
+        // Upload photo first if provided (with error handling)
+        String? photoUrl;
+        bool photoUploadFailed = false;
+
+        if (photoPath.value != null && photoPath.value!.isNotEmpty) {
+          try {
+            final file = File(photoPath.value!);
+            final uploadApiService = ref.read(uploadApiServiceProvider);
+            final uploadResult = await uploadApiService.uploadPhoto(file);
+            if (uploadResult != null) {
+              photoUrl = uploadResult.url;
+            } else {
+              photoUploadFailed = true;
+            }
+          } catch (e) {
+            photoUploadFailed = true;
+          }
+        }
+
+        // Use uploaded URL if successful, otherwise use empty string
+        // (backend validation expects HTTP URL or empty string, not local file path)
+        final finalPhotoPath = photoUrl ?? '';
+
+        // Submit to API using the complete loan release method
+        final releaseApi = ref.read(releaseApiServiceProvider);
+        final success = await releaseApi.createCompleteLoanRelease(
+          clientId: client.id!,
+          timeIn: formatTimeOfDay(timeIn.value!),
+          timeOut: formatTimeOfDay(timeOut.value!),
+          odometerArrival: odometerArrival.value ?? '',
+          odometerDeparture: odometerDeparture.value ?? '',
+          productType: productType.value,
+          loanType: loanType.value,
+          udiNumber: udiNumber.text.trim(),
+          remarks: remarks.text.trim(),
+          photoPath: finalPhotoPath,
+        ) != null;
+
         if (success && context.mounted) {
+          // Show success message with photo upload warning if applicable
+          if (photoUploadFailed && photoPath.value != null) {
+            AppNotification.showSuccess(context, 'Loan released (photo saved locally)');
+          } else {
+            AppNotification.showSuccess(context, 'Loan released successfully');
+          }
           Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if (context.mounted) {
+          AppNotification.showError(context, 'Failed to release loan: $e');
         }
       } finally {
         isSubmitting.value = false;
@@ -114,7 +214,10 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
                 child: TimePickerField(
                   label: 'Time In',
                   initialTime: timeIn.value,
-                  onTimeChanged: (time) => timeIn.value = time,
+                  onTimeChanged: (time) {
+                    timeIn.value = time;
+                    _autoCalculateTimeOut(time); // Auto-calculate Time Out
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -137,7 +240,10 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
                 child: OdometerField(
                   label: 'Odometer Arrival',
                   initialValue: odometerArrival.value,
-                  onChanged: (value) => odometerArrival.value = value,
+                  onChanged: (value) {
+                    odometerArrival.value = value;
+                    _autoCalculateOdometerDeparture(value); // Auto-calculate Departure
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -228,7 +334,7 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
           Text(
             'UDI Number *',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Colors.grey[600],
             ),
@@ -236,15 +342,17 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
           const SizedBox(height: 4),
           TextField(
             controller: udiNumber,
+            keyboardType: TextInputType.number,
             decoration: InputDecoration(
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: Colors.grey[300]!),
               ),
-              contentPadding: const EdgeInsets.all(12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               hintText: 'Enter UDI number',
+              hintStyle: TextStyle(fontSize: 15, color: Colors.grey[400]),
             ),
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 15),
           ),
 
           const SizedBox(height: 8),
@@ -253,7 +361,7 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
           Text(
             'Remarks',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Colors.grey[600],
             ),
@@ -264,29 +372,38 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
             maxLines: 2,
             decoration: InputDecoration(
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: Colors.grey[300]!),
               ),
-              contentPadding: const EdgeInsets.all(12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 15),
           ),
 
           const SizedBox(height: 8),
 
-          // Photo Capture
+          // Photo Capture (Required)
+          Text(
+            'Photo *',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 4),
           InkWell(
             onTap: pickPhoto,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(8),
             child: Container(
-              height: 48,
+              height: 52,
               decoration: BoxDecoration(
                 border: Border.all(
                   color: photoPath.value != null
                     ? Colors.green[600]!
                     : Colors.grey[300]!,
                 ),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 color: photoPath.value != null
                   ? Colors.green[50]
                   : Colors.grey[50],
@@ -309,7 +426,7 @@ class RecordLoanReleaseBottomSheet extends HookWidget {
                       ? 'Photo captured'
                       : 'Take Photo',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 15,
                       color: photoPath.value != null
                         ? Colors.green[700]
                         : Colors.grey[700],
