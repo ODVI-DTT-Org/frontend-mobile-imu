@@ -18,11 +18,11 @@ class LocationFilterIcon extends ConsumerWidget {
 
     return IconButton(
       icon: Icon(
-        LucideIcons.filter,
+        LucideIcons.mapPin,
         color: hasFilter ? const Color(0xFF0F172A) : Colors.grey,
       ),
       onPressed: onTap,
-      tooltip: hasFilter ? 'Filter active' : 'Filter by location',
+      tooltip: hasFilter ? 'Location filter active' : 'Filter by location',
     );
   }
 }

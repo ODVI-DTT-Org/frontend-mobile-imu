@@ -825,47 +825,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _handleLoanRelease() async {
     HapticUtils.lightImpact();
 
-    // Show UDI input dialog
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => _ReleaseLoanDialog(clientName: _client?.fullName ?? 'this client'),
-    );
+    // Navigate to unified Release Loan form
+    final result = await context.push<bool>('/release-loan/${widget.clientId}');
 
-    if (result == null || !result['confirmed']) return;
-
-    final udiNumber = result['udi_number'] as String?;
-    final notes = result['notes'] as String?;
-
-    if (udiNumber == null || udiNumber.trim().isEmpty) {
-      if (mounted) {
-        AppNotification.showWarning(context, 'UDI number is required');
-      }
-      return;
-    }
-
-    try {
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Submitting loan release...',
-        operation: () async {
-          final approvalsApi = ref.read(approvalsApiServiceProvider);
-          await approvalsApi.submitLoanRelease(
-            clientId: widget.clientId,
-            udiNumber: udiNumber.trim(),
-            notes: (notes?.trim().isNotEmpty ?? false) ? notes!.trim() : 'Loan release requested via mobile app',
-          );
-        },
-      );
-
-      if (mounted) {
-        AppNotification.showSuccess(context, 'Loan release submitted for approval (UDI: ${udiNumber.trim()})');
-        // Reload client to show updated loan status
-        _loadClient();
-      }
-    } catch (e) {
-      if (mounted) {
-        AppNotification.showError(context, 'Failed to submit loan release: $e');
-      }
+    // If form was submitted successfully, reload client data
+    if (result == true && mounted) {
+      _loadClient();
     }
   }
 
@@ -2318,104 +2283,6 @@ class _TouchpointHistoryItem extends StatelessWidget {
   }
 }
 
-/// Dialog for Release Loan with UDI number input
-class _ReleaseLoanDialog extends StatefulWidget {
-  final String clientName;
-
-  const _ReleaseLoanDialog({required this.clientName});
-
-  @override
-  State<_ReleaseLoanDialog> createState() => _ReleaseLoanDialogState();
-}
-
-class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
-  final _udiController = TextEditingController();
-  final _notesController = TextEditingController();
-
-  @override
-  void dispose() {
-    _udiController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      icon: Icon(
-        LucideIcons.dollarSign,
-        color: Colors.green[600],
-        size: 48,
-      ),
-      title: const Text('Release Loan'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Submit loan release request for ${widget.clientName}?',
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _udiController,
-            decoration: const InputDecoration(
-              labelText: 'UDI Number *',
-              hintText: 'Enter UDI number...',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _notesController,
-            decoration: const InputDecoration(
-              labelText: 'Notes',
-              hintText: 'Enter notes (optional)...',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'This will submit a request for approval. The loan will be marked as released and all touchpoints will be completed.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final udiNumber = _udiController.text.trim();
-            if (udiNumber.isEmpty) {
-              AppNotification.showWarning(context, 'UDI number is required');
-              return;
-            }
-            Navigator.pop(context, {
-              'confirmed': true,
-              'udi_number': udiNumber,
-              'notes': _notesController.text.trim(),
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green[600],
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Submit Request'),
-        ),
-      ],
-    );
-  }
-}
 
 /// Bottom sheet wrapper for Record Touchpoint form
 class _RecordTouchpointBottomSheet extends ConsumerStatefulWidget {

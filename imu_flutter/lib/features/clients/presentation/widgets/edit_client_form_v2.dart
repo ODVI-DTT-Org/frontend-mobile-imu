@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../data/models/client_model.dart';
@@ -360,12 +361,7 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     if (!_formKey.currentState!.validate()) {
       HapticUtils.error();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please fix the errors before saving'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Please fix the errors before saving');
       }
       return;
     }
@@ -610,34 +606,15 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotification.showSuccess(context, message);
   }
 
   void _showWarningSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    AppNotification.showWarning(context, message, duration: const Duration(seconds: 4));
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotification.showError(context, message);
   }
 
   @override

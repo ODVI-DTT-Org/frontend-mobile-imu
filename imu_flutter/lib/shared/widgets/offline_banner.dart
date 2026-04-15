@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
 import 'package:imu_flutter/core/utils/haptic_utils.dart';
+import 'package:imu_flutter/core/utils/app_notification.dart';
 
 /// Offline status banner that appears when device is not connected
 class OfflineBanner extends ConsumerWidget {
@@ -27,12 +28,10 @@ class OfflineBanner extends ConsumerWidget {
               onTap: () {
                 HapticUtils.lightImpact();
                 // Show retry snackbar or trigger sync
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Waiting for connection...'),
-                    duration: Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                AppNotification.showNeutral(
+                  context,
+                  'Waiting for connection...',
+                  duration: const Duration(seconds: 2),
                 );
               },
               child: SafeArea(

@@ -12,7 +12,7 @@ import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/powersync_connector.dart' show powerSyncConnectorProvider;
 import '../../../../shared/utils/loading_helper.dart';
-import '../../../../shared/providers/app_providers.dart' show offlineAuthProvider;
+import '../../../../shared/providers/app_providers.dart' show offlineAuthProvider, authNotifierProvider;
 import '../../../../core/utils/logger.dart';
 import '../../../../services/error_message_mapper.dart';
 

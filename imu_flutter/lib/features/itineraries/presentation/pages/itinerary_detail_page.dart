@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/itinerary_api_service.dart';
 import '../../../../services/connectivity_service.dart';
@@ -135,17 +136,13 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
         },
         onError: (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to delete visit: $e')),
-            );
+            AppNotification.showError(context, 'Failed to delete visit: $e');
           }
         },
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Itinerary deleted')),
-        );
+        AppNotification.showSuccess(context, 'Itinerary deleted');
         context.pop();
       }
     }
@@ -236,9 +233,7 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
                   },
                   onError: (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to update visit: $e')),
-                      );
+                      AppNotification.showError(context, 'Failed to update visit: $e');
                     }
                   },
                 );
@@ -246,9 +241,7 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
                 if (mounted) {
                   Navigator.pop(context);
                   _loadItinerary();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Itinerary updated')),
-                  );
+                  AppNotification.showSuccess(context, 'Itinerary updated');
                 }
               },
               child: const Text('Save'),
@@ -277,18 +270,14 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
       },
       onError: (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to mark as completed: $e')),
-          );
+          AppNotification.showError(context, 'Failed to mark as completed: $e');
         }
       },
     );
 
     if (mounted) {
       _loadItinerary();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Visit marked as completed')),
-      );
+      AppNotification.showSuccess(context, 'Visit marked as completed');
     }
   }
 
@@ -310,18 +299,14 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
       },
       onError: (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to start visit: $e')),
-          );
+          AppNotification.showError(context, 'Failed to start visit: $e');
         }
       },
     );
 
     if (mounted) {
       _loadItinerary();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Visit marked as in progress')),
-      );
+      AppNotification.showSuccess(context, 'Visit marked as in progress');
     }
   }
 
@@ -333,15 +318,11 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
 
   void _navigateToAddress() {
     if (_itinerary?.address == null || _itinerary!.address!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No address available')),
-      );
+      AppNotification.showError(context, 'No address available');
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigating to ${_itinerary!.address}...')),
-    );
+    AppNotification.showNeutral(context, 'Navigating to ${_itinerary!.address}...');
   }
 
   @override
@@ -600,9 +581,7 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
                       subtitle: 'Contact the client',
                       onTap: () {
                         HapticUtils.lightImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Call feature - Coming soon')),
-                        );
+                        AppNotification.showNeutral(context, 'Call feature - Coming soon');
                       },
                     ),
                     _ActionTile(
@@ -611,9 +590,7 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
                       subtitle: 'Send a text message',
                       onTap: () {
                         HapticUtils.lightImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Message feature - Coming soon')),
-                        );
+                        AppNotification.showNeutral(context, 'Message feature - Coming soon');
                       },
                     ),
                     _ActionTile(

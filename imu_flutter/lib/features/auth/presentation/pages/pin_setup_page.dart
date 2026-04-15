@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/auth/secure_storage_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/app_notification.dart';
 
 class PinSetupPage extends ConsumerStatefulWidget {
   const PinSetupPage({super.key});
@@ -80,23 +81,13 @@ class _PinSetupPageState extends ConsumerState<PinSetupPage> {
         // ref.read(pinStateProvider.notifier).setHasPin(true);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('PIN set successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppNotification.showSuccess(context, 'PIN set successfully!');
           // Navigate to PIN entry so user must verify the PIN they just set
           context.go('/pin-entry');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to save PIN: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppNotification.showError(context, 'Failed to save PIN: $e');
           setState(() => _isSaving = false);
         }
       }
@@ -106,12 +97,7 @@ class _PinSetupPageState extends ConsumerState<PinSetupPage> {
         _hasError = true;
         _confirmPin = '';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PINs do not match. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppNotification.showError(context, 'PINs do not match. Please try again.');
     }
   }
 

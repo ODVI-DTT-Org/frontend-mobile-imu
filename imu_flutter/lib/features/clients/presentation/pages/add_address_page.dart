@@ -6,6 +6,7 @@ import 'package:imu_flutter/features/clients/data/models/address_model.dart';
 import 'package:imu_flutter/features/clients/data/repositories/address_repository.dart';
 import 'package:imu_flutter/shared/widgets/psgc_selector.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider;
+import 'package:imu_flutter/core/utils/app_notification.dart';
 
 /// Full screen page for adding or editing an address
 class AddAddressPage extends HookConsumerWidget {
@@ -37,9 +38,7 @@ class AddAddressPage extends HookConsumerWidget {
       if (!formKey.currentState!.validate()) return;
 
       if (selectedPsgc.value == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a location')),
-        );
+        AppNotification.showWarning(context, 'Please select a location');
         return;
       }
 
@@ -50,7 +49,7 @@ class AddAddressPage extends HookConsumerWidget {
           'label': label.value.name,
           'street_address': streetAddress.text.trim(),
           'postal_code': postalCode.text.trim(),
-          'psgc_id': selectedPsgc.value!.numericId,
+          'psgc_id': selectedPsgc.value!.id,
           'latitude': latitude.value,
           'longitude': longitude.value,
           'is_primary': isPrimary.value,
@@ -64,9 +63,7 @@ class AddAddressPage extends HookConsumerWidget {
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving address: $e')),
-          );
+          AppNotification.showError(context, 'Error saving address: $e');
         }
       } finally {
         isSaving.value = false;

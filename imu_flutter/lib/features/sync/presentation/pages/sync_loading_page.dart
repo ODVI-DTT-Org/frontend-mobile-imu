@@ -103,7 +103,6 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   final SyncPreferencesService _preferencesService;
 
   StreamSubscription? _syncStatusSubscription;
-  bool _hasNavigated = false;
 
   EnhancedSyncLoadingNotifier(this._powerSyncDb)
       : _preferencesService = SyncPreferencesService(),
@@ -416,6 +415,17 @@ class SyncLoadingPage extends ConsumerStatefulWidget {
 }
 
 class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
+  @override
+  void initState() {
+    super.initState();
+    // CRITICAL FIX: Reset navigation flag when page loads
+    // This prevents the bug where login/logout/login gets stuck at sync page
+    // The _isNavigatingProvider persists across logouts and needs to be reset
+    Future.microtask(() {
+      ref.read(_isNavigatingProvider.notifier).state = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final powerSyncDb = ref.watch(powerSyncDatabaseProvider);

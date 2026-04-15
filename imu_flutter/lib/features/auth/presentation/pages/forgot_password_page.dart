@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../core/utils/app_notification.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -22,12 +23,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   Future<void> _handleReset() async {
     if (_usernameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your username'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppNotification.showWarning(context, 'Please enter your username');
       return;
     }
 

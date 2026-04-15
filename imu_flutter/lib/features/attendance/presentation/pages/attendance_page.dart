@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/attendance_record.dart';
@@ -368,18 +369,14 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           },
           error: (_, __) async {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Could not get location. Please enable GPS.')),
-              );
+              AppNotification.showError(context, 'Could not get location. Please enable GPS.');
             }
           },
         );
       },
       onError: (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to ${isCheckingOut ? "check out" : "check in"}: $e')),
-          );
+          AppNotification.showError(context, 'Failed to ${isCheckingOut ? "check out" : "check in"}: $e');
         }
       },
     );

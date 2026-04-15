@@ -7,6 +7,7 @@ import '../../../../core/services/location_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart';
 
 class DebugDashboardPage extends ConsumerStatefulWidget {
@@ -286,9 +287,7 @@ class _GpsTrackerTabState extends State<_GpsTrackerTab> {
                             Clipboard.setData(ClipboardData(
                               text: '${currentPos.latitude}, ${currentPos.longitude}',
                             ));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Coordinates copied!')),
-                            );
+                            AppNotification.showSuccess(context, 'Coordinates copied!');
                           },
                           icon: const Icon(LucideIcons.copy, size: 16),
                           label: const Text('Copy Coordinates'),

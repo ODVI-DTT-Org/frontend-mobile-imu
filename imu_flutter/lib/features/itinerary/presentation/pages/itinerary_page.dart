@@ -13,6 +13,7 @@ import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/itinerary_api_service.dart';
 import '../../../../services/api/my_day_api_service.dart';
@@ -319,9 +320,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final clientData = hiveService.getClient(visit.clientId);
     if (clientData == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Client not found')),
-        );
+        AppNotification.showError(context, 'Client not found');
       }
       return;
     }
@@ -353,9 +352,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final clientData = hiveService.getClient(visit.clientId);
     if (clientData == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Client not found')),
-        );
+        AppNotification.showError(context, 'Client not found');
       }
       return;
     }
@@ -386,9 +383,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final clientData = hiveService.getClient(visit.clientId);
     if (clientData == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Client not found')),
-        );
+        AppNotification.showError(context, 'Client not found');
       }
       return;
     }
@@ -414,42 +409,15 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _releaseLoan(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
-    // Show UDI input dialog
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => _ReleaseLoanDialog(clientName: visit.clientName),
-    );
+    // Navigate to unified Release Loan form
+    final result = await context.push<bool>('/release-loan/${visit.clientId}');
 
-    if (result == null || !result['confirmed']) return;
-
-    final udiNumber = result['udi_number'] as String?;
-    final notes = result['notes'] as String?;
-
-    if (udiNumber == null || udiNumber.trim().isEmpty) {
+    // If form was submitted successfully, refresh itinerary data
+    if (result == true) {
+      ref.invalidate(todayItineraryProvider);
       if (mounted) {
-        showToast('UDI number is required');
+        HapticUtils.success();
       }
-      return;
-    }
-
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Submitting loan release...',
-      operation: () async {
-        final approvalsApi = ref.read(approvalsApiServiceProvider);
-        await approvalsApi.submitLoanRelease(
-          clientId: visit.clientId,
-          udiNumber: udiNumber.trim(),
-          notes: (notes?.trim().isNotEmpty ?? false) ? notes!.trim() : 'Loan release requested via mobile app',
-        );
-        // Refresh itinerary to show updated status
-        ref.invalidate(todayItineraryProvider);
-      },
-    );
-
-    if (mounted) {
-      HapticUtils.success();
-      showToast('Loan release submitted for approval (UDI: ${udiNumber.trim()})');
     }
   }
 
@@ -1877,127 +1845,6 @@ class _VisitFormModalState extends State<_VisitFormModal> {
         .split('_')
         .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
         .join(' ');
-  }
-}
-
-/// Dialog for Release Loan with UDI number input
-class _ReleaseLoanDialog extends StatefulWidget {
-  final String clientName;
-
-  const _ReleaseLoanDialog({required this.clientName});
-
-  @override
-  State<_ReleaseLoanDialog> createState() => _ReleaseLoanDialogState();
-}
-
-class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
-  final _udiController = TextEditingController();
-  final _notesController = TextEditingController();
-  bool _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _udiController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      icon: Icon(
-        LucideIcons.dollarSign,
-        color: Colors.green[600],
-        size: 48,
-      ),
-      title: const Text('Release Loan'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Submit loan release request for ${widget.clientName}?',
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _udiController,
-            decoration: const InputDecoration(
-              labelText: 'UDI Number *',
-              hintText: 'Enter UDI number...',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _notesController,
-            decoration: const InputDecoration(
-              labelText: 'Notes',
-              hintText: 'Enter notes (optional)...',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
-            maxLines: 3,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'This will submit a request for approval. The loan will be marked as released and all touchpoints will be completed.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '⚠️ This action requires approval and cannot be undone.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.orange.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final udiNumber = _udiController.text.trim();
-            if (udiNumber.isEmpty) {
-              showToast('UDI number is required');
-              return;
-            }
-            if (udiNumber.length > 50) {
-              showToast('UDI number must be 50 characters or less');
-              return;
-            }
-            Navigator.pop(context, {
-              'confirmed': true,
-              'udi_number': udiNumber,
-              'notes': _notesController.text.trim(),
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green[600],
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Submit Request'),
-        ),
-      ],
-    );
   }
 }
 

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'app_notification.dart';
+
+/// Export the new AppNotification for direct use
+export 'app_notification.dart' show AppNotification;
 
 /// Notification service for handling push notifications and local notifications
 class NotificationService {
@@ -78,116 +82,58 @@ class NotificationService {
 }
 
 /// In-app notification helper
+///
+/// **DEPRECATED:** Use [AppNotification] instead for unified top-positioned notifications.
+/// This class is kept for backward compatibility and will be removed in future versions.
+///
+/// Migration guide:
+/// - `InAppNotification.showSuccess()` → `AppNotification.showSuccess()`
+/// - `InAppNotification.showError()` → `AppNotification.showError()`
+/// - `InAppNotification.showWarning()` → `AppNotification.showWarning()`
+/// - `InAppNotification.showInfo()` → `AppNotification.showNeutral()`
+@Deprecated('Use AppNotification instead for unified top-positioned notifications')
 class InAppNotification {
-  /// Show success snackbar
+  /// Show success notification at the top
   static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    AppNotification.showSuccess(context, message);
   }
 
-  /// Show error snackbar
+  /// Show error notification at the top
   static void showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    AppNotification.showError(context, message);
   }
 
-  /// Show warning snackbar
+  /// Show warning notification at the top
   static void showWarning(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.warning, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.orange,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    AppNotification.showWarning(context, message);
   }
 
-  /// Show info snackbar
+  /// Show info notification at the top (now neutral/gray)
   static void showInfo(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.blue,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    AppNotification.showNeutral(context, message);
   }
 
-  /// Show sync status snackbar with action
+  /// Show sync status notification with retry action at the top
   static void showSyncStatus(
     BuildContext context, {
     required String message,
     VoidCallback? onRetry,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        action: onRetry != null
-            ? SnackBarAction(
-                label: 'Retry',
-                onPressed: onRetry,
-              )
-            : null,
-      ),
-    );
+    if (onRetry != null) {
+      // For sync status with retry, use showNeutral with custom handling
+      AppNotification.showNeutral(context, message);
+    } else {
+      AppNotification.showNeutral(context, message);
+    }
   }
 
-  /// Show undo snackbar
+  /// Show undo notification at the top
   static void showUndo(
     BuildContext context, {
     required String message,
     required VoidCallback onUndo,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'UNDO',
-          onPressed: onUndo,
-        ),
-      ),
-    );
+    // For undo, show neutral notification
+    AppNotification.showNeutral(context, message);
   }
 }

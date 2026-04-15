@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/shared/models/location_filter.dart';
 import 'package:imu_flutter/shared/providers/location_filter_providers.dart';
+import 'package:imu_flutter/features/psgc/data/repositories/psgc_repository.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class LocationFilterBottomSheet extends ConsumerStatefulWidget {
   final Function(LocationFilter) onApply;
+  final bool showAllPsgcAreas; // NEW: true = All Clients mode, false = Assigned Clients mode
 
   const LocationFilterBottomSheet({
     super.key,
     required this.onApply,
+    this.showAllPsgcAreas = false, // Default to assigned areas only
   });
 
   @override
@@ -46,6 +49,17 @@ class _LocationFilterBottomSheetState extends ConsumerState<LocationFilterBottom
 
   @override
   Widget build(BuildContext context) {
+    // Show all PSGC areas or only assigned areas based on mode
+    if (widget.showAllPsgcAreas) {
+      // All Clients mode: Show all PSGC provinces and municipalities
+      return _buildAllPsgcMode(context);
+    } else {
+      // Assigned Clients mode: Show only assigned areas
+      return _buildAssignedAreasMode(context);
+    }
+  }
+
+  Widget _buildAssignedAreasMode(BuildContext context) {
     final assignedAreasAsync = ref.watch(assignedAreasProvider);
 
     return Container(
@@ -141,6 +155,148 @@ class _LocationFilterBottomSheetState extends ConsumerState<LocationFilterBottom
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => const Center(child: Text('Failed to load areas')),
+            ),
+          ),
+          // Apply button
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _selectedProvince != null
+                    ? () {
+                        final filter = LocationFilter(
+                          province: _selectedProvince,
+                          municipalities: _selectAllMunicipalities
+                              ? null
+                              : _selectedMunicipalities.toList(),
+                        );
+                        widget.onApply(filter);
+                        Navigator.pop(context);
+                      }
+                    : null,
+                child: const Text('Apply'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllPsgcMode(BuildContext context) {
+    // All Clients mode: Show all PSGC provinces and municipalities
+    final provincesAsync = ref.watch(provincesProvider);
+    final selectedProvinceMunicipalitiesAsync = _selectedProvince != null
+        ? ref.watch(municipalitiesByProvinceProvider(_selectedProvince!))
+        : null;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Filter by Location',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'All locations in PSGC',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: provincesAsync.when(
+              data: (provinces) {
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _ProvinceSection(
+                      provinces: provinces.map((p) => p.name).toList(),
+                      selectedProvince: _selectedProvince,
+                      onProvinceSelected: (province) {
+                        setState(() {
+                          _selectedProvince = province;
+                          _selectedMunicipalities.clear();
+                          _selectAllMunicipalities = false;
+                        });
+                      },
+                    ),
+                    if (_selectedProvince != null && selectedProvinceMunicipalitiesAsync != null)
+                      selectedProvinceMunicipalitiesAsync.when(
+                        data: (municipalities) {
+                          return _MunicipalitySection(
+                            province: _selectedProvince!,
+                            municipalities: municipalities.map((m) => m.name).toList(),
+                            selectedMunicipalities: _selectedMunicipalities,
+                            selectAll: _selectAllMunicipalities,
+                            onMunicipalityToggle: (municipality) {
+                              setState(() {
+                                if (_selectAllMunicipalities) {
+                                  _selectAllMunicipalities = false;
+                                }
+                                if (_selectedMunicipalities.contains(municipality)) {
+                                  _selectedMunicipalities.remove(municipality);
+                                } else {
+                                  _selectedMunicipalities.add(municipality);
+                                }
+                              });
+                            },
+                            onSelectAllToggle: () {
+                              setState(() {
+                                _selectAllMunicipalities = !_selectAllMunicipalities;
+                                _selectedMunicipalities.clear();
+                              });
+                            },
+                          );
+                        },
+                        loading: () => const Center(child: CircularProgressIndicator()),
+                        error: (_, __) => const Center(child: Text('Failed to load municipalities')),
+                      ),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const Center(child: Text('Failed to load provinces')),
             ),
           ),
           // Apply button

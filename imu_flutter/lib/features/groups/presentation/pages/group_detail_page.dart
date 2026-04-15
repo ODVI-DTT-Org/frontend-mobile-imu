@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/groups_api_service.dart';
 import '../../../../shared/providers/app_providers.dart';
@@ -142,17 +143,13 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
         },
         onError: (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to delete group: $e')),
-            );
+            AppNotification.showError(context, 'Failed to delete group: $e');
           }
         },
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Group deleted')),
-        );
+        AppNotification.showSuccess(context, 'Group deleted');
         context.pop();
       }
     }
@@ -200,9 +197,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Group name is required')),
-                );
+                AppNotification.showError(context, 'Group name is required');
                 return;
               }
 
@@ -220,9 +215,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                 },
                 onError: (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to update group: $e')),
-                    );
+                    AppNotification.showError(context, 'Failed to update group: $e');
                   }
                 },
               );
@@ -230,9 +223,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
               if (mounted) {
                 Navigator.pop(context);
                 _loadGroup();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Group updated')),
-                );
+                AppNotification.showSuccess(context, 'Group updated');
               }
             },
             child: const Text('Save'),
@@ -251,9 +242,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
       operation: () async {
         await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add member - Coming soon')),
-          );
+          AppNotification.showNeutral(context, 'Add member - Coming soon');
         }
       },
     );
@@ -268,9 +257,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
       operation: () async {
         await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Remove member - Coming soon')),
-          );
+          AppNotification.showNeutral(context, 'Remove member - Coming soon');
         }
       },
     );

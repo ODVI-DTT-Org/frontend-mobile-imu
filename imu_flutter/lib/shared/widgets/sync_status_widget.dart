@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/sync/sync_service.dart';
 import '../utils/loading_helper.dart';
+import '../../core/utils/app_notification.dart';
 
 /// Sync status indicator widget
 class SyncStatusWidget extends ConsumerWidget {
@@ -120,11 +121,7 @@ class SyncStatusWidget extends ConsumerWidget {
 
   void _handleTap(BuildContext context, WidgetRef ref, SyncService syncService) async {
     if (syncService.status == SyncStatusEnum.offline) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No internet connection. Changes will sync when online.'),
-        ),
-      );
+      AppNotification.showNeutral(context, 'No internet connection. Changes will sync when online.');
     } else if (syncService.pendingCount > 0) {
       await LoadingHelper.withLoading(
         ref: ref,
@@ -132,12 +129,7 @@ class SyncStatusWidget extends ConsumerWidget {
         operation: () => syncService.syncNow(),
         onError: (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Sync failed: ${e.toString()}'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            AppNotification.showError(context, 'Sync failed: ${e.toString()}');
           }
         },
       );
@@ -264,12 +256,7 @@ class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
                           operation: () => syncService.syncNow(),
                           onError: (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Sync failed: ${e.toString()}'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
+                              AppNotification.showError(context, 'Sync failed: ${e.toString()}');
                             }
                           },
                         );

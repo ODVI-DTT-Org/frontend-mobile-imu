@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import 'agencies_page.dart';
 
@@ -74,23 +75,13 @@ class _AddProspectAgencyPageState extends ConsumerState<AddProspectAgencyPage> {
         onError: (e) {
           HapticUtils.error();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to save agency: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            AppNotification.showError(context, 'Failed to save agency: $e');
           }
         },
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Prospect agency added successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppNotification.showSuccess(context, 'Prospect agency added successfully');
 
         // Return the new agency to the previous page
         context.pop(agencyData);
@@ -98,12 +89,7 @@ class _AddProspectAgencyPageState extends ConsumerState<AddProspectAgencyPage> {
     } catch (e) {
       HapticUtils.error();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to save agency'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Failed to save agency');
       }
     }
   }

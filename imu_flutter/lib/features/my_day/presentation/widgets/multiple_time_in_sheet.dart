@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/location/geolocation_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/touchpoint_api_service.dart';
@@ -756,19 +757,16 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
             result == LocationResult.serviceDisabled)) {
           _showLocationActionDialog(result);
         } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage ?? 'Unable to get location'),
-              backgroundColor: const Color(0xFFEF4444),
-              action: result == LocationResult.permissionDenied
-                  ? SnackBarAction(
-                      label: 'Settings',
-                      textColor: Colors.white,
-                      onPressed: () => _geoService.openAppSettings(),
-                    )
-                  : null,
-            ),
-          );
+          if (result == LocationResult.permissionDenied) {
+            AppNotification.showErrorWithAction(
+              context,
+              message: errorMessage ?? 'Unable to get location',
+              actionLabel: 'Settings',
+              onAction: () => _geoService.openAppSettings(),
+            );
+          } else {
+            AppNotification.showError(context, errorMessage ?? 'Unable to get location');
+          }
         }
         return;
       }
@@ -800,12 +798,7 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
         _locationError = 'Error capturing location: $e';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error capturing location: $e'),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
+        AppNotification.showError(context, 'Error capturing location: $e');
       }
     }
   }
@@ -843,12 +836,7 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
 
   Future<void> _handleBulkTouchpointSubmit() async {
     if (_selectedReason == null || _capturedPosition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a reason and ensure location is captured'),
-          backgroundColor: Color(0xFFEF4444),
-        ),
-      );
+      AppNotification.showError(context, 'Please select a reason and ensure location is captured');
       return;
     }
 
@@ -913,12 +901,10 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
           Navigator.pop(context);
 
           // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Successfully submitted $successCount touchpoint${successCount > 1 ? 's' : ''}'),
-              backgroundColor: const Color(0xFF22C55E),
-              duration: const Duration(seconds: 2),
-            ),
+          AppNotification.showSuccess(
+            context,
+            'Successfully submitted $successCount touchpoint${successCount > 1 ? 's' : ''}',
+            duration: const Duration(seconds: 2),
           );
         }
 
@@ -926,51 +912,45 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
         if (errorCount > 0) {
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$errorCount touchpoint${errorCount > 1 ? 's' : ''} failed to submit'),
-                  backgroundColor: const Color(0xFFEF4444),
-                  duration: const Duration(seconds: 3),
-                  action: SnackBarAction(
-                    label: 'View',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      // Show error details dialog
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Submission Errors'),
-                          content: SizedBox(
-                            width: double.maxFinite,
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: errors.length,
-                              itemBuilder: (context, index) {
-                                final error = errors[index] as Map<String, dynamic>;
-                                final clientId = error['clientId'] as String?;
-                                final errorMessage = error['error'] as String?;
-                                final client = widget.clients.firstWhere(
-                                  (c) => c.id == clientId,
-                                  orElse: () => widget.clients.first,
-                                );
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Text('• ${client.fullName}: $errorMessage'),
-                                );
-                              },
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'),
-                            ),
-                          ],
+              AppNotification.showErrorWithAction(
+                context,
+                message: '$errorCount touchpoint${errorCount > 1 ? 's' : ''} failed to submit',
+                actionLabel: 'View',
+                onAction: () {
+                  // Show error details dialog
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Submission Errors'),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: errors.length,
+                          itemBuilder: (context, index) {
+                            final error = errors[index] as Map<String, dynamic>;
+                            final clientId = error['clientId'] as String?;
+                            final errorMessage = error['error'] as String?;
+                            final client = widget.clients.firstWhere(
+                              (c) => c.id == clientId,
+                              orElse: () => widget.clients.first,
+                            );
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Text('• ${client.fullName}: $errorMessage'),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
             }
           });
@@ -979,13 +959,7 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
     } catch (e) {
       if (mounted) {
         HapticUtils.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit touchpoints: $e'),
-            backgroundColor: const Color(0xFFEF4444),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppNotification.showError(context, 'Failed to submit touchpoints: $e');
       }
     } finally {
       if (mounted) {

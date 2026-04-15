@@ -368,19 +368,25 @@ class MyDayApiService {
             return null; // Skip this task
           }
 
+          // Get addresses from client data (now included in backend response)
+          final addresses = clientData['addresses'] as List<dynamic>? ?? [];
+          final location = addresses.isNotEmpty
+              ? (addresses.first as Map<String, dynamic>)['street'] as String?
+              : null;
+
           return MyDayClient(
             id: taskData['id'] ?? '',
             clientId: clientId,
             fullName: '${clientData['first_name'] ?? ''} ${clientData['last_name'] ?? ''}'.trim(),
-            agencyName: clientData['agency']?['name'],
-            location: clientData['addresses'] != null && (clientData['addresses'] as List).isNotEmpty
-                ? (clientData['addresses'] as List).first['street']
-                : null,
+            agencyName: clientData['agency'] as String?,
+            location: location,
             touchpointNumber: taskData['touchpoint_number'] ?? 0,
             touchpointType: taskData['touchpoint_type'] ?? 'visit',
             isTimeIn: taskData['time_in'] != null,
             priority: taskData['priority'] ?? 'normal',
-            notes: taskData['notes'],
+            notes: taskData['notes'] as String?,
+            status: taskData['status'] as String?,
+            scheduledTime: taskData['scheduled_time'] as String?,
           );
         }).where((client) => client != null).cast<MyDayClient>().toList();
       } else {
@@ -390,8 +396,20 @@ class MyDayApiService {
     } on DioException catch (e) {
       debugPrint('MyDayApiService: DioException - ${e.message}');
       debugPrint('MyDayApiService: Response - ${e.response?.data}');
+
+      // Extract error message from backend response
+      String errorMessage = 'Network error: ${e.message}';
+      if (e.response?.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        if (data.containsKey('message')) {
+          errorMessage = data['message'].toString();
+        } else if (data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        }
+      }
+
       throw ApiException(
-        message: 'Network error: ${e.message}',
+        message: errorMessage,
         originalError: e,
       );
     } catch (e) {

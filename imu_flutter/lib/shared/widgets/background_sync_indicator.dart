@@ -6,6 +6,7 @@ import '../../services/sync/powersync_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
+import '../../core/utils/app_notification.dart';
 
 /// Compact background sync indicator widget
 ///
@@ -663,60 +664,25 @@ class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackground
 }
 
 /// Snackbar widget to show sync notifications
+///
+/// **DEPRECATED:** Use [AppNotification] instead for unified top-positioned notifications.
+/// This class is kept for backward compatibility.
+@Deprecated('Use AppNotification instead')
 class SyncNotification {
   const SyncNotification._();
 
-  /// Show success notification
+  /// Show success notification at the top
   static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.green[700],
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotification.showSuccess(context, message);
   }
 
-  /// Show error notification
+  /// Show error notification at the top
   static void showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.red[700],
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotification.showError(context, message);
   }
 
-  /// Show info notification
+  /// Show info notification at the top (neutral/gray)
   static void showInfo(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.grey[800],
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotification.showNeutral(context, message);
   }
 }

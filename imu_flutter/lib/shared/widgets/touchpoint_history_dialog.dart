@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/api/client_api_service.dart';
 
-/// Dialog showing touchpoint history for a client
+/// Bottom sheet showing touchpoint history for a client
 class TouchpointHistoryDialog extends ConsumerStatefulWidget {
   final String clientId;
   final String clientName;
@@ -21,9 +21,11 @@ class TouchpointHistoryDialog extends ConsumerStatefulWidget {
     required String clientId,
     required String clientName,
   }) {
-    return showDialog(
+    return showModalBottomSheet(
       context: context,
-      builder: (context) => TouchpointHistoryDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => TouchpointHistoryBottomSheet(
         clientId: clientId,
         clientName: clientName,
       ),
@@ -153,6 +155,167 @@ class _TouchpointHistoryDialogState extends ConsumerState<TouchpointHistoryDialo
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<List<Touchpoint>> _loadClientTouchpoints() async {
+    try {
+      final clientApi = ref.read(clientApiServiceProvider);
+      final client = await clientApi.fetchClient(widget.clientId);
+      return client?.touchpoints ?? [];
+    } catch (e) {
+      debugPrint('Error loading touchpoints: $e');
+      return [];
+    }
+  }
+}
+
+/// Bottom sheet for showing touchpoint history
+class TouchpointHistoryBottomSheet extends ConsumerStatefulWidget {
+  final String clientId;
+  final String clientName;
+
+  const TouchpointHistoryBottomSheet({
+    super.key,
+    required this.clientId,
+    required this.clientName,
+  });
+
+  @override
+  ConsumerState<TouchpointHistoryBottomSheet> createState() => _TouchpointHistoryBottomSheetState();
+}
+
+class _TouchpointHistoryBottomSheetState extends ConsumerState<TouchpointHistoryBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.history, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Touchpoint History',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.clientName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Content
+          Expanded(
+            child: FutureBuilder(
+              future: _loadClientTouchpoints(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.alertCircle, size: 48, color: Colors.red[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Failed to load history',
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final touchpoints = snapshot.data ?? [];
+
+                if (touchpoints.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.calendarX, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No touchpoints yet',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Record your first visit to start tracking',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: touchpoints.length,
+                  itemBuilder: (context, index) {
+                    return _TouchpointHistoryItem(touchpoint: touchpoints[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

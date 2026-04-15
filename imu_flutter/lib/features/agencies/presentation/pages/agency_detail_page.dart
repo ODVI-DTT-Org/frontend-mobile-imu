@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/agency_model.dart';
@@ -122,17 +123,13 @@ class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
         },
         onError: (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to delete agency: $e')),
-            );
+            AppNotification.showError(context, 'Failed to delete agency: $e');
           }
         },
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Agency deleted')),
-        );
+        AppNotification.showSuccess(context, 'Agency deleted');
         context.pop();
       }
     }
@@ -144,12 +141,11 @@ class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
     LoadingHelper.withLoading(
       ref: ref,
       message: 'Opening edit form...',
+
       operation: () async {
         await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Edit agency - Coming soon')),
-          );
+          AppNotification.showNeutral(context, 'Edit agency - Coming soon');
         }
       },
     );
@@ -157,28 +153,20 @@ class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
 
   void _callAgency(String? phone) {
     if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No phone number available')),
-      );
+      AppNotification.showError(context, 'No phone number available');
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Calling $phone...')),
-    );
+    AppNotification.showNeutral(context, 'Calling $phone...');
   }
 
   void _navigateToAddress(String? address) {
     if (address == null || address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No address available')),
-      );
+      AppNotification.showError(context, 'No address available');
       return;
     }
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigating to $address...')),
-    );
+    AppNotification.showNeutral(context, 'Navigating to $address...');
   }
 
   @override
@@ -327,9 +315,7 @@ class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
                       onTap: () {
                         if (_agency!.email != null && _agency!.email!.isNotEmpty) {
                           HapticUtils.lightImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Emailing ${_agency!.email}...')),
-                          );
+                          AppNotification.showNeutral(context, 'Emailing ${_agency!.email}...');
                         }
                       },
                     ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/missed_visit_model.dart';
@@ -121,9 +122,7 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
 
     if (visit.primaryPhone == null || visit.primaryPhone!.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No phone number available')),
-        );
+        AppNotification.showError(context, 'No phone number available');
       }
       return;
     }
@@ -133,9 +132,7 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
       await launchUrl(uri);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not launch phone app')),
-        );
+        AppNotification.showError(context, 'Could not launch phone app');
       }
     }
   }
@@ -159,18 +156,15 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
           },
           onError: (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to reschedule: $e')),
-              );
+              AppNotification.showError(context, 'Failed to reschedule: $e');
             }
           },
         );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Rescheduled ${visit.clientName} to ${_formatDate(date)}'),
-            ),
+          AppNotification.showSuccess(
+            context,
+            'Rescheduled ${visit.clientName} to ${_formatDate(date)}',
           );
         }
       }

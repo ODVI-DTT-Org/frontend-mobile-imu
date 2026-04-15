@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/app_notification.dart';
 
 /// Conflict notification data
 class ConflictNotification {
@@ -96,9 +97,9 @@ class ConflictSnackbar {
     );
   }
 
-  /// Show conflict snackbar
+  /// Show conflict notification
   static void show(BuildContext context, ConflictNotification notification) {
-    ScaffoldMessenger.of(context).showSnackBar(create(notification));
+    AppNotification.showWarning(context, notification.message);
   }
 }
 

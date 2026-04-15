@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/debounce_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 
 class CallLogPage extends ConsumerStatefulWidget {
   const CallLogPage({super.key});
@@ -184,9 +185,7 @@ class _CallLogPageState extends ConsumerState<CallLogPage> {
 
   void _makeCall(String phoneNumber) {
     HapticUtils.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Calling $phoneNumber...')),
-    );
+    AppNotification.showNeutral(context, 'Calling $phoneNumber...');
     // In production, use url_launcher to make the call
   }
 

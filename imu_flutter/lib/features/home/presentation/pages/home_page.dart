@@ -6,6 +6,7 @@ import '../../../../services/auth/session_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/powersync_connector.dart' show powerSyncConnectorProvider;
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart' hide assignedMunicipalitiesProvider;
 import '../../../../shared/providers/filter_providers.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
@@ -189,11 +190,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _showDeveloperOptions(context);
         break;
       default:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$id feature coming soon'),
-          ),
-        );
+        AppNotification.showNeutral(context, '$id feature coming soon');
     }
   }
 
@@ -459,9 +456,7 @@ class _DeveloperOptionsSheetState extends ConsumerState<_DeveloperOptionsSheet> 
                     label: 'Check Sync Errors',
                     color: Colors.orange,
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Check console for sync errors')),
-                      );
+                      AppNotification.showWarning(context, 'Check console for sync errors');
                     },
                   ),
                 ],

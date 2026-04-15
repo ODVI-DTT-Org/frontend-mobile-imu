@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/config/map_config.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../services/local_storage/hive_service.dart';
@@ -56,9 +57,7 @@ class _ClientsMapPageState extends ConsumerState<ClientsMapPage> {
       onError: (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load clients: $e')),
-          );
+          AppNotification.showError(context, 'Failed to load clients: $e');
         }
       },
     );

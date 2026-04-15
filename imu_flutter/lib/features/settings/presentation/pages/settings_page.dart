@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/auth/session_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
@@ -66,31 +67,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         await _loadLastSyncTime();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sync completed successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppNotification.showSuccess(context, 'Sync completed successfully');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Sync failed: ${result.errorMessage}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppNotification.showError(context, 'Sync failed: ${result.errorMessage}');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sync error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppNotification.showError(context, 'Sync error: ${e.toString()}');
       }
     } finally {
       if (mounted) {
@@ -303,9 +289,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 subtitle: 'FAQs and support articles',
                 onTap: () {
                   HapticUtils.lightImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Help Center coming soon')),
-                  );
+                  AppNotification.showNeutral(context, 'Help Center coming soon');
                 },
               ),
               _buildDivider(),
@@ -315,9 +299,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 subtitle: 'Report issues or suggest improvements',
                 onTap: () {
                   HapticUtils.lightImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Feedback feature coming soon')),
-                  );
+                  AppNotification.showNeutral(context, 'Feedback feature coming soon');
                 },
               ),
               _buildDivider(),
@@ -693,31 +675,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   },
                   onError: (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to change PIN'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      AppNotification.showError(context, 'Failed to change PIN');
                     }
                   },
                 );
 
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('PIN changed successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  AppNotification.showSuccess(context, 'PIN changed successfully');
                 }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('PINs do not match'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                AppNotification.showError(context, 'PINs do not match');
               }
             },
             child: const Text('Change PIN'),
@@ -788,31 +755,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   },
                   onError: (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to change password'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      AppNotification.showError(context, 'Failed to change password');
                     }
                   },
                 );
 
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Password changed successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  AppNotification.showSuccess(context, 'Password changed successfully');
                 }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Passwords do not match or too short'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                AppNotification.showError(context, 'Passwords do not match or too short');
               }
             },
             child: const Text('Change Password'),
@@ -846,20 +798,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 },
                 onError: (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to clear cache'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    AppNotification.showError(context, 'Failed to clear cache');
                   }
                 },
               );
 
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Cache cleared')),
-                );
+                AppNotification.showSuccess(context, 'Cache cleared');
               }
             }),
             _buildStorageItem('Offline Data', '12 MB', null),
@@ -887,20 +832,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 },
                 onError: (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to clear cache'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    AppNotification.showError(context, 'Failed to clear cache');
                   }
                 },
               );
 
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All cache cleared')),
-                );
+                AppNotification.showSuccess(context, 'All cache cleared');
               }
             },
             child: const Text('Clear All Cache'),

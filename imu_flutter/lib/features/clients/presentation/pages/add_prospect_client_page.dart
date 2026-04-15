@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/psgc_api_service.dart' show PsgcRegion, PsgcProvince, PsgcMunicipality, PsgcBarangay, psgcApiServiceProvider;
 import '../../../../shared/providers/app_providers.dart' show assignedClientsProvider, isOnlineProvider, clientApiServiceProvider;
@@ -358,12 +359,7 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
       onError: (e) {
         HapticUtils.error();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to save client: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppNotification.showError(context, 'Failed to save client: $e');
         }
       },
     );
@@ -371,12 +367,7 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
     // Success handling
     HapticUtils.success();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isOnline ? 'Client added successfully' : 'Client saved locally (will sync when online)'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      AppNotification.showSuccess(context, isOnline ? 'Client added successfully' : 'Client saved locally (will sync when online)');
       context.pop(true);
     }
   }

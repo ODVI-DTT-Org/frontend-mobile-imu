@@ -465,41 +465,15 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _releaseLoan(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    // Show UDI input dialog
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => _ReleaseLoanDialog(clientName: client.fullName),
-    );
+    // Navigate to unified Release Loan form
+    final result = await context.push<bool>('/release-loan/${client.clientId}');
 
-    if (result == null || !result['confirmed']) return;
-
-    final udiNumber = result['udi_number'] as String?;
-
-    if (udiNumber == null || udiNumber.trim().isEmpty) {
+    // If form was submitted successfully, refresh My Day data
+    if (result == true) {
+      await ref.read(myDayStateProvider.notifier).refresh();
       if (mounted) {
-        showToast('UDI number is required');
+        HapticUtils.success();
       }
-      return;
-    }
-
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Submitting loan release...',
-      operation: () async {
-        final approvalsApi = ref.read(approvalsApiServiceProvider);
-        await approvalsApi.submitLoanRelease(
-          clientId: client.clientId,
-          udiNumber: udiNumber.trim(),
-          notes: 'Loan release requested via mobile app',
-        );
-        // Refresh My Day to show updated status
-        await ref.read(myDayStateProvider.notifier).refresh();
-      },
-    );
-
-    if (mounted) {
-      HapticUtils.success();
-      showToast('Loan release submitted for approval (UDI: ${udiNumber.trim()})');
     }
   }
 
@@ -963,109 +937,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           const SizedBox(height: 100), // Bottom nav padding
         ],
       ),
-    );
-  }
-}
-
-/// Dialog for Release Loan with UDI number input
-class _ReleaseLoanDialog extends StatefulWidget {
-  final String clientName;
-
-  const _ReleaseLoanDialog({required this.clientName});
-
-  @override
-  State<_ReleaseLoanDialog> createState() => _ReleaseLoanDialogState();
-}
-
-class _ReleaseLoanDialogState extends State<_ReleaseLoanDialog> {
-  final _udiController = TextEditingController();
-  bool _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _udiController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      icon: Icon(
-        LucideIcons.dollarSign,
-        color: Colors.green[600],
-        size: 48,
-      ),
-      title: const Text('Release Loan'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Submit loan release request for ${widget.clientName}?',
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _udiController,
-            decoration: const InputDecoration(
-              labelText: 'UDI Number *',
-              hintText: 'Enter UDI number...',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'This will submit a request for approval. The loan will be marked as released and all touchpoints will be completed.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '⚠️ This action requires approval and cannot be undone.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.orange.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final udiNumber = _udiController.text.trim();
-            if (udiNumber.isEmpty) {
-              showToast('UDI number is required');
-              return;
-            }
-            if (udiNumber.length > 50) {
-              showToast('UDI number must be 50 characters or less');
-              return;
-            }
-            Navigator.pop(context, {
-              'confirmed': true,
-              'udi_number': udiNumber,
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green[600],
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Submit Request'),
-        ),
-      ],
     );
   }
 }
