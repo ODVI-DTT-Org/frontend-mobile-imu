@@ -1745,9 +1745,9 @@ class _QuickActionsSection extends ConsumerWidget {
               _QuickActionButton(
                 icon: LucideIcons.userCheck,
                 label: 'Record Visit',
-                onTap: isLoanReleased ? null : onRecordVisitOnly,
+                onTap: onRecordVisitOnly,
               ),
-              if (canReleaseLoan && !isLoanReleased)
+              if (canReleaseLoan)
                 _QuickActionButton(
                   icon: LucideIcons.dollarSign,
                   label: 'Release Loan',
