@@ -233,14 +233,15 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     try {
       final isOnline = ref.read(isOnlineProvider);
-      final today = DateTime.now();
+      // Use selected date instead of today for status checking
+      final selectedDate = DateTime(widget.selectedDate.year, widget.selectedDate.month, widget.selectedDate.day);
 
       if (isOnline) {
         // Use API when online
-        await _loadStatusesFromAPI(today);
+        await _loadStatusesFromAPI(selectedDate);
       } else {
         // Use PowerSync when offline
-        await _loadStatusesFromPowerSync(today);
+        await _loadStatusesFromPowerSync(selectedDate);
       }
     } catch (e) {
       if (mounted) {

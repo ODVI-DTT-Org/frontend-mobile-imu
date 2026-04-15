@@ -26,14 +26,14 @@ class ClientActionBottomSheet extends StatelessWidget {
 
     return Container(
       constraints: BoxConstraints(
-        minHeight: MediaQuery.of(context).size.height * 0.4,
-        maxHeight: MediaQuery.of(context).size.height * 0.8,
+        minHeight: MediaQuery.of(context).size.height * 0.5,
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
         ),
       ),
       child: Column(
@@ -42,35 +42,35 @@ class ClientActionBottomSheet extends StatelessWidget {
           // Drag Handle
           Center(
             child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
+              margin: const EdgeInsets.only(top: 16, bottom: 12),
+              width: 48,
+              height: 5,
               decoration: BoxDecoration(
                 color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           ),
 
           // Header - Client Name and Pension Type
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   clientName,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   pensionType,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.grey[600],
                   ),
                 ),
@@ -83,14 +83,14 @@ class ClientActionBottomSheet extends StatelessWidget {
           // Form Content
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(20),
               child: content,
             ),
           ),
 
           // Submit Button
           Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomPadding),
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomPadding),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               border: Border(
@@ -99,7 +99,7 @@ class ClientActionBottomSheet extends StatelessWidget {
             ),
             child: SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 52,
               child: FilledButton(
                 onPressed: isSubmitting ? null : onSubmit,
                 child: isSubmitting
@@ -114,7 +114,7 @@ class ClientActionBottomSheet extends StatelessWidget {
                     : Text(
                         submitButtonText,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

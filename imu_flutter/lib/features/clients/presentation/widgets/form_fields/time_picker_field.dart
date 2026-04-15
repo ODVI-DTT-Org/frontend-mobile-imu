@@ -56,27 +56,28 @@ class TimePickerField extends HookWidget {
 
     return InkWell(
       onTap: pickTime,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        margin: const EdgeInsets.only(bottom: 4),
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(8),
           color: Colors.grey[50],
         ),
         child: Row(
           children: [
             Icon(
               LucideIcons.clock,
-              size: 16,
+              size: 18,
               color: Colors.grey[600],
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: Colors.grey[600],
               ),
@@ -85,7 +86,8 @@ class TimePickerField extends HookWidget {
             Text(
               formatTime(selectedTime.value),
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
                 color: selectedTime.value != null
                   ? const Color(0xFF0F172A)
                   : Colors.grey[400],

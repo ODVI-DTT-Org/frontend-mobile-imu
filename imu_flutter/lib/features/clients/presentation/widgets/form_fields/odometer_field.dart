@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
-/// Reusable odometer number input field
+/// Reusable odometer number input field with km suffix
 class OdometerField extends HookWidget {
   final String label;
   final String? initialValue;
@@ -20,10 +20,11 @@ class OdometerField extends HookWidget {
     final controller = useTextEditingController(text: initialValue);
 
     return Container(
-      height: 40,
+      margin: const EdgeInsets.only(bottom: 4),
+      height: 52,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(8),
         color: Colors.grey[50],
       ),
       child: TextField(
@@ -32,19 +33,31 @@ class OdometerField extends HookWidget {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Colors.grey[600],
           ),
           prefixIcon: Icon(
             LucideIcons.gauge,
-            size: 16,
+            size: 18,
             color: Colors.grey[600],
           ),
+          suffix: Text(
+            'km',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+          ),
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 40,
+            minHeight: 20,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
-        style: const TextStyle(fontSize: 14),
+        style: const TextStyle(fontSize: 15),
         onChanged: onChanged,
       ),
     );
