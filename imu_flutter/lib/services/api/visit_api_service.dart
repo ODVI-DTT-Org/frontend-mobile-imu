@@ -1,0 +1,118 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import 'package:imu_flutter/services/api/api_exception.dart';
+import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
+import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvider;
+import 'package:imu_flutter/core/config/app_config.dart';
+
+/// Visit API service for creating and managing visits
+class VisitApiService {
+  final Dio _dio;
+  final JwtAuthService _authService;
+
+  VisitApiService({Dio? dio, JwtAuthService? authService})
+      : _dio = dio ?? Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+        )),
+        _authService = authService ?? JwtAuthService();
+
+  /// Create a visit record with GPS and odometer data
+  ///
+  /// Parameters:
+  /// - [clientId]: Client ID
+  /// - [timeIn]: Visit start time (ISO 8601 string or DateTime)
+  /// - [timeOut]: Visit end time (ISO 8601 string or DateTime)
+  /// - [odometerArrival]: Odometer reading at arrival
+  /// - [odometerDeparture]: Odometer reading at departure
+  /// - [photoUrl]: Optional uploaded photo URL
+  /// - [notes]: Optional visit notes
+  /// - [type]: Visit type ('regular_visit' or 'release_loan')
+  /// - [latitude]: Optional GPS latitude
+  /// - [longitude]: Optional GPS longitude
+  /// - [address]: Optional GPS address
+  ///
+  /// Returns [Map] with visit data, or null if failed
+  Future<Map<String, dynamic>?> createVisit({
+    required String clientId,
+    required String timeIn,
+    required String timeOut,
+    required String odometerArrival,
+    required String odometerDeparture,
+    String? photoUrl,
+    String? notes,
+    String? type,
+    double? latitude,
+    double? longitude,
+    String? address,
+  }) async {
+    try {
+      debugPrint('VisitApiService: Creating visit for client $clientId');
+
+      // Get the access token
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('VisitApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      // Prepare request data
+      final data = {
+        'client_id': clientId,
+        'time_in': timeIn,
+        'time_out': timeOut,
+        'odometer_arrival': odometerArrival,
+        'odometer_departure': odometerDeparture,
+        if (photoUrl != null) 'photo_url': photoUrl,
+        if (notes != null) 'notes': notes,
+        if (type != null) 'type': type,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (address != null) 'address': address,
+      };
+
+      // Make the API request
+      final response = await _dio.post(
+        '${AppConfig.postgresApiUrl}/visits',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: data,
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final visitData = response.data as Map<String, dynamic>;
+        debugPrint('VisitApiService: Visit created successfully: ${visitData['id']}');
+        return visitData;
+      } else {
+        debugPrint('VisitApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to create visit: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('VisitApiService: DioException - ${e.message}');
+      debugPrint('VisitApiService: Response - ${e.response?.data}');
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('VisitApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to create visit',
+        originalError: e,
+      );
+    }
+  }
+}
+
+/// Provider for VisitApiService
+final visitApiServiceProvider = Provider<VisitApiService>((ref) {
+  final jwtAuth = ref.watch(jwtAuthProvider);
+  return VisitApiService(authService: jwtAuth);
+});
