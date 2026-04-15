@@ -19,7 +19,8 @@ import '../../../../shared/providers/app_providers.dart' show
     authNotifierProvider,
     powerSyncDatabaseProvider,
     addressRepositoryProvider,
-    phoneNumberRepositoryProvider;
+    phoneNumberRepositoryProvider,
+    releaseApiServiceProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
@@ -1252,18 +1253,29 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         client: _client!,
         onSubmit: (data) async {
           try {
-            // Submit to API (current API only accepts client ID)
-            final clientApi = ref.read(clientApiServiceProvider);
-            final success = await clientApi.releaseLoan(_client!.id!) != null;
+            // Submit to API using enhanced release service
+            final releaseApiService = ref.read(releaseApiServiceProvider);
+            final success = await releaseApiService.createCompleteLoanRelease(
+              clientId: _client!.id!,
+              timeIn: data['time_in'],
+              timeOut: data['time_out'],
+              odometerArrival: data['odometer_arrival'],
+              odometerDeparture: data['odometer_departure'],
+              productType: data['product_type'],
+              loanType: data['loan_type'],
+              udiNumber: data['udi_number'],
+              remarks: data['remarks'],
+              photoPath: data['photo_path'],
+            ) != null;
 
-            if (success && mounted) {
+            if (success && context.mounted) {
               AppNotification.showSuccess(context, 'Loan released successfully');
               await _loadClient();
               ref.invalidate(clientTouchpointsProvider);
             }
             return success;
           } catch (e) {
-            if (mounted) {
+            if (context.mounted) {
               AppNotification.showError(context, 'Failed to release loan: $e');
             }
             return false;
