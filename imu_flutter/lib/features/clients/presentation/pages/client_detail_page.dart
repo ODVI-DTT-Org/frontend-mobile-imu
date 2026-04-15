@@ -1104,30 +1104,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _handleReleaseLoanBottomSheet() async {
     if (_client == null) return;
 
-    // Prevent release loan if already released
-    if (_client!.loanReleased) {
-      if (mounted) {
-        HapticUtils.error();
-        AppNotification.showWarning(context, 'Loan has already been released');
-      }
-      return;
-    }
-
     HapticUtils.lightImpact();
 
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-      builder: (context) => _ReleaseLoanBottomSheet(
-        client: _client!,
-      ),
-    );
-
-    if (result == true && mounted) {
-      await _loadClient();
-      ref.invalidate(clientTouchpointsProvider);
+    // TODO: Phase 1 - Implement new compact Release Loan bottom sheet
+    if (mounted) {
+      HapticUtils.error();
+      AppNotification.showError(context, 'Release Loan - Coming soon in Phase 1');
     }
   }
 
