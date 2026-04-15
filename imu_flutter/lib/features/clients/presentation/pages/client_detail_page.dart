@@ -1243,10 +1243,38 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     HapticUtils.lightImpact();
 
-    // TODO: Phase 1 - Implement new compact Release Loan bottom sheet
-    if (mounted) {
-      HapticUtils.error();
-      AppNotification.showError(context, 'Release Loan - Coming soon in Phase 1');
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (context) => RecordLoanReleaseBottomSheet(
+        client: _client!,
+        onSubmit: (data) async {
+          try {
+            // Submit to API (current API only accepts client ID)
+            final clientApi = ref.read(clientApiServiceProvider);
+            final success = await clientApi.releaseLoan(_client!.id!) != null;
+
+            if (success && mounted) {
+              AppNotification.showSuccess(context, 'Loan released successfully');
+              await _loadClient();
+              ref.invalidate(clientTouchpointsProvider);
+            }
+            return success;
+          } catch (e) {
+            if (mounted) {
+              AppNotification.showError(context, 'Failed to release loan: $e');
+            }
+            return false;
+          }
+        },
+      ),
+    );
+
+    if (result == true && mounted) {
+      await _loadClient();
+      ref.invalidate(clientTouchpointsProvider);
     }
   }
 
