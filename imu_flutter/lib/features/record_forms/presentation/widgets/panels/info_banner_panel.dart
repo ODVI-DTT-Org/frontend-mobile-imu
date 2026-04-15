@@ -18,10 +18,10 @@ class InfoBannerPanel extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: theme.colorScheme.primary.withOpacity(0.3),
         ),
@@ -33,30 +33,32 @@ class InfoBannerPanel extends StatelessWidget {
             children: [
               Icon(
                 LucideIcons.info,
-                size: 16,
+                size: 14,
                 color: theme.colorScheme.onPrimaryContainer,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 title ?? 'Auto-set Values',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
+                  fontSize: 12,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           ...messages.map((message) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: 3),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(width: 24),
+                    const SizedBox(width: 20),
                     Expanded(
                       child: Text(
                         message,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onPrimaryContainer,
+                          fontSize: 12,
                         ),
                       ),
                     ),

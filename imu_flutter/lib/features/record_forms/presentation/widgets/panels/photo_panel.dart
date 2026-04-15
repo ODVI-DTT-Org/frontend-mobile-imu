@@ -55,19 +55,20 @@ class PhotoPanel extends StatelessWidget {
           'Photo (Required)',
           style: theme.textTheme.labelSmall?.copyWith(
             color: hasError ? theme.colorScheme.error : null,
+            fontSize: 12,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
         // Photo preview or capture button
         if (hasPhoto) ...[
           Container(
-            height: 200,
+            height: 160,
             decoration: BoxDecoration(
               border: Border.all(
                 color: theme.colorScheme.outline.withOpacity(0.3),
               ),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Stack(
               children: [
@@ -98,13 +99,15 @@ class PhotoPanel extends StatelessWidget {
                         ),
                 ),
                 Positioned(
-                  top: 8,
-                  right: 8,
+                  top: 6,
+                  right: 6,
                   child: IconButton(
-                    icon: Icon(LucideIcons.x),
+                    icon: Icon(LucideIcons.x, size: 16),
                     onPressed: onPhotoRemoved,
                     style: IconButton.styleFrom(
                       backgroundColor: theme.colorScheme.surface,
+                      padding: const EdgeInsets.all(4),
+                      minimumSize: const Size(24, 24),
                     ),
                   ),
                 ),
@@ -114,9 +117,9 @@ class PhotoPanel extends StatelessWidget {
         ] else ...[
           InkWell(
             onTap: () => _pickImage(context),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             child: Container(
-              height: 120,
+              height: 100,
               decoration: BoxDecoration(
                 border: Border.all(
                   color: error != null
@@ -125,7 +128,7 @@ class PhotoPanel extends StatelessWidget {
                   width: 2,
                   style: BorderStyle.solid,
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 color: error != null
                     ? theme.colorScheme.errorContainer.withOpacity(0.1)
                     : null,
@@ -135,18 +138,19 @@ class PhotoPanel extends StatelessWidget {
                 children: [
                   Icon(
                     LucideIcons.camera,
-                    size: 32,
+                    size: 24,
                     color: error != null
                         ? theme.colorScheme.error
                         : theme.colorScheme.onSurface.withOpacity(0.6),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     'Tap to take photo',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: error != null
                           ? theme.colorScheme.error
                           : theme.colorScheme.onSurface.withOpacity(0.6),
+                      fontSize: 13,
                     ),
                   ),
                 ],
@@ -157,20 +161,21 @@ class PhotoPanel extends StatelessWidget {
 
         // Error text
         if (error != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Icon(
                 LucideIcons.alertCircle,
-                size: 14,
+                size: 12,
                 color: theme.colorScheme.error,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   error!,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
+                    fontSize: 12,
                   ),
                 ),
               ),

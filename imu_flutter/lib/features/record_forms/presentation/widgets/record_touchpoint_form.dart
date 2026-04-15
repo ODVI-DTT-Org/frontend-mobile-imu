@@ -13,6 +13,7 @@ import 'package:imu_flutter/features/record_forms/presentation/providers/record_
 import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_data.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/utils/app_notification.dart';
 
 class RecordTouchpointForm extends ConsumerStatefulWidget {
   final Client client;
@@ -29,8 +30,6 @@ class RecordTouchpointForm extends ConsumerStatefulWidget {
 class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
   bool _timeExpanded = false;
   bool _detailsExpanded = false;
-  bool _photoExpanded = false;
-  bool _notesExpanded = false;
 
   @override
   void initState() {
@@ -57,10 +56,6 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Record Touchpoint'),
-        leading: IconButton(
-          icon: Icon(LucideIcons.x),
-          onPressed: () => context.pop(),
-        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -107,13 +102,9 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
               ),
             ),
 
-            // Photo Panel
-            ExpansionFormPanel(
-              title: 'Photo',
-              icon: LucideIcons.camera,
-              isExpanded: _photoExpanded,
-              onTap: () => setState(() => _photoExpanded = !_photoExpanded),
-              summary: _buildPhotoSummary(formState.data),
+            // Photo Panel (single field - no expansion)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: PhotoPanel(
                 photoPath: formState.data.photoPath,
                 onPhotoCaptured: (path) => formNotifier.updatePhoto(path),
@@ -122,13 +113,11 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
               ),
             ),
 
-            // Notes Panel
-            ExpansionFormPanel(
-              title: 'Notes',
-              icon: LucideIcons.fileText,
-              isExpanded: _notesExpanded,
-              onTap: () => setState(() => _notesExpanded = !_notesExpanded),
-              summary: _buildNotesSummary(formState.data),
+            const SizedBox(height: 16),
+
+            // Notes Panel (single field - no expansion)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: NotesPanel(
                 remarks: formState.data.remarks,
                 onRemarksChanged: (remarks) => formNotifier.updateRemarks(remarks),
@@ -174,40 +163,41 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Client',
-            style: theme.textTheme.labelSmall,
+            style: theme.textTheme.labelSmall?.copyWith(fontSize: 11),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             client.fullName,
-            style: theme.textTheme.titleMedium,
+            style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             client.addresses?.firstOrNull?.fullAddress ?? 'No address',
-            style: theme.textTheme.bodySmall,
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
           ),
           if (touchpointNumber != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 'Touchpoint #$touchpointNumber of 7',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
+                  fontSize: 11,
                 ),
               ),
             ),
@@ -229,20 +219,6 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
       return Text('${data.reason!.displayName} • ${data.status!.displayName}');
     }
     return const Text('Select reason and status');
-  }
-
-  Widget _buildPhotoSummary(TouchpointFormData data) {
-    if (data.photoPath != null) {
-      return const Text('Photo attached');
-    }
-    return const Text('Photo required');
-  }
-
-  Widget _buildNotesSummary(TouchpointFormData data) {
-    if (data.remarks != null && data.remarks!.isNotEmpty) {
-      return Text(data.remarks!, maxLines: 1, overflow: TextOverflow.ellipsis);
-    }
-    return const Text('Add notes (optional)');
   }
 
   String _formatTime(DateTime? time) {
@@ -274,12 +250,6 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
   }
 
   void _showSuccessToast(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    AppNotification.showSuccess(context, message);
   }
 }

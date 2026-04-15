@@ -35,7 +35,7 @@ class ExpansionFormPanel extends StatelessWidget {
               ? theme.colorScheme.error
               : theme.colorScheme.outline.withOpacity(0.3),
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         color: errorText != null
             ? theme.colorScheme.errorContainer.withOpacity(0.1)
             : null,
@@ -45,20 +45,20 @@ class ExpansionFormPanel extends StatelessWidget {
           // Header
           InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
                   if (icon != null) ...[
                     Icon(
                       icon,
-                      size: 20,
+                      size: 16,
                       color: errorText != null
                           ? theme.colorScheme.error
-                          : theme.colorScheme.onSurface,
+                          : theme.colorScheme.onSurface.withOpacity(0.7),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                   ],
                   Expanded(
                     child: Column(
@@ -66,20 +66,27 @@ class ExpansionFormPanel extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: theme.textTheme.titleSmall?.copyWith(
+                          style: theme.textTheme.labelMedium?.copyWith(
                             color: errorText != null
                                 ? theme.colorScheme.error
                                 : theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        if (!isExpanded) summary,
+                        if (!isExpanded)
+                          DefaultTextStyle(
+                            style: theme.textTheme.bodySmall!.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                            child: summary,
+                          ),
                       ],
                     ),
                   ),
                   Icon(
                     isExpanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
-                    size: 18,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
                   ),
                 ],
               ),
@@ -88,9 +95,9 @@ class ExpansionFormPanel extends StatelessWidget {
 
           // Expanded content
           if (isExpanded) ...[
-            const Divider(height: 1),
+            const Divider(height: 1, thickness: 1),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: child,
             ),
           ],
@@ -98,19 +105,20 @@ class ExpansionFormPanel extends StatelessWidget {
           // Error text
           if (errorText != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Row(
                 children: [
                   Icon(
                     LucideIcons.alertCircle,
-                    size: 14,
+                    size: 12,
                     color: theme.colorScheme.error,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       errorText!,
                       style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
                         color: theme.colorScheme.error,
                       ),
                     ),

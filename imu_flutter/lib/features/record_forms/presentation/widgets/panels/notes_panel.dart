@@ -35,11 +35,13 @@ class NotesPanel extends StatelessWidget {
               'Remarks',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: hasError ? theme.colorScheme.error : null,
+                fontSize: 12,
               ),
             ),
             Text(
               '$currentLength/$maxLength',
               style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 11,
                 color: isNearLimit
                     ? Colors.orange
                     : (hasError ? theme.colorScheme.error : theme.colorScheme.onSurface.withOpacity(0.6)),
@@ -47,7 +49,7 @@ class NotesPanel extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             border: Border.all(
@@ -55,11 +57,11 @@ class NotesPanel extends StatelessWidget {
                   ? theme.colorScheme.error
                   : theme.colorScheme.outline.withOpacity(0.3),
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: TextField(
             controller: TextEditingController(text: remarks)..selection = TextSelection.fromPosition(TextPosition(offset: remarks?.length ?? 0)),
-            maxLines: 4,
+            maxLines: 3,
             maxLength: maxLength,
             onChanged: (value) {
               if (value.isEmpty) {
@@ -70,30 +72,33 @@ class NotesPanel extends StatelessWidget {
             },
             decoration: InputDecoration(
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
+              contentPadding: const EdgeInsets.all(12),
               hintText: 'Add notes about this visit...',
               hintStyle: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacity(0.5),
+                fontSize: 13,
               ),
               counterText: '', // Hide default counter, using custom one
             ),
+            style: TextStyle(fontSize: 14),
           ),
         ),
         if (error != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Icon(
                 LucideIcons.alertCircle,
-                size: 14,
+                size: 12,
                 color: theme.colorScheme.error,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   error!,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
+                    fontSize: 12,
                   ),
                 ),
               ),

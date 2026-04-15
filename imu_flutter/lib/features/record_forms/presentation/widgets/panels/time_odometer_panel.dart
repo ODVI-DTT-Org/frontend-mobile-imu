@@ -60,7 +60,7 @@ class TimeOdometerPanel extends StatelessWidget {
                 errorKey: 'timeIn',
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildTimeField(
                 context,
@@ -74,7 +74,7 @@ class TimeOdometerPanel extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Odometer Row
         Row(
@@ -89,7 +89,7 @@ class TimeOdometerPanel extends StatelessWidget {
                 errorKey: 'odometerIn',
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildOdometerField(
                 context,
@@ -120,16 +120,16 @@ class TimeOdometerPanel extends StatelessWidget {
 
     return InkWell(
       onTap: () => _selectTime(context, value, onChanged),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           border: Border.all(
             color: hasError
                 ? theme.colorScheme.error
                 : theme.colorScheme.outline.withOpacity(0.3),
           ),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,6 +138,7 @@ class TimeOdometerPanel extends StatelessWidget {
               label,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: hasError ? theme.colorScheme.error : null,
+                fontSize: 11,
               ),
             ),
             const SizedBox(height: 4),
@@ -145,24 +146,26 @@ class TimeOdometerPanel extends StatelessWidget {
               children: [
                 Icon(
                   LucideIcons.clock,
-                  size: 16,
+                  size: 14,
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
                   formattedValue,
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: hasError ? theme.colorScheme.error : null,
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
             if (subtitle != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 subtitle!,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  fontSize: 11,
                 ),
               ),
             ],
@@ -190,27 +193,28 @@ class TimeOdometerPanel extends StatelessWidget {
           label,
           style: theme.textTheme.labelSmall?.copyWith(
             color: hasError ? theme.colorScheme.error : null,
+            fontSize: 11,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             border: Border.all(
               color: hasError
                   ? theme.colorScheme.error
                   : theme.colorScheme.outline.withOpacity(0.3),
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
             children: [
               Icon(
                 LucideIcons.gauge,
-                size: 16,
+                size: 14,
                 color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: TextField(
                   controller: TextEditingController(text: displayValue)..selection = TextSelection.fromPosition(TextPosition(offset: displayValue.length)),
@@ -227,8 +231,9 @@ class TimeOdometerPanel extends StatelessWidget {
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: hasError ? theme.colorScheme.error : null,
+                    fontSize: 14,
                   ),
                 ),
               ),

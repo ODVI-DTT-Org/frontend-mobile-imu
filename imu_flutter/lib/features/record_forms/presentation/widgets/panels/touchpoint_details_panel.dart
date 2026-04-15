@@ -35,7 +35,7 @@ class TouchpointDetailsPanel extends StatelessWidget {
           onChanged: onReasonChanged,
           errorKey: 'reason',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Status dropdown
         _buildDropdown(
@@ -70,18 +70,19 @@ class TouchpointDetailsPanel extends StatelessWidget {
           label,
           style: theme.textTheme.labelSmall?.copyWith(
             color: hasError ? theme.colorScheme.error : null,
+            fontSize: 12,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             border: Border.all(
               color: hasError
                   ? theme.colorScheme.error
                   : theme.colorScheme.outline.withOpacity(0.3),
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
@@ -91,11 +92,12 @@ class TouchpointDetailsPanel extends StatelessWidget {
                 'Select $label',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 13,
                 ),
               ),
               icon: Icon(
                 LucideIcons.chevronDown,
-                size: 18,
+                size: 16,
                 color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
               items: items.map((item) {
@@ -103,13 +105,14 @@ class TouchpointDetailsPanel extends StatelessWidget {
                   value: item,
                   child: Text(
                     displayName(item),
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
                   ),
                 );
               }).toList(),
               onChanged: onChanged,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: hasError ? theme.colorScheme.error : null,
+                fontSize: 14,
               ),
             ),
           ),
@@ -120,15 +123,16 @@ class TouchpointDetailsPanel extends StatelessWidget {
             children: [
               Icon(
                 LucideIcons.alertCircle,
-                size: 14,
+                size: 12,
                 color: theme.colorScheme.error,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   errors[errorKey]!,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
+                    fontSize: 12,
                   ),
                 ),
               ),
