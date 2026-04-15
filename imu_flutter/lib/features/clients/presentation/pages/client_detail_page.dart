@@ -654,8 +654,9 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     HapticUtils.lightImpact();
     final addressRepo = ref.read(addressRepositoryProvider);
 
-    final result = await showDialog<Address>(
+    final result = await showModalBottomSheet<Address>(
       context: context,
+      isScrollControlled: true,
       builder: (context) => AddAddressModal(
         clientId: widget.clientId,
         onSubmit: (clientId, data) async {
@@ -804,8 +805,9 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     HapticUtils.lightImpact();
     final phoneRepo = ref.read(phoneNumberRepositoryProvider);
 
-    final result = await showDialog<PhoneNumber>(
+    final result = await showModalBottomSheet<PhoneNumber>(
       context: context,
+      isScrollControlled: true,
       builder: (context) => AddPhoneModal(
         clientId: widget.clientId,
         onSubmit: (clientId, data) async {
