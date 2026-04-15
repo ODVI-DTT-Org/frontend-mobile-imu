@@ -230,6 +230,124 @@ class TouchpointApiService {
     }
   }
 
+  /// Create touchpoint with photo upload (single FormData request)
+  ///
+  /// This method sends the touchpoint data and photo file in a single multipart/form-data request.
+  /// The backend handles the photo upload internally and creates the touchpoint record.
+  ///
+  /// Parameters:
+  /// - [touchpoint]: Touchpoint data (client, touchpoint number, type, etc.)
+  /// - [photoFile]: Optional photo file to upload with touchpoint data
+  ///
+  /// Returns [Touchpoint] if successful, null if failed
+  ///
+  /// Note: Uses /api/my-day/visits endpoint which handles FormData with photo uploads
+  Future<Touchpoint?> createTouchpointWithPhoto(Touchpoint touchpoint, {File? photoFile}) async {
+    try {
+      debugPrint('TouchpointApiService: Creating touchpoint with photo upload...');
+
+      // Get the access token
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('TouchpointApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      late final dynamic response;
+
+      // If photo file is provided, use FormData (single request with photo upload)
+      if (photoFile != null) {
+        debugPrint('TouchpointApiService: Using FormData with photo upload');
+
+        final formData = FormData.fromMap({
+          'client_id': touchpoint.clientId,
+          'touchpoint_number': touchpoint.touchpointNumber.toString(),
+          'type': touchpoint.type.apiValue,
+          'reason': touchpoint.reason.apiValue,
+          if (touchpoint.status.apiValue.isNotEmpty) 'status': touchpoint.status.apiValue,
+          if (touchpoint.address != null) 'address': touchpoint.address,
+          if (touchpoint.timeArrival != null) 'time_arrival': '${touchpoint.timeArrival!.hour}:${touchpoint.timeArrival!.minute.toString().padLeft(2, '0')}',
+          if (touchpoint.timeDeparture != null) 'time_departure': '${touchpoint.timeDeparture!.hour}:${touchpoint.timeDeparture!.minute.toString().padLeft(2, '0')}',
+          if (touchpoint.odometerArrival != null) 'odometer_arrival': touchpoint.odometerArrival,
+          if (touchpoint.odometerDeparture != null) 'odometer_departure': touchpoint.odometerDeparture,
+          if (touchpoint.remarks != null) 'notes': touchpoint.remarks,
+          if (touchpoint.latitude != null) 'latitude': touchpoint.latitude,
+          if (touchpoint.longitude != null) 'longitude': touchpoint.longitude,
+          if (touchpoint.timeIn != null) 'time_in': touchpoint.timeIn!.toIso8601String(),
+          if (touchpoint.timeInGpsLat != null) 'time_in_gps_lat': touchpoint.timeInGpsLat,
+          if (touchpoint.timeInGpsLng != null) 'time_in_gps_lng': touchpoint.timeInGpsLng,
+          if (touchpoint.timeInGpsAddress != null) 'time_in_gps_address': touchpoint.timeInGpsAddress,
+          if (touchpoint.timeOut != null) 'time_out': touchpoint.timeOut!.toIso8601String(),
+          if (touchpoint.timeOutGpsLat != null) 'time_out_gps_lat': touchpoint.timeOutGpsLat,
+          if (touchpoint.timeOutGpsLng != null) 'time_out_gps_lng': touchpoint.timeOutGpsLng,
+          if (touchpoint.timeOutGpsAddress != null) 'time_out_gps_address': touchpoint.timeOutGpsAddress,
+          'photo': await MultipartFile.fromFile(
+            photoFile.path,
+            filename: photoFile.path.split('/').last.split('\\').last,
+          ),
+        });
+
+        debugPrint('TouchpointApiService: FormData fields prepared');
+        debugPrint('TouchpointApiService: Photo file: ${photoFile.path}');
+
+        response = await _dio.post(
+          '${AppConfig.postgresApiUrl}/my-day/visits',
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $token',
+              // Don't set Content-Type - Dio sets it automatically with boundary for FormData
+            },
+          ),
+          data: formData,
+        );
+      } else {
+        // No photo file - use regular JSON approach (fallback to original endpoint)
+        debugPrint('TouchpointApiService: No photo file, using JSON endpoint');
+        return await createTouchpoint(touchpoint);
+      }
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final touchpointData = response.data as Map<String, dynamic>;
+        debugPrint('TouchpointApiService: Touchpoint created successfully: ${touchpointData['id']}');
+        return Touchpoint.fromJson(touchpointData);
+      } else {
+        debugPrint('TouchpointApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to create touchpoint: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('TouchpointApiService: DioException - ${e.message}');
+      debugPrint('TouchpointApiService: Response - ${e.response?.data}');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'save touchpoint with photo',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'clientId': touchpoint.clientId,
+          'touchpointNumber': touchpoint.touchpointNumber,
+        },
+      );
+      throw ApiException(
+        message: 'Network error: ${e.message}',
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('TouchpointApiService: Unexpected error - $e');
+      ErrorLoggingHelper.logCriticalError(
+        operation: 'save touchpoint with photo',
+        error: e,
+        stackTrace: StackTrace.current,
+        context: {
+          'clientId': touchpoint.clientId,
+          'touchpointNumber': touchpoint.touchpointNumber,
+        },
+      );
+      throw ApiException(
+        message: 'Failed to create touchpoint',
+        originalError: e,
+      );
+    }
+  }
+
   /// Update touchpoint
   Future<Touchpoint?> updateTouchpoint(Touchpoint touchpoint) async {
     try {

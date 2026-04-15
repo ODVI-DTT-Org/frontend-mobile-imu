@@ -10,7 +10,6 @@ import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/od
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/time_picker_field.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show
     visitApiServiceProvider,
-    uploadApiServiceProvider,
     releaseApiServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
