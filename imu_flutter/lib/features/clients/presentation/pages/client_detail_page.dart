@@ -1091,30 +1091,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _handleRecordVisitOnly() async {
     if (_client == null) return;
 
-    // Prevent visit only for loan released clients
-    if (_client!.loanReleased) {
-      if (mounted) {
-        HapticUtils.error();
-        AppNotification.showError(context, 'Cannot create visit: Loan has been released');
-      }
-      return;
-    }
-
     HapticUtils.lightImpact();
 
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-      builder: (context) => _RecordVisitOnlyBottomSheet(
-        client: _client!,
-      ),
-    );
-
-    if (result == true && mounted) {
-      await _loadClient();
-      ref.invalidate(clientTouchpointsProvider);
+    // TODO: Phase 1 - Implement new compact Record Visit Only bottom sheet
+    if (mounted) {
+      HapticUtils.error();
+      AppNotification.showError(context, 'Record Visit Only - Coming soon in Phase 1');
     }
   }
 
