@@ -37,9 +37,6 @@ import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
 import '../../../clients/presentation/widgets/address_selection_modal.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
-import '../../../record_forms/presentation/widgets/record_touchpoint_form.dart';
-import '../../../record_forms/presentation/widgets/record_visit_only_form.dart';
-import '../../../record_forms/presentation/widgets/release_loan_form.dart';
 import 'package:powersync/powersync.dart' hide Column;
 
 // Client detail provider
