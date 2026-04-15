@@ -42,6 +42,12 @@ class Client {
   final List<addr.Address> addresses; // Multiple addresses
   final List<ph.PhoneNumber> phoneNumbers; // Multiple phone numbers
   final List<Touchpoint> touchpoints;
+
+  // NEW: Pre-calculated touchpoint data (from API)
+  final List<Touchpoint> touchpointSummary; // From touchpoint_summary JSON
+  final int touchpointNumber; // From touchpoint_number field
+  final String? nextTouchpoint; // From next_touchpoint field
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? createdBy; // User ID of who created the client
@@ -88,6 +94,9 @@ class Client {
     this.addresses = const [],
     this.phoneNumbers = const [],
     this.touchpoints = const [],
+    this.touchpointSummary = const [],
+    this.touchpointNumber = 1,
+    this.nextTouchpoint,
     required this.createdAt,
     this.updatedAt,
     this.createdBy,
@@ -126,7 +135,13 @@ class Client {
     return age;
   }
 
-  int get completedTouchpoints => touchpoints.length;
+  int get completedTouchpoints => touchpointNumber - 1;
+
+  // Next touchpoint display
+  String get nextTouchpointDisplay {
+    if (nextTouchpoint == null) return '$touchpointNumber/7';
+    return '$touchpointNumber/7 • ${nextTouchpoint!.toLowerCase()}';
+  }
 
   /// Display product type - shows raw value if available, otherwise enum value
   String get productTypeDisplay {
@@ -319,6 +334,9 @@ class Client {
     List<addr.Address>? addresses,
     List<ph.PhoneNumber>? phoneNumbers,
     List<Touchpoint>? touchpoints,
+    List<Touchpoint>? touchpointSummary,
+    int? touchpointNumber,
+    String? nextTouchpoint,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isStarred,
@@ -360,6 +378,9 @@ class Client {
       addresses: addresses ?? this.addresses,
       phoneNumbers: phoneNumbers ?? this.phoneNumbers,
       touchpoints: touchpoints ?? this.touchpoints,
+      touchpointSummary: touchpointSummary ?? this.touchpointSummary,
+      touchpointNumber: touchpointNumber ?? this.touchpointNumber,
+      nextTouchpoint: nextTouchpoint ?? this.nextTouchpoint,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isStarred: isStarred ?? this.isStarred,
@@ -399,6 +420,9 @@ class Client {
       'barangay': barangay,
       'udi': udi,
       'touchpoints': touchpoints.map((t) => t.toJson()).toList(),
+      'touchpoint_summary': touchpointSummary.map((t) => t.toJson()).toList(),
+      'touchpoint_number': touchpointNumber,
+      'next_touchpoint': nextTouchpoint,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'isStarred': isStarred,
@@ -481,6 +505,12 @@ class Client {
     }
   }
 
+  /// Parse field as string, handling int to string conversion
+  static String? _parseStringField(dynamic value) {
+    if (value == null) return null;
+    return value.toString();
+  }
+
   factory Client.fromJson(Map<String, dynamic> json) {
     return Client(
       id: json['id'] ?? '',
@@ -507,7 +537,7 @@ class Client {
       marketTypeRaw: json['marketType'] ?? json['market_type'],
       productTypeRaw: json['productType'] ?? json['product_type'],
       pensionTypeRaw: json['pensionType'] ?? json['pension_type'],
-      loanTypeRaw: json['loanType'] ?? json['loan_type'],
+      loanTypeRaw: _parseStringField(json['loanType'] ?? json['loan_type']),
       pan: json['pan'],
       email: json['email'],
       facebookLink: json['facebookLink'] ?? json['facebook_link'],
@@ -519,6 +549,9 @@ class Client {
       barangay: json['barangay'] ?? json['psgc_barangay'],
       udi: json['udi'],
       touchpoints: (json['touchpoints'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
+      touchpointSummary: (json['touchpoint_summary'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
+      touchpointNumber: json['touchpoint_number'] as int? ?? 1,
+      nextTouchpoint: json['next_touchpoint'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : (json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now()),
@@ -540,11 +573,11 @@ class Client {
 
   /// Create Client from PowerSync/PostgreSQL row (snake_case column names)
   factory Client.fromRow(Map<String, dynamic> row) {
-    final clientTypeRaw = row['client_type'] as String?;
-    final marketTypeRaw = row['market_type'] as String?;
-    final productTypeRaw = row['product_type'] as String?;
-    final pensionTypeRaw = row['pension_type'] as String?;
-    final loanTypeRaw = row['loan_type'] as String?;
+    final clientTypeRaw = _parseStringField(row['client_type']);
+    final marketTypeRaw = _parseStringField(row['market_type']);
+    final productTypeRaw = _parseStringField(row['product_type']);
+    final pensionTypeRaw = _parseStringField(row['pension_type']);
+    final loanTypeRaw = _parseStringField(row['loan_type']);
 
     return Client(
       id: row['id'] as String,
@@ -580,6 +613,9 @@ class Client {
       municipality: row['municipality'] as String?,
       barangay: row['barangay'] as String?,
       udi: row['udi'] as String?,
+      touchpointSummary: const [], // Will be populated from touchpoint_summary JSON
+      touchpointNumber: row['touchpoint_number'] as int? ?? 1,
+      nextTouchpoint: row['next_touchpoint'] as String?,
       isStarred: (row['is_starred'] as bool?) ?? false,
       loanReleased: (row['loan_released'] as bool?) ?? false,
       loanReleasedAt: row['loan_released_at'] != null
