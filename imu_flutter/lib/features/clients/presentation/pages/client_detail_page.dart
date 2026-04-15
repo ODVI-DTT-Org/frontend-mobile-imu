@@ -36,6 +36,9 @@ import '../../../clients/presentation/widgets/contact_info_section.dart';
 import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
 import '../../../clients/presentation/widgets/address_selection_modal.dart';
+import '../../../clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
+import '../../../clients/presentation/widgets/record_visit_only_bottom_sheet.dart';
+import '../../../clients/presentation/widgets/record_loan_release_bottom_sheet.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 import 'package:powersync/powersync.dart' hide Column;
 
