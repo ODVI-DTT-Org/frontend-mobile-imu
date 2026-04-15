@@ -42,6 +42,10 @@ const Schema _powerSyncSchema = Schema([
     Column.integer('loan_released'),
     Column.text('udi'),
     Column.text('full_address'),
+    // Touchpoint summary fields - NEW (denormalized from backend)
+    Column.text('touchpoint_summary'), // JSON array of touchpoint history
+    Column.integer('touchpoint_number'), // Next touchpoint number (1-7)
+    Column.text('next_touchpoint'), // Next touchpoint type ('Visit' or 'Call')
     // Audit fields - NEW
     Column.text('created_by'), // User ID of who created the client
     Column.text('deleted_by'), // User ID of who soft-deleted the client
@@ -51,15 +55,17 @@ const Schema _powerSyncSchema = Schema([
   ]),
   Table('addresses', [
     Column.text('client_id'),
-    Column.text('type'),
-    Column.text('street'),
-    Column.text('barangay'),
-    Column.text('city'),
-    Column.text('province'),
+    Column.integer('psgc_id'), // Foreign key to PSGC table
+    Column.text('label'), // Address label (home, work, relative, other)
+    Column.text('street_address'), // Full street address
     Column.text('postal_code'),
     Column.real('latitude'),
     Column.real('longitude'),
     Column.integer('is_primary'),
+    // Audit fields
+    Column.text('created_at'),
+    Column.text('updated_at'),
+    Column.text('deleted_at'),
   ]),
   Table('phone_numbers', [
     Column.text('client_id'),
@@ -68,36 +74,9 @@ const Schema _powerSyncSchema = Schema([
     Column.text('label'),
     Column.integer('is_primary'),
   ]),
-  Table('touchpoints', [
-    Column.text('client_id'),
-    Column.text('user_id'),
-    Column.integer('touchpoint_number'),
-    Column.text('type'),
-    Column.text('date'),
-    Column.text('address'),
-    Column.text('time_arrival'),
-    Column.text('time_departure'),
-    Column.text('odometer_arrival'),
-    Column.text('odometer_departure'),
-    Column.text('reason'),
-    Column.text('status'),
-    Column.text('next_visit_date'),
-    Column.text('notes'),
-    Column.text('photo_url'),
-    Column.text('audio_url'),
-    Column.real('latitude'),
-    Column.real('longitude'),
-    Column.text('time_in'),
-    Column.real('time_in_gps_lat'),
-    Column.real('time_in_gps_lng'),
-    Column.text('time_in_gps_address'),
-    Column.text('time_out'),
-    Column.real('time_out_gps_lat'),
-    Column.real('time_out_gps_lng'),
-    Column.text('time_out_gps_address'),
-    Column.text('rejection_reason'),
-    Column.text('updated_at'), // NEW: Last update timestamp
-  ]),
+  // NOTE: Touchpoints table removed from PowerSync schema
+  // Touchpoint data is now available via clients.touchpoint_summary (denormalized JSON array)
+  // This reduces sync bandwidth and storage on mobile devices
   Table('itineraries', [
     Column.text('user_id'),
     Column.text('client_id'),
