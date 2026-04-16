@@ -186,3 +186,4 @@ playwright/.cache/
 powersync/service.yaml
 powersync/service.yaml.leaked
 *.service.yaml.leaked
+.worktrees
