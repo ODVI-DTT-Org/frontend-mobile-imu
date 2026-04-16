@@ -7,7 +7,7 @@ import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
-import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointPattern, TouchpointType;
+import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointType;
 import '../../features/clients/data/models/address_model.dart' show Address;
 import '../../models/client_status.dart';
 import '../../services/api/my_day_api_service.dart';
@@ -26,7 +26,6 @@ import '../../shared/providers/app_providers.dart' show
     isOnlineProvider,
     currentUserRoleProvider,
     assignedMunicipalitiesProvider,
-    clientTouchpointsSyncProvider,
     clientTouchpointCountsProvider,
     myDayApiServiceProvider,
     locationFilterProvider,
@@ -373,11 +372,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     // Get client status and touchpoint info for validation
     final status = _clientStatuses[client.id];
-    final touchpointsAsync = ref.watch(clientTouchpointsSyncProvider);
-    final touchpoints = touchpointsAsync.valueOrNull ?? [];
-    final clientTouchpoints = touchpoints.where((t) => t.clientId == client.id).toList();
-    final nextTouchpoint = clientTouchpoints.length;
-    final nextType = nextTouchpoint < 7 ? TouchpointPattern.getType(nextTouchpoint + 1) : TouchpointType.visit;
+    // Use Client.touchpointNumber (next touchpoint number 1-7) directly
+    final nextTouchpoint = client.touchpointNumber;
+    // Use Client.nextTouchpointType to get the next touchpoint type
+    final nextType = client.nextTouchpointType;
 
     // Check if can add before proceeding
     if (!_canAddToItinerary(client, status, nextType)) {
