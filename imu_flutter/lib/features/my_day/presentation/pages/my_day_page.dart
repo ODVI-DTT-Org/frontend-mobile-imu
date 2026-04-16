@@ -364,8 +364,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _recordVisit(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    // Validate the touchpoint sequence
-    final touchpointNumber = client.touchpointNumber > 0 ? client.touchpointNumber : 1;
+    // Use backend-calculated nextTouchpointNumber if available
+    final touchpointNumber = client.nextTouchpointNumber ?? (client.touchpointNumber > 0 ? client.touchpointNumber : 1);
 
     // Calculate expected touchpoint type based on touchpoint number (enforce sequence)
     final touchpointType = TouchpointValidationService.getExpectedTouchpointType(touchpointNumber);

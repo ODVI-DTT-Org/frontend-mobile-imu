@@ -981,7 +981,14 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     HapticUtils.lightImpact();
 
     final nextType = _client!.nextTouchpointType;
-    final nextNumber = _client!.completedTouchpoints + 1;
+    // Use backend-calculated nextTouchpointNumber instead of calculating locally
+    final nextNumber = _client!.nextTouchpointNumber;
+
+    if (nextNumber == null) {
+      // All touchpoints completed (nextTouchpointNumber is null when touchpointNumber >= 7)
+      await _showTouchpointCompletionDialog();
+      return;
+    }
 
     if (nextType == null) {
       // Show completion dialog
@@ -1653,9 +1660,9 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             _ExpandableSection(
               title: 'Visit History',
               icon: LucideIcons.history,
-              itemCount: _client!.touchpoints.length,
-              initiallyExpanded: _client!.touchpoints.isNotEmpty,
-              child: _client!.touchpoints.isEmpty
+              itemCount: _client!.touchpointSummary.length,
+              initiallyExpanded: _client!.touchpointSummary.isNotEmpty,
+              child: _client!.touchpointSummary.isEmpty
                   ? Padding(
                       padding: const EdgeInsets.all(16),
                       child: Center(
@@ -1667,8 +1674,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     )
                   : Column(
                       children: [
-                        for (var i = 0; i < _client!.touchpoints.length; i++)
-                          _TouchpointHistoryItem(touchpoint: _client!.touchpoints[i]),
+                        for (var i = 0; i < _client!.touchpointSummary.length; i++)
+                          _TouchpointHistoryItem(touchpoint: _client!.touchpointSummary[i]),
                       ],
                     ),
             ),

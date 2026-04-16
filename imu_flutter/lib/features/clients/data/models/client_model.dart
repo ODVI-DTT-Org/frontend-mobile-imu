@@ -49,6 +49,7 @@ class Client {
   final List<Touchpoint> touchpointSummary; // From touchpoint_summary JSON
   final int touchpointNumber; // From touchpoint_number field
   final String? nextTouchpoint; // From next_touchpoint field
+  final int? nextTouchpointNumber; // From next_touchpoint_number field (backend-calculated)
 
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -99,6 +100,7 @@ class Client {
     this.touchpointSummary = const [],
     this.touchpointNumber = 1,
     this.nextTouchpoint,
+    this.nextTouchpointNumber,
     required this.createdAt,
     this.updatedAt,
     this.createdBy,
@@ -137,7 +139,14 @@ class Client {
     return age;
   }
 
-  int get completedTouchpoints => touchpointNumber - 1;
+  int get completedTouchpoints {
+    // Use backend-calculated nextTouchpointNumber if available
+    if (nextTouchpointNumber != null && nextTouchpointNumber! > 0) {
+      return nextTouchpointNumber! - 1;
+    }
+    // Fallback: calculate from touchpointNumber, but ensure non-negative
+    return touchpointNumber > 0 ? touchpointNumber - 1 : 0;
+  }
 
   // Next touchpoint display
   String get nextTouchpointDisplay {
@@ -610,6 +619,7 @@ class Client {
       touchpointSummary: (json['touchpoint_summary'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       touchpointNumber: json['touchpoint_number'] as int? ?? 1,
       nextTouchpoint: json['next_touchpoint'] as String?,
+      nextTouchpointNumber: json['nextTouchpointNumber'] ?? json['next_touchpoint_number'] as int?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : (json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now()),
@@ -674,6 +684,7 @@ class Client {
       touchpointSummary: _parseTouchpointSummary(row['touchpoint_summary']),
       touchpointNumber: row['touchpoint_number'] as int? ?? 1,
       nextTouchpoint: row['next_touchpoint'] as String?,
+      nextTouchpointNumber: row['next_touchpoint_number'] as int?,
       isStarred: (row['is_starred'] as bool?) ?? false,
       loanReleased: (row['loan_released'] as bool?) ?? false,
       loanReleasedAt: row['loan_released_at'] != null
