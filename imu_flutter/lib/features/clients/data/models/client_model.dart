@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'address_model.dart' as addr;
 import 'phone_number_model.dart' as ph;
@@ -511,6 +513,28 @@ class Client {
     return value.toString();
   }
 
+  /// Parse touchpoint_summary JSON array into Touchpoint objects
+  static List<Touchpoint> _parseTouchpointSummary(dynamic value) {
+    if (value == null || value == '') {
+      return const [];
+    }
+
+    try {
+      final jsonString = value.toString();
+      if (jsonString.isEmpty) {
+        return const [];
+      }
+
+      final jsonList = jsonDecode(jsonString) as List;
+      return jsonList
+          .map((json) => Touchpoint.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error parsing touchpoint_summary: $e');
+      return const [];
+    }
+  }
+
   factory Client.fromJson(Map<String, dynamic> json) {
     return Client(
       id: json['id'] ?? '',
@@ -613,7 +637,7 @@ class Client {
       municipality: row['municipality'] as String?,
       barangay: row['barangay'] as String?,
       udi: row['udi'] as String?,
-      touchpointSummary: const [], // Will be populated from touchpoint_summary JSON
+      touchpointSummary: _parseTouchpointSummary(row['touchpoint_summary']),
       touchpointNumber: row['touchpoint_number'] as int? ?? 1,
       nextTouchpoint: row['next_touchpoint'] as String?,
       isStarred: (row['is_starred'] as bool?) ?? false,
@@ -976,7 +1000,7 @@ class Touchpoint {
     'time_out_gps_address': timeOutGpsAddress,
     'rejection_reason': rejectionReason, // NEW
     'updated_at': updatedAt?.toIso8601String(), // NEW
-    'created_at': createdAt.toIso8601String(),
+    'created_at': createdAt?.toIso8601String(),
   };
 
   /// Parse from API format (snake_case) or local format (camelCase)
