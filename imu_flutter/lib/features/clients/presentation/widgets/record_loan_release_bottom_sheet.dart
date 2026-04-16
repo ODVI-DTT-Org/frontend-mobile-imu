@@ -9,9 +9,7 @@ import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/au
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/odometer_field.dart';
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/time_picker_field.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show
-    releaseApiServiceProvider,
-    uploadApiServiceProvider,
-    visitApiServiceProvider;
+    releaseApiServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
@@ -131,30 +129,8 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
       isSubmitting.value = true;
 
       try {
-        // Upload photo first if provided (with error handling)
-        String? photoUrl;
-        bool photoUploadFailed = false;
-
-        if (photoPath.value != null && photoPath.value!.isNotEmpty) {
-          try {
-            final file = File(photoPath.value!);
-            final uploadApiService = ref.read(uploadApiServiceProvider);
-            final uploadResult = await uploadApiService.uploadPhoto(file);
-            if (uploadResult != null) {
-              photoUrl = uploadResult.url;
-            } else {
-              photoUploadFailed = true;
-            }
-          } catch (e) {
-            photoUploadFailed = true;
-          }
-        }
-
-        // Use uploaded URL if successful, otherwise use empty string
-        // (backend validation expects HTTP URL or empty string, not local file path)
-        final finalPhotoPath = photoUrl ?? '';
-
         // Submit to API using the complete loan release method
+        // The API service will handle photo upload internally with FormData
         final releaseApi = ref.read(releaseApiServiceProvider);
         final success = await releaseApi.createCompleteLoanRelease(
           clientId: client.id!,
@@ -166,16 +142,11 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           loanType: loanType.value,
           udiNumber: udiNumber.text.trim(),
           remarks: remarks.text.trim(),
-          photoPath: finalPhotoPath,
+          photoPath: photoPath.value, // API service will handle File creation and upload
         ) != null;
 
         if (success && context.mounted) {
-          // Show success message with photo upload warning if applicable
-          if (photoUploadFailed && photoPath.value != null) {
-            AppNotification.showSuccess(context, 'Loan released (photo saved locally)');
-          } else {
-            AppNotification.showSuccess(context, 'Loan released successfully');
-          }
+          AppNotification.showSuccess(context, 'Loan released successfully');
           Navigator.of(context).pop(true);
         }
       } catch (e) {
