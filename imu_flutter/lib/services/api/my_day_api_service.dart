@@ -317,7 +317,15 @@ class MyDayApiService {
   Future<List<MyDayClient>> fetchMyDayClients(DateTime date) async {
     try {
       final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      debugPrint('MyDayApiService: Fetching my day clients for $dateStr...');
+
+      // Enhanced debug logging
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      debugPrint('MyDayApiService: Fetching my day clients');
+      debugPrint('  Requested date: $date');
+      debugPrint('  Requested date string: $dateStr');
+      debugPrint('  Today date string: $todayStr');
+      debugPrint('  Dates match: $dateStr == $todayStr');
 
       final token = _authService.accessToken;
       if (token == null) {
@@ -592,7 +600,7 @@ class MyDayApiService {
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
-            'Content-Type': 'multipart/form-data',
+            // Don't set Content-Type - Dio sets it automatically with boundary
           },
         ),
       );

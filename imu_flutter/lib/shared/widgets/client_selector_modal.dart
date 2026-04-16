@@ -236,6 +236,16 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       // Use selected date instead of today for status checking
       final selectedDate = DateTime(widget.selectedDate.year, widget.selectedDate.month, widget.selectedDate.day);
 
+      // Debug logging
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      debugPrint('ClientSelectorModal: Date debug');
+      debugPrint('  widget.selectedDate: $widget.selectedDate');
+      debugPrint('  selectedDate (normalized): $selectedDate');
+      debugPrint('  today (for comparison): $today');
+      debugPrint('  dates match: ${selectedDate == today}');
+      debugPrint('  isOnline: $isOnline');
+
       if (isOnline) {
         // Use API when online
         await _loadStatusesFromAPI(selectedDate);

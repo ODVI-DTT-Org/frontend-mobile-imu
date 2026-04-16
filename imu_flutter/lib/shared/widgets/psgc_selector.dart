@@ -174,7 +174,7 @@ class PSGCSelector extends HookWidget {
 
     final municipalities = useMemoized(() {
       if (selectedProvince.value == null) return <String>[];
-      // Mock data
+      // Mock data - in production, load from database
       final municipalityMap = {
         'Metro Manila': [
           'Manila',
@@ -183,11 +183,415 @@ class PSGCSelector extends HookWidget {
           'Taguig',
           'Pasay',
         ],
+        'Quezon City': [
+          'Quezon City',
+        ],
+        'Manila': [
+          'Manila',
+        ],
+        'Caloocan': [
+          'Caloocan',
+        ],
+        'Abra': [
+          'Bangued',
+          'Boliney',
+          'Bucay',
+        ],
+        'Apayao': [
+          'Calanasan',
+          'Conner',
+          'Kabugao',
+        ],
+        'Benguet': [
+          'Baguio',
+          'La Trinidad',
+          'Itogon',
+        ],
+        'Ifugao': [
+          'Lagawe',
+          'Lamut',
+          'Kiangan',
+        ],
+        'Kalinga': [
+          'Tabuk',
+          'Rizal',
+          'Tanudan',
+        ],
+        'Mountain Province': [
+          'Bontoc',
+          'Sadanga',
+          'Barlig',
+        ],
+        'Ilocos Norte': [
+          'Laoag',
+          'Batac',
+          'San Nicolas',
+        ],
+        'Ilocos Sur': [
+          'Vigan',
+          'Candon',
+          'Bantay',
+        ],
+        'La Union': [
+          'San Fernando',
+          'Agoo',
+          'Bauang',
+        ],
+        'Pangasinan': [
+          'Lingayen',
+          'Dagupan',
+          'San Carlos',
+        ],
+        'Batanes': [
+          'Basco',
+          'Itbayat',
+          'Sabtang',
+        ],
+        'Cagayan': [
+          'Tuguegarao',
+          'Aparri',
+          'Gonzaga',
+        ],
+        'Isabela': [
+          'Ilagan',
+          'Cauayan',
+          'Santiago',
+        ],
+        'Nueva Vizcaya': [
+          'Bayombong',
+          'Solano',
+          'Bambang',
+        ],
+        'Quirino': [
+          'Cabarroguis',
+          'Diffun',
+          'Maddela',
+        ],
+        'Aurora': [
+          'Baler',
+          'Maria Aurora',
+          'San Luis',
+        ],
+        'Bataan': [
+          'Balanga',
+          'Dinalupihan',
+          'Mariveles',
+        ],
+        'Bulacan': [
+          'Malolos',
+          'Meycauayan',
+          'San Jose del Monte',
+        ],
+        'Nueva Ecija': [
+          'Palayan',
+          'Cabanatuan',
+          'Gapan',
+        ],
+        'Pampanga': [
+          'San Fernando',
+          'Angeles',
+          'Mabalacat',
+        ],
+        'Tarlac': [
+          'Tarlac',
+          'Concepcion',
+          'Capas',
+        ],
+        'Zambales': [
+          'Olongapo',
+          'Iba',
+          'Subic',
+        ],
         'Cavite': [
           'Dasmariñas',
           'Bacoor',
           'Imus',
           'Dasmariñas City',
+        ],
+        'Laguna': [
+          'Santa Cruz',
+          'San Pedro',
+          'Biñan',
+        ],
+        'Batangas': [
+          'Batangas',
+          'Lipa',
+          'Tanauan',
+        ],
+        'Rizal': [
+          'Antipolo',
+          'Taytay',
+          'Cainta',
+        ],
+        'Quezon': [
+          'Lucena',
+          'Tayabas',
+          'Sariaya',
+        ],
+        'Marinduque': [
+          'Boac',
+          'Gasan',
+          'Santa Cruz',
+        ],
+        'Occidental Mindoro': [
+          'Mamburao',
+          'San Jose',
+          'Sablayan',
+        ],
+        'Oriental Mindoro': [
+          'Calapan',
+          'Puerto Galera',
+          'Baco',
+        ],
+        'Palawan': [
+          'Puerto Princesa',
+          'Coron',
+          'El Nido',
+        ],
+        'Romblon': [
+          'Romblon',
+          'Odiongan',
+          'San Agustin',
+        ],
+        'Albay': [
+          'Legazpi',
+          'Tabaco',
+          'Ligao',
+        ],
+        'Camarines Norte': [
+          'Daet',
+          'Vinzons',
+          'Basud',
+        ],
+        'Camarines Sur': [
+          'Naga',
+          'Iriga',
+          'Pili',
+        ],
+        'Catanduanes': [
+          'Virac',
+          'Bato',
+          'San Miguel',
+        ],
+        'Masbate': [
+          'Masbate',
+          'Cataingan',
+          'Milagros',
+        ],
+        'Sorsogon': [
+          'Sorsogon',
+          'Bulan',
+          'Gubat',
+        ],
+        'Aklan': [
+          'Kalibo',
+          'Boracay',
+          'New Washington',
+        ],
+        'Antique': [
+          'San Jose',
+          'Sibalom',
+          'Belison',
+        ],
+        'Capiz': [
+          'Roxas',
+          'Panay',
+          'Tapaz',
+        ],
+        'Guimaras': [
+          'Jordan',
+          'Buenavista',
+          'Nueva Valencia',
+        ],
+        'Iloilo': [
+          'Iloilo',
+          'Passi',
+          'Oton',
+        ],
+        'Negros Occidental': [
+          'Bacolod',
+          'Silay',
+          'Bago',
+        ],
+        'Bohol': [
+          'Tagbilaran',
+          'Carmen',
+          'Jagna',
+        ],
+        'Cebu': [
+          'Cebu',
+          'Mandaue',
+          'Lapu-Lapu',
+        ],
+        'Negros Oriental': [
+          'Dumaguete',
+          'Bais',
+          'Canlaon',
+        ],
+        'Siquijor': [
+          'Siquijor',
+          'Lazi',
+          'San Juan',
+        ],
+        'Biliran': [
+          'Naval',
+          'Caibiran',
+          'Culaba',
+        ],
+        'Eastern Samar': [
+          'Borongan',
+          'Guiuan',
+          'Salcedo',
+        ],
+        'Leyte': [
+          'Tacloban',
+          'Ormoc',
+          'Baybay',
+        ],
+        'Northern Samar': [
+          'Catarman',
+          'Allen',
+          'Laoang',
+        ],
+        'Samar': [
+          'Catbalogan',
+          'Calbayog',
+          'Gandara',
+        ],
+        'Southern Leyte': [
+          'Maasin',
+          'Sogod',
+          'Bontoc',
+        ],
+        'Zamboanga del Norte': [
+          'Dipolog',
+          'Dapitan',
+          'Sindangan',
+        ],
+        'Zamboanga del Sur': [
+          'Zamboanga',
+          'Pagadian',
+          'Ipil',
+        ],
+        'Zamboanga Sibugay': [
+          'Ipil',
+          'Kabasalan',
+          'Naga',
+        ],
+        'Bukidnon': [
+          'Malaybalay',
+          'Valencia',
+          'Maramag',
+        ],
+        'Camiguin': [
+          'Mambajao',
+          'Catarman',
+          'Mahinog',
+        ],
+        'Lanao del Norte': [
+          'Iligan',
+          'Tubod',
+          'Lala',
+        ],
+        'Misamis Occidental': [
+          'Oroquieta',
+          'Ozamiz',
+          'Tangub',
+        ],
+        'Misamis Oriental': [
+          'Cagayan de Oro',
+          'Gingoog',
+          'El Salvador',
+        ],
+        'Compostela Valley': [
+          'Nabunturan',
+          'Monkayo',
+          'Compostela',
+        ],
+        'Davao del Norte': [
+          'Tagum',
+          'Panabo',
+          'Samal',
+        ],
+        'Davao del Sur': [
+          'Davao',
+          'Digos',
+          'Mati',
+        ],
+        'Davao Occidental': [
+          'Malita',
+          'Jose Abad Santos',
+          'Santa Maria',
+        ],
+        'North Cotabato': [
+          'Kidapawan',
+          'Midsayap',
+          'Kabacan',
+        ],
+        'Sarangani': [
+          'Alabel',
+          'Glan',
+          'Kiamba',
+        ],
+        'South Cotabato': [
+          'Koronadal',
+          'General Santos',
+          'Polomolok',
+        ],
+        'Sultan Kudarat': [
+          'Isulan',
+          'Tacurong',
+          'President Quirino',
+        ],
+        'Agusan del Norte': [
+          'Cabadbaran',
+          'Butuan',
+          'Carmen',
+        ],
+        'Agusan del Sur': [
+          'Prosperidad',
+          'Bayugan',
+          'San Francisco',
+        ],
+        'Dinagat Islands': [
+          'Dinagat',
+          'Libjo',
+          'Tubajon',
+        ],
+        'Surigao del Norte': [
+          'Surigao',
+          'Siargao',
+          'Claver',
+        ],
+        'Surigao del Sur': [
+          'Tandag',
+          'Bislig',
+          'Carrascal',
+        ],
+        'Basilan': [
+          'Lamitan',
+          'Isabela',
+          'Tipo-Tipo',
+        ],
+        'Lanao del Sur': [
+          'Marawi',
+          'Lumba-Bayabao',
+          'Butig',
+        ],
+        'Maguindanao': [
+          'Shariff Aguak',
+          'Buldon',
+          'Datu Odin Sinsuat',
+        ],
+        'Sulu': [
+          'Jolo',
+          'Talipao',
+          'Pata',
+        ],
+        'Tawi-Tawi': [
+          'Bongao',
+          'Mapun',
+          'Sitangkai',
         ],
       };
       return municipalityMap[selectedProvince.value] ?? <String>[];
@@ -195,21 +599,10 @@ class PSGCSelector extends HookWidget {
 
     final barangays = useMemoized(() {
       if (selectedMunicipality.value == null) return <String>[];
-      // Mock data
-      final barangayMap = {
-        'Dasmariñas': [
-          'Barangay 1',
-          'Barangay 2',
-          'Barangay 3',
-          'Barangay 123',
-        ],
-        'Makati': [
-          'Poblacion',
-          'Bel-Air',
-          'San Lorenzo',
-        ],
-      };
-      return barangayMap[selectedMunicipality.value] ?? <String>[];
+      // Mock data - generate default barangays for any municipality
+      final municipalityName = selectedMunicipality.value!;
+      final defaultBarangays = List.generate(10, (index) => 'Barangay ${index + 1}');
+      return defaultBarangays;
     }, [selectedMunicipality.value]);
 
     return Column(

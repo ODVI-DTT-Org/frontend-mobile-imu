@@ -7,23 +7,37 @@ class OdometerField extends HookWidget {
   final String label;
   final String? initialValue;
   final ValueChanged<String?> onChanged;
+  final bool showError;
 
   const OdometerField({
     super.key,
     required this.label,
     this.initialValue,
     required this.onChanged,
+    this.showError = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final controller = useTextEditingController(text: initialValue);
 
+    // Update controller when initialValue changes externally
+    useEffect(() {
+      if (initialValue != null && controller.text != initialValue) {
+        controller.text = initialValue!;
+      }
+    }, [initialValue]);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       height: 52,
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(
+          color: showError
+            ? Colors.red[600]!
+            : Colors.grey[300]!,
+          width: showError ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(8),
         color: Colors.grey[50],
       ),
@@ -58,7 +72,10 @@ class OdometerField extends HookWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         style: const TextStyle(fontSize: 15),
-        onChanged: onChanged,
+        onChanged: (value) {
+          // Call the onChanged callback with the current value
+          onChanged(value.isEmpty ? null : value);
+        },
       ),
     );
   }

@@ -95,7 +95,7 @@ class VisitApiService {
           options: Options(
             headers: {
               'Authorization': 'Bearer $token',
-              // Don't set Content-Type - Dio sets it automatically with boundary for FormData
+              'Content-Type': 'multipart/form-data',
             },
           ),
           data: formData,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 import 'package:imu_flutter/features/clients/data/models/phone_number_model.dart';
+import 'package:imu_flutter/core/utils/app_notification.dart';
 
 /// Bottom sheet for adding or editing a phone number
 class AddPhoneModal extends HookWidget {
@@ -28,6 +29,48 @@ class AddPhoneModal extends HookWidget {
     Future<void> handleSubmit() async {
       if (!formKey.currentState!.validate()) return;
 
+      // Show confirmation dialog before submitting
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: Icon(LucideIcons.phone, color: theme.colorScheme.primary),
+          title: const Text('Add Phone Number'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Number: ${number.text.trim()}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text('Type: ${label.value.displayName}'),
+              if (isPrimary.value) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Set as primary',
+                  style: TextStyle(color: theme.colorScheme.primary, fontSize: 12),
+                ),
+              ],
+              const SizedBox(height: 16),
+              const Text('Add this phone number?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
       isSubmitting.value = true;
 
       try {
@@ -40,16 +83,12 @@ class AddPhoneModal extends HookWidget {
         final result = await onSubmit(clientId, data);
 
         if (context.mounted) {
+          AppNotification.showSuccess(context, 'Phone number added successfully');
           Navigator.of(context).pop(result);
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error saving phone number: $e'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          AppNotification.showError(context, 'Error saving phone number: $e');
         }
       } finally {
         isSubmitting.value = false;

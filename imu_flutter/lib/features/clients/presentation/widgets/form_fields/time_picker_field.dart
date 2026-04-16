@@ -7,17 +7,26 @@ class TimePickerField extends HookWidget {
   final String label;
   final TimeOfDay? initialTime;
   final ValueChanged<TimeOfDay?> onTimeChanged;
+  final bool showError;
 
   const TimePickerField({
     super.key,
     required this.label,
     this.initialTime,
     required this.onTimeChanged,
+    this.showError = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final selectedTime = useState<TimeOfDay?>(initialTime);
+
+    // Sync with external initialTime changes
+    useEffect(() {
+      if (initialTime != null && selectedTime.value != initialTime) {
+        selectedTime.value = initialTime;
+      }
+    }, [initialTime]);
 
     Future<void> pickTime() async {
       final now = TimeOfDay.now();
@@ -42,7 +51,10 @@ class TimePickerField extends HookWidget {
 
       if (picked != null) {
         selectedTime.value = picked;
-        onTimeChanged(picked);
+        onTimeChanged(picked); // This should trigger auto-calculation
+        print('TimePickerField: Time picked - ${picked.hour}:${picked.minute}'); // Debug
+      } else {
+        print('TimePickerField: No time picked'); // Debug
       }
     }
 
@@ -54,15 +66,18 @@ class TimePickerField extends HookWidget {
       return '$hour:$minute $period';
     }
 
-    return InkWell(
+    return GestureDetector(
       onTap: pickTime,
-      borderRadius: BorderRadius.circular(8),
       child: Container(
         margin: const EdgeInsets.only(bottom: 4),
         height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
+          border: Border.all(
+            color: showError
+              ? Colors.red[600]!
+              : Colors.grey[300]!,
+            width: showError ? 2 : 1,
+          ),
           borderRadius: BorderRadius.circular(8),
           color: Colors.grey[50],
         ),
@@ -74,23 +89,16 @@ class TimePickerField extends HookWidget {
               color: Colors.grey[600],
             ),
             const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
-              ),
-            ),
-            const Spacer(),
-            Text(
-              formatTime(selectedTime.value),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: selectedTime.value != null
-                  ? const Color(0xFF0F172A)
-                  : Colors.grey[400],
+            Expanded(
+              child: Text(
+                selectedTime.value != null ? formatTime(selectedTime.value) : label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: selectedTime.value != null
+                    ? const Color(0xFF0F172A)
+                    : Colors.grey[600],
+                ),
               ),
             ),
           ],
