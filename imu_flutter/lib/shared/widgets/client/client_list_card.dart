@@ -213,7 +213,7 @@ class ClientListCard extends ConsumerWidget {
     // Use override parameters if provided, otherwise use client properties
     final effectiveFullName = overrideFullName ?? client.fullName;
     final effectiveFullAddress = overrideFullAddress ?? client.fullAddress;
-    final effectiveTouchpoints = overrideTouchpoints ?? client.touchpoints;
+    final effectiveTouchpoints = overrideTouchpoints ?? client.touchpointSummary;
     final effectiveLoanReleased = overrideLoanReleased ?? client.loanReleased;
     final effectiveUdi = overrideUdi ?? client.udi;
 

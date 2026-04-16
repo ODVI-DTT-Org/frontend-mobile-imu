@@ -28,14 +28,20 @@ class ClientStatusBadge extends StatelessWidget {
 
     // Check if last touchpoint was today
     bool visitedToday = false;
-    if (client.touchpoints.isNotEmpty) {
-      final lastTouchpoint = client.touchpoints.last;
-      final lastTouchpointDate = DateTime(
-        lastTouchpoint.date.year,
-        lastTouchpoint.date.month,
-        lastTouchpoint.date.day,
-      );
-      visitedToday = lastTouchpointDate.isAtSameMomentAs(today);
+    if (client.touchpointSummary.isNotEmpty && client.touchpointSummary.length > 0) {
+      try {
+        final lastTouchpoint = client.touchpointSummary.last;
+        final lastTouchpointDate = DateTime(
+          lastTouchpoint.date.year,
+          lastTouchpoint.date.month,
+          lastTouchpoint.date.day,
+        );
+        visitedToday = lastTouchpointDate.isAtSameMomentAs(today);
+      } catch (e) {
+        // If there's an error accessing the touchpoint, assume not visited today
+        debugPrint('ClientStatusBadge: Error checking touchpoint date - $e');
+        visitedToday = false;
+      }
     }
 
     // Priority 1: Loan released

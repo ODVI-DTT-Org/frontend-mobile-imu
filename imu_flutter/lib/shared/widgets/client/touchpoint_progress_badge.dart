@@ -16,7 +16,7 @@ class TouchpointProgressBadge extends StatelessWidget {
     this.touchpointCount,  // NEW
   });
 
-  /// Internal getter that uses provided count or falls back to client.touchpoints.length
+  /// Internal getter that uses provided count or falls back to client.completedTouchpoints
   int get _displayedCount => touchpointCount ?? client.completedTouchpoints;
 
   /// Calculate next touchpoint type based on displayed count

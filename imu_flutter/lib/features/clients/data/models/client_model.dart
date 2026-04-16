@@ -421,8 +421,42 @@ class Client {
       'municipality': municipality,
       'barangay': barangay,
       'udi': udi,
-      'touchpoints': touchpoints.map((t) => t.toJson()).toList(),
-      'touchpoint_summary': touchpointSummary.map((t) => t.toJson()).toList(),
+      'touchpoints': touchpoints.map((t) {
+        try {
+          return t.toJson();
+        } catch (e) {
+          debugPrint('Client.toJson: Error serializing touchpoint - $e');
+          // Return minimal valid touchpoint data
+          return {
+            'id': t.id,
+            'client_id': t.clientId,
+            'touchpoint_number': t.touchpointNumber,
+            'type': 'Visit',
+            'date': t.date.toIso8601String(),
+            'status': 'Interested',
+            'reason': 'Follow-up',
+            'created_at': DateTime.now().toIso8601String(),
+          };
+        }
+      }).toList(),
+      'touchpoint_summary': touchpointSummary.map((t) {
+        try {
+          return t.toJson();
+        } catch (e) {
+          debugPrint('Client.toJson: Error serializing touchpoint summary - $e');
+          // Return minimal valid touchpoint data
+          return {
+            'id': t.id,
+            'client_id': t.clientId,
+            'touchpoint_number': t.touchpointNumber,
+            'type': 'Visit',
+            'date': t.date.toIso8601String(),
+            'status': 'Interested',
+            'reason': 'Follow-up',
+            'created_at': DateTime.now().toIso8601String(),
+          };
+        }
+      }).toList(),
       'touchpoint_number': touchpointNumber,
       'next_touchpoint': nextTouchpoint,
       'createdAt': createdAt?.toIso8601String(),

@@ -15,11 +15,11 @@ class TouchpointStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (client.touchpoints.isEmpty) {
+    if (client.touchpointSummary.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final lastTouchpoint = client.touchpoints.last;
+    final lastTouchpoint = client.touchpointSummary.last;
     final reason = lastTouchpoint.reason;
     final status = lastTouchpoint.status;
 

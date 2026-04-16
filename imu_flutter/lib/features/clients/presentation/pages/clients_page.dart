@@ -944,10 +944,10 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   }
 
   Widget _buildClientCard(Client client) {
-    final latestTouchpoint = client.touchpoints.isNotEmpty
-        ? client.touchpoints.last
+    final latestTouchpoint = client.touchpointSummary.isNotEmpty
+        ? client.touchpointSummary.last
         : null;
-    final isFirstTime = client.touchpoints.isEmpty;
+    final isFirstTime = client.touchpointSummary.isEmpty;
 
     // Check if client is in today's itinerary using local data
     final todayItineraryAsync = ref.watch(todayItineraryProvider);

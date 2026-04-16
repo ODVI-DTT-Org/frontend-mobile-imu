@@ -63,7 +63,7 @@ class TouchpointValidationService {
   /// Get the next expected touchpoint number for a client
   /// Returns null if all 7 touchpoints are completed
   static int? getNextTouchpointNumber(Client client) {
-    final completedCount = client.touchpoints.length;
+    final completedCount = client.touchpointSummary.length;
     if (completedCount >= 7) return null;
     return completedCount + 1;
   }

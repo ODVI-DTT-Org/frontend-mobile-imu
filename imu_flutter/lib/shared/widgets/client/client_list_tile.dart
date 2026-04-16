@@ -44,9 +44,9 @@ class ClientListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isFirstTime = client.touchpoints.isEmpty;
-    final lastTouchpoint = client.touchpoints.isNotEmpty
-        ? client.touchpoints.last
+    final isFirstTime = client.touchpointSummary.isEmpty;
+    final lastTouchpoint = client.touchpointSummary.isNotEmpty
+        ? client.touchpointSummary.last
         : null;
     final primaryAddress = client.addresses.isNotEmpty
         ? client.addresses.firstWhere(

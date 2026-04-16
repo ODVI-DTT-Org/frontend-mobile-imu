@@ -296,7 +296,7 @@ class TouchpointApiService {
           options: Options(
             headers: {
               'Authorization': 'Bearer $token',
-              'Content-Type': 'multipart/form-data',
+              // Don't set Content-Type manually - Dio will set it with proper boundary
             },
           ),
           data: formData,

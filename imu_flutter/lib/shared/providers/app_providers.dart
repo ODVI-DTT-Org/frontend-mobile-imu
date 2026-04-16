@@ -350,7 +350,19 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   // Step 1: Load from Hive cache immediately
   debugPrint('assignedClientsProvider: Loading from Hive cache...');
   final clientsData = hiveService.getAllClients();
-  var cachedClients = clientsData.map((data) => Client.fromJson(data)).toList();
+
+  // Parse clients with error handling to skip invalid records
+  var cachedClients = <Client>[];
+  for (final data in clientsData) {
+    try {
+      final client = Client.fromJson(data);
+      cachedClients.add(client);
+    } catch (e) {
+      debugPrint('assignedClientsProvider: Error parsing client data - $e');
+      debugPrint('assignedClientsProvider: Skipping invalid client record');
+      // Continue with next client instead of failing entire provider
+    }
+  }
 
   debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from Hive cache');
 
@@ -790,8 +802,8 @@ final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
 
         // Determine scheduled date based on last touchpoint or client creation
         DateTime scheduledDate;
-        if (client.touchpoints.isNotEmpty) {
-          final lastTouchpoint = client.touchpoints.last;
+        if (client.touchpointSummary.isNotEmpty) {
+          final lastTouchpoint = client.touchpointSummary.last;
           // Schedule next touchpoint 3 days after last one
           scheduledDate = lastTouchpoint.date.add(const Duration(days: 3));
         } else {

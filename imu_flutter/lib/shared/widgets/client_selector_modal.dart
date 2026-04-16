@@ -505,8 +505,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     bool visitedToday = false;
-    if (client.touchpoints.isNotEmpty) {
-      final lastTouchpoint = client.touchpoints.last;
+    if (client.touchpointSummary.isNotEmpty) {
+      final lastTouchpoint = client.touchpointSummary.last;
       final lastTouchpointDate = DateTime(
         lastTouchpoint.date.year,
         lastTouchpoint.date.month,
@@ -534,8 +534,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     bool visitedToday = false;
-    if (client.touchpoints.isNotEmpty) {
-      final lastTouchpoint = client.touchpoints.last;
+    if (client.touchpointSummary.isNotEmpty) {
+      final lastTouchpoint = client.touchpointSummary.last;
       final lastTouchpointDate = DateTime(
         lastTouchpoint.date.year,
         lastTouchpoint.date.month,
