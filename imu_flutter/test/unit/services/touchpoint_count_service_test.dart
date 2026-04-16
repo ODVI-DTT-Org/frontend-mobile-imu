@@ -51,4 +51,73 @@ void main() {
     // Note: Full integration tests with PowerSync and API mocking
     // require database test setup and are covered in integration tests
   });
+
+  group('Client.completedTouchpoints', () {
+    test('should return touchpointNumber minus 1', () {
+      final client = Client(
+        id: 'client-1',
+        firstName: 'John',
+        lastName: 'Doe',
+        clientType: ClientType.existing,
+        productType: ProductType.bfpPension,
+        pensionType: PensionType.sss,
+        createdAt: DateTime.now(),
+        touchpointNumber: 3, // Has 2 completed touchpoints
+        touchpointSummary: [],
+      );
+
+      expect(client.completedTouchpoints, 2); // touchpointNumber - 1
+    });
+
+    test('should return 0 when touchpointNumber is 1', () {
+      final client = Client(
+        id: 'client-1',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        clientType: ClientType.existing,
+        productType: ProductType.bfpPension,
+        pensionType: PensionType.sss,
+        createdAt: DateTime.now(),
+        touchpointNumber: 1, // Has 0 completed touchpoints
+        touchpointSummary: [],
+      );
+
+      expect(client.completedTouchpoints, 0); // touchpointNumber - 1
+    });
+
+    test('should handle multiple clients correctly', () {
+      final clients = [
+        Client(
+          id: 'client-1',
+          firstName: 'John',
+          lastName: 'Doe',
+          clientType: ClientType.existing,
+          productType: ProductType.bfpPension,
+          pensionType: PensionType.sss,
+          createdAt: DateTime.now(),
+          touchpointNumber: 3, // 2 completed
+          touchpointSummary: [],
+        ),
+        Client(
+          id: 'client-2',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          clientType: ClientType.existing,
+          productType: ProductType.bfpPension,
+          pensionType: PensionType.sss,
+          createdAt: DateTime.now(),
+          touchpointNumber: 5, // 4 completed
+          touchpointSummary: [],
+        ),
+      ];
+
+      final expectedCounts = {
+        'client-1': 2, // touchpointNumber - 1
+        'client-2': 4, // touchpointNumber - 1
+      };
+
+      expect(clients[0].completedTouchpoints, expectedCounts['client-1']);
+      expect(clients[1].completedTouchpoints, expectedCounts['client-2']);
+    });
+  });
 }

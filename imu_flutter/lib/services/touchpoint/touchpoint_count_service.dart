@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../sync/powersync_service.dart';
 import '../../shared/providers/app_providers.dart' show isOnlineProvider, clientApiServiceProvider;
+import '../../features/clients/data/models/client_model.dart';
 
 /// Service for fetching touchpoint counts for multiple clients
 /// Uses PowerSync as primary source with API fallback
@@ -10,30 +11,26 @@ class TouchpointCountService {
 
   TouchpointCountService(this._ref);
 
-  /// Fetch touchpoint counts from PowerSync using batch query
+  /// Fetch touchpoint counts from PowerSync using Client.touchpointNumber
   Future<Map<String, int>> fetchFromPowerSync(List<String> clientIds) async {
     if (clientIds.isEmpty) return {};
 
-    final placeholders = clientIds.map((_) => '?').join(',');
-    final query = '''
-      SELECT client_id, COUNT(*) as count
-      FROM touchpoints
-      WHERE client_id IN ($placeholders)
-      GROUP BY client_id
-    ''';
-
-    final results = await PowerSyncService.query(query, clientIds);
-
     final counts = <String, int>{};
-    for (final row in results) {
-      final clientId = row['client_id'] as String;
-      final count = row['count'] as int;
-      counts[clientId] = count;
-    }
 
-    // Ensure all requested client IDs are in the result (even if 0)
     for (final clientId in clientIds) {
-      counts.putIfAbsent(clientId, () => 0);
+      // Query client from PowerSync
+      final results = await PowerSyncService.query(
+        'SELECT * FROM clients WHERE id = ?',
+        [clientId],
+      );
+
+      if (results.isNotEmpty) {
+        final client = Client.fromRow(results.first);
+        // touchpointNumber is next number, so completed = touchpointNumber - 1
+        counts[clientId] = client.completedTouchpoints;
+      } else {
+        counts[clientId] = 0;
+      }
     }
 
     return counts;
@@ -52,7 +49,8 @@ class TouchpointCountService {
       final counts = <String, int>{};
       for (final client in response.items) {
         if (client.id != null) {
-          counts[client.id!] = client.touchpoints.length;
+          // Use completedTouchpoints which is touchpointNumber - 1
+          counts[client.id!] = client.completedTouchpoints;
         }
       }
 
