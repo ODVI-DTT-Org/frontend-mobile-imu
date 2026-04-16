@@ -1504,6 +1504,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               onRecordVisitOnly: _handleRecordVisitOnly,
               onReleaseLoan: _handleReleaseLoanBottomSheet,
               onEdit: _editClient,
+              client: _client, // NEW: Pass client for permission checks
             ),
 
             // Expandable Sections
@@ -1760,6 +1761,7 @@ class _QuickActionsSection extends ConsumerWidget {
   final VoidCallback onRecordVisitOnly;
   final VoidCallback onReleaseLoan;
   final VoidCallback onEdit;
+  final Client? client; // NEW: Add client parameter for permission checks
 
   const _QuickActionsSection({
     required this.primaryAddress,
@@ -1769,13 +1771,31 @@ class _QuickActionsSection extends ConsumerWidget {
     required this.onRecordVisitOnly,
     required this.onReleaseLoan,
     required this.onEdit,
+    this.client, // NEW
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
-    final userRole = authState.user?.role?.apiValue;
-    final canReleaseLoan = userRole == 'admin' || userRole == 'caravan' || userRole == 'tele';
+    final userRole = authState.user?.role;
+    final canReleaseLoan = userRole?.apiValue == 'admin' || userRole?.apiValue == 'caravan' || userRole?.apiValue == 'tele';
+
+    // NEW: Check if user can create the next touchpoint based on their role
+    bool canRecordTouchpoint = true;
+    if (client != null && !isLoanReleased) {
+      final nextNumber = client!.nextTouchpointNumber;
+      final nextType = client!.nextTouchpointType;
+
+      // Disable if all touchpoints are complete
+      if (nextNumber == null) {
+        canRecordTouchpoint = false;
+      }
+      // Disable if user's role doesn't allow this touchpoint type
+      else if (userRole != null) {
+        final canCreate = isValidTouchpointNumberForRole(nextNumber, userRole);
+        canRecordTouchpoint = canCreate;
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1809,7 +1829,7 @@ class _QuickActionsSection extends ConsumerWidget {
               _QuickActionButton(
                 icon: LucideIcons.clipboardList,
                 label: 'Record Touchpoint',
-                onTap: isLoanReleased ? null : onRecordTouchpoint,
+                onTap: (isLoanReleased || !canRecordTouchpoint) ? null : onRecordTouchpoint,
                 isPrimary: true,
               ),
               _QuickActionButton(
