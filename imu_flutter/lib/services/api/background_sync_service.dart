@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -11,6 +12,8 @@ import '../sync/powersync_connector.dart';
 import '../error_logging_helper.dart';
 import '../../core/utils/logger.dart';
 import '../../core/config/app_config.dart';
+import '../touchpoint/pending_touchpoint_service.dart';
+import '../api/touchpoint_api_service.dart';
 
 /// Background sync service for automatic data synchronization
 ///
@@ -246,6 +249,9 @@ class BackgroundSyncService extends ChangeNotifier {
       // We just need to wait for pending uploads to complete
       await _waitForPendingUploads();
 
+      // Sync pending touchpoints created while offline
+      await _syncPendingTouchpoints();
+
       _lastSyncTime = DateTime.now();
       _lastSyncError = null;
       _currentSyncRetry = 0;
@@ -362,6 +368,124 @@ class BackgroundSyncService extends ChangeNotifier {
       // Log non-critical error - pending count update doesn't block workflow
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'pending count update',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Sync pending touchpoints created while offline
+  ///
+  /// This method:
+  /// 1. Fetches all pending touchpoints from Hive storage
+  /// 2. Attempts to sync each touchpoint to the backend API
+  /// 3. Removes successfully synced touchpoints from pending storage
+  /// 4. Handles errors for failed sync attempts
+  Future<void> _syncPendingTouchpoints() async {
+    try {
+      logDebug('BackgroundSyncService: Checking for pending touchpoints...');
+
+      final pendingService = PendingTouchpointService();
+      final pendingTouchpoints = await pendingService.getPendingTouchpoints();
+
+      if (pendingTouchpoints.isEmpty) {
+        logDebug('BackgroundSyncService: No pending touchpoints to sync');
+        return;
+      }
+
+      logDebug('BackgroundSyncService: Found ${pendingTouchpoints.length} pending touchpoints');
+
+      // Import API service (lazy import to avoid circular dependency)
+      final touchpointApi = TouchpointApiService();
+
+      int syncedCount = 0;
+      int failedCount = 0;
+
+      for (final pending in pendingTouchpoints) {
+        try {
+          logDebug('BackgroundSyncService: Syncing touchpoint for client ${pending.clientId}');
+
+          // Reconstruct File objects from saved paths if they exist
+          File? photoFile;
+          File? audioFile;
+
+          if (pending.photoPath != null) {
+            photoFile = File(pending.photoPath!);
+            if (!await photoFile.exists()) {
+              logWarning('BackgroundSyncService: Photo file not found: ${pending.photoPath}');
+              photoFile = null;
+            }
+          }
+
+          if (pending.audioPath != null) {
+            audioFile = File(pending.audioPath!);
+            if (!await audioFile.exists()) {
+              logWarning('BackgroundSyncService: Audio file not found: ${pending.audioPath}');
+              audioFile = null;
+            }
+          }
+
+          // Call API to create touchpoint
+          if (photoFile != null) {
+            await touchpointApi.createTouchpointWithPhoto(
+              pending.touchpoint,
+              photoFile: photoFile,
+            );
+          } else {
+            await touchpointApi.createTouchpoint(pending.touchpoint);
+          }
+
+          // Remove from pending storage after successful sync
+          await pendingService.removePendingTouchpoint(pending.id);
+
+          // Clean up saved files
+          if (pending.photoPath != null) {
+            try {
+              await File(pending.photoPath!).delete();
+              logDebug('BackgroundSyncService: Deleted saved photo: ${pending.photoPath}');
+            } catch (e) {
+              logWarning('BackgroundSyncService: Failed to delete saved photo: $e');
+            }
+          }
+
+          if (pending.audioPath != null) {
+            try {
+              await File(pending.audioPath!).delete();
+              logDebug('BackgroundSyncService: Deleted saved audio: ${pending.audioPath}');
+            } catch (e) {
+              logWarning('BackgroundSyncService: Failed to delete saved audio: $e');
+            }
+          }
+
+          syncedCount++;
+          logDebug('BackgroundSyncService: Successfully synced touchpoint ${pending.touchpoint.id}');
+        } catch (e, stackTrace) {
+          failedCount++;
+          logError('BackgroundSyncService: Failed to sync pending touchpoint ${pending.id}', e, stackTrace);
+          // Continue with next touchpoint instead of failing entire batch
+        }
+      }
+
+      logDebug('BackgroundSyncService: Pending touchpoints sync complete - $syncedCount synced, $failedCount failed');
+
+      if (failedCount > 0) {
+        // Log non-critical error - some touchpoints failed to sync but will be retried
+        await ErrorLoggingHelper.logNonCriticalError(
+          operation: 'pending touchpoints sync',
+          error: Exception('$failedCount of ${pendingTouchpoints.length} touchpoints failed to sync'),
+          stackTrace: StackTrace.current,
+          context: {
+            'syncedCount': syncedCount.toString(),
+            'failedCount': failedCount.toString(),
+            'totalPending': pendingTouchpoints.length.toString(),
+          },
+        );
+      }
+    } catch (e, stackTrace) {
+      logError('BackgroundSyncService: Failed to sync pending touchpoints', e, stackTrace);
+      // Log non-critical error - pending touchpoints sync doesn't block main sync
+      await ErrorLoggingHelper.logNonCriticalError(
+        operation: 'pending touchpoints sync',
         error: e,
         stackTrace: stackTrace,
       );
