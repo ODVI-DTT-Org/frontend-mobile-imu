@@ -27,6 +27,8 @@ export 'permission_providers.dart' show
   canDeleteProvider;
 // Re-export user providers
 export './app_providers.dart' show currentUserRoleProvider;
+// Re-export touchpoint creation service provider
+export './app_providers.dart' show touchpointCreationServiceProvider, pendingTouchpointServiceProvider;
 // Re-export area filter providers
 export '../../services/area/area_filter_service.dart' show
   areaFilterServiceProvider;
@@ -38,6 +40,11 @@ export 'location_filter_providers.dart' show
 // Re-export touchpoint count provider
 export '../../services/touchpoint/touchpoint_count_service.dart' show
   touchpointCountServiceProvider;
+// Re-export touchpoint creation service provider
+export '../../services/touchpoint/touchpoint_creation_service.dart' show
+  TouchpointCreationService;
+export '../../services/touchpoint/pending_touchpoint_service.dart' show
+  PendingTouchpointService;
 // Re-export PowerSync database provider
 export '../../services/sync/powersync_service.dart' show
   powerSyncDatabaseProvider;
@@ -87,6 +94,8 @@ import '../../services/api/approvals_api_service.dart';
 import '../../services/api/groups_api_service.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
+import '../../services/touchpoint/touchpoint_creation_service.dart';
+import '../../services/touchpoint/pending_touchpoint_service.dart';
 import '../../services/area/area_filter_service.dart';
 import '../models/location_filter.dart';
 import '../models/client_attribute_filter.dart';
@@ -594,38 +603,6 @@ final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
   return touchpointsData.map((data) => Touchpoint.fromJson(data)).toList();
 });
 
-/// Touchpoints for selected client from PowerSync (used by client selector)
-/// Provides real-time synced touchpoint data for status display
-final clientTouchpointsSyncProvider = FutureProvider.autoDispose<List<Touchpoint>>((ref) async {
-  final clientId = ref.watch(selectedClientIdProvider);
-  if (clientId == null) return [];
-
-  // Query PowerSync for touchpoints
-  final touchpoints = await PowerSyncService.query('''
-    SELECT t.id, t.client_id, t.user_id, t.touchpoint_number, t.type,
-           t.date, t.time_arrival, t.time_departure, t.reason, t.status,
-           t.notes, t.photo_path, t.audio_path,
-           t.latitude, t.longitude,
-           t.time_in, t.time_in_gps_lat, t.time_in_gps_lng, t.time_in_gps_address,
-           t.time_out, t.time_out_gps_lat, t.time_out_gps_lng, t.time_out_gps_address
-    FROM touchpoints t
-    WHERE t.client_id = ?
-    ORDER BY t.touchpoint_number ASC
-  ''', [clientId]);
-
-  // Fallback to Hive if PowerSync empty (migration safety)
-  if (touchpoints.isEmpty) {
-    final hiveService = ref.watch(hiveServiceProvider);
-    if (!hiveService.isInitialized) {
-      await hiveService.init();
-    }
-    final touchpointsData = hiveService.getTouchpointsForClient(clientId);
-    return touchpointsData.map((data) => Touchpoint.fromJson(data)).toList();
-  }
-
-  return touchpoints.map((row) => Touchpoint.fromRow(row)).toList();
-});
-
 /// Touchpoint counts for multiple clients from PowerSync (with API fallback)
 /// Returns Map<String, int> where key is client_id and value is touchpoint count
 /// Used by ClientListTile and ClientSelectorModal to display accurate progress badges
@@ -652,6 +629,22 @@ final clientTouchpointCountsProvider = FutureProvider.autoDispose<Map<String, in
   // Use service to fetch counts
   final service = ref.watch(touchpointCountServiceProvider);
   return await service.fetchCounts(clientIds);
+});
+
+/// Pending touchpoint service provider
+/// Manages offline touchpoint storage in Hive
+final pendingTouchpointServiceProvider = Provider<PendingTouchpointService>((ref) {
+  return PendingTouchpointService();
+});
+
+/// Touchpoint creation service provider
+/// Handles online/offline touchpoint creation logic
+final touchpointCreationServiceProvider = Provider<TouchpointCreationService>((ref) {
+  final connectivity = ref.watch(connectivityServiceProvider);
+  final api = ref.watch(touchpointApiServiceProvider);
+  final pending = ref.watch(pendingTouchpointServiceProvider);
+
+  return TouchpointCreationService(connectivity, api, pending);
 });
 
 // ==================== Sync Providers ====================
