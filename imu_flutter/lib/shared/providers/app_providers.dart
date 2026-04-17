@@ -111,7 +111,6 @@ import '../models/client_attribute_filter.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 import 'client_attribute_filter_provider.dart' show clientAttributeFilterProvider;
 import 'touchpoint_filter_provider.dart' show touchpointFilterProvider;
-import '../models/touchpoint_filter.dart';
 
 // ==================== Service Providers ====================
 
