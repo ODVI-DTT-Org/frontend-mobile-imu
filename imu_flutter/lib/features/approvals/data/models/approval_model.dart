@@ -18,6 +18,9 @@ enum ApprovalStatus {
 /// Approval type enum
 enum ApprovalType {
   client('client'),
+  clientDelete('client_delete'),
+  clientAddress('client_address'),
+  clientPhone('client_phone'),
   udi('udi');
 
   final String value;
@@ -138,6 +141,12 @@ class Approval {
     switch (type) {
       case ApprovalType.client:
         return 'Client Edit';
+      case ApprovalType.clientDelete:
+        return 'Client Deletion';
+      case ApprovalType.clientAddress:
+        return 'Add Address';
+      case ApprovalType.clientPhone:
+        return 'Add Phone Number';
       case ApprovalType.udi:
         return 'Loan Release';
     }
@@ -151,6 +160,12 @@ class Approval {
     switch (type) {
       case ApprovalType.client:
         return 'Client information update';
+      case ApprovalType.clientDelete:
+        return 'Request to delete client';
+      case ApprovalType.clientAddress:
+        return 'Request to add address';
+      case ApprovalType.clientPhone:
+        return 'Request to add phone number';
       case ApprovalType.udi:
         return 'Loan release request';
     }

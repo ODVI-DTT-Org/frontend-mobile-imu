@@ -383,6 +383,12 @@ class _ApprovalCard extends HookWidget {
     switch (type) {
       case ApprovalType.client:
         return LucideIcons.user;
+      case ApprovalType.clientDelete:
+        return LucideIcons.userX;
+      case ApprovalType.clientAddress:
+        return LucideIcons.mapPin;
+      case ApprovalType.clientPhone:
+        return LucideIcons.phone;
       case ApprovalType.udi:
         return LucideIcons.dollarSign;
     }
@@ -391,6 +397,12 @@ class _ApprovalCard extends HookWidget {
   Color _getTypeColor(ApprovalType type) {
     switch (type) {
       case ApprovalType.client:
+        return AppColors.primary;
+      case ApprovalType.clientDelete:
+        return AppColors.error;
+      case ApprovalType.clientAddress:
+        return AppColors.primary;
+      case ApprovalType.clientPhone:
         return AppColors.primary;
       case ApprovalType.udi:
         return AppColors.success;
