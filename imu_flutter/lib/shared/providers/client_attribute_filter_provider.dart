@@ -1,4 +1,3 @@
-// lib/shared/providers/client_attribute_filter_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_attribute_filter.dart';
 import '../models/location_filter.dart';
@@ -6,14 +5,11 @@ import '../../features/clients/data/models/client_model.dart';
 import '../../services/filter_preferences_service.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 
-/// Active client attribute filter state with persistence
-/// Loads from SharedPreferences on initialization, saves on change
 final clientAttributeFilterProvider =
     StateNotifierProvider<ClientAttributeFilterNotifier, ClientAttributeFilter>((ref) {
   return ClientAttributeFilterNotifier();
 });
 
-/// Notifier for client attribute filter with persistence support
 class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter> {
   final FilterPreferencesService _prefs = FilterPreferencesService();
 
@@ -21,111 +17,79 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     _loadFromPreferences();
   }
 
-  /// Load saved filter from SharedPreferences
   Future<void> _loadFromPreferences() async {
-    final clientTypeStr = _prefs.getClientType();
-    final marketTypeStr = _prefs.getMarketType();
-    final pensionTypeStr = _prefs.getPensionType();
-    final productTypeStr = _prefs.getProductType();
+    final clientTypeStrs = await _prefs.getClientTypes();
+    final marketTypeStrs = await _prefs.getMarketTypes();
+    final pensionTypeStrs = await _prefs.getPensionTypes();
+    final productTypeStrs = await _prefs.getProductTypes();
 
-    // Parse strings to enums
-    ClientType? clientType;
-    if (clientTypeStr != null) {
-      try {
-        clientType = ClientType.values.firstWhere(
-          (e) => e.name.toLowerCase() == clientTypeStr.toLowerCase(),
-        );
-      } catch (_) {
-        clientType = null;
-      }
-    }
+    List<T> parseEnums<T extends Enum>(List<String> strs, List<T> values) =>
+        strs
+            .map((s) {
+              try {
+                return values.firstWhere((e) => e.name.toLowerCase() == s.toLowerCase());
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<T>()
+            .toList();
 
-    MarketType? marketType;
-    if (marketTypeStr != null) {
-      try {
-        marketType = MarketType.values.firstWhere(
-          (e) => e.name.toLowerCase() == marketTypeStr.toLowerCase(),
-        );
-      } catch (_) {
-        marketType = null;
-      }
-    }
+    final clientTypes = parseEnums(clientTypeStrs, ClientType.values);
+    final marketTypes = parseEnums(marketTypeStrs, MarketType.values);
+    final pensionTypes = parseEnums(pensionTypeStrs, PensionType.values);
+    final productTypes = parseEnums(productTypeStrs, ProductType.values);
 
-    PensionType? pensionType;
-    if (pensionTypeStr != null) {
-      try {
-        pensionType = PensionType.values.firstWhere(
-          (e) => e.name.toLowerCase() == pensionTypeStr.toLowerCase(),
-        );
-      } catch (_) {
-        pensionType = null;
-      }
-    }
-
-    ProductType? productType;
-    if (productTypeStr != null) {
-      try {
-        productType = ProductType.values.firstWhere(
-          (e) => e.name.toLowerCase() == productTypeStr.toLowerCase(),
-        );
-      } catch (_) {
-        productType = null;
-      }
-    }
-
-    if (clientType != null || marketType != null ||
-        pensionType != null || productType != null) {
+    if (clientTypes.isNotEmpty || marketTypes.isNotEmpty ||
+        pensionTypes.isNotEmpty || productTypes.isNotEmpty) {
       state = ClientAttributeFilter(
-        clientType: clientType,
-        marketType: marketType,
-        pensionType: pensionType,
-        productType: productType,
+        clientTypes: clientTypes.isEmpty ? null : clientTypes,
+        marketTypes: marketTypes.isEmpty ? null : marketTypes,
+        pensionTypes: pensionTypes.isEmpty ? null : pensionTypes,
+        productTypes: productTypes.isEmpty ? null : productTypes,
       );
     }
   }
 
-  /// Update filter and persist to SharedPreferences
   void updateFilter(ClientAttributeFilter newFilter) {
     state = newFilter;
     _persistFilter(newFilter);
   }
 
-  /// Set client type and persist
-  void setClientType(ClientType? type) {
-    state = state.copyWith(clientType: type);
-    _prefs.setClientType(type?.name);
+  void toggleClientType(ClientType type) {
+    final current = List<ClientType>.from(state.clientTypes ?? []);
+    current.contains(type) ? current.remove(type) : current.add(type);
+    updateFilter(state.copyWith(clientTypes: current.isEmpty ? null : current));
   }
 
-  /// Set market type and persist
-  void setMarketType(MarketType? type) {
-    state = state.copyWith(marketType: type);
-    _prefs.setMarketType(type?.name);
+  void toggleMarketType(MarketType type) {
+    final current = List<MarketType>.from(state.marketTypes ?? []);
+    current.contains(type) ? current.remove(type) : current.add(type);
+    updateFilter(state.copyWith(marketTypes: current.isEmpty ? null : current));
   }
 
-  /// Set pension type and persist
-  void setPensionType(PensionType? type) {
-    state = state.copyWith(pensionType: type);
-    _prefs.setPensionType(type?.name);
+  void togglePensionType(PensionType type) {
+    final current = List<PensionType>.from(state.pensionTypes ?? []);
+    current.contains(type) ? current.remove(type) : current.add(type);
+    updateFilter(state.copyWith(pensionTypes: current.isEmpty ? null : current));
   }
 
-  /// Set product type and persist
-  void setProductType(ProductType? type) {
-    state = state.copyWith(productType: type);
-    _prefs.setProductType(type?.name);
+  void toggleProductType(ProductType type) {
+    final current = List<ProductType>.from(state.productTypes ?? []);
+    current.contains(type) ? current.remove(type) : current.add(type);
+    updateFilter(state.copyWith(productTypes: current.isEmpty ? null : current));
   }
 
-  /// Clear filter and persist
   void clear() {
     state = ClientAttributeFilter.none();
     _prefs.clearAttributeFilters();
   }
 
-  /// Persist filter to SharedPreferences
   void _persistFilter(ClientAttributeFilter filter) {
-    _prefs.setClientType(filter.clientType?.name);
-    _prefs.setMarketType(filter.marketType?.name);
-    _prefs.setPensionType(filter.pensionType?.name);
-    _prefs.setProductType(filter.productType?.name);
+    _prefs.setClientTypes(filter.clientTypes?.map((t) => t.name).toList() ?? []);
+    _prefs.setMarketTypes(filter.marketTypes?.map((t) => t.name).toList() ?? []);
+    _prefs.setPensionTypes(filter.pensionTypes?.map((t) => t.name).toList() ?? []);
+    _prefs.setProductTypes(filter.productTypes?.map((t) => t.name).toList() ?? []);
   }
 }
 
@@ -136,18 +100,12 @@ final activeFilterCountProvider = Provider<int>((ref) {
   final attributeFilter = ref.watch(clientAttributeFilterProvider);
 
   int count = 0;
-
-  // Count location filters
   if (locationFilter.province != null) {
     count += 1;
-    if (locationFilter.municipalities != null &&
-        locationFilter.municipalities!.isNotEmpty) {
-      count += locationFilter.municipalities!.length.toInt();
+    if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
+      count += locationFilter.municipalities!.length;
     }
   }
-
-  // Count attribute filters
   count += attributeFilter.activeFilterCount;
-
   return count;
 });

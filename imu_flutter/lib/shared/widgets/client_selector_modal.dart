@@ -868,14 +868,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       // Handle filter removal
                       if (filterType == FilterType.location) {
                         ref.read(locationFilterProvider.notifier).clear();
-                      } else if (filterType == FilterType.clientType) {
-                        ref.read(clientAttributeFilterProvider.notifier).setClientType(null);
-                      } else if (filterType == FilterType.marketType) {
-                        ref.read(clientAttributeFilterProvider.notifier).setMarketType(null);
-                      } else if (filterType == FilterType.pensionType) {
-                        ref.read(clientAttributeFilterProvider.notifier).setPensionType(null);
-                      } else if (filterType == FilterType.productType) {
-                        ref.read(clientAttributeFilterProvider.notifier).setProductType(null);
+                      } else {
+                        ref.read(clientAttributeFilterProvider.notifier).clear();
                       }
                       _applyClientFilter();
                     },

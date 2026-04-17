@@ -82,16 +82,10 @@ class _UnifiedClientSelectorBottomSheetState
         ref.read(locationFilterProvider.notifier).clear();
         break;
       case FilterType.clientType:
-        ref.read(clientAttributeFilterProvider.notifier).setClientType(null);
-        break;
       case FilterType.marketType:
-        ref.read(clientAttributeFilterProvider.notifier).setMarketType(null);
-        break;
       case FilterType.pensionType:
-        ref.read(clientAttributeFilterProvider.notifier).setPensionType(null);
-        break;
       case FilterType.productType:
-        ref.read(clientAttributeFilterProvider.notifier).setProductType(null);
+        ref.read(clientAttributeFilterProvider.notifier).clear();
         break;
     }
     setState(() {});
