@@ -110,6 +110,8 @@ import '../models/location_filter.dart';
 import '../models/client_attribute_filter.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 import 'client_attribute_filter_provider.dart' show clientAttributeFilterProvider;
+import 'touchpoint_filter_provider.dart' show touchpointFilterProvider;
+import '../models/touchpoint_filter.dart';
 
 // ==================== Service Providers ====================
 
@@ -288,6 +290,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final page = ref.watch(onlineClientPageProvider);
   final locationFilter = ref.watch(locationFilterProvider);
   final attributeFilter = ref.watch(clientAttributeFilterProvider);
+  final touchpointFilter = ref.watch(touchpointFilterProvider);
 
   // Must be online to fetch all clients
   if (!isOnline) {
@@ -329,6 +332,20 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       municipalityIds: municipalityIds,
     );
 
+    // Apply touchpoint filter locally on loaded results
+    if (touchpointFilter.hasFilter) {
+      final filteredItems = response.items
+          .where((client) => touchpointFilter.matches(client))
+          .toList();
+      return ClientsResponse(
+        items: filteredItems,
+        page: response.page,
+        perPage: response.perPage,
+        totalItems: filteredItems.length,
+        totalPages: response.totalPages,
+      );
+    }
+
     debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
     return response;
   } catch (e) {
@@ -352,6 +369,7 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final page = ref.watch(assignedClientPageProvider);
   final locationFilter = ref.watch(locationFilterProvider);
   final attributeFilter = ref.watch(clientAttributeFilterProvider);
+  final touchpointFilter = ref.watch(touchpointFilterProvider);
   final hiveService = ref.watch(hiveServiceProvider);
 
   debugPrint('=== ASSIGNED CLIENTS FETCH ===');
@@ -454,6 +472,14 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     debugPrint('assignedClientsProvider: Applying attribute filter locally - ${attributeFilter.toQueryParams()}');
     cachedClients = cachedClients.where((client) => attributeFilter.matches(client)).toList();
     debugPrint('assignedClientsProvider: After attribute filter - ${cachedClients.length} clients');
+  }
+
+  // Apply touchpoint filter locally
+  if (touchpointFilter.hasFilter) {
+    cachedClients = cachedClients
+        .where((client) => touchpointFilter.matches(client))
+        .toList();
+    debugPrint('assignedClientsProvider: After touchpoint filter - ${cachedClients.length} clients');
   }
 
   // Apply fuzzy search filter locally if needed
