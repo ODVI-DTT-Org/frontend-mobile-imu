@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 /// Client model for My Day list display
@@ -88,6 +90,81 @@ class MyDayClient {
       previousTouchpointDate: json['previous_touchpoint_date'] != null
           ? DateTime.parse(json['previous_touchpoint_date'])
           : null,
+    );
+  }
+
+  static const List<String> _sequence = [
+    'Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'
+  ];
+
+  /// Create from PowerSync JOIN row (itineraries + clients tables)
+  factory MyDayClient.fromPowerSync(Map<String, dynamic> row) {
+    final clientId = row['client_id'] as String?;
+    if (clientId == null || clientId.isEmpty) {
+      throw ArgumentError('clientId is required and cannot be empty');
+    }
+
+    final summaryJson = row['touchpoint_summary'] as String?;
+    List<Map<String, dynamic>> touchpoints = [];
+    if (summaryJson != null && summaryJson.isNotEmpty && summaryJson != 'null') {
+      try {
+        final decoded = jsonDecode(summaryJson);
+        if (decoded is List) {
+          touchpoints = decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      } catch (_) {}
+    }
+
+    final completedNumbers = touchpoints
+        .map((t) => (t['touchpoint_number'] as num?)?.toInt() ?? 0)
+        .where((n) => n > 0)
+        .toSet();
+
+    int? nextNum;
+    for (int i = 1; i <= 7; i++) {
+      if (!completedNumbers.contains(i)) {
+        nextNum = i;
+        break;
+      }
+    }
+
+    final nextType = nextNum != null ? _sequence[nextNum - 1] : null;
+    final currentNum = nextNum ?? 0;
+    final currentType = nextNum != null ? nextType!.toLowerCase() : 'visit';
+
+    Map<String, dynamic>? lastTouchpoint;
+    if (touchpoints.isNotEmpty) {
+      touchpoints.sort((a, b) =>
+          ((b['touchpoint_number'] as num?)?.toInt() ?? 0)
+              .compareTo((a['touchpoint_number'] as num?)?.toInt() ?? 0));
+      lastTouchpoint = touchpoints.first;
+    }
+
+    DateTime? previousDate;
+    if (lastTouchpoint?['date'] != null) {
+      try {
+        previousDate = DateTime.parse(lastTouchpoint!['date'] as String);
+      } catch (_) {}
+    }
+
+    return MyDayClient(
+      id: row['id'] as String,
+      clientId: clientId,
+      fullName: '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim(),
+      agencyName: null,
+      location: null,
+      touchpointNumber: currentNum,
+      touchpointType: currentType,
+      priority: row['priority'] as String? ?? 'normal',
+      notes: row['notes'] as String?,
+      status: row['status'] as String?,
+      scheduledTime: row['scheduled_time'] as String?,
+      nextTouchpointNumber: nextNum,
+      nextTouchpointType: nextType,
+      previousTouchpointNumber: (lastTouchpoint?['touchpoint_number'] as num?)?.toInt(),
+      previousTouchpointReason: lastTouchpoint?['reason'] as String?,
+      previousTouchpointType: lastTouchpoint?['type'] as String?,
+      previousTouchpointDate: previousDate,
     );
   }
 
