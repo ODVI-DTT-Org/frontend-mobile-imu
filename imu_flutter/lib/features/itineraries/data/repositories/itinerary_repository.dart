@@ -35,7 +35,7 @@ class Itinerary {
   factory Itinerary.fromJson(Map<String, dynamic> json) {
     return Itinerary(
       id: json['id'] ?? '',
-      caravanId: json['caravan_id'] ?? json['caravanId'],
+      caravanId: json['user_id'] ?? json['caravan_id'] ?? json['caravanId'],
       clientId: json['client_id'] ?? json['clientId'],
       scheduledDate: json['scheduled_date'] != null
           ? DateTime.parse(json['scheduled_date'])
@@ -127,7 +127,7 @@ class ItineraryRepository {
     try {
       final db = await PowerSyncService.database;
       await for (final row in db.watch(
-        'SELECT * FROM itineraries WHERE caravan_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC',
+        'SELECT * FROM itineraries WHERE user_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC',
         parameters: [caravanId],
       )) {
         yield row.map(Itinerary.fromJson).toList();
@@ -190,7 +190,7 @@ class ItineraryRepository {
     try {
       final db = await PowerSyncService.database;
       final results = await db.getAll(
-        'SELECT * FROM itineraries WHERE caravan_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC',
+        'SELECT * FROM itineraries WHERE user_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC',
         [caravanId],
       );
       return results.map(Itinerary.fromJson).toList();
@@ -240,7 +240,7 @@ class ItineraryRepository {
 
       await db.execute(
         '''INSERT INTO itineraries (
-          id, caravan_id, client_id, scheduled_date, scheduled_time,
+          id, user_id, client_id, scheduled_date, scheduled_time,
           status, priority, notes
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
         [
@@ -270,7 +270,7 @@ class ItineraryRepository {
 
       await db.execute(
         '''UPDATE itineraries SET
-          caravan_id = ?, client_id = ?, scheduled_date = ?,
+          user_id = ?, client_id = ?, scheduled_date = ?,
           scheduled_time = ?, status = ?, priority = ?, notes = ?
         WHERE id = ?''',
         [
@@ -324,7 +324,7 @@ class ItineraryRepository {
     try {
       final db = await PowerSyncService.database;
       final results = await db.get(
-        'SELECT COUNT(*) as count FROM itineraries WHERE caravan_id = ?',
+        'SELECT COUNT(*) as count FROM itineraries WHERE user_id = ?',
         [caravanId],
       );
       return results?['count'] as int? ?? 0;
