@@ -16,7 +16,6 @@ import '../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/sync/powersync_service.dart';
-import '../../services/filter_preferences_service.dart';
 import '../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     onlineClientsProvider,
@@ -32,15 +31,10 @@ import '../../shared/providers/app_providers.dart' show
     myDayApiServiceProvider,
     locationFilterProvider,
     clientAttributeFilterProvider;
-import '../models/client_attribute_filter.dart' show ClientAttributeFilter;
-import '../models/location_filter.dart' show LocationFilter;
-import 'location_filter_icon.dart';
-import 'location_filter_chips.dart';
-import 'client_filter_chips.dart';
+import '../providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
 import 'filters/touchpoint_filter_chips.dart';
-import 'location_filter_bottom_sheet.dart';
-import 'client_attribute_filter_bottom_sheet.dart';
-import '../../features/clients/presentation/widgets/client_filter_icon_button.dart';
+import 'filters/filter_drawer.dart';
+import 'filters/active_filter_chips_row.dart';
 import './client/client_list_tile.dart';
 import './client/touchpoint_progress_badge.dart';
 import './client/touchpoint_status_badge.dart';
@@ -104,27 +98,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   bool _isLoadingStatuses = true;
   bool _hasStatusError = false;
 
-  // Filter state for province/municipality
-  String? _selectedProvince;
-  String? _selectedMunicipality;
-  final _filterPreferencesService = FilterPreferencesService();
-
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _loadFilterPreferences();
-  }
-
-  Future<void> _loadFilterPreferences() async {
-    final province = _filterPreferencesService.getProvince();
-    final municipalities = _filterPreferencesService.getMunicipalities();
-    if (mounted) {
-      setState(() {
-        _selectedProvince = province?.isNotEmpty == true ? province : null;
-        _selectedMunicipality = municipalities.isNotEmpty ? municipalities.first : null;
-      });
-    }
   }
 
   @override
@@ -611,102 +588,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     );
   }
 
-  /// Clear all filters (province, municipality)
-  Future<void> _clearAllFilters() async {
-    HapticUtils.lightImpact();
-    await _filterPreferencesService.clearAll();
-    if (mounted) {
-      setState(() {
-        _selectedProvince = null;
-        _selectedMunicipality = null;
-      });
-    }
-  }
-
-  /// Remove a specific filter
-  Future<void> _removeFilter(String filterType) async {
-    HapticUtils.lightImpact();
-    if (filterType == 'province') {
-      await _filterPreferencesService.setProvince(null);
-      if (mounted) {
-        setState(() {
-          _selectedProvince = null;
-          _selectedMunicipality = null; // Clear municipality when province changes
-        });
-      }
-    } else if (filterType == 'municipality') {
-      await _filterPreferencesService.setMunicipalities([]);
-      if (mounted) {
-        setState(() {
-          _selectedMunicipality = null;
-        });
-      }
-    }
-  }
-
-  /// Build removable filter chip
-  Widget _buildRemovableFilterChip({
-    required String label,
-    required VoidCallback onRemove,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF0F172A).withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: onRemove,
-            child: const Icon(
-              LucideIcons.x,
-              size: 14,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLocationFilterBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => LocationFilterBottomSheet(
-        onApply: (filter) {
-          ref.read(locationFilterProvider.notifier).updateFilter(filter);
-          _applyClientFilter();
-        },
-      ),
-    );
-  }
-
-  void _showAttributeFilterBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ClientAttributeFilterBottomSheet(
-        onApply: (filter) {
-          ref.read(clientAttributeFilterProvider.notifier).updateFilter(filter);
-          _applyClientFilter();
-        },
-      ),
-    );
+  void _showFilterDrawer() {
+    showFilterDrawer(context, showAllPsgc: _clientFilter == 'all');
   }
 
   @override
@@ -839,12 +722,32 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                                   _filterClients();
                                 },
                               ),
-                            ClientFilterIconButton(
-                              showAttributeOnly: true,
-                              onPressed: () => _showAttributeFilterBottomSheet(context),
-                            ),
-                            LocationFilterIcon(
-                              onTap: () => _showLocationFilterBottomSheet(context),
+                            Builder(
+                              builder: (ctx) {
+                                final count = ref.watch(activeFilterCountProvider);
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.tune),
+                                      onPressed: _showFilterDrawer,
+                                    ),
+                                    if (count > 0)
+                                      Positioned(
+                                        right: 6,
+                                        top: 6,
+                                        child: Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -860,25 +763,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   const SizedBox(height: 4),
                   const TouchpointFilterChips(),
 
-                  // Active filter chips (using new widget)
-                  ClientFilterChips(
-                    locationFilter: ref.watch(locationFilterProvider),
-                    attributeFilter: ref.watch(clientAttributeFilterProvider),
-                    onRemove: (filterType) {
-                      // Handle filter removal
-                      if (filterType == FilterType.location) {
-                        ref.read(locationFilterProvider.notifier).clear();
-                      } else {
-                        ref.read(clientAttributeFilterProvider.notifier).clear();
-                      }
-                      _applyClientFilter();
-                    },
-                    onClearAll: () {
-                      ref.read(locationFilterProvider.notifier).clear();
-                      ref.read(clientAttributeFilterProvider.notifier).clear();
-                      _applyClientFilter();
-                    },
-                  ),
+                  // Active filter chips
+                  const ActiveFilterChipsRow(),
                   // Filter toggle
                   if (widget.showAssignedFilter)
                     Container(
@@ -888,58 +774,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                           _buildFilterChip('Assigned', 'assigned'),
                           const SizedBox(width: 8),
                           _buildFilterChip('All Clients', 'all'),
-                        ],
-                      ),
-                    ),
-                  // Active filter chips (province/municipality)
-                  if (_selectedProvince != null || _selectedMunicipality != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          if (_selectedProvince != null)
-                            _buildRemovableFilterChip(
-                              label: _selectedProvince!,
-                              onRemove: () => _removeFilter('province'),
-                            ),
-                          if (_selectedMunicipality != null)
-                            _buildRemovableFilterChip(
-                              label: _selectedMunicipality!,
-                              onRemove: () => _removeFilter('municipality'),
-                            ),
-                          // Clear All button
-                          GestureDetector(
-                            onTap: _clearAllFilters,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.red.shade200),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    LucideIcons.x,
-                                    size: 14,
-                                    color: Colors.red,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'Clear All',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -1080,17 +914,32 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       decoration: InputDecoration(
                         hintText: 'Search clients...',
                         prefixIcon: const Icon(LucideIcons.search, size: 20),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ClientFilterIconButton(
-                              showAttributeOnly: true,
-                              onPressed: () => _showAttributeFilterBottomSheet(context),
-                            ),
-                            LocationFilterIcon(
-                              onTap: () => _showLocationFilterBottomSheet(context),
-                            ),
-                          ],
+                        suffixIcon: Builder(
+                          builder: (ctx) {
+                            final count = ref.watch(activeFilterCountProvider);
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.tune),
+                                  onPressed: _showFilterDrawer,
+                                ),
+                                if (count > 0)
+                                  Positioned(
+                                    right: 6,
+                                    top: 6,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),

@@ -2,15 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../models/client_attribute_filter.dart';
-import '../models/location_filter.dart';
 import '../../features/clients/data/models/client_model.dart';
-import 'client_filter_chips.dart';
-import 'client_attribute_filter_bottom_sheet.dart';
-import 'location_filter_bottom_sheet.dart';
-import '../providers/client_attribute_filter_provider.dart';
-import '../providers/location_filter_providers.dart';
-import '../../features/clients/presentation/widgets/client_filter_icon_button.dart';
+import '../providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
+import 'filters/filter_drawer.dart';
+import 'filters/active_filter_chips_row.dart';
 
 class UnifiedClientSelectorBottomSheet extends ConsumerStatefulWidget {
   final String context; // 'my_day' or 'itinerary'
@@ -44,57 +39,12 @@ class _UnifiedClientSelectorBottomSheetState
     });
   }
 
-  void _showAttributeFilters() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => ClientAttributeFilterBottomSheet(
-        onApply: (filter) {
-          ref.read(clientAttributeFilterProvider.notifier).state = filter;
-          setState(() {});
-        },
-      ),
-    );
-  }
-
-  void _showLocationFilters() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => LocationFilterBottomSheet(
-        onApply: (filter) {
-          ref.read(locationFilterProvider.notifier).updateFilter(filter);
-          setState(() {});
-        },
-      ),
-    );
-  }
-
-  void _clearAllFilters() {
-    ref.read(locationFilterProvider.notifier).clear();
-    ref.read(clientAttributeFilterProvider.notifier).clear();
-    setState(() {});
-  }
-
-  void _removeFilter(FilterType type) {
-    switch (type) {
-      case FilterType.location:
-        ref.read(locationFilterProvider.notifier).clear();
-        break;
-      case FilterType.clientType:
-      case FilterType.marketType:
-      case FilterType.pensionType:
-      case FilterType.productType:
-        ref.read(clientAttributeFilterProvider.notifier).clear();
-        break;
-    }
-    setState(() {});
+  void _showFilterDrawer() {
+    showFilterDrawer(context, showAllPsgc: true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final locationFilter = ref.watch(locationFilterProvider);
-    final attributeFilter = ref.watch(clientAttributeFilterProvider);
     final title = widget.context == 'my_day' ? 'Add to My Day' : 'Add to Itinerary';
 
     return Container(
@@ -107,12 +57,7 @@ class _UnifiedClientSelectorBottomSheetState
         children: [
           _buildHeader(title),
           _buildSearchBar(),
-          ClientFilterChips(
-            locationFilter: locationFilter,
-            attributeFilter: attributeFilter,
-            onRemove: _removeFilter,
-            onClearAll: _clearAllFilters,
-          ),
+          const ActiveFilterChipsRow(),
           Expanded(
             child: _buildClientList(),
           ),
@@ -180,13 +125,32 @@ class _UnifiedClientSelectorBottomSheetState
             ),
           ),
           const SizedBox(width: 8),
-          ClientFilterIconButton(
-            showAttributeOnly: true,
-            onPressed: _showAttributeFilters,
-          ),
-          ClientFilterIconButton(
-            showLocationOnly: true,
-            onPressed: _showLocationFilters,
+          Consumer(
+            builder: (context, ref, _) {
+              final count = ref.watch(activeFilterCountProvider);
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.tune),
+                    onPressed: _showFilterDrawer,
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
