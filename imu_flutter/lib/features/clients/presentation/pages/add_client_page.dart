@@ -7,6 +7,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../data/models/client_model.dart';
 import '../../../psgc/data/models/psgc_models.dart';
 import '../../../psgc/data/repositories/psgc_repository.dart';
@@ -166,11 +167,8 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     setState(() => _isSaving = true);
 
     try {
-      // Generate a temporary ID (backend will generate the actual UUID)
-      final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-
       final newClient = Client(
-        id: tempId,
+        id: '',
         firstName: _firstNameController.text.trim(),
         middleName: _middleNameController.text.trim().isEmpty
             ? null
@@ -231,41 +229,19 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
       debugPrint('[AddClientPage] Submitting new client');
 
-      final isOnline = ref.read(isOnlineProvider);
+      final mutationService = ref.read(clientMutationServiceProvider);
+      final result = await mutationService.createClient(newClient);
 
-      if (isOnline) {
-        debugPrint('[AddClientPage] Online - submitting to backend API');
-        final clientApi = ref.read(clientApiServiceProvider);
-        final result = await clientApi.createClient(newClient);
-
-        if (result != null) {
-          // Admin direct creation - client created immediately
-          debugPrint('[AddClientPage] Client created successfully');
-          // Save to local storage
-          if (result.id != null) {
-            await _hiveService.saveClient(result.id!, result.toJson());
-          }
-
-          if (mounted) {
+      if (mounted) {
+        switch (result) {
+          case ClientMutationResult.success:
             _showSuccessSnackBar('Client added successfully');
-            context.pop(true);
-          }
-        } else {
-          // Caravan/Tele - approval required
-          debugPrint('[AddClientPage] Client creation requires approval');
-          if (mounted) {
+          case ClientMutationResult.requiresApproval:
             _showSuccessSnackBar('Client submitted for approval');
-            context.pop(true);
-          }
+          case ClientMutationResult.queued:
+            _showWarningSnackBar('Offline: Client will sync when connected');
         }
-      } else {
-        debugPrint('[AddClientPage] Offline - saving to local storage only');
-        await _hiveService.saveClient(tempId, newClient.toJson());
-
-        if (mounted) {
-          _showWarningSnackBar('Offline: Client will sync when connected');
-          context.pop(true);
-        }
+        context.pop(true);
       }
     } catch (e, stack) {
       debugPrint('[AddClientPage] Error: $e\n$stack');

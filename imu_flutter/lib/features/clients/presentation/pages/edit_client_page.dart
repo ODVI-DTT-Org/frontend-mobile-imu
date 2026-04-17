@@ -7,6 +7,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
+import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../data/models/client_model.dart';
 import '../../../psgc/data/models/psgc_models.dart';
 import '../../../psgc/data/repositories/psgc_repository.dart';
@@ -406,32 +407,19 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         psgcId: _client?.psgcId,
       );
 
-      final isOnline = ref.read(isOnlineProvider);
+      final mutationService = ref.read(clientMutationServiceProvider);
+      final result = await mutationService.updateClient(updatedClient);
 
-      if (isOnline) {
-        final clientApi = ref.read(clientApiServiceProvider);
-        final result = await clientApi.updateClient(updatedClient);
-
-        if (result != null) {
-          await _hiveService.saveClient(widget.clientId, result.toJson());
-          ref.invalidate(assignedClientsProvider);
-          if (mounted) {
+      if (mounted) {
+        switch (result) {
+          case ClientMutationResult.success:
             AppNotification.showSuccess(context, 'Client updated successfully');
-            context.pop(true);
-          }
-        } else {
-          if (mounted) {
+          case ClientMutationResult.requiresApproval:
             AppNotification.showSuccess(context, 'Client edit submitted for approval');
-            context.pop(true);
-          }
+          case ClientMutationResult.queued:
+            AppNotification.showWarning(context, 'Offline: Changes will sync when connected');
         }
-      } else {
-        await _hiveService.saveClient(widget.clientId, updatedClient.toJson());
-        ref.invalidate(assignedClientsProvider);
-        if (mounted) {
-          AppNotification.showWarning(context, 'Offline: Changes will sync when connected');
-          context.pop(true);
-        }
+        context.pop(true);
       }
     } catch (e, stack) {
       debugPrint('[EditClientPage] Error: $e\n$stack');
@@ -466,20 +454,12 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
     if (confirmed != true) return;
 
-    final isOnline = ref.read(isOnlineProvider);
-    if (!isOnline) {
-      AppNotification.showError(context, 'Cannot delete while offline');
-      return;
-    }
-
     HapticUtils.mediumImpact();
     setState(() => _isSaving = true);
 
     try {
-      final clientApi = ref.read(clientApiServiceProvider);
-      await clientApi.deleteClient(widget.clientId);
-      await _hiveService.deleteClient(widget.clientId);
-      ref.invalidate(assignedClientsProvider);
+      final mutationService = ref.read(clientMutationServiceProvider);
+      await mutationService.deleteClient(widget.clientId);
 
       if (mounted) {
         AppNotification.showSuccess(context, 'Client deleted');

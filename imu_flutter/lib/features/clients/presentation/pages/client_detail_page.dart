@@ -16,7 +16,8 @@ import '../../../../shared/providers/app_providers.dart' show
     touchpointApiServiceProvider,
     authNotifierProvider,
     addressRepositoryProvider,
-    phoneNumberRepositoryProvider;
+    phoneNumberRepositoryProvider,
+    clientMutationServiceProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
@@ -421,9 +422,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         ref: ref,
         message: 'Deleting client...',
         operation: () async {
-          await _hiveService.deleteClient(widget.clientId);
-          // PowerSync handles sync automatically via the repository
-          ref.invalidate(assignedClientsProvider);
+          final mutationService = ref.read(clientMutationServiceProvider);
+          await mutationService.deleteClient(widget.clientId);
         },
         onError: (e) {
           if (mounted) {
