@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../core/models/user_role.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
@@ -76,12 +77,11 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
   // Section expansion states
   final Map<String, bool> _expandedSections = {
-    'basic': true,
+    'personal': true,
     'contact': true,
-    'employment': false,
-    'product': true,
-    'location': true,
-    'remarks': false,
+    'professional': false,
+    'product': false,
+    'notes': false,
   };
 
   @override
@@ -410,6 +410,8 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final role = ref.watch(currentUserRoleProvider);
+    final saveLabel = role == UserRole.admin ? 'Save Client' : 'Submit for Approval';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -422,109 +424,116 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
           controller: _scrollController,
           padding: const EdgeInsets.all(16),
           children: [
-            // Basic Information Section
+            // Personal Section
             _buildSectionHeader(
-              title: 'Basic Information',
+              title: 'Personal',
               icon: LucideIcons.user,
-              sectionKey: 'basic',
+              sectionKey: 'personal',
               color: colorScheme.primary,
             ),
             const SizedBox(height: 12),
-            _buildBasicInfoSection(colorScheme),
+            _buildPersonalSection(colorScheme),
 
             const SizedBox(height: 24),
 
-            // Contact Details Section
+            // Contact Section (phone/email/facebook + location)
             _buildSectionHeader(
-              title: 'Contact Details',
+              title: 'Contact',
               icon: LucideIcons.phone,
               sectionKey: 'contact',
               color: colorScheme.primary,
             ),
             const SizedBox(height: 12),
-            _buildContactDetailsSection(colorScheme),
+            _buildContactSection(colorScheme),
 
             const SizedBox(height: 24),
 
-            // Employment Information Section
+            // Professional Section
             _buildSectionHeader(
-              title: 'Employment Information',
+              title: 'Professional',
               icon: LucideIcons.briefcase,
-              sectionKey: 'employment',
+              sectionKey: 'professional',
               color: colorScheme.primary,
             ),
             const SizedBox(height: 12),
-            _buildEmploymentSection(colorScheme),
+            _buildProfessionalSection(colorScheme),
 
             const SizedBox(height: 24),
 
-            // Product Information Section
+            // Product Section
             _buildSectionHeader(
-              title: 'Product Information',
+              title: 'Product',
               icon: LucideIcons.creditCard,
               sectionKey: 'product',
               color: colorScheme.primary,
             ),
             const SizedBox(height: 12),
-            _buildProductInfoSection(colorScheme),
+            _buildProductSection(colorScheme),
 
             const SizedBox(height: 24),
 
-            // Location Section
+            // Notes Section
             _buildSectionHeader(
-              title: 'Location',
-              icon: LucideIcons.mapPin,
-              sectionKey: 'location',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildLocationSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Remarks Section
-            _buildSectionHeader(
-              title: 'Remarks',
+              title: 'Notes',
               icon: LucideIcons.messageSquare,
-              sectionKey: 'remarks',
+              sectionKey: 'notes',
               color: colorScheme.primary,
             ),
             const SizedBox(height: 12),
-            _buildRemarksSection(colorScheme),
+            _buildNotesSection(colorScheme),
 
             const SizedBox(height: 32),
 
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Cancel + Save button row
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isSaving ? null : () => context.pop(),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'SUBMIT',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-              ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            saveLabel,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 16),
@@ -575,13 +584,12 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     );
   }
 
-  Widget _buildBasicInfoSection(ColorScheme colorScheme) {
-    if (!_expandedSections['basic']!) return const SizedBox.shrink();
+  Widget _buildPersonalSection(ColorScheme colorScheme) {
+    if (!_expandedSections['personal']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name fields
         Row(
           children: [
             Expanded(
@@ -626,7 +634,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         ),
         const SizedBox(height: 16),
 
-        // Birth Date
         InkWell(
           onTap: () async {
             final picked = await showDatePicker(
@@ -657,56 +664,16 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             ),
           ),
         ),
-
-        const SizedBox(height: 16),
-
-        // Client Type
-        const Text(
-          'Client Type',
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _ClientTypeButton(
-                label: 'Potential',
-                isSelected: _clientType == 'POTENTIAL',
-                colorScheme: colorScheme,
-                onTap: () {
-                  HapticUtils.selectionClick();
-                  setState(() => _clientType = 'POTENTIAL');
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ClientTypeButton(
-                label: 'Existing',
-                isSelected: _clientType == 'EXISTING',
-                colorScheme: colorScheme,
-                onTap: () {
-                  HapticUtils.selectionClick();
-                  setState(() => _clientType = 'EXISTING');
-                },
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
 
-  Widget _buildContactDetailsSection(ColorScheme colorScheme) {
+  Widget _buildContactSection(ColorScheme colorScheme) {
     if (!_expandedSections['contact']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Phone
         TextFormField(
           controller: _phoneController,
           decoration: const InputDecoration(
@@ -720,7 +687,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         ),
         const SizedBox(height: 16),
 
-        // Email
         TextFormField(
           controller: _emailController,
           decoration: const InputDecoration(
@@ -734,7 +700,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         ),
         const SizedBox(height: 16),
 
-        // Facebook
         TextFormField(
           controller: _facebookController,
           decoration: const InputDecoration(
@@ -745,12 +710,235 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             isDense: true,
           ),
         ),
+
+        const SizedBox(height: 24),
+
+        // Location fields (merged from old Location section)
+        DropdownButtonFormField<PsgcRegion>(
+          value: _selectedRegion,
+          decoration: InputDecoration(
+            labelText: 'Region *',
+            border: const OutlineInputBorder(),
+            isDense: true,
+            suffixIcon: _regions.isEmpty
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+          ),
+          items: _regions.map((region) {
+            return DropdownMenuItem<PsgcRegion>(
+              value: region,
+              child: Text(region.name),
+            );
+          }).toList(),
+          onChanged: (region) async {
+            setState(() {
+              _selectedRegion = region;
+              _selectedProvince = null;
+              _selectedMunicipality = null;
+              _selectedBarangay = null;
+              _provinces = [];
+              _municipalities = [];
+              _barangays = [];
+              _isLoadingProvinces = region != null;
+            });
+
+            if (region != null) {
+              try {
+                final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                final provinces = await psgcRepository.getProvincesByRegion(region.name);
+                if (mounted) {
+                  setState(() {
+                    _provinces = provinces;
+                    _isLoadingProvinces = false;
+                  });
+                }
+              } catch (e) {
+                if (mounted) {
+                  setState(() => _isLoadingProvinces = false);
+                }
+                if (mounted) {
+                  _showErrorDialog('Failed to load provinces', e);
+                }
+              }
+            }
+          },
+          validator: (value) => value == null ? 'Required' : null,
+        ),
+        const SizedBox(height: 16),
+
+        IgnorePointer(
+          ignoring: _selectedRegion == null || _isLoadingProvinces,
+          child: DropdownButtonFormField<PsgcProvince>(
+            value: _selectedProvince,
+            decoration: InputDecoration(
+              labelText: 'Province *',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: _selectedRegion == null,
+              fillColor: _selectedRegion == null ? Colors.grey.shade100 : null,
+              suffixIcon: _isLoadingProvinces
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              hintText: _selectedRegion == null ? 'Select region first' : null,
+            ),
+            items: _provinces.isEmpty && _selectedRegion != null && !_isLoadingProvinces
+                ? [
+                    const DropdownMenuItem<PsgcProvince>(
+                      value: null,
+                      enabled: false,
+                      child: Text('No provinces available', style: TextStyle(color: Colors.grey)),
+                    ),
+                  ]
+                : _provinces.map((province) {
+                    return DropdownMenuItem<PsgcProvince>(
+                      value: province,
+                      child: Text(province.name),
+                    );
+                  }).toList(),
+            onChanged: _selectedRegion == null
+                ? null
+                : (province) async {
+                    setState(() {
+                      _selectedProvince = province;
+                      _selectedMunicipality = null;
+                      _selectedBarangay = null;
+                      _municipalities = [];
+                      _barangays = [];
+                      _isLoadingMunicipalities = province != null;
+                    });
+
+                    if (province != null) {
+                      try {
+                        final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                        final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
+                        if (mounted) {
+                          setState(() {
+                            _municipalities = municipalities;
+                            _isLoadingMunicipalities = false;
+                          });
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setState(() => _isLoadingMunicipalities = false);
+                        }
+                        if (mounted) {
+                          _showErrorDialog('Failed to load municipalities', e);
+                        }
+                      }
+                    }
+                  },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        IgnorePointer(
+          ignoring: _selectedProvince == null || _isLoadingMunicipalities,
+          child: DropdownButtonFormField<PsgcMunicipality>(
+            value: _selectedMunicipality,
+            decoration: InputDecoration(
+              labelText: 'Municipality/City *',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: _selectedProvince == null,
+              fillColor: _selectedProvince == null ? Colors.grey.shade100 : null,
+              suffixIcon: _isLoadingMunicipalities
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              hintText: _selectedProvince == null ? 'Select province first' : null,
+            ),
+            items: _municipalities.isEmpty && _selectedProvince != null && !_isLoadingMunicipalities
+                ? [
+                    const DropdownMenuItem<PsgcMunicipality>(
+                      value: null,
+                      enabled: false,
+                      child: Text('No municipalities available', style: TextStyle(color: Colors.grey)),
+                    ),
+                  ]
+                : _municipalities.map((municipality) {
+                    return DropdownMenuItem<PsgcMunicipality>(
+                      value: municipality,
+                      child: Text(municipality.displayName),
+                    );
+                  }).toList(),
+            onChanged: _selectedProvince == null
+                ? null
+                : (municipality) async {
+                    setState(() {
+                      _selectedMunicipality = municipality;
+                      _selectedBarangay = null;
+                      _barangays = [];
+                      _isLoadingBarangays = municipality != null;
+                    });
+
+                    if (municipality != null) {
+                      await _loadBarangays(municipality.name);
+                    }
+                  },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        IgnorePointer(
+          ignoring: _selectedMunicipality == null || _isLoadingBarangays,
+          child: DropdownButtonFormField<PsgcBarangay>(
+            value: _selectedBarangay,
+            decoration: InputDecoration(
+              labelText: 'Barangay *',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: _selectedMunicipality == null,
+              fillColor: _selectedMunicipality == null ? Colors.grey.shade100 : null,
+              suffixIcon: _isLoadingBarangays
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              hintText: _selectedMunicipality == null ? 'Select municipality first' : null,
+            ),
+            items: _barangays.isEmpty && _selectedMunicipality != null && !_isLoadingBarangays
+                ? [
+                    const DropdownMenuItem<PsgcBarangay>(
+                      value: null,
+                      enabled: false,
+                      child: Text('No barangays available', style: TextStyle(color: Colors.grey)),
+                    ),
+                  ]
+                : _barangays.map((barangay) {
+                    return DropdownMenuItem<PsgcBarangay>(
+                      value: barangay,
+                      child: Text(barangay.barangay ?? 'Unknown'),
+                    );
+                  }).toList(),
+            onChanged: _selectedMunicipality == null
+                ? null
+                : (barangay) {
+                    HapticUtils.lightImpact();
+                    setState(() {
+                      _selectedBarangay = barangay;
+                    });
+                  },
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildEmploymentSection(ColorScheme colorScheme) {
-    if (!_expandedSections['employment']!) return const SizedBox.shrink();
+  Widget _buildProfessionalSection(ColorScheme colorScheme) {
+    if (!_expandedSections['professional']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -840,12 +1028,47 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     );
   }
 
-  Widget _buildProductInfoSection(ColorScheme colorScheme) {
+  Widget _buildProductSection(ColorScheme colorScheme) {
     if (!_expandedSections['product']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Client Type (moved from Personal)
+        const Text(
+          'Client Type',
+          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _ClientTypeButton(
+                label: 'Potential',
+                isSelected: _clientType == 'POTENTIAL',
+                colorScheme: colorScheme,
+                onTap: () {
+                  HapticUtils.selectionClick();
+                  setState(() => _clientType = 'POTENTIAL');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ClientTypeButton(
+                label: 'Existing',
+                isSelected: _clientType == 'EXISTING',
+                colorScheme: colorScheme,
+                onTap: () {
+                  HapticUtils.selectionClick();
+                  setState(() => _clientType = 'EXISTING');
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
         Row(
           children: [
             Expanded(
@@ -854,10 +1077,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                 children: [
                   const Text(
                     'Product Type',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -866,20 +1086,15 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
                     items: const ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            ))
+                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
                         HapticUtils.lightImpact();
                         setState(() => _productType = value);
-                        // No auto-set for pension type with new product types
                       }
                     },
                   ),
@@ -893,10 +1108,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                 children: [
                   const Text(
                     'Pension Type',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -905,14 +1117,10 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
                     items: ['SSS', 'GSIS', 'Private', 'None']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            ))
+                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
@@ -937,10 +1145,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           ),
           items: ['Residential', 'Commercial', 'Industrial']
-              .map((type) => DropdownMenuItem(
-                    value: type,
-                    child: Text(type),
-                  ))
+              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
               .toList(),
           onChanged: (value) {
             if (value != null) {
@@ -960,10 +1165,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           ),
           items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
-              .map((type) => DropdownMenuItem(
-                    value: type,
-                    child: Text(type),
-                  ))
+              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
               .toList(),
           onChanged: (value) {
             if (value != null) {
@@ -972,244 +1174,21 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             }
           },
         ),
-      ],
-    );
-  }
-
-  Widget _buildLocationSection(ColorScheme colorScheme) {
-    if (!_expandedSections['location']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Region Dropdown
-        DropdownButtonFormField<PsgcRegion>(
-          value: _selectedRegion,
-          decoration: InputDecoration(
-            labelText: 'Region *',
-            border: const OutlineInputBorder(),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _panController,
+          decoration: const InputDecoration(
+            labelText: 'PAN',
+            border: OutlineInputBorder(),
             isDense: true,
-            suffixIcon: _regions.isEmpty
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-          ),
-          items: _regions.map((region) {
-            return DropdownMenuItem<PsgcRegion>(
-              value: region,
-              child: Text(region.name),
-            );
-          }).toList(),
-          onChanged: (region) async {
-            setState(() {
-              _selectedRegion = region;
-              _selectedProvince = null;
-              _selectedMunicipality = null;
-              _selectedBarangay = null;
-              _provinces = [];
-              _municipalities = [];
-              _barangays = [];
-              _isLoadingProvinces = region != null;
-            });
-
-            if (region != null) {
-              try {
-                final psgcRepository = await ref.read(psgcRepositoryProvider.future);
-                final provinces = await psgcRepository.getProvincesByRegion(region.name);
-                if (mounted) {
-                  setState(() {
-                    _provinces = provinces;
-                    _isLoadingProvinces = false;
-                  });
-                }
-              } catch (e) {
-                if (mounted) {
-                  setState(() => _isLoadingProvinces = false);
-                }
-                if (mounted) {
-                  _showErrorDialog('Failed to load provinces', e);
-                }
-              }
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Province Dropdown
-        IgnorePointer(
-          ignoring: _selectedRegion == null || _isLoadingProvinces,
-          child: DropdownButtonFormField<PsgcProvince>(
-            value: _selectedProvince,
-            decoration: InputDecoration(
-              labelText: 'Province *',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: _selectedRegion == null,
-              fillColor: _selectedRegion == null ? Colors.grey.shade100 : null,
-              suffixIcon: _isLoadingProvinces
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-              hintText: _selectedRegion == null ? 'Select region first' : null,
-            ),
-            items: _provinces.isEmpty && _selectedRegion != null && !_isLoadingProvinces
-                ? [
-                    const DropdownMenuItem<PsgcProvince>(
-                      value: null,
-                      enabled: false,
-                      child: Text('No provinces available', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ]
-                : _provinces.map((province) {
-                    return DropdownMenuItem<PsgcProvince>(
-                      value: province,
-                      child: Text(province.name),
-                    );
-                  }).toList(),
-            onChanged: _selectedRegion == null
-                ? null
-                : (province) async {
-                    setState(() {
-                      _selectedProvince = province;
-                      _selectedMunicipality = null;
-                      _selectedBarangay = null;
-                      _municipalities = [];
-                      _barangays = [];
-                      _isLoadingMunicipalities = province != null;
-                    });
-
-                    if (province != null) {
-                      try {
-                        final psgcRepository = await ref.read(psgcRepositoryProvider.future);
-                        final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
-                        if (mounted) {
-                          setState(() {
-                            _municipalities = municipalities;
-                            _isLoadingMunicipalities = false;
-                          });
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          setState(() => _isLoadingMunicipalities = false);
-                        }
-                        if (mounted) {
-                          _showErrorDialog('Failed to load municipalities', e);
-                        }
-                      }
-                    }
-                  },
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Municipality Dropdown
-        IgnorePointer(
-          ignoring: _selectedProvince == null || _isLoadingMunicipalities,
-          child: DropdownButtonFormField<PsgcMunicipality>(
-            value: _selectedMunicipality,
-            decoration: InputDecoration(
-              labelText: 'Municipality/City *',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: _selectedProvince == null,
-              fillColor: _selectedProvince == null ? Colors.grey.shade100 : null,
-              suffixIcon: _isLoadingMunicipalities
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-              hintText: _selectedProvince == null ? 'Select province first' : null,
-            ),
-            items: _municipalities.isEmpty && _selectedProvince != null && !_isLoadingMunicipalities
-                ? [
-                    const DropdownMenuItem<PsgcMunicipality>(
-                      value: null,
-                      enabled: false,
-                      child: Text('No municipalities available', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ]
-                : _municipalities.map((municipality) {
-                    return DropdownMenuItem<PsgcMunicipality>(
-                      value: municipality,
-                      child: Text(municipality.displayName),
-                    );
-                  }).toList(),
-            onChanged: _selectedProvince == null
-                ? null
-                : (municipality) async {
-                    setState(() {
-                      _selectedMunicipality = municipality;
-                      _selectedBarangay = null;
-                      _barangays = [];
-                      _isLoadingBarangays = municipality != null;
-                    });
-
-                    if (municipality != null) {
-                      await _loadBarangays(municipality.name);
-                    }
-                  },
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Barangay Dropdown
-        IgnorePointer(
-          ignoring: _selectedMunicipality == null || _isLoadingBarangays,
-          child: DropdownButtonFormField<PsgcBarangay>(
-            value: _selectedBarangay,
-            decoration: InputDecoration(
-              labelText: 'Barangay *',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: _selectedMunicipality == null,
-              fillColor: _selectedMunicipality == null ? Colors.grey.shade100 : null,
-              suffixIcon: _isLoadingBarangays
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-              hintText: _selectedMunicipality == null ? 'Select municipality first' : null,
-            ),
-            items: _barangays.isEmpty && _selectedMunicipality != null && !_isLoadingBarangays
-                ? [
-                    const DropdownMenuItem<PsgcBarangay>(
-                      value: null,
-                      enabled: false,
-                      child: Text('No barangays available', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ]
-                : _barangays.map((barangay) {
-                    return DropdownMenuItem<PsgcBarangay>(
-                      value: barangay,
-                      child: Text(barangay.barangay ?? 'Unknown'),
-                    );
-                  }).toList(),
-            onChanged: _selectedMunicipality == null
-                ? null
-                : (barangay) {
-                    HapticUtils.lightImpact();
-                    setState(() {
-                      _selectedBarangay = barangay;
-                    });
-                  },
           ),
         ),
       ],
     );
   }
 
-  Widget _buildRemarksSection(ColorScheme colorScheme) {
-    if (!_expandedSections['remarks']!) return const SizedBox.shrink();
+  Widget _buildNotesSection(ColorScheme colorScheme) {
+    if (!_expandedSections['notes']!) return const SizedBox.shrink();
 
     return TextFormField(
       controller: _remarksController,
