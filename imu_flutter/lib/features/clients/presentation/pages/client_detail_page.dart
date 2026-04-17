@@ -26,7 +26,6 @@ import '../../../clients/data/models/address_model.dart';
 import '../../../clients/data/models/phone_number_model.dart';
 import '../../../clients/data/repositories/address_repository.dart' show AddressRepository;
 import '../../../clients/data/repositories/phone_number_repository.dart' show PhoneNumberRepository;
-import '../../../clients/presentation/widgets/edit_client_form_v2.dart';
 import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
 import '../../../clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
@@ -472,69 +471,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Future<void> _editClient() async {
     HapticUtils.lightImpact();
-
-    // Show edit form as a full-page modal with the client data preloaded
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            title: const Text('Edit Client'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.delete),
-                tooltip: 'Delete Client',
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Client'),
-                      content: const Text('Are you sure you want to delete this client?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: TextButton.styleFrom(foregroundColor: Colors.red),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true && context.mounted) {
-                    // Handle delete
-                    final clientApi = ref.read(clientApiServiceProvider);
-                    try {
-                      await clientApi.deleteClient(widget.clientId);
-                      if (context.mounted) {
-                        Navigator.of(context).pop(); // Close edit form
-                        context.pop(); // Close client detail
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        AppNotification.showError(context, 'Failed to delete client: $e');
-                      }
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-          body: EditClientFormV2(
-            clientId: widget.clientId,
-            initialClient: _client, // Pass the already-loaded client data
-            onSave: (savedClient) {
-              Navigator.of(context).pop(true); // Close edit form
-              return true;
-            },
-          ),
-        ),
-      ),
-    );
-
-    // Reload client data after edit if changes were made
+    final result = await context.push<bool>('/clients/${widget.clientId}/edit');
     if (result == true) {
       _loadClient();
       ref.invalidate(assignedClientsProvider);

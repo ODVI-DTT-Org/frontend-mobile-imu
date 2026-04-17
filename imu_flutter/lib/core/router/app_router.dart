@@ -15,7 +15,7 @@ import '../../features/agencies/presentation/pages/add_prospect_agency_page.dart
 import '../../features/agencies/presentation/pages/agency_detail_page.dart';
 import '../../features/groups/presentation/pages/group_detail_page.dart';
 import '../../features/itineraries/presentation/pages/itinerary_detail_page.dart';
-import '../../features/clients/presentation/widgets/edit_client_form_v2.dart';
+import '../../features/clients/presentation/pages/edit_client_page.dart';
 import '../../features/clients/presentation/pages/add_client_page.dart';
 import '../../features/itinerary/presentation/pages/itinerary_page.dart';
 import '../../features/my_day/presentation/pages/my_day_page.dart';
@@ -240,50 +240,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/clients/:id/edit',
         builder: (context, state) {
           final clientId = state.pathParameters['id']!;
-          return Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBar(
-              title: const Text('Edit Client'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  tooltip: 'Delete Client',
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Client'),
-                        content: const Text('Are you sure you want to delete this client?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            style: TextButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true && context.mounted) {
-                      // Handle delete - you may want to add a callback or navigate
-                      context.pop();
-                    }
-                  },
-                ),
-              ],
-            ),
-            body: EditClientFormV2(
-              clientId: clientId,
-              onSave: (savedClient) {
-                // Return to client detail after saving
-                context.pop();
-                return true;
-              },
-            ),
-          );
+          return EditClientPage(clientId: clientId);
         },
       ),
 
