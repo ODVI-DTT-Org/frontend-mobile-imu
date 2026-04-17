@@ -43,7 +43,7 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
     final timeOut = useState<TimeOfDay?>(null);
     final odometerArrival = useState<String?>(null);
     final odometerDeparture = useState<String?>(null);
-    final productType = useState<String>('PUSU');
+    final productType = useState<String>('BFP_ACTIVE');
     final loanType = useState<String>('NEW');
     final udiNumber = useTextEditingController();
     final remarks = useTextEditingController();
@@ -140,7 +140,7 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           odometerDeparture: odometerDeparture.value ?? '',
           productType: productType.value,
           loanType: loanType.value,
-          udiNumber: udiNumber.text.trim(),
+          udiNumber: int.tryParse(udiNumber.text.trim()),
           remarks: remarks.text.trim(),
           photoPath: photoPath.value, // API service will handle File creation and upload
         ) != null;
@@ -254,9 +254,11 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
                 isExpanded: true,
                 style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                 items: const [
-                  DropdownMenuItem(value: 'PUSU', child: Text('PUSU')),
-                  DropdownMenuItem(value: 'LIKA', child: Text('LIKA')),
-                  DropdownMenuItem(value: 'SUB2K', child: Text('SUB2K')),
+                  DropdownMenuItem(value: 'BFP_ACTIVE', child: Text('BFP Active')),
+                  DropdownMenuItem(value: 'BFP_PENSION', child: Text('BFP Pension')),
+                  DropdownMenuItem(value: 'PNP_PENSION', child: Text('PNP Pension')),
+                  DropdownMenuItem(value: 'NAPOLCOM', child: Text('NAPOLCOM')),
+                  DropdownMenuItem(value: 'BFP_STP', child: Text('BFP STP')),
                 ],
                 onChanged: (value) => productType.value = value ?? productType.value,
               ),

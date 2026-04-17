@@ -40,7 +40,7 @@ class ReleaseApiService {
     required String visitId,
     required String productType,
     required String loanType,
-    String? udiNumber,
+    int? udiNumber,
     String? approvalNotes,
     double amount = 0,
   }) async {
@@ -61,7 +61,7 @@ class ReleaseApiService {
         'product_type': productType,
         'loan_type': loanType,
         'amount': amount,
-        if (udiNumber != null && udiNumber.isNotEmpty) 'udi_number': udiNumber,
+        if (udiNumber != null) 'udi_number': udiNumber,
         if (approvalNotes != null && approvalNotes.isNotEmpty) 'approval_notes': approvalNotes,
       };
 
@@ -132,7 +132,7 @@ class ReleaseApiService {
     required String odometerDeparture,
     required String productType,
     required String loanType,
-    String? udiNumber,
+    int? udiNumber,
     String? remarks,
     String? photoPath,
     double? latitude,
