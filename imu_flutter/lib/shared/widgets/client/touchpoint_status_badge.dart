@@ -15,13 +15,14 @@ class TouchpointStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (client.touchpointSummary.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    try {
+      if (client.touchpointSummary.isEmpty) {
+        return const SizedBox.shrink();
+      }
 
-    final lastTouchpoint = client.touchpointSummary.last;
-    final reason = lastTouchpoint.reason;
-    final status = lastTouchpoint.status;
+      final lastTouchpoint = client.touchpointSummary.last;
+      final reason = lastTouchpoint.reason;
+      final status = lastTouchpoint.status;
 
     // Build label based on reason and status
     String label;
@@ -81,5 +82,10 @@ class TouchpointStatusBadge extends StatelessWidget {
         ],
       ),
     );
+    } catch (e) {
+      // BUG FIX: Catch any errors parsing touchpoint data and return empty widget
+      debugPrint('[TouchpointStatusBadge] Error rendering badge for client ${client.id}: $e');
+      return const SizedBox.shrink();
+    }
   }
 }

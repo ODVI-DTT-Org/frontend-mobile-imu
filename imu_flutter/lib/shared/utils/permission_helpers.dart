@@ -1,5 +1,6 @@
 // lib/shared/utils/permission_helpers.dart
 import '../../core/models/user_role.dart';
+import '../../features/clients/data/models/client_model.dart' show TouchpointType;
 
 /// Returns the generic permission denied message
 String getPermissionDeniedMessage() {
@@ -23,8 +24,31 @@ List<int> getValidTouchpointNumbers(UserRole role) {
   return [1, 2, 3, 4, 5, 6, 7]; // Default to all
 }
 
+/// Returns valid touchpoint types for the given role
+List<TouchpointType> getValidTouchpointTypes(UserRole role) {
+  if (role.isManager) {
+    return [TouchpointType.visit, TouchpointType.call];
+  }
+
+  if (role == UserRole.caravan) {
+    return [TouchpointType.visit]; // Visit touchpoints only
+  }
+
+  if (role == UserRole.tele) {
+    return [TouchpointType.call]; // Call touchpoints only
+  }
+
+  return [TouchpointType.visit, TouchpointType.call]; // Default to all
+}
+
 /// Checks if the touchpoint number is valid for the given role
 bool isValidTouchpointNumberForRole(int number, UserRole role) {
   final validNumbers = getValidTouchpointNumbers(role);
   return validNumbers.contains(number);
+}
+
+/// Checks if the touchpoint type is valid for the given role
+bool isValidTouchpointTypeForRole(TouchpointType type, UserRole role) {
+  final validTypes = getValidTouchpointTypes(role);
+  return validTypes.contains(type);
 }

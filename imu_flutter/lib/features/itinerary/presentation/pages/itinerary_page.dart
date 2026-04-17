@@ -229,10 +229,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         subtitle: visit.address,
         options: [
           ActionOption(
-            icon: LucideIcons.history,
-            title: 'View History',
-            description: 'See all touchpoints',
-            value: 'history',
+            icon: LucideIcons.user,
+            title: 'View Details',
+            description: 'Go to client profile',
+            value: 'details',
           ),
           ActionOption(
             icon: LucideIcons.edit,
@@ -282,8 +282,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         case 'edit':
           await _editClient(visit);
           break;
-        case 'history':
-          await _viewHistory(visit);
+        case 'details':
+          await _viewDetails(visit);
           break;
       }
     }
@@ -324,8 +324,11 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
 
-    if (userRole == null || !isValidTouchpointNumberForRole(touchpointNumber, userRole)) {
-      // User's role doesn't allow this touchpoint number
+    // BUG FIX: Check BOTH touchpoint number AND type
+    if (userRole == null ||
+        !isValidTouchpointNumberForRole(touchpointNumber, userRole) ||
+        (touchpointType != null && !isValidTouchpointTypeForRole(touchpointType, userRole))) {
+      // User's role doesn't allow this touchpoint number or type
       if (mounted) {
         showDialog(
           context: context,
@@ -462,14 +465,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     context.push('/clients/${visit.clientId}/edit');
   }
 
-  Future<void> _viewHistory(ItineraryItem visit) async {
+  Future<void> _viewDetails(ItineraryItem visit) async {
     HapticUtils.lightImpact();
-    if (mounted) {
-      await TouchpointHistoryDialog.show(
-        context,
-        clientId: visit.clientId,
-        clientName: visit.clientName,
-      );
+    if (mounted && visit.clientId != null) {
+      context.push('/clients/${visit.clientId}');
     }
   }
 

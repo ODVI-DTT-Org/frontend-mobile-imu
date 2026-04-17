@@ -92,12 +92,10 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
 
   // Section expansion states
   final Map<String, bool> _expandedSections = {
-    'basic': true,
-    'contact': true,
-    'employment': false,
-    'product': true,
-    'location': true,
-    'remarks': false,
+    'client': true,         // Client Information - EXPANDED (client type, nested panels)
+    'employment': false,    // Employment Info - COLLAPSED (nested under client)
+    'product': false,       // Product Info - COLLAPSED (nested under client)
+    'contact': false,       // Contact Information - COLLAPSED (phone, email, facebook, address)
   };
 
   @override
@@ -165,38 +163,17 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
           _regions = regions;
         });
 
-        // Load provinces if region is set
-        if (_client!.region != null && _client!.region!.isNotEmpty) {
-          final provinces = await psgcRepository.getProvincesByRegion(_client!.region!);
-          if (mounted) {
-            setState(() {
-              _provinces = provinces;
-            });
+        // BUG FIX: Populate form fields IMMEDIATELY after client data is loaded
+        // Don't wait for location data - load that in background
+        _populateFormFields();
 
-            // Load municipalities if province is set
-            if (_client!.province != null && _client!.province!.isNotEmpty) {
-              final municipalities = await psgcRepository.getMunicipalitiesByProvince(_client!.province!);
-              if (mounted) {
-                setState(() {
-                  _municipalities = municipalities;
-                });
+        // Set loading to false here - form is ready to use
+        setState(() {
+          _isLoading = false;
+        });
 
-                // Load barangays if municipality is set - AWAIT the result
-                if (_client!.municipality != null && _client!.municipality!.isNotEmpty) {
-                  await _loadBarangays(_client!.municipality!);
-                }
-              }
-            }
-          }
-        }
-
-        // Now populate form fields AFTER all location data is loaded
-        if (mounted) {
-          setState(() {
-            _populateFormFields();
-            _isLoading = false;
-          });
-        }
+        // Load location data in background without blocking the form
+        _loadLocationDataInBackground();
       } else {
         if (mounted) {
           setState(() => _isLoading = false);
@@ -209,6 +186,88 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         setState(() => _isLoading = false);
         _showErrorDialog('Failed to load client', e);
       }
+    }
+  }
+
+  // Load location data in background without blocking the form
+  Future<void> _loadLocationDataInBackground() async {
+    if (_client == null) return;
+
+    try {
+      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+
+      // Load provinces if region is set
+      if (_client!.region != null && _client!.region!.isNotEmpty) {
+        final provinces = await psgcRepository.getProvincesByRegion(_client!.region!);
+        if (mounted) {
+          setState(() {
+            _provinces = provinces;
+          });
+
+          // Set the selected province from client data (now that provinces list is loaded)
+          if (_client!.province != null && _client!.province!.isNotEmpty && provinces.isNotEmpty) {
+            try {
+              final foundProvince = provinces.firstWhere(
+                (p) => p.name == _client!.province,
+                orElse: () => provinces.first,
+              );
+              setState(() {
+                _selectedProvince = foundProvince;
+              });
+            } catch (e) {
+              debugPrint('[EditClientFormV2] Error finding province: $e');
+            }
+          }
+
+          // Load municipalities if province is set
+          if (_client!.province != null && _client!.province!.isNotEmpty) {
+            final municipalities = await psgcRepository.getMunicipalitiesByProvince(_client!.province!);
+            if (mounted) {
+              setState(() {
+                _municipalities = municipalities;
+              });
+
+              // Set the selected municipality from client data (now that municipalities list is loaded)
+              if (_client!.municipality != null && _client!.municipality!.isNotEmpty && municipalities.isNotEmpty) {
+                try {
+                  final foundMunicipality = municipalities.firstWhere(
+                    (m) => m.name == _client!.municipality || m.displayName == _client!.municipality,
+                    orElse: () => municipalities.first,
+                  );
+                  setState(() {
+                    _selectedMunicipality = foundMunicipality;
+                  });
+                } catch (e) {
+                  debugPrint('[EditClientFormV2] Error finding municipality: $e');
+                }
+              }
+
+              // Load barangays if municipality is set
+              if (_client!.municipality != null && _client!.municipality!.isNotEmpty) {
+                await _loadBarangays(_client!.municipality!);
+
+                // Set the selected barangay from client data (now that barangays list is loaded)
+                if (_client!.barangay != null && _client!.barangay!.isNotEmpty && _barangays.isNotEmpty) {
+                  try {
+                    final foundBarangay = _barangays.firstWhere(
+                      (b) => b.barangay == _client!.barangay,
+                      orElse: () => _barangays.first,
+                    );
+                    setState(() {
+                      _selectedBarangay = foundBarangay;
+                    });
+                  } catch (e) {
+                    debugPrint('[EditClientFormV2] Error finding barangay: $e');
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[EditClientFormV2] Error loading location data in background: $e');
+      // Don't show error to user - form is already usable
     }
   }
 
@@ -623,7 +682,7 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
       final loadingWidget = Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          children: const [
             CircularProgressIndicator(),
             SizedBox(height: 16),
             Text('Loading client...'),
@@ -644,118 +703,103 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         children: [
-          // Basic Information Section
-          _buildSectionHeader(
-            title: 'Basic Information',
-            icon: LucideIcons.user,
-            sectionKey: 'basic',
-            color: colorScheme.primary,
+          // Name Section (always visible, not expandable)
+          const Text(
+            'Name',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
+          _buildNameFields(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Basic Info Section (always visible)
           _buildBasicInfoSection(colorScheme),
 
           const SizedBox(height: 24),
 
-          // Contact Details Section
+          // Client Information Section
           _buildSectionHeader(
-            title: 'Contact Details',
+            title: 'Client Information',
+            icon: LucideIcons.user,
+            sectionKey: 'client',
+            color: colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildClientInfoSection(colorScheme),
+
+          const SizedBox(height: 24),
+
+          // Contact Information Section
+          _buildSectionHeader(
+            title: 'Contact Information',
             icon: LucideIcons.phone,
             sectionKey: 'contact',
             color: colorScheme.primary,
           ),
           const SizedBox(height: 12),
-          _buildContactDetailsSection(colorScheme),
-
-          const SizedBox(height: 24),
-
-          // Employment Information Section
-          _buildSectionHeader(
-            title: 'Employment Information',
-            icon: LucideIcons.briefcase,
-            sectionKey: 'employment',
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          _buildEmploymentSection(colorScheme),
-
-          const SizedBox(height: 24),
-
-          // Product Information Section
-          _buildSectionHeader(
-            title: 'Product Information',
-            icon: LucideIcons.creditCard,
-            sectionKey: 'product',
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          _buildProductInfoSection(colorScheme),
-
-          const SizedBox(height: 24),
-
-          // Location Section
-          _buildSectionHeader(
-            title: 'Location',
-            icon: LucideIcons.mapPin,
-            sectionKey: 'location',
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          _buildLocationSection(colorScheme),
-
-          const SizedBox(height: 24),
-
-          // Remarks Section
-          _buildSectionHeader(
-            title: 'Remarks',
-            icon: LucideIcons.messageSquare,
-            sectionKey: 'remarks',
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          _buildRemarksSection(colorScheme),
+          _buildContactInfoSection(colorScheme),
 
           const SizedBox(height: 32),
 
-          // Save Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _handleSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Buttons (Cancel + Save Changes)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isSaving ? null : (widget.onCancel ?? () => Navigator.of(context).pop()),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: colorScheme.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'CANCEL',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'SAVE CHANGES',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _handleSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-            ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'SAVE CHANGES',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            ],
           ),
-
-          if (widget.isModal) ...[
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: widget.onCancel ?? () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
         ],
       ),
     );
@@ -768,6 +812,168 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     }
 
     return formContent;
+  }
+
+  Widget _buildNameFields(ColorScheme colorScheme) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: TextFormField(
+            controller: _firstNameController,
+            decoration: const InputDecoration(
+              labelText: 'First Name *',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            validator: (value) =>
+                value?.trim().isEmpty == true ? 'Required' : null,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextFormField(
+            controller: _middleNameController,
+            decoration: const InputDecoration(
+              labelText: 'Middle Name',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: TextFormField(
+            controller: _lastNameController,
+            decoration: const InputDecoration(
+              labelText: 'Last Name *',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            validator: (value) =>
+                value?.trim().isEmpty == true ? 'Required' : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBasicInfoSection(ColorScheme colorScheme) {
+    // Calculate age
+    int age = 0;
+    if (_birthDate != null) {
+      final now = DateTime.now();
+      age = now.year - _birthDate!.year;
+      if (now.month < _birthDate!.month ||
+          (now.month == _birthDate!.month && now.day < _birthDate!.day)) {
+        age--;
+      }
+    }
+
+    // Format created at date
+    String createdAtFormatted = 'N/A';
+    if (_client?.createdAt != null) {
+      final date = _client!.createdAt!;
+      createdAtFormatted = '${_getMonthName(date.month)} ${date.day}, ${date.year}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Birth Date
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _birthDate ?? DateTime.now(),
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              setState(() => _birthDate = picked);
+            }
+          },
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Birth Date',
+              border: OutlineInputBorder(),
+              isDense: true,
+              suffixIcon: Icon(LucideIcons.calendar, size: 20),
+            ),
+            baseStyle: TextStyle(
+              fontSize: 16,
+              color: _birthDate != null ? Colors.black : Colors.grey,
+            ),
+            child: Text(
+              _birthDate != null
+                  ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
+                  : 'Select birth date',
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Age and Created At
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Age',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    age > 0 ? '$age' : 'N/A',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Created At',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    createdAtFormatted,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[month - 1];
   }
 
   Widget _buildSectionHeader({
@@ -811,91 +1017,12 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     );
   }
 
-  Widget _buildBasicInfoSection(ColorScheme colorScheme) {
-    if (!_expandedSections['basic']!) return const SizedBox.shrink();
+  Widget _buildClientInfoSection(ColorScheme colorScheme) {
+    if (!_expandedSections['client']!) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name fields
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: _firstNameController,
-                decoration: const InputDecoration(
-                  labelText: 'First Name *',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                validator: (value) =>
-                    value?.trim().isEmpty == true ? 'Required' : null,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _middleNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Middle Name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: _lastNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Last Name *',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                validator: (value) =>
-                    value?.trim().isEmpty == true ? 'Required' : null,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Birth Date
-        InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _birthDate ?? DateTime.now(),
-              firstDate: DateTime(1900),
-              lastDate: DateTime.now(),
-            );
-            if (picked != null) {
-              setState(() => _birthDate = picked);
-            }
-          },
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'Birth Date',
-              border: OutlineInputBorder(),
-              isDense: true,
-              suffixIcon: Icon(LucideIcons.calendar, size: 20),
-            ),
-            baseStyle: TextStyle(
-              fontSize: 16,
-              color: _birthDate != null ? Colors.black : Colors.grey,
-            ),
-            child: Text(
-              _birthDate != null
-                  ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
-                  : 'Select birth date',
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
         // Client Type
         const Text(
           'Client Type',
@@ -932,11 +1059,300 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
             ),
           ],
         ),
+
+        const SizedBox(height: 16),
+
+        // Nested: Employment Info Section
+        _buildNestedSectionHeader(
+          title: 'Employment Info',
+          icon: LucideIcons.briefcase,
+          sectionKey: 'employment',
+          color: colorScheme.primary,
+        ),
+        const SizedBox(height: 12),
+        _buildEmploymentInfoSection(colorScheme),
+
+        const SizedBox(height: 16),
+
+        // Nested: Product Info Section
+        _buildNestedSectionHeader(
+          title: 'Product Info',
+          icon: LucideIcons.creditCard,
+          sectionKey: 'product',
+          color: colorScheme.primary,
+        ),
+        const SizedBox(height: 12),
+        _buildProductInfoSection(colorScheme),
       ],
     );
   }
 
-  Widget _buildContactDetailsSection(ColorScheme colorScheme) {
+  Widget _buildNestedSectionHeader({
+    required String title,
+    required IconData icon,
+    required String sectionKey,
+    required Color color,
+  }) {
+    final isExpanded = _expandedSections[sectionKey]!;
+    return InkWell(
+      onTap: () => _toggleSection(sectionKey),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ),
+            Icon(
+              isExpanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
+              color: color,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmploymentInfoSection(ColorScheme colorScheme) {
+    if (!_expandedSections['employment']!) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _agencyNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Agency Name',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Department',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _positionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Position',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _employmentStatusController,
+                  decoration: const InputDecoration(
+                    labelText: 'Employment Status',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _payrollDateController,
+                  decoration: const InputDecoration(
+                    labelText: 'Payroll Date',
+                    hintText: 'YYYY-MM-DD',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _tenureController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tenure (months)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductInfoSection(ColorScheme colorScheme) {
+    if (!_expandedSections['product']!) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _productType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Product Type',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  ),
+                  items: const ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP']
+                      .map((type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      HapticUtils.lightImpact();
+                      setState(() => _productType = value);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _pensionType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Pension Type',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  ),
+                  items: ['SSS', 'GSIS', 'Private', 'None']
+                      .map((type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      HapticUtils.lightImpact();
+                      setState(() => _pensionType = value);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _marketType,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Market Type',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            ),
+            items: ['Residential', 'Commercial', 'Industrial']
+                .map((type) => DropdownMenuItem(
+                      value: type,
+                      child: Text(type),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                HapticUtils.lightImpact();
+                setState(() => _marketType = value);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _loanType,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Loan Type',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            ),
+            items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
+                .map((type) => DropdownMenuItem(
+                      value: type,
+                      child: Text(type),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                HapticUtils.lightImpact();
+                setState(() => _loanType = value);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _panController,
+            decoration: const InputDecoration(
+              labelText: 'PAN',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactInfoSection(ColorScheme colorScheme) {
     if (!_expandedSections['contact']!) return const SizedBox.shrink();
 
     return Column(
@@ -981,243 +1397,18 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
             isDense: true,
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildEmploymentSection(ColorScheme colorScheme) {
-    if (!_expandedSections['employment']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _agencyNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Agency Name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _departmentController,
-                decoration: const InputDecoration(
-                  labelText: 'Department',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 16),
 
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _positionController,
-                decoration: const InputDecoration(
-                  labelText: 'Position',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _employmentStatusController,
-                decoration: const InputDecoration(
-                  labelText: 'Employment Status',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _payrollDateController,
-                decoration: const InputDecoration(
-                  labelText: 'Payroll Date',
-                  hintText: 'YYYY-MM-DD',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _tenureController,
-                decoration: const InputDecoration(
-                  labelText: 'Tenure (months)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProductInfoSection(ColorScheme colorScheme) {
-    if (!_expandedSections['product']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Product Type',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _productType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                    ),
-                    items: const ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        HapticUtils.lightImpact();
-                        setState(() => _productType = value);
-                        // No auto-set for pension type with new product types
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Pension Type',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _pensionType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                    ),
-                    items: ['SSS', 'GSIS', 'Private', 'None']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        HapticUtils.lightImpact();
-                        setState(() => _pensionType = value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _marketType,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Market Type',
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        // Address Section Header
+        const Text(
+          'Address',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
           ),
-          items: ['Residential', 'Commercial', 'Industrial']
-              .map((type) => DropdownMenuItem(
-                    value: type,
-                    child: Text(type),
-                  ))
-              .toList(),
-          onChanged: (value) {
-            if (value != null) {
-              HapticUtils.lightImpact();
-              setState(() => _marketType = value);
-            }
-          },
         ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _loanType,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Loan Type',
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          ),
-          items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
-              .map((type) => DropdownMenuItem(
-                    value: type,
-                    child: Text(type),
-                  ))
-              .toList(),
-          onChanged: (value) {
-            if (value != null) {
-              HapticUtils.lightImpact();
-              setState(() => _loanType = value);
-            }
-          },
-        ),
-      ],
-    );
-  }
+        const SizedBox(height: 12),
 
-  Widget _buildLocationSection(ColorScheme colorScheme) {
-    if (!_expandedSections['location']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
         // Region Dropdown
         DropdownButtonFormField<PsgcRegion>(
           value: _selectedRegion,
@@ -1438,19 +1629,6 @@ class _EditClientFormV2State extends ConsumerState<EditClientFormV2> {
     );
   }
 
-  Widget _buildRemarksSection(ColorScheme colorScheme) {
-    if (!_expandedSections['remarks']!) return const SizedBox.shrink();
-
-    return TextFormField(
-      controller: _remarksController,
-      decoration: const InputDecoration(
-        labelText: 'Remarks',
-        hintText: 'Additional notes about this client...',
-        border: OutlineInputBorder(),
-      ),
-      maxLines: 4,
-    );
-  }
 }
 
 class _ClientTypeButton extends StatelessWidget {

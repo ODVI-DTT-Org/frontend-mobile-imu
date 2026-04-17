@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../app.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -19,10 +20,13 @@ import '../../../../shared/providers/app_providers.dart' show
     assignedMunicipalitiesProvider,
     currentUserRoleProvider,
     locationFilterProvider,
-    clientAttributeFilterProvider;
+    clientAttributeFilterProvider,
+    myDayApiServiceProvider,
+    todayItineraryProvider;
 import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
 import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
 import '../../../../shared/widgets/client/client_status_badge.dart';
+import '../../../../shared/widgets/client/client_list_tile.dart';
 import '../../../../shared/widgets/location_filter_icon.dart';
 import '../../../../shared/widgets/location_filter_chips.dart';
 import '../../../../shared/widgets/location_filter_bottom_sheet.dart';
@@ -454,7 +458,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                                   itemCount: paginatedClients.length,
                                   itemBuilder: (context, index) {
                                     final client = paginatedClients[index];
-                                    return _buildClientCard(client);
+                                    return _buildClientTile(client);
                                   },
                                 ),
                               ),
@@ -913,7 +917,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _showAssignedClientsOnly ? LucideIcons.users : LucideIcons.search,
+              // Use consistent icon for both tabs - search icon indicates "no results"
+              _searchQuery.isEmpty ? LucideIcons.users : LucideIcons.search,
               size: 40,
               color: Colors.grey.shade400,
             ),
@@ -921,7 +926,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty
-                ? (_showAssignedClientsOnly ? 'No assigned clients' : 'No clients found')
+                ? 'No clients found'
                 : 'No clients found',
             style: TextStyle(
               fontSize: 18,
@@ -933,8 +938,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           Text(
             _searchQuery.isEmpty
                 ? (_showAssignedClientsOnly
-                    ? 'Add your first client to get started'
-                    : 'Try searching for clients by name')
+                    ? 'No clients assigned to your territory yet'
+                    : 'No clients in the database')
                 : 'Try a different search term',
             style: TextStyle(color: Colors.grey.shade500),
           ),
@@ -943,11 +948,64 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     );
   }
 
+  Widget _buildClientTile(Client client) {
+    // Check if client is in today's itinerary using local data
+    final todayItineraryAsync = ref.watch(todayItineraryProvider);
+    final today = DateTime.now();
+
+    bool isInMyDay = false;
+    todayItineraryAsync.when(
+      data: (items) {
+        isInMyDay = items.any((item) =>
+          item.clientId == client.id &&
+          item.scheduledDate.year == today.year &&
+          item.scheduledDate.month == today.month &&
+          item.scheduledDate.day == today.day
+        );
+      },
+      loading: () => isInMyDay = false,
+      error: (_, __) => isInMyDay = false,
+    );
+
+    // Build action buttons
+    final actionButtons = [
+      _buildActionButton(
+        icon: LucideIcons.calendar,
+        label: isInMyDay ? 'Added' : 'Add to Today',
+        isPrimary: true,
+        onTap: isInMyDay
+            ? null
+            : () => _addClientToToday(client),
+      ),
+      _buildActionButton(
+        icon: LucideIcons.calendarClock,
+        label: 'Add with Date',
+        isPrimary: false,
+        onTap: () => _showDatePickerForClient(client),
+      ),
+    ];
+
+    return ClientListTile(
+      client: client,
+      onTap: () {
+        HapticUtils.lightImpact();
+        if (client.id != null) {
+          context.push('/clients/${client.id}');
+        } else {
+          showToast('Client ID is missing');
+        }
+      },
+      actions: actionButtons,
+    );
+  }
+
   Widget _buildClientCard(Client client) {
-    final latestTouchpoint = client.touchpointSummary.isNotEmpty
-        ? client.touchpointSummary.last
-        : null;
-    final isFirstTime = client.touchpointSummary.isEmpty;
+    // BUG FIX: Wrap in try-catch to prevent gray square on render errors
+    try {
+      final latestTouchpoint = client.touchpointSummary.isNotEmpty
+          ? client.touchpointSummary.last
+          : null;
+      final isFirstTime = client.touchpointSummary.isEmpty;
 
     // Check if client is in today's itinerary using local data
     final todayItineraryAsync = ref.watch(todayItineraryProvider);
@@ -1251,6 +1309,68 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         ),
       ),
     );
+    } catch (e, stackTrace) {
+      // BUG FIX: Catch render errors and show error card instead of gray square
+      debugPrint('[ClientsPage] Error rendering client card for client ${client.id}: $e');
+      debugPrint('[ClientsPage] Stack trace: $stackTrace');
+
+      // Return a simplified error card that shows client name and error indicator
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.alertCircle,
+              color: Colors.red.shade700,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    client.fullName.isNotEmpty ? client.fullName : 'Unknown Client',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Error displaying client information',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade700,
+                    ),
+                  ),
+                  if (client.id != null)
+                    Text(
+                      'ID: ${client.id}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: Colors.grey.shade400,
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   String _getTouchpointSummary(Touchpoint touchpoint) {
@@ -1378,6 +1498,126 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     } else {
       ref.invalidate(onlineClientsProvider);
     }
+  }
+
+  // Action button helper
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isPrimary,
+    VoidCallback? onTap,
+  }) {
+    final isDisabled = onTap == null;
+    final fontSize = isDisabled && label.length > 20 ? 10.0 : 12.0;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: isDisabled && label.length > 20 ? 8 : 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDisabled
+              ? Colors.grey.shade300
+              : isPrimary
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDisabled ? Colors.grey.shade400 : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (!isDisabled || label.length <= 20)
+              Icon(
+                icon,
+                size: 14,
+                color: isDisabled
+                    ? Colors.grey.shade500
+                    : isPrimary
+                        ? Colors.white
+                        : const Color(0xFF0F172A),
+              ),
+            if (!isDisabled || label.length <= 20)
+              const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w500,
+                color: isDisabled
+                    ? Colors.grey.shade500
+                    : isPrimary
+                        ? Colors.white
+                        : const Color(0xFF0F172A),
+              ),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Unified handler for adding client to itinerary
+  // If useDatePicker is true, shows date picker first
+  // Otherwise, adds directly to today's itinerary
+  Future<void> _addClientToItinerary(Client client, {bool useDatePicker = false}) async {
+    DateTime? scheduledDate;
+
+    // Show date picker if requested
+    if (useDatePicker) {
+      final DateTime now = DateTime.now();
+      scheduledDate = await showDatePicker(
+        context: context,
+        initialDate: now,
+        firstDate: now,
+        lastDate: now.add(const Duration(days: 30)),
+      );
+
+      if (scheduledDate == null) return; // User canceled
+    }
+
+    try {
+      HapticUtils.lightImpact();
+      final myDayApiService = ref.read(myDayApiServiceProvider);
+
+      final success = await myDayApiService.addToMyDay(
+        client.id!,
+        scheduledDate: scheduledDate,
+      );
+
+      if (mounted) {
+        if (success) {
+          if (scheduledDate == null) {
+            showToast('Added to today\'s itinerary');
+          } else {
+            showToast('Added to itinerary for ${DateFormat('MMM dd').format(scheduledDate)}');
+          }
+          // Refresh today's itinerary
+          ref.invalidate(todayItineraryProvider);
+        } else {
+          showToast('Failed to add client');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showToast('Failed to add client: $e');
+      }
+    }
+  }
+
+  // Add client to today's itinerary (wrapper for unified handler)
+  Future<void> _addClientToToday(Client client) async {
+    await _addClientToItinerary(client, useDatePicker: false);
+  }
+
+  // Show date picker for adding client with custom date (wrapper for unified handler)
+  Future<void> _showDatePickerForClient(Client client) async {
+    await _addClientToItinerary(client, useDatePicker: true);
   }
 }
 

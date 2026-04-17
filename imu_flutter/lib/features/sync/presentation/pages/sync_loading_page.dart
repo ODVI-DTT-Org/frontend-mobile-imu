@@ -435,7 +435,19 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
       data: (db) {
         final syncState = ref.watch(enhancedSyncLoadingProvider(db));
 
-        // Auto-navigate when sync completes
+        // FIX: Handle case where sync is already complete on page load (e.g., after logout/login)
+        // The ref.listen only fires on state changes, not when state equals a value
+        if (syncState.syncComplete && !isNavigating && mounted) {
+          // Use WidgetsBinding to prevent navigation during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !ref.read(_isNavigatingProvider)) {
+              ref.read(_isNavigatingProvider.notifier).state = true;
+              context.go('/home');
+            }
+          });
+        }
+
+        // Auto-navigate when sync completes (for state changes during page lifecycle)
         ref.listen<EnhancedSyncLoadingState>(enhancedSyncLoadingProvider(db), (prev, next) {
           if (next.syncComplete && !isNavigating && mounted) {
             ref.read(_isNavigatingProvider.notifier).state = true;

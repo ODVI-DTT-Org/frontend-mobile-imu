@@ -1,53 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../features/clients/data/models/client_model.dart';
-import 'touchpoint_progress_badge.dart';
-import 'touchpoint_status_badge.dart';
+import '../../../core/models/user_role.dart';
+import '../../../shared/providers/app_providers.dart' show currentUserRoleProvider;
 
-/// Reusable client list tile with enhanced details display
+/// Unified client list tile with minimal information
 ///
-/// Shows:
+/// Shows only:
 /// - Client name
-/// - Touchpoint progress badge (e.g., "2/7 • Call")
-/// - Touchpoint status badge (e.g., "Follow-up - Interested")
-/// - Location/address
-/// - Touchpoint summary (e.g., "3rd Call - 2 days ago")
-/// - Touchpoint reason
-/// - "NEW" badge for first-time clients
-/// - Star indicator for starred clients
-class ClientListTile extends StatelessWidget {
+/// - Address
+/// - Touchpoint number (e.g., "2/7")
+/// - Next touchpoint type (e.g., "Call")
+/// - Touchpoint reason (e.g., "Follow-up")
+/// - Status (e.g., "Interested")
+class ClientListTile extends ConsumerWidget {
   final Client client;
   final VoidCallback? onTap;
   final Widget? trailing;
-  final bool showStar;
-  final bool showNewBadge;
-  final bool showTouchpointSummary;
-  final bool showLocation;
-  final bool showProgressBadge;
-  final bool showStatusBadge;
-  final int? touchpointCount;  // NEW: Optional pre-fetched count
+  final bool useCardStyle;
+  final List<Widget>? actions;
 
   const ClientListTile({
     super.key,
     required this.client,
     this.onTap,
     this.trailing,
-    this.showStar = true,
-    this.showNewBadge = true,
-    this.showTouchpointSummary = true,
-    this.showLocation = true,
-    this.showProgressBadge = true,
-    this.showStatusBadge = true,
-    this.touchpointCount,  // NEW
+    this.useCardStyle = false,
+    this.actions,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isFirstTime = client.touchpointSummary.isEmpty;
-    final lastTouchpoint = client.touchpointSummary.isNotEmpty
-        ? client.touchpointSummary.last
-        : null;
+  Widget build(BuildContext context, WidgetRef ref) {
     final primaryAddress = client.addresses.isNotEmpty
         ? client.addresses.firstWhere(
             (a) => a.isPrimary,
@@ -55,270 +39,401 @@ class ClientListTile extends StatelessWidget {
           )
         : null;
 
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: _buildLeading(context, isFirstTime),
-      title: _buildTitle(context, isFirstTime),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Touchpoint progress and status badges
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.start,
+    final lastTouchpoint = client.touchpointSummary.isNotEmpty
+        ? client.touchpointSummary.last
+        : null;
+
+    final nextNumber = client.nextTouchpointNumber;
+    final nextType = client.nextTouchpointType;
+    final userRole = ref.watch(currentUserRoleProvider);
+
+    // Build address text
+    String addressText = '';
+    if (primaryAddress != null) {
+      addressText = [
+        if (primaryAddress.barangay != null) primaryAddress.barangay,
+        if (primaryAddress.municipality != null && primaryAddress.municipality!.isNotEmpty)
+          primaryAddress.municipality,
+        if (primaryAddress.province != null) primaryAddress.province,
+      ].join(', ');
+    }
+
+    // Build touchpoint info
+    String touchpointInfo = '';
+    if (nextNumber != null && nextType != null) {
+      final typeLabel = nextType == TouchpointType.visit ? 'Visit' : 'Call';
+      touchpointInfo = '$nextNumber/7 • $typeLabel';
+    } else if (nextNumber == null) {
+      touchpointInfo = 'Completed';
+    }
+
+    // Build reason and status
+    String? reason;
+    String? status;
+    if (lastTouchpoint != null) {
+      reason = lastTouchpoint.reason?.apiValue;
+      status = lastTouchpoint.status?.apiValue;
+    }
+
+    // Check if user can create the next touchpoint
+    bool canRecordNext = true;
+    if (nextNumber != null && nextType != null && userRole != null) {
+      final validNumbers = _getValidTouchpointNumbers(userRole);
+      final validTypes = _getValidTouchpointTypes(userRole);
+      canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextType);
+    }
+
+    if (useCardStyle) {
+      return _buildCardStyle(
+        context,
+        client.fullName,
+        addressText,
+        touchpointInfo,
+        reason,
+        status,
+        canRecordNext,
+      );
+    }
+
+    return _buildListTileStyle(
+      context,
+      client.fullName,
+      addressText,
+      touchpointInfo,
+      reason,
+      status,
+      canRecordNext,
+    );
+  }
+
+  Widget _buildListTileStyle(
+    BuildContext context,
+    String name,
+    String addressText,
+    String touchpointInfo,
+    String? reason,
+    String? status,
+    bool canRecordNext,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (showProgressBadge)
-                TouchpointProgressBadge(
-                  client: client,
-                  touchpointCount: touchpointCount,  // NEW
+              // Name and touchpoint number
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  if (touchpointInfo.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: canRecordNext
+                            ? const Color(0xFF3B82F6).withOpacity(0.1)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: canRecordNext
+                              ? const Color(0xFF3B82F6).withOpacity(0.3)
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Text(
+                        touchpointInfo,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: canRecordNext ? const Color(0xFF3B82F6) : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  if (trailing != null) trailing!,
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Address
+              if (addressText.isNotEmpty)
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.mapPin,
+                      size: 14,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        addressText,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-              if (showStatusBadge)
-                TouchpointStatusBadge(client: client),
+              // Reason and Status
+              if (reason != null || status != null) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    if (reason != null)
+                      _buildInfoChip(
+                        icon: LucideIcons.messageCircle,
+                        label: reason!,
+                        color: const Color(0xFF64748B),
+                      ),
+                    if (status != null)
+                      _buildStatusChip(status!),
+                  ],
+                ),
+              ],
             ],
           ),
-          // Location and touchpoint details
-          if (showLocation && primaryAddress != null)
-            _buildLocation(primaryAddress),
-          if (showTouchpointSummary && lastTouchpoint != null)
-            _buildTouchpointSummary(lastTouchpoint),
-          if (showTouchpointSummary && lastTouchpoint != null)
-            _buildTouchpointReason(lastTouchpoint),
-        ],
-      ),
-      trailing: trailing ??
-          (showStar && client.isStarred
-              ? const Icon(Icons.star, color: Colors.amber, size: 20)
-              : null),
-    );
-  }
-
-  Widget _buildLeading(BuildContext context, bool isFirstTime) {
-    final initials = _getInitials();
-    final bgColor = isFirstTime
-        ? Colors.green.shade100
-        : const Color(0xFF0F172A).withOpacity(0.1);
-
-    return CircleAvatar(
-      backgroundColor: bgColor,
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: isFirstTime ? Colors.green.shade700 : const Color(0xFF0F172A),
-          fontWeight: FontWeight.w600,
-          fontSize: 16,
         ),
       ),
     );
   }
 
-  Widget _buildTitle(BuildContext context, bool isFirstTime) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            client.fullName,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+  Widget _buildCardStyle(
+    BuildContext context,
+    String name,
+    String addressText,
+    String touchpointInfo,
+    String? reason,
+    String? status,
+    bool canRecordNext,
+  ) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Name and touchpoint number
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+                if (touchpointInfo.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: canRecordNext
+                          ? const Color(0xFF3B82F6).withOpacity(0.1)
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: canRecordNext
+                            ? const Color(0xFF3B82F6).withOpacity(0.3)
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Text(
+                      touchpointInfo,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: canRecordNext ? const Color(0xFF3B82F6) : Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                if (trailing != null) trailing!,
+              ],
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
+            const SizedBox(height: 8),
+            // Address
+            if (addressText.isNotEmpty)
+              Row(
+                children: [
+                  const Icon(
+                    LucideIcons.mapPin,
+                    size: 14,
+                    color: Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      addressText,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            // Reason and Status
+            if (reason != null || status != null) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (reason != null)
+                    _buildInfoChip(
+                      icon: LucideIcons.messageCircle,
+                      label: reason!,
+                      color: const Color(0xFF64748B),
+                    ),
+                  if (status != null)
+                    _buildStatusChip(status!),
+                ],
+              ),
+            ],
+            // Action buttons (if provided)
+            if (actions != null && actions!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: actions!
+                    .map((action) => Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: action,
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ],
         ),
-        if (showNewBadge && isFirstTime) ...[
-          const SizedBox(width: 4),
-          _NewBadge(),
-        ],
-        if (showStar && client.isStarred && trailing == null) ...[
-          const SizedBox(width: 4),
-          Icon(
-            Icons.star,
-            size: 14,
-            color: Colors.amber.shade700,
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildLocation(Address address) {
-    final locationText = [
-      if (address.barangay != null) address.barangay,
-      if (address.city.isNotEmpty) address.city,
-      if (address.province != null) address.province,
-    ].join(', ');
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          const Icon(
-            LucideIcons.mapPin,
-            size: 14,
-            color: Color(0xFF0F172A),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              locationText.isNotEmpty ? locationText : 'No location',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF64748B),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildTouchpointSummary(Touchpoint touchpoint) {
-    final summary = _getTouchpointSummary(touchpoint);
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          Icon(
-            touchpoint.type == TouchpointType.visit
-                ? LucideIcons.mapPin
-                : LucideIcons.phone,
-            size: 14,
-            color: const Color(0xFF64748B),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              summary,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF64748B),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTouchpointReason(Touchpoint touchpoint) {
-    // TouchpointReason is an enum, check if null
-    if (touchpoint.reason == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Row(
-        children: [
-          const Icon(
-            LucideIcons.messageCircle,
-            size: 14,
-            color: Color(0xFF64748B),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              touchpoint.reason.apiValue, // Use apiValue for display
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF94A3B8),
-                fontStyle: FontStyle.italic,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getInitials() {
-    final firstNameInitial = client.firstName.isNotEmpty
-        ? client.firstName[0].toUpperCase()
-        : '';
-    final lastNameInitial = client.lastName.isNotEmpty
-        ? client.lastName[0].toUpperCase()
-        : '';
-    return '$firstNameInitial$lastNameInitial';
-  }
-
-  String _getTouchpointSummary(Touchpoint touchpoint) {
-    final ordinal = _getOrdinal(touchpoint.touchpointNumber);
-    final type = touchpoint.type == TouchpointType.visit ? 'Visit' : 'Call';
-    final timeAgo = _getTimeAgo(touchpoint.date);
-    return '${touchpoint.touchpointNumber}$ordinal $type - $timeAgo';
-  }
-
-  String _getOrdinal(int number) {
-    if (number >= 11 && number <= 13) {
-      return 'th';
-    }
-    switch (number % 10) {
-      case 1:
-        return 'st';
-      case 2:
-        return 'nd';
-      case 3:
-        return 'rd';
-      default:
-        return 'th';
-    }
-  }
-
-  String _getTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        final minutes = difference.inMinutes;
-        return minutes <= 1 ? 'just now' : '$minutes min ago';
-      }
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays == 1) {
-      return 'yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inDays < 30) {
-      final weeks = (difference.inDays / 7).floor();
-      return weeks == 1 ? 'last week' : '$weeks weeks ago';
-    } else if (difference.inDays < 365) {
-      final months = (difference.inDays / 30).floor();
-      return months == 1 ? 'last month' : '$months months ago';
-    } else {
-      final years = (difference.inDays / 365).floor();
-      return years == 1 ? 'last year' : '$years years ago';
-    }
-  }
-}
-
-class _NewBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.green.shade200, width: 1),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Text(
-        'NEW',
-        style: TextStyle(
-          color: Colors.green.shade700,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color color;
+    IconData icon;
+
+    switch (status.toLowerCase()) {
+      case 'interested':
+        color = const Color(0xFF22C55E);
+        icon = LucideIcons.thumbsUp;
+        break;
+      case 'undecided':
+        color = const Color(0xFFF59E0B);
+        icon = LucideIcons.helpCircle;
+        break;
+      case 'not interested':
+        color = const Color(0xFFEF4444);
+        icon = LucideIcons.thumbsDown;
+        break;
+      case 'completed':
+        color = const Color(0xFF3B82F6);
+        icon = LucideIcons.checkCircle;
+        break;
+      default:
+        color = const Color(0xFF64748B);
+        icon = LucideIcons.circle;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            status,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<int> _getValidTouchpointNumbers(UserRole role) {
+    if (role.isManager) return [1, 2, 3, 4, 5, 6, 7];
+    if (role == UserRole.caravan) return [1, 4, 7];
+    if (role == UserRole.tele) return [2, 3, 5, 6];
+    return [1, 2, 3, 4, 5, 6, 7];
+  }
+
+  List<TouchpointType> _getValidTouchpointTypes(UserRole role) {
+    if (role.isManager) return [TouchpointType.visit, TouchpointType.call];
+    if (role == UserRole.caravan) return [TouchpointType.visit];
+    if (role == UserRole.tele) return [TouchpointType.call];
+    return [TouchpointType.visit, TouchpointType.call];
   }
 }
