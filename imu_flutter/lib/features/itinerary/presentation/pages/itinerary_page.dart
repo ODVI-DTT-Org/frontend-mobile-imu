@@ -154,30 +154,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     _toggleVisitSelection(visit.id);
   }
 
-  Future<void> _onBulkSubmitVisit() async {
-    if (_selectedVisitIds.isEmpty) return;
-
-    final targetDate = _selectedCalendarDate ?? _selectedDate;
-    final state = ref.read(itineraryByDateProvider(targetDate));
-    final selectedVisits = state.valueOrNull ?? [];
-    final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
-
-    if (filteredVisits.isEmpty) {
-      showToast('No visits selected');
-      return;
-    }
-
-    HapticUtils.lightImpact();
-
-    // Process each selected visit
-    for (final visit in filteredVisits) {
-      await _recordVisit(visit);
-    }
-
-    // Exit multi-select mode after processing
-    _exitMultiSelectMode();
-  }
-
   Future<void> _onBulkRemove() async {
     if (_selectedVisitIds.isEmpty) {
       showToast('No visits selected');
@@ -832,7 +808,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: _MultiSelectHeaderButtons(
                   selectedCount: _selectedVisitIds.length,
-                  onSubmitVisit: _onBulkSubmitVisit,
                   onRemove: _onBulkRemove,
                   onCancel: _exitMultiSelectMode,
                 ),
@@ -1820,16 +1795,14 @@ class _VisitFormModalState extends State<_VisitFormModal> {
   }
 }
 
-/// Multi-select header buttons: Submit Visit, Remove, Cancel
+/// Multi-select header buttons: Remove, Cancel
 class _MultiSelectHeaderButtons extends StatelessWidget {
   final int selectedCount;
-  final VoidCallback onSubmitVisit;
   final VoidCallback onRemove;
   final VoidCallback onCancel;
 
   const _MultiSelectHeaderButtons({
     required this.selectedCount,
-    required this.onSubmitVisit,
     required this.onRemove,
     required this.onCancel,
   });
@@ -1852,15 +1825,6 @@ class _MultiSelectHeaderButtons extends StatelessWidget {
         // Action buttons
         Row(
           children: [
-            // Submit Visit button
-            Expanded(
-              child: _PillButton(
-                icon: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF0F172A)),
-                label: 'Submit Visit',
-                onTap: onSubmitVisit,
-              ),
-            ),
-            const SizedBox(width: 12),
             // Remove button
             Expanded(
               child: _PillButton(

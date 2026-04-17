@@ -132,27 +132,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     }
   }
 
-  Future<void> _onBulkSubmitVisit() async {
-    if (_selectedClientIds.isEmpty) return;
-
-    final selectedClients = ref.read(myDayStateProvider).clients.where((c) => _selectedClientIds.contains(c.id)).toList();
-
-    if (selectedClients.isEmpty) {
-      showToast('No clients selected');
-      return;
-    }
-
-    HapticUtils.lightImpact();
-
-    // Process each selected client
-    for (final client in selectedClients) {
-      await _recordVisit(client);
-    }
-
-    // Exit multi-select mode after processing
-    _exitMultiSelectMode();
-  }
-
   Future<void> _onBulkRemove() async {
     if (_selectedClientIds.isEmpty) {
       showToast('No clients selected');
@@ -901,7 +880,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                 else
                   _MultiSelectHeaderButtons(
                     selectedCount: _selectedClientIds.length,
-                    onSubmitVisit: _onBulkSubmitVisit,
                     onRemove: _onBulkRemove,
                     onCancel: _exitMultiSelectMode,
                   ),
@@ -1007,16 +985,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   }
 }
 
-/// Multi-select header buttons: Submit Visit, Remove, Cancel
+/// Multi-select header buttons: Remove, Cancel
 class _MultiSelectHeaderButtons extends StatelessWidget {
   final int selectedCount;
-  final VoidCallback onSubmitVisit;
   final VoidCallback onRemove;
   final VoidCallback onCancel;
 
   const _MultiSelectHeaderButtons({
     required this.selectedCount,
-    required this.onSubmitVisit,
     required this.onRemove,
     required this.onCancel,
   });
@@ -1039,15 +1015,6 @@ class _MultiSelectHeaderButtons extends StatelessWidget {
         // Action buttons
         Row(
           children: [
-            // Submit Visit button
-            Expanded(
-              child: _PillButton(
-                icon: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF0F172A)),
-                label: 'Submit Visit',
-                onTap: onSubmitVisit,
-              ),
-            ),
-            const SizedBox(width: 12),
             // Remove button
             Expanded(
               child: _PillButton(
