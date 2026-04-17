@@ -10,6 +10,7 @@ import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/od
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/time_picker_field.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show
     visitApiServiceProvider,
+    visitCreationServiceProvider,
     releaseApiServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
@@ -129,18 +130,19 @@ class RecordVisitOnlyBottomSheet extends HookConsumerWidget {
           photoFile = File(photoPath.value!);
         }
 
-        // Submit to API with photo file (single FormData request)
-        final visitApi = ref.read(visitApiServiceProvider);
-        final success = await visitApi.createVisit(
+        // Submit via VisitCreationService (online → API, offline → Hive queue)
+        final visitService = ref.read(visitCreationServiceProvider);
+        await visitService.createVisit(
           clientId: client.id!,
           timeIn: formatTimeOfDay(timeIn.value!),
           timeOut: formatTimeOfDay(timeOut.value!),
           odometerArrival: odometerArrival.value ?? '',
           odometerDeparture: odometerDeparture.value ?? '',
-          photoFile: photoFile, // Send photo file with visit data
+          photoFile: photoFile,
           notes: null,
           type: 'regular_visit',
-        ) != null;
+        );
+        const success = true;
 
         if (success && context.mounted) {
           AppNotification.showSuccess(context, 'Visit recorded successfully');

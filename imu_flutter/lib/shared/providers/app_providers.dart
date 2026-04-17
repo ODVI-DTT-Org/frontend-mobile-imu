@@ -29,6 +29,9 @@ export 'permission_providers.dart' show
 export './app_providers.dart' show currentUserRoleProvider;
 // Re-export touchpoint creation service provider
 export './app_providers.dart' show touchpointCreationServiceProvider, pendingTouchpointServiceProvider;
+// Re-export visit/release creation service providers
+export './app_providers.dart' show visitCreationServiceProvider, pendingVisitServiceProvider;
+export './app_providers.dart' show releaseCreationServiceProvider, pendingReleaseServiceProvider;
 // Re-export area filter providers
 export '../../services/area/area_filter_service.dart' show
   areaFilterServiceProvider;
@@ -96,6 +99,12 @@ import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/touchpoint/touchpoint_creation_service.dart';
 import '../../services/touchpoint/pending_touchpoint_service.dart';
+import '../../services/visit/visit_creation_service.dart';
+import '../../services/visit/pending_visit_service.dart';
+import '../../services/release/release_creation_service.dart';
+import '../../services/release/pending_release_service.dart';
+import '../../services/api/visit_api_service.dart' show VisitApiService, visitApiServiceProvider;
+import '../../services/api/release_api_service.dart' show releaseApiServiceProvider;
 import '../../services/area/area_filter_service.dart';
 import '../models/location_filter.dart';
 import '../models/client_attribute_filter.dart';
@@ -645,6 +654,33 @@ final touchpointCreationServiceProvider = Provider<TouchpointCreationService>((r
   final pending = ref.watch(pendingTouchpointServiceProvider);
 
   return TouchpointCreationService(connectivity, api, pending);
+});
+
+/// Pending visit service provider
+final pendingVisitServiceProvider = Provider<PendingVisitService>((ref) {
+  return PendingVisitService();
+});
+
+/// Visit creation service provider — online → API, offline → Hive queue
+final visitCreationServiceProvider = Provider<VisitCreationService>((ref) {
+  final connectivity = ref.watch(connectivityServiceProvider);
+  final api = ref.watch(visitApiServiceProvider);
+  final pending = ref.watch(pendingVisitServiceProvider);
+  return VisitCreationService(connectivity, api, pending);
+});
+
+/// Pending release service provider
+final pendingReleaseServiceProvider = Provider<PendingReleaseService>((ref) {
+  return PendingReleaseService();
+});
+
+/// Release creation service provider — online → API, offline → Hive queue
+final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
+  final connectivity = ref.watch(connectivityServiceProvider);
+  final releaseApi = ref.watch(releaseApiServiceProvider);
+  final visitApi = ref.watch(visitApiServiceProvider);
+  final pending = ref.watch(pendingReleaseServiceProvider);
+  return ReleaseCreationService(connectivity, releaseApi, visitApi, pending);
 });
 
 // ==================== Sync Providers ====================

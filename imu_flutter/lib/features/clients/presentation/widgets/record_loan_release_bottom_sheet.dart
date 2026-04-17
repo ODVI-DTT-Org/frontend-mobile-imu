@@ -9,7 +9,8 @@ import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/au
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/odometer_field.dart';
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/time_picker_field.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show
-    releaseApiServiceProvider;
+    releaseApiServiceProvider,
+    releaseCreationServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
@@ -129,10 +130,9 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
       isSubmitting.value = true;
 
       try {
-        // Submit to API using the complete loan release method
-        // The API service will handle photo upload internally with FormData
-        final releaseApi = ref.read(releaseApiServiceProvider);
-        final success = await releaseApi.createCompleteLoanRelease(
+        // Submit via ReleaseCreationService (online → API, offline → Hive queue)
+        final releaseService = ref.read(releaseCreationServiceProvider);
+        await releaseService.createCompleteLoanRelease(
           clientId: client.id!,
           timeIn: formatTimeOfDay(timeIn.value!),
           timeOut: formatTimeOfDay(timeOut.value!),
@@ -142,8 +142,9 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           loanType: loanType.value,
           udiNumber: int.tryParse(udiNumber.text.trim()),
           remarks: remarks.text.trim(),
-          photoPath: photoPath.value, // API service will handle File creation and upload
-        ) != null;
+          photoPath: photoPath.value,
+        );
+        const success = true;
 
         if (success && context.mounted) {
           AppNotification.showSuccess(context, 'Loan released successfully');

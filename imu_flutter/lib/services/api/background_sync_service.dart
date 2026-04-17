@@ -14,6 +14,12 @@ import '../../core/utils/logger.dart';
 import '../../core/config/app_config.dart';
 import '../touchpoint/pending_touchpoint_service.dart';
 import '../api/touchpoint_api_service.dart';
+import '../visit/pending_visit_service.dart';
+import '../visit/models/pending_visit.dart';
+import '../release/pending_release_service.dart';
+import '../release/models/pending_release.dart';
+import 'visit_api_service.dart' show VisitApiService;
+import 'release_api_service.dart' show ReleaseApiService;
 
 /// Background sync service for automatic data synchronization
 ///
@@ -252,6 +258,10 @@ class BackgroundSyncService extends ChangeNotifier {
       // Sync pending touchpoints created while offline
       await _syncPendingTouchpoints();
 
+      // Sync pending visits and releases created while offline
+      await _syncPendingVisits();
+      await _syncPendingReleases();
+
       _lastSyncTime = DateTime.now();
       _lastSyncError = null;
       _currentSyncRetry = 0;
@@ -489,6 +499,96 @@ class BackgroundSyncService extends ChangeNotifier {
         error: e,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  /// Sync pending visits stored while offline
+  Future<void> _syncPendingVisits() async {
+    try {
+      final pendingService = PendingVisitService();
+      final pendingVisits = await pendingService.getPendingVisits();
+
+      if (pendingVisits.isEmpty) return;
+
+      logDebug('BackgroundSyncService: Syncing ${pendingVisits.length} pending visits');
+      final visitApi = VisitApiService();
+      int syncedCount = 0;
+
+      for (final pending in pendingVisits) {
+        try {
+          File? photoFile;
+          if (pending.photoPath != null) {
+            final f = File(pending.photoPath!);
+            if (await f.exists()) photoFile = f;
+          }
+
+          await visitApi.createVisit(
+            clientId: pending.clientId,
+            timeIn: pending.timeIn,
+            timeOut: pending.timeOut,
+            odometerArrival: pending.odometerArrival,
+            odometerDeparture: pending.odometerDeparture,
+            photoFile: photoFile,
+            notes: pending.notes,
+            type: pending.type,
+          );
+
+          await pendingService.removePendingVisit(pending.id);
+          if (pending.photoPath != null) {
+            try { await File(pending.photoPath!).delete(); } catch (_) {}
+          }
+          syncedCount++;
+        } catch (e) {
+          logError('BackgroundSyncService: Failed to sync pending visit ${pending.id}', e);
+        }
+      }
+
+      logDebug('BackgroundSyncService: Visits sync complete - $syncedCount/${pendingVisits.length} synced');
+    } catch (e, stackTrace) {
+      logError('BackgroundSyncService: Failed to sync pending visits', e, stackTrace);
+    }
+  }
+
+  /// Sync pending loan releases stored while offline
+  Future<void> _syncPendingReleases() async {
+    try {
+      final pendingService = PendingReleaseService();
+      final pendingReleases = await pendingService.getPendingReleases();
+
+      if (pendingReleases.isEmpty) return;
+
+      logDebug('BackgroundSyncService: Syncing ${pendingReleases.length} pending releases');
+      final releaseApi = ReleaseApiService();
+      int syncedCount = 0;
+
+      for (final pending in pendingReleases) {
+        try {
+          await releaseApi.createCompleteLoanRelease(
+            clientId: pending.clientId,
+            timeIn: pending.timeIn,
+            timeOut: pending.timeOut,
+            odometerArrival: pending.odometerArrival,
+            odometerDeparture: pending.odometerDeparture,
+            productType: pending.productType,
+            loanType: pending.loanType,
+            udiNumber: pending.udiNumber,
+            remarks: pending.remarks,
+            photoPath: pending.photoPath,
+          );
+
+          await pendingService.removePendingRelease(pending.id);
+          if (pending.photoPath != null) {
+            try { await File(pending.photoPath!).delete(); } catch (_) {}
+          }
+          syncedCount++;
+        } catch (e) {
+          logError('BackgroundSyncService: Failed to sync pending release ${pending.id}', e);
+        }
+      }
+
+      logDebug('BackgroundSyncService: Releases sync complete - $syncedCount/${pendingReleases.length} synced');
+    } catch (e, stackTrace) {
+      logError('BackgroundSyncService: Failed to sync pending releases', e, stackTrace);
     }
   }
 
