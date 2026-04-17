@@ -1011,8 +1011,11 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
 
-    if (userRole == null || !isValidTouchpointNumberForRole(nextNumber, userRole)) {
-      // User's role doesn't allow this touchpoint number
+    // BUG FIX: Check BOTH touchpoint number AND type
+    if (userRole == null ||
+        !isValidTouchpointNumberForRole(nextNumber, userRole) ||
+        (nextType != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
+      // User's role doesn't allow this touchpoint number or type
       if (mounted) {
         showDialog(
           context: context,
@@ -1780,22 +1783,9 @@ class _QuickActionsSection extends ConsumerWidget {
     final userRole = authState.user?.role;
     final canReleaseLoan = userRole?.apiValue == 'admin' || userRole?.apiValue == 'caravan' || userRole?.apiValue == 'tele';
 
-    // NEW: Check if user can create the next touchpoint based on their role
-    bool canRecordTouchpoint = true;
-    if (client != null && !isLoanReleased) {
-      final nextNumber = client!.nextTouchpointNumber;
-      final nextType = client!.nextTouchpointType;
-
-      // Disable if all touchpoints are complete
-      if (nextNumber == null) {
-        canRecordTouchpoint = false;
-      }
-      // Disable if user's role doesn't allow this touchpoint type
-      else if (userRole != null) {
-        final canCreate = isValidTouchpointNumberForRole(nextNumber, userRole);
-        canRecordTouchpoint = canCreate;
-      }
-    }
+    // Use backend-provided can_create_touchpoint field (single source of truth)
+    // Fallback to true for backward compatibility with cached data
+    final canRecordTouchpoint = client?.touchpointStatus?.canCreateTouchpoint ?? true;
 
     return Container(
       padding: const EdgeInsets.all(16),

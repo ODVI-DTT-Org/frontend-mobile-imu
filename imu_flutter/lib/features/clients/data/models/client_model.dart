@@ -50,6 +50,7 @@ class Client {
   final int touchpointNumber; // From touchpoint_number field
   final String? nextTouchpoint; // From next_touchpoint field
   final int? nextTouchpointNumber; // From next_touchpoint_number field (backend-calculated)
+  final ClientTouchpointStatus? touchpointStatus; // From backend touchpoint_status object
 
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -101,6 +102,7 @@ class Client {
     this.touchpointNumber = 1,
     this.nextTouchpoint,
     this.nextTouchpointNumber,
+    this.touchpointStatus,
     required this.createdAt,
     this.updatedAt,
     this.createdBy,
@@ -348,6 +350,8 @@ class Client {
     List<Touchpoint>? touchpointSummary,
     int? touchpointNumber,
     String? nextTouchpoint,
+    int? nextTouchpointNumber,
+    ClientTouchpointStatus? touchpointStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isStarred,
@@ -392,6 +396,8 @@ class Client {
       touchpointSummary: touchpointSummary ?? this.touchpointSummary,
       touchpointNumber: touchpointNumber ?? this.touchpointNumber,
       nextTouchpoint: nextTouchpoint ?? this.nextTouchpoint,
+      nextTouchpointNumber: nextTouchpointNumber ?? this.nextTouchpointNumber,
+      touchpointStatus: touchpointStatus ?? this.touchpointStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isStarred: isStarred ?? this.isStarred,
@@ -620,6 +626,9 @@ class Client {
       touchpointNumber: json['touchpoint_number'] as int? ?? 1,
       nextTouchpoint: json['next_touchpoint'] as String?,
       nextTouchpointNumber: json['nextTouchpointNumber'] ?? json['next_touchpoint_number'] as int?,
+      touchpointStatus: json['touchpoint_status'] != null
+          ? ClientTouchpointStatus.fromJson(json['touchpoint_status'] as Map<String, dynamic>)
+          : null,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : (json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now()),
@@ -685,6 +694,9 @@ class Client {
       touchpointNumber: row['touchpoint_number'] as int? ?? 1,
       nextTouchpoint: row['next_touchpoint'] as String?,
       nextTouchpointNumber: row['next_touchpoint_number'] as int?,
+      touchpointStatus: row['touchpoint_status'] != null
+          ? ClientTouchpointStatus.fromRow(row)
+          : null,
       isStarred: (row['is_starred'] as bool?) ?? false,
       loanReleased: (row['loan_released'] as bool?) ?? false,
       loanReleasedAt: row['loan_released_at'] != null
@@ -1310,6 +1322,80 @@ enum TouchpointReason {
     return TouchpointReason.values.firstWhere(
       (e) => e._apiValue == value.toUpperCase(),
       orElse: () => TouchpointReason.interested,
+    );
+  }
+}
+
+/// Client touchpoint status from backend API
+/// Represents the touchpoint_status object returned by /api/clients endpoints
+class ClientTouchpointStatus {
+  final int completedTouchpoints;
+  final int? nextTouchpointNumber;
+  final String? nextTouchpointType; // 'Visit' or 'Call'
+  final bool canCreateTouchpoint;
+  final String? expectedRole; // 'caravan' or 'tele'
+  final bool isComplete;
+  final String? lastTouchpointType;
+  final String? lastTouchpointAgentName;
+  final bool loanReleased;
+  final DateTime? loanReleasedAt;
+
+  const ClientTouchpointStatus({
+    required this.completedTouchpoints,
+    this.nextTouchpointNumber,
+    this.nextTouchpointType,
+    required this.canCreateTouchpoint,
+    this.expectedRole,
+    required this.isComplete,
+    this.lastTouchpointType,
+    this.lastTouchpointAgentName,
+    required this.loanReleased,
+    this.loanReleasedAt,
+  });
+
+  /// Create from backend API response (touchpoint_status object)
+  factory ClientTouchpointStatus.fromJson(Map<String, dynamic> json) {
+    return ClientTouchpointStatus(
+      completedTouchpoints: json['completed_touchpoints'] as int? ?? 0,
+      nextTouchpointNumber: json['next_touchpoint_number'] as int?,
+      nextTouchpointType: json['next_touchpoint_type'] as String?,
+      canCreateTouchpoint: json['can_create_touchpoint'] as bool? ?? false,
+      expectedRole: json['expected_role'] as String?,
+      isComplete: json['is_complete'] as bool? ?? false,
+      lastTouchpointType: json['last_touchpoint_type'] as String?,
+      lastTouchpointAgentName: json['last_touchpoint_agent_name'] as String?,
+      loanReleased: json['loan_released'] as bool? ?? false,
+      loanReleasedAt: json['loan_released_at'] != null
+          ? DateTime.parse(json['loan_released_at'] as String)
+          : null,
+    );
+  }
+
+  /// Create from database row (snake_case columns)
+  factory ClientTouchpointStatus.fromRow(Map<String, dynamic> row) {
+    // Handle both nested touchpoint_status object and flat fields
+    final touchpointStatus = row['touchpoint_status'] as Map<String, dynamic>?;
+
+    if (touchpointStatus != null) {
+      return ClientTouchpointStatus.fromJson(touchpointStatus);
+    }
+
+    // Fallback to flat fields if touchpoint_status not available
+    return ClientTouchpointStatus(
+      completedTouchpoints: row['completed_touchpoints'] as int? ??
+                          (row['touchpoint_number'] as int? ?? 0),
+      nextTouchpointNumber: row['next_touchpoint_number'] as int?,
+      nextTouchpointType: row['next_touchpoint_type'] as String?,
+      canCreateTouchpoint: false, // Will be computed locally if not provided
+      expectedRole: null,
+      isComplete: (row['touchpoint_number'] as int? ?? 0) >= 7 ||
+                  (row['loan_released'] as bool? ?? false),
+      lastTouchpointType: row['last_touchpoint_type'] as String?,
+      lastTouchpointAgentName: row['last_touchpoint_agent_name'] as String?,
+      loanReleased: row['loan_released'] as bool? ?? false,
+      loanReleasedAt: row['loan_released_at'] != null
+          ? DateTime.parse(row['loan_released_at'] as String)
+          : null,
     );
   }
 }
