@@ -15,6 +15,9 @@ class FilterPreferencesService {
   static const String _keyPensionType = 'filter_pension_type';
   static const String _keyProductType = 'filter_product_type';
 
+  // Touchpoint filter key
+  static const String _keyTouchpointNumbers = 'filter_touchpoint_numbers';
+
   /// Get singleton instance
   static final FilterPreferencesService _instance = FilterPreferencesService._internal();
   factory FilterPreferencesService() => _instance;
@@ -155,6 +158,8 @@ class FilterPreferencesService {
     await _prefs?.remove(_keyMarketType);
     await _prefs?.remove(_keyPensionType);
     await _prefs?.remove(_keyProductType);
+    // Touchpoint filter
+    await _prefs?.remove(_keyTouchpointNumbers);
   }
 
   /// Clear only location filters
@@ -172,6 +177,31 @@ class FilterPreferencesService {
     await _prefs?.remove(_keyMarketType);
     await _prefs?.remove(_keyPensionType);
     await _prefs?.remove(_keyProductType);
+  }
+
+  // ============================================
+  // TOUCHPOINT FILTER
+  // ============================================
+
+  /// Touchpoint Numbers Filter (1–7 = touchpoint positions, 8 = archive)
+  List<int> getTouchpointNumbers() {
+    final jsonString = _prefs?.getString(_keyTouchpointNumbers);
+    if (jsonString == null || jsonString.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = json.decode(jsonString);
+      return decoded.cast<int>();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> setTouchpointNumbers(List<int> value) async {
+    await init();
+    if (value.isEmpty) {
+      await _prefs?.remove(_keyTouchpointNumbers);
+    } else {
+      await _prefs?.setString(_keyTouchpointNumbers, json.encode(value));
+    }
   }
 
   /// Check if any filters are active
