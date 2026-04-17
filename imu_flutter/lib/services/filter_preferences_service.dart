@@ -83,62 +83,90 @@ class FilterPreferencesService {
   }
 
   // ============================================
-  // CLIENT ATTRIBUTE FILTERS
+  // CLIENT ATTRIBUTE FILTERS (multi-select lists)
   // ============================================
 
-  /// Client Type Filter
-  String? getClientType() {
-    return _prefs?.getString(_keyClientType);
+  /// Client Types Filter (multi-select)
+  Future<List<String>> getClientTypes() async {
+    await init();
+    final jsonStr = _prefs?.getString(_keyClientType);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      return (json.decode(jsonStr) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
   }
 
-  Future<void> setClientType(String? value) async {
+  Future<void> setClientTypes(List<String> values) async {
     await init();
-    if (value == null || value.isEmpty) {
+    if (values.isEmpty) {
       await _prefs?.remove(_keyClientType);
     } else {
-      await _prefs?.setString(_keyClientType, value);
+      await _prefs?.setString(_keyClientType, json.encode(values));
     }
   }
 
-  /// Market Type Filter
-  String? getMarketType() {
-    return _prefs?.getString(_keyMarketType);
+  /// Market Types Filter (multi-select)
+  Future<List<String>> getMarketTypes() async {
+    await init();
+    final jsonStr = _prefs?.getString(_keyMarketType);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      return (json.decode(jsonStr) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
   }
 
-  Future<void> setMarketType(String? value) async {
+  Future<void> setMarketTypes(List<String> values) async {
     await init();
-    if (value == null || value.isEmpty) {
+    if (values.isEmpty) {
       await _prefs?.remove(_keyMarketType);
     } else {
-      await _prefs?.setString(_keyMarketType, value);
+      await _prefs?.setString(_keyMarketType, json.encode(values));
     }
   }
 
-  /// Pension Type Filter
-  String? getPensionType() {
-    return _prefs?.getString(_keyPensionType);
+  /// Pension Types Filter (multi-select)
+  Future<List<String>> getPensionTypes() async {
+    await init();
+    final jsonStr = _prefs?.getString(_keyPensionType);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      return (json.decode(jsonStr) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
   }
 
-  Future<void> setPensionType(String? value) async {
+  Future<void> setPensionTypes(List<String> values) async {
     await init();
-    if (value == null || value.isEmpty) {
+    if (values.isEmpty) {
       await _prefs?.remove(_keyPensionType);
     } else {
-      await _prefs?.setString(_keyPensionType, value);
+      await _prefs?.setString(_keyPensionType, json.encode(values));
     }
   }
 
-  /// Product Type Filter
-  String? getProductType() {
-    return _prefs?.getString(_keyProductType);
+  /// Product Types Filter (multi-select)
+  Future<List<String>> getProductTypes() async {
+    await init();
+    final jsonStr = _prefs?.getString(_keyProductType);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      return (json.decode(jsonStr) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
   }
 
-  Future<void> setProductType(String? value) async {
+  Future<void> setProductTypes(List<String> values) async {
     await init();
-    if (value == null || value.isEmpty) {
+    if (values.isEmpty) {
       await _prefs?.remove(_keyProductType);
     } else {
-      await _prefs?.setString(_keyProductType, value);
+      await _prefs?.setString(_keyProductType, json.encode(values));
     }
   }
 
@@ -209,18 +237,18 @@ class FilterPreferencesService {
     final assignedOnly = await getAssignedOnly();
     final province = getProvince();
     final municipalities = getMunicipalities();
-    final clientType = getClientType();
-    final marketType = getMarketType();
-    final pensionType = getPensionType();
-    final productType = getProductType();
+    final clientTypes = await getClientTypes();
+    final marketTypes = await getMarketTypes();
+    final pensionTypes = await getPensionTypes();
+    final productTypes = await getProductTypes();
 
     return assignedOnly ||
         (province?.isNotEmpty ?? false) ||
         municipalities.isNotEmpty ||
-        (clientType?.isNotEmpty ?? false) ||
-        (marketType?.isNotEmpty ?? false) ||
-        (pensionType?.isNotEmpty ?? false) ||
-        (productType?.isNotEmpty ?? false);
+        clientTypes.isNotEmpty ||
+        marketTypes.isNotEmpty ||
+        pensionTypes.isNotEmpty ||
+        productTypes.isNotEmpty;
   }
 
   /// Get count of active filters
@@ -230,10 +258,10 @@ class FilterPreferencesService {
     if (await getAssignedOnly()) count++;
     if (getProvince()?.isNotEmpty ?? false) count++;
     if (getMunicipalities().isNotEmpty) count++;
-    if (getClientType()?.isNotEmpty ?? false) count++;
-    if (getMarketType()?.isNotEmpty ?? false) count++;
-    if (getPensionType()?.isNotEmpty ?? false) count++;
-    if (getProductType()?.isNotEmpty ?? false) count++;
+    count += (await getClientTypes()).length;
+    count += (await getMarketTypes()).length;
+    count += (await getPensionTypes()).length;
+    count += (await getProductTypes()).length;
 
     return count;
   }
@@ -245,10 +273,10 @@ class FilterPreferencesService {
       'assigned_only': await getAssignedOnly(),
       'province': getProvince(),
       'municipalities': getMunicipalities(),
-      'client_type': getClientType(),
-      'market_type': getMarketType(),
-      'pension_type': getPensionType(),
-      'product_type': getProductType(),
+      'client_types': await getClientTypes(),
+      'market_types': await getMarketTypes(),
+      'pension_types': await getPensionTypes(),
+      'product_types': await getProductTypes(),
     };
   }
 }
