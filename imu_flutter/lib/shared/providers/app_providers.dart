@@ -32,6 +32,8 @@ export './app_providers.dart' show touchpointCreationServiceProvider, pendingTou
 // Re-export visit/release creation service providers
 export './app_providers.dart' show visitCreationServiceProvider, pendingVisitServiceProvider;
 export './app_providers.dart' show releaseCreationServiceProvider, pendingReleaseServiceProvider;
+// Re-export client mutation service providers
+export './app_providers.dart' show clientMutationServiceProvider, pendingClientServiceProvider;
 // Re-export area filter providers
 export '../../services/area/area_filter_service.dart' show
   areaFilterServiceProvider;
@@ -103,6 +105,8 @@ import '../../services/visit/visit_creation_service.dart';
 import '../../services/visit/pending_visit_service.dart';
 import '../../services/release/release_creation_service.dart';
 import '../../services/release/pending_release_service.dart';
+import '../../services/client/pending_client_service.dart';
+import '../../services/client/client_mutation_service.dart';
 import '../../services/api/visit_api_service.dart' show VisitApiService, visitApiServiceProvider;
 import '../../services/api/release_api_service.dart' show releaseApiServiceProvider;
 import '../../services/area/area_filter_service.dart';
@@ -706,6 +710,20 @@ final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
   final visitApi = ref.watch(visitApiServiceProvider);
   final pending = ref.watch(pendingReleaseServiceProvider);
   return ReleaseCreationService(connectivity, releaseApi, visitApi, pending);
+});
+
+/// Pending client service provider
+final pendingClientServiceProvider = Provider<PendingClientService>((ref) {
+  return PendingClientService();
+});
+
+/// Client mutation service provider — online → API, offline → Hive queue
+final clientMutationServiceProvider = Provider<ClientMutationService>((ref) {
+  final connectivity = ref.watch(connectivityServiceProvider);
+  final api = ref.watch(clientApiServiceProvider);
+  final pending = ref.watch(pendingClientServiceProvider);
+  final hive = ref.watch(hiveServiceProvider);
+  return ClientMutationService(connectivity, api, pending, hive);
 });
 
 // ==================== Sync Providers ====================
