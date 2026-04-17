@@ -18,6 +18,11 @@ import '../visit/pending_visit_service.dart';
 import '../visit/models/pending_visit.dart';
 import '../release/pending_release_service.dart';
 import '../release/models/pending_release.dart';
+import '../client/pending_client_service.dart';
+import '../client/client_mutation_service.dart';
+import '../client/models/pending_client_operation.dart';
+import 'client_api_service.dart' show ClientApiService;
+import '../../features/clients/data/models/client_model.dart' show Client;
 import 'visit_api_service.dart' show VisitApiService;
 import 'release_api_service.dart' show ReleaseApiService;
 
@@ -262,6 +267,9 @@ class BackgroundSyncService extends ChangeNotifier {
       await _syncPendingVisits();
       await _syncPendingReleases();
 
+      // Sync pending client mutations created while offline
+      await _syncPendingClients();
+
       _lastSyncTime = DateTime.now();
       _lastSyncError = null;
       _currentSyncRetry = 0;
@@ -372,7 +380,8 @@ class BackgroundSyncService extends ChangeNotifier {
       final hiveTouchpoints = await PendingTouchpointService().getPendingCount();
       final hiveVisits = await PendingVisitService().getPendingCount();
       final hiveReleases = await PendingReleaseService().getPendingCount();
-      _pendingCount = powerSyncPending + hiveTouchpoints + hiveVisits + hiveReleases;
+      final hiveClients = await PendingClientService().getPendingCount();
+      _pendingCount = powerSyncPending + hiveTouchpoints + hiveVisits + hiveReleases + hiveClients;
       if (_pendingCount > 0) {
         logDebug('BackgroundSyncService: $_pendingCount pending uploads');
       }
@@ -593,6 +602,52 @@ class BackgroundSyncService extends ChangeNotifier {
       logDebug('BackgroundSyncService: Releases sync complete - $syncedCount/${pendingReleases.length} synced');
     } catch (e, stackTrace) {
       logError('BackgroundSyncService: Failed to sync pending releases', e, stackTrace);
+    }
+  }
+
+  /// Sync pending client mutations (create/update/delete) stored while offline
+  Future<void> _syncPendingClients() async {
+    try {
+      final pendingService = PendingClientService();
+      final allOps = await pendingService.getAll();
+
+      if (allOps.isEmpty) return;
+
+      final collapsed = pendingService.collapse(allOps);
+      logDebug('BackgroundSyncService: Syncing ${collapsed.length} collapsed client ops (${allOps.length} raw)');
+
+      final clientApi = ClientApiService();
+      final hiveService = HiveService();
+      if (!hiveService.isInitialized) await hiveService.init();
+
+      for (final op in collapsed) {
+        try {
+          switch (op.operation) {
+            case ClientOperationType.create:
+              final client = Client.fromJson(op.clientData!);
+              final result = await clientApi.createClient(client);
+              if (result?.id != null) {
+                await hiveService.deleteClient(op.clientId);
+                await hiveService.saveClient(result!.id!, result.toJson());
+              }
+            case ClientOperationType.update:
+              final client = Client.fromJson(op.clientData!);
+              final result = await clientApi.updateClient(client);
+              if (result != null) {
+                await hiveService.saveClient(result.id!, result.toJson());
+              }
+            case ClientOperationType.delete:
+              await clientApi.deleteClient(op.clientId);
+          }
+          await pendingService.removeAllForClient(op.clientId);
+        } catch (e) {
+          logError('BackgroundSyncService: Failed to sync client op ${op.id}', e);
+        }
+      }
+
+      logDebug('BackgroundSyncService: Clients sync complete');
+    } catch (e, stackTrace) {
+      logError('BackgroundSyncService: Failed to sync pending clients', e, stackTrace);
     }
   }
 
