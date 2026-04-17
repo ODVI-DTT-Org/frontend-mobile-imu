@@ -12,6 +12,7 @@ import '../../features/clients/data/models/address_model.dart' show Address;
 import '../../models/client_status.dart';
 import '../../services/api/my_day_api_service.dart';
 import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
+import '../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/sync/powersync_service.dart';
@@ -25,6 +26,7 @@ import '../../shared/providers/app_providers.dart' show
     onlineClientPageProvider,
     isOnlineProvider,
     currentUserRoleProvider,
+    currentUserIdProvider,
     assignedMunicipalitiesProvider,
     clientTouchpointCountsProvider,
     myDayApiServiceProvider,
@@ -393,21 +395,19 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     });
 
     try {
-      final myDayApiService = ref.read(myDayApiServiceProvider);
-      // Default to today if no date is provided (ensure we always send a date to backend)
+      // Default to today if no date is provided
       final targetDate = customDate ?? widget.selectedDate ?? DateTime.now();
 
-      debugPrint('ClientSelectorModal: _addClientToItinerary');
-      debugPrint('ClientSelectorModal: widget.selectedDate = $widget.selectedDate');
-      debugPrint('ClientSelectorModal: customDate = $customDate');
-      debugPrint('ClientSelectorModal: targetDate = $targetDate');
-
-      // Use my-day API for adding to itinerary (supports both today and custom dates)
-      await myDayApiService.addToMyDay(
-        client.id!,
+      final repo = ref.read(itineraryRepositoryProvider);
+      final userId = ref.read(currentUserIdProvider);
+      await repo.createItinerary(Itinerary(
+        id: '',
+        caravanId: userId,
+        clientId: client.id!,
         scheduledDate: targetDate,
-        priority: 5,
-      );
+        status: 'pending',
+        priority: 'normal',
+      ));
 
       if (mounted) {
         HapticUtils.success();
