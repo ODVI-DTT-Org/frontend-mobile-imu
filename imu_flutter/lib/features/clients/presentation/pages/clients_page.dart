@@ -27,18 +27,13 @@ import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
 import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
 import '../../../../shared/widgets/client/client_status_badge.dart';
 import '../../../../shared/widgets/client/client_list_tile.dart';
-import '../../../../shared/widgets/location_filter_icon.dart';
-import '../../../../shared/widgets/location_filter_chips.dart';
-import '../../../../shared/widgets/location_filter_bottom_sheet.dart';
-import '../../../../shared/widgets/filters/client_attribute_filter_bottom_sheet_dropdown.dart';
-import '../../../../shared/widgets/filters/attribute_filter_chip.dart';
 import '../../../../shared/widgets/filters/touchpoint_filter_chips.dart';
-import '../../../../shared/widgets/filters/client_attribute_filter_helpers.dart';
-import '../widgets/client_filter_icon_button.dart';
+import '../../../../shared/widgets/filters/filter_drawer.dart';
+import '../../../../shared/widgets/filters/active_filter_chips_row.dart';
+import '../../../../shared/providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
 import '../../../../models/client_status.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
-import '../../../../shared/models/client_attribute_filter.dart';
 import '../../../../services/api/itinerary_api_service.dart';
 
 class ClientsPage extends ConsumerStatefulWidget {
@@ -165,61 +160,14 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     }
   }
 
-  void _showLocationFilterBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => LocationFilterBottomSheet(
-        onApply: (filter) {
-          ref.read(locationFilterProvider.notifier).updateFilter(filter);
-          // Invalidate the appropriate provider based on mode
-          if (_showAssignedClientsOnly) {
-            ref.invalidate(assignedClientsProvider);
-          } else {
-            ref.invalidate(onlineClientsProvider);
-          }
-        },
-        showAllPsgcAreas: !_showAssignedClientsOnly, // All Clients mode = show all PSGC areas
-      ),
-    );
-  }
-
-  void _showAttributeFilterBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ClientAttributeFilterDropdownBottomSheet(
-        onApply: (filter) {
-          final notifier = ref.read(clientAttributeFilterProvider.notifier);
-          notifier.updateFilter(filter);
-          // Invalidate the appropriate provider based on mode
-          if (_showAssignedClientsOnly) {
-            ref.invalidate(assignedClientsProvider);
-          } else {
-            ref.invalidate(onlineClientsProvider);
-          }
-        },
-        onClearAll: () {
-          final notifier = ref.read(clientAttributeFilterProvider.notifier);
-          notifier.clear();
-          // Invalidate the appropriate provider based on mode
-          if (_showAssignedClientsOnly) {
-            ref.invalidate(assignedClientsProvider);
-          } else {
-            ref.invalidate(onlineClientsProvider);
-          }
-        },
-      ),
-    );
+  void _showFilterDrawer(BuildContext context) {
+    showFilterDrawer(context, showAllPsgc: !_showAssignedClientsOnly);
   }
 
   @override
   Widget build(BuildContext context) {
     final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
     final isOnline = ref.watch(isOnlineProvider);
-    final attributeFilter = ref.watch(clientAttributeFilterProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
@@ -403,12 +351,35 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                                 setState(() => _searchQuery = '');
                               },
                             ),
-                          ClientFilterIconButton(
-                            showAttributeOnly: true,
-                            onPressed: () => _showAttributeFilterBottomSheet(context),
-                          ),
-                          LocationFilterIcon(
-                            onTap: () => _showLocationFilterBottomSheet(context),
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final count = ref.watch(activeFilterCountProvider);
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.tune),
+                                    onPressed: () => _showFilterDrawer(context),
+                                  ),
+                                  if (count > 0)
+                                    Positioned(
+                                      right: 4,
+                                      top: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          '$count',
+                                          style: const TextStyle(color: Colors.white, fontSize: 9),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -426,15 +397,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 const SizedBox(height: 8),
                 const TouchpointFilterChips(),
 
-                // Active filter chips
-                const LocationFilterChips(),
-
-                // Client attribute filter chips
-                if (attributeFilter.hasFilter)
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-                    child: _buildAttributeFilterChips(attributeFilter),
-                  ),
+                // Active filter chips row
+                const ActiveFilterChipsRow(),
 
                 const SizedBox(height: 12),
 
@@ -483,7 +447,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         );
       },
       loading: () {
-        final attributeFilter = ref.watch(clientAttributeFilterProvider);
         return Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -630,12 +593,35 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               setState(() => _searchQuery = '');
                             },
                           ),
-                        ClientFilterIconButton(
-                          showAttributeOnly: true,
-                          onPressed: () => _showAttributeFilterBottomSheet(context),
-                        ),
-                        LocationFilterIcon(
-                          onTap: () => _showLocationFilterBottomSheet(context),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final count = ref.watch(activeFilterCountProvider);
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.tune),
+                                  onPressed: () => _showFilterDrawer(context),
+                                ),
+                                if (count > 0)
+                                  Positioned(
+                                    right: 4,
+                                    top: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        '$count',
+                                        style: const TextStyle(color: Colors.white, fontSize: 9),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -655,12 +641,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
               const SizedBox(height: 12),
 
-              // Active filter chips (loading state)
-              if (attributeFilter.hasFilter)
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
-                  child: _buildAttributeFilterChips(attributeFilter),
-                ),
+              const ActiveFilterChipsRow(),
 
               const SizedBox(height: 12),
 
@@ -1417,94 +1398,6 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     }
     HapticUtils.lightImpact();
     showToast('Navigating to $address...');
-  }
-
-  Widget _buildAttributeFilterChips(ClientAttributeFilter filter) {
-    final chips = <Widget>[];
-
-    // Add Client Type chip if active
-    if (filter.clientType != null) {
-      chips.add(
-        AttributeFilterChip(
-          label: formatClientType(filter.clientType),
-          icon: getClientTypeIcon(filter.clientType),
-          onRemoved: () => _removeFilter('clientType'),
-        ),
-      );
-    }
-
-    // Add Market Type chip if active
-    if (filter.marketType != null) {
-      chips.add(
-        AttributeFilterChip(
-          label: formatMarketType(filter.marketType),
-          icon: getMarketTypeIcon(filter.marketType),
-          onRemoved: () => _removeFilter('marketType'),
-        ),
-      );
-    }
-
-    // Add Pension Type chip if active
-    if (filter.pensionType != null) {
-      chips.add(
-        AttributeFilterChip(
-          label: formatPensionType(filter.pensionType),
-          icon: getPensionTypeIcon(filter.pensionType),
-          onRemoved: () => _removeFilter('pensionType'),
-        ),
-      );
-    }
-
-    // Add Product Type chip if active
-    if (filter.productType != null) {
-      chips.add(
-        AttributeFilterChip(
-          label: formatProductType(filter.productType),
-          icon: getProductTypeIcon(filter.productType),
-          onRemoved: () => _removeFilter('productType'),
-        ),
-      );
-    }
-
-    if (chips.isEmpty) return const SizedBox.shrink();
-
-    return Wrap(
-      spacing: 0,
-      runSpacing: 0,
-      children: chips,
-    );
-  }
-
-  void _removeFilter(String filterType) {
-    HapticUtils.lightImpact();
-    final currentFilter = ref.read(clientAttributeFilterProvider);
-    ClientAttributeFilter newFilter;
-
-    switch (filterType) {
-      case 'clientType':
-        newFilter = currentFilter.copyWith(clientType: null);
-        break;
-      case 'marketType':
-        newFilter = currentFilter.copyWith(marketType: null);
-        break;
-      case 'pensionType':
-        newFilter = currentFilter.copyWith(pensionType: null);
-        break;
-      case 'productType':
-        newFilter = currentFilter.copyWith(productType: null);
-        break;
-      default:
-        return;
-    }
-
-    ref.read(clientAttributeFilterProvider.notifier).updateFilter(newFilter);
-
-    // Invalidate the appropriate provider based on mode
-    if (_showAssignedClientsOnly) {
-      ref.invalidate(assignedClientsProvider);
-    } else {
-      ref.invalidate(onlineClientsProvider);
-    }
   }
 
   // Action button helper
