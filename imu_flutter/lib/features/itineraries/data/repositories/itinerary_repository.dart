@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/core/utils/logger.dart';
+import 'package:imu_flutter/services/api/itinerary_api_service.dart' show ItineraryItem;
+import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserIdProvider;
 
 /// Itinerary model for scheduled visits
 class Itinerary {
@@ -338,4 +340,32 @@ class ItineraryRepository {
 /// Provider for itinerary repository
 final itineraryRepositoryProvider = Provider<ItineraryRepository>((ref) {
   return ItineraryRepository();
+});
+
+/// Stream provider for itineraries on a specific date — queries PowerSync local SQLite
+/// Returns items for the current user, ordered by scheduled_time.
+final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateTime>((ref, date) async* {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) {
+    yield [];
+    return;
+  }
+  final dateStr =
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  try {
+    final db = await PowerSyncService.database;
+    await for (final rows in db.watch(
+      '''SELECT i.*, c.first_name, c.last_name
+         FROM itineraries i
+         LEFT JOIN clients c ON c.id = i.client_id
+         WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
+         ORDER BY i.scheduled_time ASC''',
+      parameters: [userId, dateStr],
+    )) {
+      yield rows.map(ItineraryItem.fromPowerSync).toList();
+    }
+  } catch (e) {
+    logError('itineraryByDateProvider error', e);
+    yield [];
+  }
 });

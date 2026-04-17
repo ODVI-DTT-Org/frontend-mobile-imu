@@ -11,18 +11,16 @@ import '../../../../shared/widgets/offline_banner.dart';
 import '../../../../shared/widgets/swipeable_list_tile.dart';
 import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
-import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
-import '../../../../services/api/itinerary_api_service.dart';
-import '../../../../services/api/my_day_api_service.dart';
+import '../../../../services/api/itinerary_api_service.dart' show ItineraryItem;
 import '../../../../services/api/approvals_api_service.dart';
+import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryByDateProvider, itineraryRepositoryProvider;
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
-    bulkDeleteApiServiceProvider,
     authNotifierProvider,
     hiveServiceProvider,
     touchpointApiServiceProvider,
@@ -78,7 +76,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
   Future<void> _handleRefresh() async {
     HapticUtils.pullToRefresh();
-    ref.invalidate(todayItineraryProvider);
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
@@ -160,7 +157,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _onBulkSubmitVisit() async {
     if (_selectedVisitIds.isEmpty) return;
 
-    final state = ref.watch(todayItineraryProvider);
+    final targetDate = _selectedCalendarDate ?? _selectedDate;
+    final state = ref.read(itineraryByDateProvider(targetDate));
     final selectedVisits = state.valueOrNull ?? [];
     final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
 
@@ -186,31 +184,35 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       return;
     }
 
-    final state = ref.watch(todayItineraryProvider);
-    final selectedVisits = state.valueOrNull ?? [];
-    final filteredVisits = selectedVisits.where((v) => _selectedVisitIds.contains(v.id)).toList();
-
-    if (filteredVisits.isEmpty) {
-      showToast('No visits selected');
-      return;
-    }
-
     HapticUtils.lightImpact();
 
-    // Show bulk delete bottom sheet
-    await BulkDeleteBottomSheet.show(
+    final confirmed = await showDialog<bool>(
       context: context,
-      itemIds: _selectedVisitIds.toList(),
-      itemType: 'itineraries',
-      onDelete: (ids) {
-        final bulkDeleteApi = ref.read(bulkDeleteApiServiceProvider);
-        return bulkDeleteApi.bulkDeleteItineraries(ids);
-      },
-      onComplete: () {
-        _exitMultiSelectMode();
-        ref.invalidate(todayItineraryProvider);
-      },
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Visits'),
+        content: Text('Remove ${_selectedVisitIds.length} visit${_selectedVisitIds.length == 1 ? '' : 's'} from itinerary?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed != true) return;
+
+    final repo = ref.read(itineraryRepositoryProvider);
+    for (final id in _selectedVisitIds.toList()) {
+      await repo.deleteItinerary(id);
+    }
+    _exitMultiSelectMode();
+    if (mounted) showToast('Visits removed');
   }
 
   Future<void> _onVisitTap(ItineraryItem visit) async {
@@ -380,10 +382,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       ),
     );
 
-    if (result == true && mounted) {
-      // Refresh itinerary to show updated status
-      ref.invalidate(todayItineraryProvider);
-    }
   }
 
   Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
@@ -411,9 +409,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       ),
     );
 
-    if (result == true && mounted) {
-      ref.invalidate(todayItineraryProvider);
-    }
   }
 
   Future<void> _handleReleaseLoan(ItineraryItem visit) async {
@@ -441,9 +436,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       ),
     );
 
-    if (result == true && mounted) {
-      ref.invalidate(todayItineraryProvider);
-    }
   }
 
   Future<void> _releaseLoan(ItineraryItem visit) async {
@@ -453,11 +445,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final result = await context.push<bool>('/release-loan/${visit.clientId}');
 
     // If form was submitted successfully, refresh itinerary data
-    if (result == true) {
-      ref.invalidate(todayItineraryProvider);
-      if (mounted) {
-        HapticUtils.success();
-      }
+    if (result == true && mounted) {
+      HapticUtils.success();
     }
   }
 
@@ -576,21 +565,12 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
   void _editVisit(String visitId) {
     HapticUtils.lightImpact();
-    final itineraryAsync = ref.read(todayItineraryProvider);
     final targetDate = _selectedCalendarDate ?? _selectedDate;
+    final itineraryAsync = ref.read(itineraryByDateProvider(targetDate));
 
     itineraryAsync.when(
       data: (items) {
-        final filteredItems = items.where((item) {
-          final itemDate = item.scheduledDate;
-          final dateMatches = itemDate.year == targetDate.year &&
-                 itemDate.month == targetDate.month &&
-                 itemDate.day == targetDate.day;
-          final isNotCompleted = item.status != 'completed';
-          return dateMatches && isNotCompleted;
-        }).toList();
-
-        final visit = filteredItems.firstWhere((v) => v.id == visitId, orElse: null);
+        final visit = items.where((v) => v.id == visitId && v.status != 'completed').firstOrNull;
         if (visit != null) {
           _showVisitForm(existingVisit: visit);
         }
@@ -602,43 +582,22 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
   Future<void> _deleteVisit(String visitId) async {
     try {
-      final itineraryApi = ref.read(itineraryApiServiceProvider);
+      final targetDate = _selectedCalendarDate ?? _selectedDate;
+      final currentItems = ref.read(itineraryByDateProvider(targetDate)).valueOrNull ?? [];
+      final index = currentItems.indexWhere((v) => v.id == visitId && v.status != 'completed');
+      if (index != -1) {
+        setState(() {
+          _recentlyDeletedVisit = currentItems[index];
+          _recentlyDeletedIndex = index;
+        });
+      }
 
-      // Call API to delete from database
-      await itineraryApi.deleteItinerary(visitId);
+      final repo = ref.read(itineraryRepositoryProvider);
+      await repo.deleteItinerary(visitId);
 
       if (mounted) {
-        final itineraryAsync = ref.read(todayItineraryProvider);
-        final targetDate = _selectedCalendarDate ?? _selectedDate;
-
-        itineraryAsync.when(
-          data: (items) {
-            final filteredItems = items.where((item) {
-              final itemDate = item.scheduledDate;
-              final dateMatches = itemDate.year == targetDate.year &&
-                     itemDate.month == targetDate.month &&
-                     itemDate.day == targetDate.day;
-              final isNotCompleted = item.status != 'completed';
-              return dateMatches && isNotCompleted;
-            }).toList();
-
-            final index = filteredItems.indexWhere((v) => v.id == visitId);
-            if (index != -1) {
-              setState(() {
-                _recentlyDeletedVisit = filteredItems[index];
-                _recentlyDeletedIndex = index;
-              });
-
-              HapticUtils.delete();
-              showToast('Visit deleted');
-            }
-          },
-          loading: () {},
-          error: (_, __) {},
-        );
-
-        // Invalidate provider to refresh the list
-        ref.invalidate(todayItineraryProvider);
+        HapticUtils.delete();
+        showToast('Visit deleted');
       }
     } catch (e) {
       if (mounted) {
@@ -657,7 +616,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
       HapticUtils.lightImpact();
       showToast('Visit restored');
-      ref.invalidate(todayItineraryProvider);
     }
   }
 
@@ -672,7 +630,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         ref: ref,
         onSave: (visitData) {
           HapticUtils.success();
-          ref.invalidate(todayItineraryProvider);
         },
       ),
     );
@@ -684,7 +641,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       selectedDate: _selectedDate,
       onClientAdded: () {
         HapticUtils.success();
-        ref.invalidate(todayItineraryProvider);
       },
       title: 'Add to Itinerary',
       showAssignedFilter: true,
@@ -739,8 +695,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final itineraryAsync = ref.watch(todayItineraryProvider);
     final targetDate = _selectedCalendarDate ?? _selectedDate;
+    final itineraryAsync = ref.watch(itineraryByDateProvider(targetDate));
 
     return PopScope(
       canPop: !_isMultiSelectMode,
@@ -886,28 +842,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             Expanded(
               child: itineraryAsync.when(
                 data: (items) {
-                  // Debug logging for filtering
-                  debugPrint('[ItineraryPage] Filtering items for ${_getSelectedTabLabel()}:');
-                  debugPrint('[ItineraryPage] targetDate: $targetDate (local: ${DateTime(targetDate.year, targetDate.month, targetDate.day)})');
-                  for (var item in items) {
-                    final itemDate = item.scheduledDate;
-                    final matches = itemDate.year == targetDate.year &&
-                           itemDate.month == targetDate.month &&
-                           itemDate.day == targetDate.day;
-                    debugPrint('[ItineraryPage] item: ${item.clientName} - scheduledDate: $itemDate (${itemDate.year}-${itemDate.month}-${itemDate.day}) -> matches: $matches');
-                  }
-
-                  // Filter items for the selected date and exclude completed visits
-                  final filteredItems = items.where((item) {
-                    final itemDate = item.scheduledDate;
-                    final dateMatches = itemDate.year == targetDate.year &&
-                           itemDate.month == targetDate.month &&
-                           itemDate.day == targetDate.day;
-                    final isNotCompleted = item.status != 'completed';
-                    return dateMatches && isNotCompleted;
-                  }).toList();
-
-                  debugPrint('[ItineraryPage] Filtered ${filteredItems.length} items for ${_getSelectedTabLabel()}');
+                  final filteredItems = items.where((item) => item.status != 'completed').toList();
 
                   if (filteredItems.isEmpty) {
                     return PullToRefresh(

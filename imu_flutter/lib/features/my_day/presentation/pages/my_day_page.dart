@@ -11,16 +11,13 @@ import '../../../../shared/widgets/offline_banner.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
-import '../../../../shared/widgets/bulk_delete_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../core/utils/haptic_utils.dart';
-import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
-    bulkDeleteApiServiceProvider,
     authNotifierProvider,
     hiveServiceProvider,
     touchpointApiServiceProvider,
@@ -30,6 +27,7 @@ import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../providers/my_day_provider.dart';
+import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider;
 import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
 import '../widgets/multiple_time_in_sheet.dart';
@@ -170,20 +168,36 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
     HapticUtils.lightImpact();
 
-    // Show bulk delete bottom sheet
-    await BulkDeleteBottomSheet.show(
+    final confirmed = await showDialog<bool>(
       context: context,
-      itemIds: _selectedClientIds.toList(),
-      itemType: 'clients',
-      onDelete: (ids) {
-        final bulkDeleteApi = ref.read(bulkDeleteApiServiceProvider);
-        return bulkDeleteApi.bulkRemoveFromMyDay(ids);
-      },
-      onComplete: () {
-        _exitMultiSelectMode();
-        ref.read(myDayStateProvider.notifier).refresh();
-      },
+      builder: (context) => AlertDialog(
+        title: const Text('Remove from My Day'),
+        content: Text('Remove ${_selectedClientIds.length} client${_selectedClientIds.length == 1 ? '' : 's'} from today\'s list?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed != true) return;
+
+    final repo = ref.read(itineraryRepositoryProvider);
+    final selectedClients = ref.read(myDayStateProvider).clients
+        .where((c) => _selectedClientIds.contains(c.id))
+        .toList();
+    for (final client in selectedClients) {
+      await repo.deleteItinerary(client.id);
+    }
+    _exitMultiSelectMode();
+    if (mounted) showToast('Clients removed from My Day');
   }
 
   void _onMultipleTimeIn() {
@@ -264,12 +278,11 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         ref: ref,
         message: 'Removing ${client.fullName}...',
         operation: () async {
-          final myDayApiService = ref.read(myDayApiServiceProvider);
-          await myDayApiService.removeFromMyDay(client.clientId);
+          final repo = ref.read(itineraryRepositoryProvider);
+          await repo.deleteItinerary(client.id);
           if (mounted) {
             HapticUtils.success();
             showToast('${client.fullName} removed from My Day');
-            await ref.read(myDayStateProvider.notifier).refresh();
           }
         },
       );
