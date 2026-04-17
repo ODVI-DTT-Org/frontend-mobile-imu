@@ -37,6 +37,7 @@ import '../models/location_filter.dart' show LocationFilter;
 import 'location_filter_icon.dart';
 import 'location_filter_chips.dart';
 import 'client_filter_chips.dart';
+import 'filters/touchpoint_filter_chips.dart';
 import 'location_filter_bottom_sheet.dart';
 import 'client_attribute_filter_bottom_sheet.dart';
 import '../../features/clients/presentation/widgets/client_filter_icon_button.dart';
@@ -856,6 +857,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     ),
                   ),
 
+                  const SizedBox(height: 4),
+                  const TouchpointFilterChips(),
+
                   // Active filter chips (using new widget)
                   ClientFilterChips(
                     locationFilter: ref.watch(locationFilterProvider),
@@ -1102,6 +1106,10 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 4),
+                  const TouchpointFilterChips(),
+
                   // Filter toggle
                   if (widget.showAssignedFilter)
                     Container(
