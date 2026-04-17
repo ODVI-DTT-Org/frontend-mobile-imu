@@ -14,6 +14,8 @@ class MyDayClient {
   final String? notes; // Optional notes for the visit
   final String? status; // 'pending', 'in_progress', 'completed'
   final String? scheduledTime; // Scheduled time for the visit (HH:MM format)
+  final int? nextTouchpointNumber; // Backend-calculated next touchpoint number (1-7 or null if complete)
+  final String? nextTouchpointType; // Next touchpoint type ('Visit' or 'Call')
 
   // Previous touchpoint info
   final int? previousTouchpointNumber; // Last completed touchpoint number
@@ -34,6 +36,8 @@ class MyDayClient {
     this.notes,
     this.status,
     this.scheduledTime,
+    this.nextTouchpointNumber,
+    this.nextTouchpointType,
     this.previousTouchpointNumber,
     this.previousTouchpointReason,
     this.previousTouchpointType,
@@ -76,6 +80,8 @@ class MyDayClient {
       notes: json['notes'] ?? json['note'],
       status: json['status'],
       scheduledTime: json['scheduled_time'] ?? json['scheduledTime'],
+      nextTouchpointNumber: json['nextTouchpointNumber'] ?? json['next_touchpoint_number'] as int?,
+      nextTouchpointType: json['nextTouchpointType'] ?? json['next_touchpoint_type'] as String?,
       previousTouchpointNumber: validatedPreviousNumber,
       previousTouchpointReason: json['previous_touchpoint_reason'] ?? json['previousTouchpointReason'],
       previousTouchpointType: json['previous_touchpoint_type'] ?? json['previousTouchpointType'],
@@ -98,6 +104,8 @@ class MyDayClient {
     'notes': notes,
     'status': status,
     'scheduled_time': scheduledTime,
+    'next_touchpoint_number': nextTouchpointNumber,
+    'next_touchpoint_type': nextTouchpointType,
     'previous_touchpoint_number': previousTouchpointNumber,
     'previous_touchpoint_reason': previousTouchpointReason,
     'previous_touchpoint_type': previousTouchpointType,
@@ -117,6 +125,8 @@ class MyDayClient {
     String? notes,
     String? status,
     String? scheduledTime,
+    int? nextTouchpointNumber,
+    String? nextTouchpointType,
     int? previousTouchpointNumber,
     String? previousTouchpointReason,
     String? previousTouchpointType,
@@ -135,6 +145,8 @@ class MyDayClient {
       notes: notes ?? this.notes,
       status: status ?? this.status,
       scheduledTime: scheduledTime ?? this.scheduledTime,
+      nextTouchpointNumber: nextTouchpointNumber ?? this.nextTouchpointNumber,
+      nextTouchpointType: nextTouchpointType ?? this.nextTouchpointType,
       previousTouchpointNumber: previousTouchpointNumber ?? this.previousTouchpointNumber,
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
@@ -158,6 +170,8 @@ class MyDayClient {
           other.notes == notes &&
           other.status == status &&
           other.scheduledTime == scheduledTime &&
+          other.nextTouchpointNumber == nextTouchpointNumber &&
+          other.nextTouchpointType == nextTouchpointType &&
           other.previousTouchpointNumber == previousTouchpointNumber &&
           other.previousTouchpointReason == previousTouchpointReason &&
           other.previousTouchpointType == previousTouchpointType &&
@@ -177,6 +191,8 @@ class MyDayClient {
         notes,
         status,
         scheduledTime,
+        nextTouchpointNumber,
+        nextTouchpointType,
         previousTouchpointNumber,
         previousTouchpointReason,
         previousTouchpointType,

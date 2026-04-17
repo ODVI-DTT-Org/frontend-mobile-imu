@@ -32,15 +32,16 @@ import '../../shared/providers/app_providers.dart' show
     clientAttributeFilterProvider;
 import '../models/client_attribute_filter.dart' show ClientAttributeFilter;
 import '../models/location_filter.dart' show LocationFilter;
-import 'client/touchpoint_progress_badge.dart';
-import 'client/touchpoint_status_badge.dart';
-import 'client/client_status_badge.dart';
 import 'location_filter_icon.dart';
 import 'location_filter_chips.dart';
 import 'client_filter_chips.dart';
 import 'location_filter_bottom_sheet.dart';
 import 'client_attribute_filter_bottom_sheet.dart';
 import '../../features/clients/presentation/widgets/client_filter_icon_button.dart';
+import './client/client_list_tile.dart';
+import './client/touchpoint_progress_badge.dart';
+import './client/touchpoint_status_badge.dart';
+import './client/client_status_badge.dart';
 
 /// Reusable client selector modal for adding clients to itinerary
 /// Used by both ItineraryPage and MyDayPage
@@ -1271,119 +1272,43 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final isAdding = _addingClientIds.contains(client.id);
         final status = _clientStatuses[client.id];
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Client info row with avatar
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: client.clientType == ClientType.existing
-                          ? Colors.green.shade100
-                          : Colors.blue.shade100,
-                      child: Text(
-                        '${client.firstName[0]}${client.lastName.isNotEmpty ? client.lastName[0] : ''}',
-                        style: TextStyle(
-                          color: client.clientType == ClientType.existing
-                              ? Colors.green.shade700
-                              : Colors.blue.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            client.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                          ),
-                          if (client.addresses.isNotEmpty)
-                            Text(
-                              _formatAddress(client.addresses.first),
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Touchpoint progress and status badges
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.start,
-                  children: [
-                    TouchpointProgressBadge(
-                      client: client,
-                      touchpointCount: touchpointCountsAsync.valueOrNull?[client.id],
-                    ),
-                    TouchpointStatusBadge(client: client),
-                  ],
-                ),
-                // Overall status badges (Already added, Call Touchpoint, etc.)
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.start,
-                  children: [
-                    // Client status badge (shows "Already added", "Call Touchpoint", etc.)
-                    ClientStatusBadge(
-                      client: client,
-                      status: status,
-                      currentUserRole: ref.watch(currentUserRoleProvider),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Touchpoint history preview
-                Text(
-                  'Touchpoint History',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Action buttons row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: LucideIcons.calendar,
-                        label: _getActionButtonLabel(client, status, true),
-                        isPrimary: true,
-                        isLoading: isAdding,
-                        onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
-                            ? () => _addClientToItinerary(client)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: LucideIcons.calendarClock,
-                        label: _getActionButtonLabel(client, status, false),
-                        isPrimary: false,
-                        isLoading: isAdding,
-                        onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
-                            ? () => _showDatePicker(client)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        // Build action buttons for the modal
+        final actionButtons = [
+          _buildActionButton(
+            icon: LucideIcons.calendar,
+            label: _getActionButtonLabel(client, status, true),
+            isPrimary: true,
+            isLoading: isAdding,
+            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
+                ? () => _addClientToItinerary(client)
+                : null,
           ),
+          _buildActionButton(
+            icon: LucideIcons.calendarClock,
+            label: _getActionButtonLabel(client, status, false),
+            isPrimary: false,
+            isLoading: isAdding,
+            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
+                ? () => _showDatePicker(client)
+                : null,
+          ),
+        ];
+
+        // Build trailing widget for status
+        Widget? trailingWidget;
+        if (status != null && status.inItinerary) {
+          trailingWidget = Icon(
+            LucideIcons.checkCircle,
+            size: 20,
+            color: const Color(0xFF22C55E),
+          );
+        }
+
+        return ClientListTile(
+          client: client,
+          useCardStyle: true, // Use Card style for modal
+          actions: actionButtons,
+          trailing: trailingWidget,
         );
       },
     );

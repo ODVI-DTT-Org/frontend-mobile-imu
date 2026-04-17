@@ -395,8 +395,11 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
 
-    if (userRole == null || !isValidTouchpointNumberForRole(touchpointNumber, userRole)) {
-      // User's role doesn't allow this touchpoint number
+    // BUG FIX: Check BOTH touchpoint number AND type
+    if (userRole == null ||
+        !isValidTouchpointNumberForRole(touchpointNumber, userRole) ||
+        (touchpointType != null && !isValidTouchpointTypeForRole(touchpointType, userRole))) {
+      // User's role doesn't allow this touchpoint number or type
       if (mounted) {
         showDialog(
           context: context,

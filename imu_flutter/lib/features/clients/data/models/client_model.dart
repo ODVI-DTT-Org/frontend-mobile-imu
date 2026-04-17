@@ -11,6 +11,13 @@ class Client {
   final String firstName;
   final String? middleName;
   final String lastName;
+
+  // Legacy PCNICMS fields
+  final String? extName; // Extension name (Jr., Sr., etc.)
+  final String? fullname; // Full name (legacy computed field)
+  // fullAddress removed - using getter instead
+  final String? dob; // Date of birth as text (legacy)
+
   final String? agencyName;
   final String? department;
   final String? position;
@@ -35,6 +42,21 @@ class Client {
   final String? email;
   final String? facebookLink;
   final String? agencyId;
+
+  // Legacy PCNICMS fields continued
+  final String? accountCode;
+  final String? accountNumber;
+  final String? rank;
+  final double? monthlyPensionAmount;
+  final double? monthlyPensionGross;
+  final String? atmNumber;
+  final String? applicableRepublicAct;
+  final String? unitCode;
+  final String? pcniAcctCode;
+  final String? gCompany; // G company (legacy)
+  final String? gStatus; // G status (legacy)
+  final String? status; // Client status (default: 'active')
+
   final int? psgcId; // Foreign key to PSGC table (INTEGER in database)
   final String? region; // Region from PSGC (e.g., NCR, Region I)
   final String? province; // Province from PSGC (e.g., Metro Manila, Pangasinan)
@@ -66,6 +88,10 @@ class Client {
     required this.firstName,
     this.middleName,
     required this.lastName,
+    this.extName,
+    this.fullname,
+    // fullAddress removed - using getter instead
+    this.dob,
     this.agencyName,
     this.department,
     this.position,
@@ -89,6 +115,18 @@ class Client {
     this.email,
     this.facebookLink,
     this.agencyId,
+    this.accountCode,
+    this.accountNumber,
+    this.rank,
+    this.monthlyPensionAmount,
+    this.monthlyPensionGross,
+    this.atmNumber,
+    this.applicableRepublicAct,
+    this.unitCode,
+    this.pcniAcctCode,
+    this.gCompany,
+    this.gStatus,
+    this.status,
     this.psgcId,
     this.region,
     this.province,
@@ -317,6 +355,10 @@ class Client {
     String? firstName,
     String? middleName,
     String? lastName,
+    String? extName,
+    String? fullname,
+    // fullAddress removed - using getter instead
+    String? dob,
     String? agencyName,
     String? department,
     String? position,
@@ -338,6 +380,18 @@ class Client {
     String? email,
     String? facebookLink,
     String? agencyId,
+    String? accountCode,
+    String? accountNumber,
+    String? rank,
+    double? monthlyPensionAmount,
+    double? monthlyPensionGross,
+    String? atmNumber,
+    String? applicableRepublicAct,
+    String? unitCode,
+    String? pcniAcctCode,
+    String? gCompany,
+    String? gStatus,
+    String? status,
     int? psgcId,
     String? region,
     String? province,
@@ -363,6 +417,10 @@ class Client {
       firstName: firstName ?? this.firstName,
       middleName: middleName ?? this.middleName,
       lastName: lastName ?? this.lastName,
+      extName: extName ?? this.extName,
+      fullname: fullname ?? this.fullname,
+      // fullAddress removed - using getter instead
+      dob: dob ?? this.dob,
       agencyName: agencyName ?? this.agencyName,
       department: department ?? this.department,
       position: position ?? this.position,
@@ -384,6 +442,18 @@ class Client {
       email: email ?? this.email,
       facebookLink: facebookLink ?? this.facebookLink,
       agencyId: agencyId ?? this.agencyId,
+      accountCode: accountCode ?? this.accountCode,
+      accountNumber: accountNumber ?? this.accountNumber,
+      rank: rank ?? this.rank,
+      monthlyPensionAmount: monthlyPensionAmount ?? this.monthlyPensionAmount,
+      monthlyPensionGross: monthlyPensionGross ?? this.monthlyPensionGross,
+      atmNumber: atmNumber ?? this.atmNumber,
+      applicableRepublicAct: applicableRepublicAct ?? this.applicableRepublicAct,
+      unitCode: unitCode ?? this.unitCode,
+      pcniAcctCode: pcniAcctCode ?? this.pcniAcctCode,
+      gCompany: gCompany ?? this.gCompany,
+      gStatus: gStatus ?? this.gStatus,
+      status: status ?? this.status,
       psgcId: psgcId ?? this.psgcId,
       region: region ?? this.region,
       province: province ?? this.province,
@@ -590,6 +660,12 @@ class Client {
       firstName: json['firstName'] ?? json['first_name'] ?? '',
       middleName: json['middleName'] ?? json['middle_name'],
       lastName: json['lastName'] ?? json['last_name'] ?? '',
+      // Legacy PCNICMS fields
+      extName: json['extName'] ?? json['ext_name'],
+      fullname: json['fullname'] ?? json['full_name'],
+      // fullAddress removed - using getter instead
+      dob: json['dob'],
+      // Standard fields
       agencyName: json['agencyName'] ?? json['agency_name'],
       department: json['department'],
       position: json['position'],
@@ -615,6 +691,20 @@ class Client {
       email: json['email'],
       facebookLink: json['facebookLink'] ?? json['facebook_link'],
       agencyId: json['agencyId'] ?? json['agency_id'],
+      // Legacy PCNICMS fields continued
+      accountCode: json['accountCode'] ?? json['account_code'],
+      accountNumber: json['accountNumber'] ?? json['account_number'],
+      rank: json['rank'],
+      monthlyPensionAmount: json['monthlyPensionAmount'] ?? json['monthly_pension_amount'],
+      monthlyPensionGross: json['monthlyPensionGross'] ?? json['monthly_pension_gross'],
+      atmNumber: json['atmNumber'] ?? json['atm_number'],
+      applicableRepublicAct: json['applicableRepublicAct'] ?? json['applicable_republic_act'],
+      unitCode: json['unitCode'] ?? json['unit_code'],
+      pcniAcctCode: json['pcniAcctCode'] ?? json['pcni_acct_code'],
+      gCompany: json['gCompany'] ?? json['g_company'],
+      gStatus: json['gStatus'] ?? json['g_status'],
+      status: json['status'],
+      // PSGC fields
       psgcId: json['psgcId'] ?? (json['psgc_id'] is int ? json['psgc_id'] : (json['psgc_id'] != null ? int.tryParse(json['psgc_id'].toString()) : null)),
       region: json['region'] ?? json['psgc_region'],
       province: json['province'] ?? json['psgc_province'],
@@ -661,6 +751,12 @@ class Client {
       firstName: row['first_name'] as String? ?? '',
       lastName: row['last_name'] as String? ?? '',
       middleName: row['middle_name'] as String?,
+      // Legacy PCNICMS fields
+      extName: row['ext_name'] as String?,
+      fullname: row['fullname'] as String?,
+      // fullAddress removed - using getter instead
+      dob: row['dob'] as String?,
+      // Standard fields
       birthDate: row['birth_date'] != null ? DateTime.parse(row['birth_date'] as String) : null,
       email: row['email'] as String?,
       phone: row['phone'] as String?,
@@ -684,6 +780,20 @@ class Client {
       facebookLink: row['facebook_link'] as String?,
       remarks: row['remarks'] as String?,
       agencyId: row['agency_id'] as String?,
+      // Legacy PCNICMS fields continued
+      accountCode: row['account_code'] as String?,
+      accountNumber: row['account_number'] as String?,
+      rank: row['rank'] as String?,
+      monthlyPensionAmount: row['monthly_pension_amount'] as double?,
+      monthlyPensionGross: row['monthly_pension_gross'] as double?,
+      atmNumber: row['atm_number'] as String?,
+      applicableRepublicAct: row['applicable_republic_act'] as String?,
+      unitCode: row['unit_code'] as String?,
+      pcniAcctCode: row['pcni_acct_code'] as String?,
+      gCompany: row['g_company'] as String?,
+      gStatus: row['g_status'] as String?,
+      status: row['status'] as String?,
+      // PSGC fields
       psgcId: row['psgc_id'] as int?,
       region: row['region'] as String?,
       province: row['province'] as String?,

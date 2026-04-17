@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,8 +7,6 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/client_api_service.dart';
-import '../../../../services/api/approvals_api_service.dart';
-import '../../../../services/auth/auth_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
@@ -18,16 +15,11 @@ import '../../../../shared/providers/app_providers.dart' show
     isOnlineProvider,
     touchpointApiServiceProvider,
     authNotifierProvider,
-    powerSyncDatabaseProvider,
     addressRepositoryProvider,
-    phoneNumberRepositoryProvider,
-    releaseApiServiceProvider,
-    uploadApiServiceProvider;
+    phoneNumberRepositoryProvider;
 import '../../../../shared/utils/loading_helper.dart';
-import '../../../../shared/widgets/permission_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
-import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart' hide Address, PhoneNumber;
 import '../../../clients/data/models/address_model.dart';
@@ -35,15 +27,16 @@ import '../../../clients/data/models/phone_number_model.dart';
 import '../../../clients/data/repositories/address_repository.dart' show AddressRepository;
 import '../../../clients/data/repositories/phone_number_repository.dart' show PhoneNumberRepository;
 import '../../../clients/presentation/widgets/edit_client_form_v2.dart';
-import '../../../clients/presentation/widgets/contact_info_section.dart';
 import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
-import '../../../clients/presentation/widgets/address_selection_modal.dart';
 import '../../../clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
 import '../../../clients/presentation/widgets/record_visit_only_bottom_sheet.dart';
 import '../../../clients/presentation/widgets/record_loan_release_bottom_sheet.dart';
+import '../../../clients/presentation/widgets/client_information_expansion_panel.dart';
+import '../../../clients/presentation/widgets/contact_information_expansion_panel.dart';
+import '../../../clients/presentation/widgets/touchpoint_history_expansion_panel.dart';
+import '../../../clients/presentation/widgets/cms_visit_history_expansion_panel.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
-import 'package:powersync/powersync.dart' hide Column;
 
 // Client detail provider
 final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
@@ -443,6 +436,36 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       if (mounted) {
         AppNotification.showSuccess(context, 'Client deleted');
         context.pop();
+      }
+    }
+  }
+
+  Future<void> _navigateToClient() async {
+    if (_client == null) return;
+
+    final client = _client!;
+    final address = client.addresses.isNotEmpty ? client.addresses.first : null;
+
+    if (address != null && (address.latitude != null && address.longitude != null)) {
+      // Use GPS coordinates from address
+      final url = 'https://www.google.com/maps/search/?api=1&query=${address.latitude},${address.longitude}';
+      if (!await launchUrl(Uri.parse(url))) {
+        if (mounted) {
+          AppNotification.showError(context, 'Could not open maps');
+        }
+      }
+    } else if (client.municipality != null && client.province != null) {
+      // Use municipality and province
+      final query = '${client.municipality}, ${client.province}';
+      final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}';
+      if (!await launchUrl(Uri.parse(url))) {
+        if (mounted) {
+          AppNotification.showError(context, 'Could not open maps');
+        }
+      }
+    } else {
+      if (mounted) {
+        AppNotification.showError(context, 'No location information available');
       }
     }
   }
@@ -1279,6 +1302,292 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
   }
 
+  Widget _buildHeroCard() {
+    final client = _client!;
+    final primaryAddress = client.addresses.isNotEmpty
+        ? client.addresses.first
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[200]!),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar and badges row
+          Row(
+            children: [
+              // Avatar
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Center(
+                  child: Text(
+                    client.firstName.isNotEmpty
+                        ? client.firstName[0].toUpperCase()
+                        : client.lastName[0].toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Name and badges
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      client.fullName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Badges
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        _buildBadge(client.clientType.name, _getClientTypeColor(client.clientType)),
+                        _buildBadge(client.productType.name, _getProductTypeColor(client.productType)),
+                        if (client.isStarred)
+                          const Icon(Icons.star, size: 16, color: Colors.amber),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Birthday and created date
+          Row(
+            children: [
+              Icon(LucideIcons.cake, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 6),
+              Text(
+                client.birthDate != null
+                    ? '${_formatDate(client.birthDate!)} (${client.age} years old)'
+                    : 'No birthday',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Icon(LucideIcons.calendar, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 6),
+              Text(
+                'Created: ${_formatDate(client.createdAt!)}',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Touchpoint progress badge and location
+          Row(
+            children: [
+              _buildTouchpointProgressBadge(),
+              const SizedBox(width: 12),
+              if (client.isStarred)
+                const Icon(Icons.star, size: 16, color: Colors.amber),
+              const SizedBox(width: 8),
+              if (primaryAddress != null)
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.mapPin, size: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${primaryAddress.municipality}, ${primaryAddress.province}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    final client = _client!;
+    final authState = ref.watch(authNotifierProvider);
+    final userRole = authState.user?.role;
+    final canRecordTouchpoint = client.touchpointStatus?.canCreateTouchpoint ?? true;
+
+    // Check role-based permissions for quick actions
+    final canCreateVisit = userRole?.canCreateVisitTouchpoints ?? false;
+    final canReleaseLoan = userRole?.isManager ?? false;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Visit Only button
+          Expanded(
+            child: ElevatedButton(
+              onPressed: (canCreateVisit && canRecordTouchpoint)
+                  ? () => _handleRecordVisitOnly()
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: (canCreateVisit && canRecordTouchpoint)
+                    ? Colors.blue[700]
+                    : Colors.grey[300],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('VISIT ONLY'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Touchpoint button
+          Expanded(
+            child: ElevatedButton(
+              onPressed: canRecordTouchpoint
+                  ? () => _handleRecordTouchpoint()
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: canRecordTouchpoint
+                    ? Colors.green[700]
+                    : Colors.grey[300],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('TOUCHPOINT'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Release Loan button
+          Expanded(
+            child: ElevatedButton(
+              onPressed: canReleaseLoan
+                  ? () => _handleReleaseLoanBottomSheet()
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: canReleaseLoan
+                    ? Colors.orange[700]
+                    : Colors.grey[300],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('RELEASE LOAN'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadge(String text, Color backgroundColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Color _getClientTypeColor(ClientType type) {
+    switch (type) {
+      case ClientType.potential:
+        return Colors.blue;
+      case ClientType.existing:
+        return Colors.green;
+    }
+  }
+
+  Color _getProductTypeColor(ProductType type) {
+    switch (type) {
+      case ProductType.bfpActive:
+        return Colors.red;
+      case ProductType.bfpPension:
+        return Colors.orange;
+      case ProductType.pnpPension:
+        return Colors.blue;
+      case ProductType.napolcom:
+        return Colors.purple;
+      case ProductType.bfpStp:
+        return Colors.teal;
+    }
+  }
+
+  Widget _buildTouchpointProgressBadge() {
+    final client = _client!;
+    final completedCount = client.completedTouchpoints;
+    final totalCount = 7;
+
+    // Determine next touchpoint type
+    final nextType = completedCount < totalCount
+        ? (completedCount == 0 || completedCount == 3 || completedCount == 6
+            ? 'Visit'
+            : 'Call')
+        : null;
+
+    final badgeText = nextType != null
+        ? '$completedCount/$totalCount • $nextType'
+        : '$completedCount/$totalCount';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        badgeText,
+        style: TextStyle(
+          color: Colors.blue[700],
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show skeleton loading while data is being fetched
@@ -1308,13 +1617,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       );
     }
 
-    final primaryAddress = _client!.addresses.isNotEmpty
-        ? _client!.addresses.first
-        : null;
-    final primaryPhone = _client!.phoneNumbers.isNotEmpty
-        ? _client!.phoneNumbers.first.number
-        : null;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1322,18 +1624,35 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           icon: const Icon(LucideIcons.arrowLeft),
           onPressed: () => context.pop(),
         ),
+        title: const Text('Client Details'),
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.history),
-            tooltip: 'View History',
+            icon: const Icon(LucideIcons.pencil),
+            tooltip: 'Edit Client',
             onPressed: () async {
               HapticUtils.lightImpact();
               if (mounted) {
-                await TouchpointHistoryDialog.show(
-                  context,
-                  clientId: widget.clientId,
-                  clientName: _client?.fullName ?? 'Client',
-                );
+                await _editClient();
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(LucideIcons.trash),
+            tooltip: 'Delete Client',
+            onPressed: () async {
+              HapticUtils.lightImpact();
+              if (mounted) {
+                await _handleDelete();
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(LucideIcons.mapPin),
+            tooltip: 'Navigate',
+            onPressed: () async {
+              HapticUtils.lightImpact();
+              if (mounted) {
+                await _navigateToClient();
               }
             },
           ),
@@ -1391,367 +1710,45 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Client header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey[200]!),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                _client!.fullName,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            if (_client!.loanReleased) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[50],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.green[200]!),
-                                ),
-                                child: Text(
-                                  'RELEASED',
-                                  style: TextStyle(
-                                    color: Colors.green[700],
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_client!.clientType.name.toUpperCase()} Client',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
+                  // Hero Card - Always visible basic info
+                  _buildHeroCard(),
+
+                  // Quick Actions - Visit, Touchpoint, Release Loan buttons
+                  _buildQuickActions(),
+
+                  // Expansion Panels
+                  // 1. Client Information (44 fields in 8 subsections)
+                  ClientInformationExpansionPanel(client: _client!),
+
+                  // 2. Contact Information (Phone, Email, Addresses, Social Media)
+                  ContactInformationExpansionPanel(
+                    client: _client!,
+                    onAddPhone: _addPhoneNumber,
+                    onAddAddress: _addAddress,
                   ),
-                  // Touchpoint indicator
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${_client!.completedTouchpoints}/7 Touchpoints',
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+
+                  // 3. CMS Visit History (Legacy PCNICMS visits)
+                  const CmsVisitHistoryExpansionPanel(),
+
+                  // 4. Touchpoint History (7-step sequence)
+                  TouchpointHistoryExpansionPanel(
+                    client: _client!,
+                    touchpoints: _client!.touchpoints,
                   ),
+
+                  const SizedBox(height: 100), // Bottom padding
                 ],
               ),
             ),
-
-            // View History button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    HapticUtils.lightImpact();
-                    if (mounted) {
-                      await TouchpointHistoryDialog.show(
-                        context,
-                        clientId: widget.clientId,
-                        clientName: _client?.fullName ?? 'Client',
-                      );
-                    }
-                  },
-                  icon: const Icon(LucideIcons.history, size: 18),
-                  label: const Text('View Touchpoint History'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Quick Actions Section (always visible at top)
-            _QuickActionsSection(
-              primaryAddress: primaryAddress,
-              isLoanReleased: _client!.loanReleased,
-              onNavigate: () => _navigateToAddress(primaryAddress?.fullAddress),
-              onRecordTouchpoint: _handleRecordTouchpoint,
-              onRecordVisitOnly: _handleRecordVisitOnly,
-              onReleaseLoan: _handleReleaseLoanBottomSheet,
-              onEdit: _editClient,
-              client: _client, // NEW: Pass client for permission checks
-            ),
-
-            // Expandable Sections
-            // Personal Information
-            _ExpandableSection(
-              title: 'Personal Information',
-              icon: LucideIcons.user,
-              itemCount: _getPersonalInfoCount(),
-              child: Column(
-                children: [
-                  if (_client!.birthDate != null)
-                    _InfoRow(
-                      icon: LucideIcons.cake,
-                      label: 'Birthday',
-                      value: _formatDate(_client!.birthDate!),
-                    ),
-                  if (_client!.age > 0)
-                    _InfoRow(
-                      icon: LucideIcons.user,
-                      label: 'Age',
-                      value: '${_client!.age} years old',
-                    ),
-                  if (_client!.agencyName != null)
-                    _InfoRow(
-                      icon: LucideIcons.building,
-                      label: 'Agency',
-                      value: _client!.agencyName!,
-                    ),
-                  if (_client!.department != null)
-                    _InfoRow(
-                      icon: LucideIcons.briefcase,
-                      label: 'Department',
-                      value: _client!.department!,
-                    ),
-                  if (_client!.position != null)
-                    _InfoRow(
-                      icon: LucideIcons.award,
-                      label: 'Position',
-                      value: _client!.position!,
-                    ),
-                ],
-              ),
-            ),
-
-            // Contact Information (Addresses & Phone Numbers)
-            _ExpandableSection(
-              title: 'Contact Information',
-              icon: LucideIcons.phone,
-              itemCount: _client!.addresses.length + _client!.phoneNumbers.length,
-              child: ContactInfoSection(
-                client: _client!,
-                onViewAddresses: _viewAddresses,
-                onViewPhoneNumbers: _viewPhoneNumbers,
-                onAddAddress: _addAddress,
-                onAddPhoneNumber: _addPhoneNumber,
-              ),
-            ),
-
-            // Map Preview (always visible if coordinates exist)
-            if (_client!.addresses.any((a) => a.latitude != null && a.longitude != null))
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(LucideIcons.map, size: 16, color: Colors.grey[600]),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Location',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        height: 180,
-                        child: ClientMapView(
-                          clients: [_client!],
-                          showControls: false,
-                          showSearch: false,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Other Contact Information (email, Facebook)
-            if (_client!.email != null || _client!.facebookLink != null)
-              _ExpandableSection(
-                title: 'Other Contact',
-                icon: LucideIcons.share2,
-                itemCount: (_client!.email != null ? 1 : 0) + (_client!.facebookLink != null ? 1 : 0),
-                child: Column(
-                  children: [
-                    if (_client!.email != null)
-                      _InfoRow(
-                        icon: LucideIcons.mail,
-                        label: 'Email',
-                        value: _client!.email!,
-                      ),
-                    if (_client!.facebookLink != null)
-                      _InfoRow(
-                        icon: LucideIcons.facebook,
-                        label: 'Facebook',
-                        value: _client!.facebookLink!,
-                      ),
-                  ],
-                ),
-              ),
-
-            // Pension Information
-            _ExpandableSection(
-              title: 'Pension Information',
-              icon: LucideIcons.creditCard,
-              itemCount: _getPensionInfoCount(),
-              child: Column(
-                children: [
-                  _InfoRow(
-                    icon: LucideIcons.creditCard,
-                    label: 'Product Type',
-                    value: _getProductTypeLabel(_client!.productType),
-                  ),
-                  _InfoRow(
-                    icon: LucideIcons.wallet,
-                    label: 'Pension Type',
-                    value: _client!.pensionType.name.toUpperCase(),
-                  ),
-                  if (_client!.marketType != null)
-                    _InfoRow(
-                      icon: LucideIcons.building2,
-                      label: 'Market Type',
-                      value: _getMarketTypeLabel(_client!.marketType!),
-                    ),
-                  if (_client!.payrollDate != null)
-                    _InfoRow(
-                      icon: LucideIcons.calendar,
-                      label: 'Payroll Date',
-                      value: _client!.payrollDate!,
-                    ),
-                ],
-              ),
-            ),
-
-            // Visit History
-            _ExpandableSection(
-              title: 'Visit History',
-              icon: LucideIcons.history,
-              itemCount: _client!.touchpointSummary.length,
-              initiallyExpanded: _client!.touchpointSummary.isNotEmpty,
-              child: _client!.touchpointSummary.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Center(
-                        child: Text(
-                          'No touchpoints yet',
-                          style: TextStyle(color: Colors.grey[500]),
-                        ),
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        for (var i = 0; i < _client!.touchpointSummary.length; i++)
-                          _TouchpointHistoryItem(touchpoint: _client!.touchpointSummary[i]),
-                      ],
-                    ),
-            ),
-
-            // Remarks
-            if (_client!.remarks != null && _client!.remarks!.isNotEmpty)
-              _ExpandableSection(
-                title: 'Remarks',
-                icon: LucideIcons.messageSquare,
-                itemCount: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(_client!.remarks!),
-                ),
-              ),
-
-            const SizedBox(height: 100), // Bottom padding
-          ],
-        ),
+          ),
+        ],
       ),
-    ),
-    ],
-  ),
-);
+    );
   }
 
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
-  String _getProductTypeLabel(ProductType type) {
-    switch (type) {
-      case ProductType.bfpActive:
-        return 'BFP ACTIVE';
-      case ProductType.bfpPension:
-        return 'BFP PENSION';
-      case ProductType.pnpPension:
-        return 'PNP PENSION';
-      case ProductType.napolcom:
-        return 'NAPOLCOM';
-      case ProductType.bfpStp:
-        return 'BFP STP';
-    }
-  }
-
-  String _getMarketTypeLabel(MarketType type) {
-    switch (type) {
-      case MarketType.residential:
-        return 'Residential';
-      case MarketType.commercial:
-        return 'Commercial';
-      case MarketType.industrial:
-        return 'Industrial';
-    }
-  }
-
-  int _getPersonalInfoCount() {
-    int count = 0;
-    if (_client!.birthDate != null) count++;
-    if (_client!.age > 0) count++;
-    if (_client!.agencyName != null) count++;
-    if (_client!.department != null) count++;
-    if (_client!.position != null) count++;
-    return count;
-  }
-
-  int _getPensionInfoCount() {
-    int count = 2; // Product type and Pension type always present
-    if (_client!.marketType != null) count++;
-    if (_client!.payrollDate != null) count++;
-    return count;
   }
 }
 
