@@ -148,6 +148,44 @@ class ItineraryItem {
     );
   }
 
+  /// Create from PowerSync row (SELECT i.*, c.first_name, c.last_name FROM itineraries i LEFT JOIN clients c ...)
+  factory ItineraryItem.fromPowerSync(Map<String, dynamic> row) {
+    final firstName = row['first_name'] as String? ?? '';
+    final lastName = row['last_name'] as String? ?? '';
+    final clientName = '$lastName, $firstName'.trim().replaceAll(RegExp(r'^,\s*|,\s*$'), '');
+
+    final scheduledDateStr = row['scheduled_date'] as String? ?? DateTime.now().toIso8601String();
+    DateTime scheduledDate;
+    if (scheduledDateStr.contains('T')) {
+      final parsed = DateTime.parse(scheduledDateStr);
+      final local = parsed.toLocal();
+      scheduledDate = DateTime(local.year, local.month, local.day);
+    } else {
+      final parts = scheduledDateStr.split('-');
+      scheduledDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+    }
+
+    return ItineraryItem(
+      id: row['id'] as String,
+      clientId: row['client_id'] as String? ?? '',
+      clientName: clientName,
+      scheduledDate: scheduledDate,
+      scheduledTime: row['scheduled_time'] as String?,
+      status: row['status'] as String? ?? 'pending',
+      priority: row['priority'] as String? ?? 'normal',
+      notes: row['notes'] as String?,
+      address: null,
+      latitude: null,
+      longitude: null,
+      createdAt: row['created_at'] != null
+          ? DateTime.parse(row['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: row['updated_at'] != null
+          ? DateTime.parse(row['updated_at'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     // Format date as YYYY-MM-DD using local date components (not UTC)
     final dateStr = '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}';

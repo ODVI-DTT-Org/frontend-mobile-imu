@@ -5,39 +5,26 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/itinerary_api_service.dart';
-import '../../../../services/connectivity_service.dart';
+import '../../../../services/sync/powersync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
+import '../../../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../data/models/itinerary_model.dart';
 
-/// Itinerary detail provider
+/// Itinerary detail provider — reads from PowerSync local SQLite
 final itineraryDetailProvider = FutureProvider.family<ItineraryItem?, String>((ref, itineraryId) async {
-  final itineraryApi = ref.watch(itineraryApiServiceProvider);
-  final isOnline = ref.watch(isOnlineProvider);
-
-  if (isOnline) {
-    try {
-      return await itineraryApi.fetchItineraryById(itineraryId);
-    } catch (e) {
-      // Fall back to local cache
-      final hiveService = HiveService();
-      if (!hiveService.isInitialized) await hiveService.init();
-      final localItinerary = await hiveService.getItinerary(itineraryId);
-      if (localItinerary != null) {
-        return ItineraryItem.fromJson(localItinerary);
-      }
-      return null;
-    }
-  } else {
-    // Offline - use local cache
-    final hiveService = HiveService();
-    if (!hiveService.isInitialized) await hiveService.init();
-    final localItinerary = await hiveService.getItinerary(itineraryId);
-    if (localItinerary != null) {
-      return ItineraryItem.fromJson(localItinerary);
-    }
+  try {
+    final db = await PowerSyncService.database;
+    final results = await db.getAll(
+      '''SELECT i.*, c.first_name, c.last_name
+         FROM itineraries i
+         LEFT JOIN clients c ON c.id = i.client_id
+         WHERE i.id = ?''',
+      [itineraryId],
+    );
+    return results.isNotEmpty ? ItineraryItem.fromPowerSync(results.first) : null;
+  } catch (e) {
     return null;
   }
 });
@@ -55,8 +42,6 @@ class ItineraryDetailPage extends ConsumerStatefulWidget {
 }
 
 class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
-  final _hiveService = HiveService();
-
   ItineraryItem? _itinerary;
   bool _isLoading = true;
 
@@ -67,39 +52,25 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
   }
 
   Future<void> _loadItinerary() async {
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Loading visit details...',
-      operation: () async {
-        if (!_hiveService.isInitialized) {
-          await _hiveService.init();
-        }
-
-        final itineraryData = await _hiveService.getItinerary(widget.itineraryId);
-        if (itineraryData != null && mounted) {
-          setState(() {
-            _itinerary = ItineraryItem.fromJson(itineraryData);
-            _isLoading = false;
-          });
-        } else {
-          // Try API
-          final itineraryApi = ref.read(itineraryApiServiceProvider);
-          try {
-            final itinerary = await itineraryApi.fetchItineraryById(widget.itineraryId);
-            if (itinerary != null && mounted) {
-              setState(() {
-                _itinerary = itinerary;
-                _isLoading = false;
-              });
-            }
-          } catch (e) {
-            if (mounted) {
-              setState(() => _isLoading = false);
-            }
-          }
-        }
-      },
-    );
+    if (mounted) setState(() => _isLoading = true);
+    try {
+      final db = await PowerSyncService.database;
+      final results = await db.getAll(
+        '''SELECT i.*, c.first_name, c.last_name
+           FROM itineraries i
+           LEFT JOIN clients c ON c.id = i.client_id
+           WHERE i.id = ?''',
+        [widget.itineraryId],
+      );
+      if (mounted) {
+        setState(() {
+          _itinerary = results.isNotEmpty ? ItineraryItem.fromPowerSync(results.first) : null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _handleDelete() async {
@@ -131,7 +102,8 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
         ref: ref,
         message: 'Deleting visit...',
         operation: () async {
-          await _hiveService.deleteItinerary(widget.itineraryId);
+          final repo = ref.read(itineraryRepositoryProvider);
+          await repo.deleteItinerary(widget.itineraryId);
           ref.invalidate(todayItineraryProvider);
         },
         onError: (e) {
@@ -228,7 +200,16 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
                   ref: ref,
                   message: 'Updating visit...',
                   operation: () async {
-                    await _hiveService.updateItinerary(updatedItinerary.toJson());
+                    final repo = ref.read(itineraryRepositoryProvider);
+                    await repo.updateItinerary(Itinerary(
+                      id: updatedItinerary.id,
+                      clientId: updatedItinerary.clientId,
+                      scheduledDate: updatedItinerary.scheduledDate,
+                      scheduledTime: updatedItinerary.scheduledTime,
+                      status: updatedItinerary.status,
+                      priority: updatedItinerary.priority,
+                      notes: updatedItinerary.notes,
+                    ));
                     ref.invalidate(todayItineraryProvider);
                   },
                   onError: (e) {
@@ -257,15 +238,12 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
 
     HapticUtils.success();
 
-    final updatedItinerary = _itinerary!.copyWith(
-      status: 'completed',
-    );
-
     await LoadingHelper.withLoading(
       ref: ref,
       message: 'Marking visit as completed...',
       operation: () async {
-        await _hiveService.updateItinerary(updatedItinerary.toJson());
+        final repo = ref.read(itineraryRepositoryProvider);
+        await repo.updateStatus(widget.itineraryId, 'completed');
         ref.invalidate(todayItineraryProvider);
       },
       onError: (e) {
@@ -286,15 +264,12 @@ class _ItineraryDetailPageState extends ConsumerState<ItineraryDetailPage> {
 
     HapticUtils.lightImpact();
 
-    final updatedItinerary = _itinerary!.copyWith(
-      status: 'in_progress',
-    );
-
     await LoadingHelper.withLoading(
       ref: ref,
       message: 'Starting visit...',
       operation: () async {
-        await _hiveService.updateItinerary(updatedItinerary.toJson());
+        final repo = ref.read(itineraryRepositoryProvider);
+        await repo.updateStatus(widget.itineraryId, 'in_progress');
         ref.invalidate(todayItineraryProvider);
       },
       onError: (e) {
