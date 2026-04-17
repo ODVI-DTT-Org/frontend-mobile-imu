@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/my_day_client.dart';
-import '../../../../services/api/my_day_api_service.dart';
+import '../../../../services/sync/powersync_service.dart';
+import '../../../../shared/providers/app_providers.dart';
+import '../../../../core/utils/logger.dart';
 
 /// State for My Day page
 class MyDayState {
@@ -31,43 +35,83 @@ class MyDayState {
   }
 }
 
-/// Notifier for My Day state
+/// Notifier for My Day state — reads from PowerSync local SQLite
 class MyDayNotifier extends StateNotifier<MyDayState> {
-  final MyDayApiService _apiService;
+  final Ref _ref;
+  StreamSubscription<List<MyDayClient>>? _subscription;
 
-  MyDayNotifier(this._apiService) : super(MyDayState()) {
-    loadClients();
+  MyDayNotifier(this._ref) : super(MyDayState()) {
+    _subscribeToDate(DateTime.now());
   }
 
-  Future<void> loadClients() async {
-    state = state.copyWith(isLoading: true, error: null);
+  void _subscribeToDate(DateTime date) {
+    _subscription?.cancel();
+    state = state.copyWith(isLoading: true, error: null, selectedDate: date);
 
-    try {
-      final clients = await _apiService.fetchMyDayClients(state.selectedDate);
-      state = state.copyWith(clients: clients, isLoading: false);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) {
+      state = state.copyWith(isLoading: false, error: 'Not logged in');
+      return;
+    }
+
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+    _subscription = _buildStream(userId, dateStr).listen(
+      (clients) {
+        if (mounted) state = state.copyWith(clients: clients, isLoading: false);
+      },
+      onError: (e) {
+        logError('MyDayNotifier stream error', e);
+        if (mounted) state = state.copyWith(isLoading: false, error: e.toString());
+      },
+    );
+  }
+
+  Stream<List<MyDayClient>> _buildStream(String userId, String dateStr) async* {
+    final db = await PowerSyncService.database;
+    await for (final rows in db.watch(
+      '''SELECT i.id, i.client_id, i.user_id, i.scheduled_time, i.status,
+                i.priority, i.notes,
+                c.first_name, c.last_name, c.client_type,
+                c.touchpoint_summary
+         FROM itineraries i
+         JOIN clients c ON c.id = i.client_id
+         WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
+         ORDER BY i.scheduled_time ASC''',
+      parameters: [userId, dateStr],
+    )) {
+      yield rows.map(MyDayClient.fromPowerSync).toList();
     }
   }
 
   Future<void> refresh() async {
-    await loadClients();
+    _subscribeToDate(state.selectedDate);
+  }
+
+  void changeDate(DateTime date) {
+    _subscribeToDate(date);
   }
 
   Future<void> setTimeIn(String clientId, bool isTimeIn) async {
-    try {
-      await _apiService.setTimeIn(clientId);
-      await loadClients();
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
+    // Time-in is tracked locally via client list update
+    final updated = state.clients.map((c) {
+      if (c.clientId == clientId) return c.copyWith(isTimeIn: isTimeIn);
+      return c;
+    }).toList();
+    state = state.copyWith(clients: updated);
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }
 
 /// Provider for My Day state
 final myDayStateProvider = StateNotifierProvider<MyDayNotifier, MyDayState>((ref) {
-  final apiService = ref.watch(myDayApiServiceProvider);
-  return MyDayNotifier(apiService);
+  return MyDayNotifier(ref);
 });
 
 /// Provider for filtered clients (by time-in status)
