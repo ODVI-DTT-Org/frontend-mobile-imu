@@ -1,73 +1,69 @@
-// lib/shared/models/client_attribute_filter.dart
+import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
 
 class ClientAttributeFilter {
-  final ClientType? clientType;
-  final MarketType? marketType;
-  final PensionType? pensionType;
-  final ProductType? productType;
+  final List<ClientType>? clientTypes;
+  final List<MarketType>? marketTypes;
+  final List<PensionType>? pensionTypes;
+  final List<ProductType>? productTypes;
 
   const ClientAttributeFilter({
-    this.clientType,
-    this.marketType,
-    this.pensionType,
-    this.productType,
+    this.clientTypes,
+    this.marketTypes,
+    this.pensionTypes,
+    this.productTypes,
   });
 
   bool get hasFilter =>
-      clientType != null ||
-      marketType != null ||
-      pensionType != null ||
-      productType != null;
+      (clientTypes?.isNotEmpty ?? false) ||
+      (marketTypes?.isNotEmpty ?? false) ||
+      (pensionTypes?.isNotEmpty ?? false) ||
+      (productTypes?.isNotEmpty ?? false);
 
   int get activeFilterCount {
-    return [clientType, marketType, pensionType, productType]
-        .where((f) => f != null)
-        .length;
+    return (clientTypes?.length ?? 0) +
+        (marketTypes?.length ?? 0) +
+        (pensionTypes?.length ?? 0) +
+        (productTypes?.length ?? 0);
   }
 
   static ClientAttributeFilter none() => const ClientAttributeFilter();
 
-  /// AND logic - client must match ALL non-null filters
+  /// OR within category, AND across categories
   bool matches(Client client) {
-    if (clientType != null && client.clientType != clientType) {
-      return false;
+    if (clientTypes != null && clientTypes!.isNotEmpty) {
+      if (!clientTypes!.contains(client.clientType)) return false;
     }
-    if (marketType != null && client.marketType != marketType) {
-      return false;
+    if (marketTypes != null && marketTypes!.isNotEmpty) {
+      if (!marketTypes!.contains(client.marketType)) return false;
     }
-    if (pensionType != null && client.pensionType != pensionType) {
-      return false;
+    if (pensionTypes != null && pensionTypes!.isNotEmpty) {
+      if (!pensionTypes!.contains(client.pensionType)) return false;
     }
-    if (productType != null && client.productType != productType) {
-      return false;
+    if (productTypes != null && productTypes!.isNotEmpty) {
+      if (!productTypes!.contains(client.productType)) return false;
     }
     return true;
   }
 
-  /// Convert to API query parameters for All Clients mode
   Map<String, String> toQueryParams() {
     final params = <String, String>{};
-    if (clientType != null) {
-      params['client_type'] = clientType!.name.toUpperCase();
+    if (clientTypes != null && clientTypes!.isNotEmpty) {
+      params['client_type'] = clientTypes!.map((t) => t.name.toUpperCase()).join(',');
     }
-    if (marketType != null) {
-      // Convert camelCase to UPPERCASE (residential -> RESIDENTIAL)
-      params['market_type'] = marketType!.name.toUpperCase();
+    if (marketTypes != null && marketTypes!.isNotEmpty) {
+      params['market_type'] = marketTypes!.map((t) => t.name.toUpperCase()).join(',');
     }
-    if (pensionType != null) {
-      // Convert camelCase to UPPERCASE (sss -> SSS)
-      params['pension_type'] = pensionType!.name.toUpperCase();
+    if (pensionTypes != null && pensionTypes!.isNotEmpty) {
+      params['pension_type'] = pensionTypes!.map((t) => t.name.toUpperCase()).join(',');
     }
-    if (productType != null) {
-      // Convert camelCase to UPPERCASE_WITH_UNDERSCORES (pnpPension -> SSS_PENSIONER)
-      params['product_type'] = _getProductTypeApiValue(productType!);
+    if (productTypes != null && productTypes!.isNotEmpty) {
+      params['product_type'] = productTypes!.map((t) => _productTypeApiValue(t)).join(',');
     }
     return params;
   }
 
-  /// Convert ProductType enum to API value format
-  String _getProductTypeApiValue(ProductType type) {
+  String _productTypeApiValue(ProductType type) {
     switch (type) {
       case ProductType.bfpActive:
         return 'BFP ACTIVE';
@@ -83,34 +79,40 @@ class ClientAttributeFilter {
   }
 
   ClientAttributeFilter copyWith({
-    ClientType? clientType,
-    MarketType? marketType,
-    PensionType? pensionType,
-    ProductType? productType,
+    List<ClientType>? clientTypes,
+    List<MarketType>? marketTypes,
+    List<PensionType>? pensionTypes,
+    List<ProductType>? productTypes,
   }) {
     return ClientAttributeFilter(
-      clientType: clientType ?? this.clientType,
-      marketType: marketType ?? this.marketType,
-      pensionType: pensionType ?? this.pensionType,
-      productType: productType ?? this.productType,
+      clientTypes: clientTypes ?? this.clientTypes,
+      marketTypes: marketTypes ?? this.marketTypes,
+      pensionTypes: pensionTypes ?? this.pensionTypes,
+      productTypes: productTypes ?? this.productTypes,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
+    const listEq = ListEquality();
     return other is ClientAttributeFilter &&
-        other.clientType == clientType &&
-        other.marketType == marketType &&
-        other.pensionType == pensionType &&
-        other.productType == productType;
+        listEq.equals(other.clientTypes, clientTypes) &&
+        listEq.equals(other.marketTypes, marketTypes) &&
+        listEq.equals(other.pensionTypes, pensionTypes) &&
+        listEq.equals(other.productTypes, productTypes);
   }
 
   @override
-  int get hashCode =>
-      Object.hash(clientType, marketType, pensionType, productType);
+  int get hashCode => Object.hash(
+        Object.hashAll(clientTypes ?? []),
+        Object.hashAll(marketTypes ?? []),
+        Object.hashAll(pensionTypes ?? []),
+        Object.hashAll(productTypes ?? []),
+      );
 
   @override
   String toString() =>
-      'ClientAttributeFilter(clientType: $clientType, marketType: $marketType, pensionType: $pensionType, productType: $productType)';
+      'ClientAttributeFilter(clientTypes: $clientTypes, marketTypes: $marketTypes, '
+      'pensionTypes: $pensionTypes, productTypes: $productTypes)';
 }

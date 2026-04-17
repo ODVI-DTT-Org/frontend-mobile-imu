@@ -1,4 +1,3 @@
-// test/unit/models/client_attribute_filter_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:imu_flutter/shared/models/client_attribute_filter.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
@@ -7,126 +6,112 @@ void main() {
   group('ClientAttributeFilter', () {
     test('none() returns filter with no values set', () {
       final filter = ClientAttributeFilter.none();
-      expect(filter.clientType, isNull);
-      expect(filter.marketType, isNull);
-      expect(filter.pensionType, isNull);
-      expect(filter.productType, isNull);
+      expect(filter.clientTypes, isNull);
+      expect(filter.marketTypes, isNull);
+      expect(filter.pensionTypes, isNull);
+      expect(filter.productTypes, isNull);
     });
 
     test('hasFilter returns false when no filters set', () {
-      final filter = ClientAttributeFilter.none();
-      expect(filter.hasFilter, false);
+      expect(ClientAttributeFilter.none().hasFilter, false);
     });
 
-    test('hasFilter returns true when any filter is set', () {
-      final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-      );
+    test('hasFilter returns true when any filter list is non-empty', () {
+      final filter = ClientAttributeFilter(clientTypes: [ClientType.potential]);
       expect(filter.hasFilter, true);
     });
 
-    test('activeFilterCount returns correct count', () {
+    test('activeFilterCount sums total selected values across all categories', () {
       final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-        marketType: MarketType.residential,
+        clientTypes: [ClientType.potential, ClientType.existing],
+        pensionTypes: [PensionType.sss],
       );
-      expect(filter.activeFilterCount, 2);
+      expect(filter.activeFilterCount, 3);
     });
 
-    test('matches returns true when client matches all filters', () {
-      final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-        marketType: MarketType.residential,
-      );
-
-      final client = Client(
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        clientType: ClientType.potential,
-        marketType: MarketType.residential,
-        productType: ProductType.pnpPension,
-        pensionType: PensionType.sss,
-        createdAt: DateTime.now(),
-      );
-
+    test('matches returns true when no filters set', () {
+      final filter = ClientAttributeFilter.none();
+      final client = _makeClient(ClientType.potential, MarketType.residential, PensionType.sss, ProductType.pnpPension);
       expect(filter.matches(client), true);
     });
 
-    test('matches returns false when client fails any filter', () {
+    test('matches returns true when client value is in list (OR within category)', () {
       final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-        marketType: MarketType.residential,
+        clientTypes: [ClientType.potential, ClientType.existing],
       );
+      final client = _makeClient(ClientType.existing, MarketType.residential, PensionType.sss, ProductType.pnpPension);
+      expect(filter.matches(client), true);
+    });
 
-      final client = Client(
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        clientType: ClientType.existing, // Wrong!
-        marketType: MarketType.residential,
-        productType: ProductType.pnpPension,
-        pensionType: PensionType.sss,
-        createdAt: DateTime.now(),
+    test('matches returns false when client value is NOT in list', () {
+      final filter = ClientAttributeFilter(
+        pensionTypes: [PensionType.sss, PensionType.gsis],
       );
-
+      final client = _makeClient(ClientType.potential, MarketType.residential, PensionType.private, ProductType.pnpPension);
       expect(filter.matches(client), false);
     });
 
-    test('matches returns true when filter is empty', () {
-      final filter = ClientAttributeFilter.none();
-
-      final client = Client(
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        clientType: ClientType.potential,
-        productType: ProductType.pnpPension,
-        pensionType: PensionType.sss,
-        createdAt: DateTime.now(),
+    test('matches uses AND across categories', () {
+      final filter = ClientAttributeFilter(
+        clientTypes: [ClientType.potential],
+        marketTypes: [MarketType.residential],
       );
-
-      expect(filter.matches(client), true);
+      // Correct client type, wrong market type
+      final client = _makeClient(ClientType.potential, MarketType.commercial, PensionType.sss, ProductType.pnpPension);
+      expect(filter.matches(client), false);
     });
 
-    test('toQueryParams returns correct API parameters', () {
+    test('toQueryParams emits comma-separated uppercase values', () {
       final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-        marketType: MarketType.residential,
-        pensionType: PensionType.sss,
-        productType: ProductType.pnpPension,
+        clientTypes: [ClientType.potential, ClientType.existing],
+        marketTypes: [MarketType.residential],
+        pensionTypes: [PensionType.sss, PensionType.gsis],
+        productTypes: [ProductType.pnpPension, ProductType.bfpActive],
       );
-
       final params = filter.toQueryParams();
-
-      expect(params['client_type'], 'POTENTIAL');
+      expect(params['client_type'], 'POTENTIAL,EXISTING');
       expect(params['market_type'], 'RESIDENTIAL');
-      expect(params['pension_type'], 'SSS');
-      expect(params['product_type'], 'SSS_PENSIONER');
+      expect(params['pension_type'], 'SSS,GSIS');
+      expect(params['product_type'], 'PNP PENSION,BFP ACTIVE');
     });
 
-    test('toQueryParams excludes null values', () {
-      final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-      );
-
+    test('toQueryParams excludes empty lists', () {
+      final filter = ClientAttributeFilter(clientTypes: [ClientType.potential]);
       final params = filter.toQueryParams();
-
       expect(params['client_type'], 'POTENTIAL');
       expect(params.containsKey('market_type'), false);
       expect(params.containsKey('pension_type'), false);
       expect(params.containsKey('product_type'), false);
     });
 
-    test('copyWith creates new instance with updated values', () {
-      final filter = ClientAttributeFilter(
-        clientType: ClientType.potential,
-      );
+    test('toQueryParams returns empty map when no filters', () {
+      expect(ClientAttributeFilter.none().toQueryParams(), isEmpty);
+    });
 
-      final updated = filter.copyWith(clientType: ClientType.existing);
+    test('copyWith preserves unspecified fields', () {
+      final filter = ClientAttributeFilter(clientTypes: [ClientType.potential]);
+      final updated = filter.copyWith(pensionTypes: [PensionType.sss]);
+      expect(updated.clientTypes, [ClientType.potential]);
+      expect(updated.pensionTypes, [PensionType.sss]);
+    });
 
-      expect(filter.clientType, ClientType.potential); // Original unchanged
-      expect(updated.clientType, ClientType.existing);
+    test('equality: two filters with same lists are equal', () {
+      final a = ClientAttributeFilter(clientTypes: [ClientType.potential, ClientType.existing]);
+      final b = ClientAttributeFilter(clientTypes: [ClientType.potential, ClientType.existing]);
+      expect(a, equals(b));
     });
   });
+}
+
+Client _makeClient(ClientType ct, MarketType mt, PensionType pt, ProductType pdt) {
+  return Client(
+    id: '1',
+    firstName: 'Test',
+    lastName: 'User',
+    clientType: ct,
+    marketType: mt,
+    pensionType: pt,
+    productType: pdt,
+    createdAt: DateTime.now(),
+  );
 }
