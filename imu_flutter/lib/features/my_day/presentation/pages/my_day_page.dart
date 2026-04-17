@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../app.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
+import '../../../../shared/widgets/offline_banner.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
@@ -700,13 +701,20 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           },
           behavior: HitTestBehavior.opaque,
           child: SafeArea(
-            child: PullToRefresh(
-              onRefresh: _handleRefresh,
-              child: state.isLoading
-                  ? const MyDaySkeleton()
-                  : state.error != null
-                      ? _buildErrorState(state.error!)
-                      : _buildContent(state.clients),
+            child: Column(
+              children: [
+                const OfflineBanner(),
+                Expanded(
+                  child: PullToRefresh(
+                    onRefresh: _handleRefresh,
+                    child: state.isLoading
+                        ? const MyDaySkeleton()
+                        : state.error != null
+                            ? _buildErrorState(state.error!)
+                            : _buildContent(state.clients),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

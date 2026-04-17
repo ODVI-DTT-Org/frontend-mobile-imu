@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../app.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
+import '../../../../shared/widgets/offline_banner.dart';
 import '../../../../shared/widgets/swipeable_list_tile.dart';
 import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
@@ -767,6 +768,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           child: SafeArea(
             child: Column(
           children: [
+            const OfflineBanner(),
             // Header - centered title (per Figma)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),

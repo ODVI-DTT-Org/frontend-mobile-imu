@@ -368,7 +368,11 @@ class BackgroundSyncService extends ChangeNotifier {
   /// Update pending count from PowerSync
   Future<void> _updatePendingCount() async {
     try {
-      _pendingCount = await PowerSyncService.pendingUploadCount;
+      final powerSyncPending = await PowerSyncService.pendingUploadCount;
+      final hiveTouchpoints = await PendingTouchpointService().getPendingCount();
+      final hiveVisits = await PendingVisitService().getPendingCount();
+      final hiveReleases = await PendingReleaseService().getPendingCount();
+      _pendingCount = powerSyncPending + hiveTouchpoints + hiveVisits + hiveReleases;
       if (_pendingCount > 0) {
         logDebug('BackgroundSyncService: $_pendingCount pending uploads');
       }
