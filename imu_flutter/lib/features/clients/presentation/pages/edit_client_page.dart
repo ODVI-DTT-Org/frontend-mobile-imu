@@ -159,45 +159,57 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
       final psgcRepository = await ref.read(psgcRepositoryProvider.future);
 
       if (_client!.region != null && _client!.region!.isNotEmpty) {
+        if (mounted) setState(() => _isLoadingProvinces = true);
         final provinces = await psgcRepository.getProvincesByRegion(_client!.region!);
         if (mounted) {
+          PsgcProvince? matchedProvince;
+          if (_client!.province != null && provinces.isNotEmpty) {
+            try {
+              matchedProvince = provinces.firstWhere(
+                (p) => p.name == _client!.province,
+              );
+            } catch (_) {
+              matchedProvince = null;
+            }
+          }
           setState(() {
             _provinces = provinces;
-            if (_client!.province != null && provinces.isNotEmpty) {
-              try {
-                _selectedProvince = provinces.firstWhere(
-                  (p) => p.name == _client!.province,
-                  orElse: () => provinces.first,
-                );
-              } catch (_) {}
-            }
+            _selectedProvince = matchedProvince;
+            _isLoadingProvinces = false;
           });
 
           if (_client!.province != null) {
+            setState(() => _isLoadingMunicipalities = true);
             final municipalities = await psgcRepository.getMunicipalitiesByProvince(_client!.province!);
             if (mounted) {
+              PsgcMunicipality? matchedMunicipality;
+              if (_client!.municipality != null && municipalities.isNotEmpty) {
+                try {
+                  matchedMunicipality = municipalities.firstWhere(
+                    (m) => m.name == _client!.municipality || m.displayName == _client!.municipality,
+                  );
+                } catch (_) {
+                  matchedMunicipality = null;
+                }
+              }
               setState(() {
                 _municipalities = municipalities;
-                if (_client!.municipality != null && municipalities.isNotEmpty) {
-                  try {
-                    _selectedMunicipality = municipalities.firstWhere(
-                      (m) => m.name == _client!.municipality || m.displayName == _client!.municipality,
-                      orElse: () => municipalities.first,
-                    );
-                  } catch (_) {}
-                }
+                _selectedMunicipality = matchedMunicipality;
+                _isLoadingMunicipalities = false;
               });
 
               if (_client!.municipality != null) {
+                setState(() => _isLoadingBarangays = true);
                 await _loadBarangays(_client!.municipality!);
                 if (mounted && _client!.barangay != null && _barangays.isNotEmpty) {
                   try {
                     final foundBarangay = _barangays.firstWhere(
                       (b) => b.barangay == _client!.barangay,
-                      orElse: () => _barangays.first,
                     );
                     setState(() => _selectedBarangay = foundBarangay);
-                  } catch (_) {}
+                  } catch (_) {
+                    // No match — leave null rather than selecting wrong barangay
+                  }
                 }
               }
             }
@@ -206,6 +218,13 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
       }
     } catch (e) {
       debugPrint('[EditClientPage] Error loading location data in background: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingProvinces = false;
+          _isLoadingMunicipalities = false;
+          _isLoadingBarangays = false;
+        });
+      }
     }
   }
 
@@ -254,9 +273,10 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
       try {
         _selectedRegion = _regions.firstWhere(
           (r) => r.name == _client!.region || r.code == _client!.region,
-          orElse: () => _regions.first,
         );
-      } catch (_) {}
+      } catch (_) {
+        // No match — leave null rather than selecting wrong region
+      }
     }
 
     _panController.text = _client!.pan ?? '';
@@ -445,6 +465,12 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     );
 
     if (confirmed != true) return;
+
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      AppNotification.showError(context, 'Cannot delete while offline');
+      return;
+    }
 
     HapticUtils.mediumImpact();
     setState(() => _isSaving = true);
