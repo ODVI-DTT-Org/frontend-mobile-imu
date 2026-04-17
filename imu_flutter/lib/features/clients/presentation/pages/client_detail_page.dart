@@ -1443,7 +1443,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     // Check role-based permissions for quick actions
     final canCreateVisit = userRole?.canCreateVisitTouchpoints ?? false;
-    final canReleaseLoan = userRole?.isManager ?? false;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1489,16 +1488,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Release Loan button
+          // Release Loan button (available to all roles)
           Expanded(
             child: ElevatedButton(
-              onPressed: canReleaseLoan
-                  ? () => _handleReleaseLoanBottomSheet()
-                  : null,
+              onPressed: () => _handleReleaseLoanBottomSheet(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: canReleaseLoan
-                    ? Colors.orange[700]
-                    : Colors.grey[300],
+                backgroundColor: Colors.orange[700],
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(

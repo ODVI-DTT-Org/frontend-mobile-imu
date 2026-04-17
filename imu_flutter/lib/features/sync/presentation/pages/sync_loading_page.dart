@@ -91,10 +91,11 @@ const Map<String, String> _tableDisplayNames = {
   'psgc': 'PSGC (Locations)',
   'touchpoint_reasons': 'Touchpoint Reasons',
   'user_locations': 'User Locations',
-  'clients': 'Clients',
-  'touchpoints': 'Touchpoints',
   'itineraries': 'Itineraries',
   'approvals': 'Approvals',
+  // NOTE: Clients and touchpoints removed from PowerSync sync
+  // Clients are synced via REST API (/clients/assigned) and stored in Hive cache
+  // Touchpoint data is available via clients.touchpoint_summary (denormalized JSON array)
 };
 
 /// Enhanced sync loading state notifier
@@ -181,13 +182,9 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   /// Check if we have any local data in the database
   Future<bool> _checkForLocalData() async {
     try {
-      logDebug('[LOCAL-DATA-CHECK] Checking for local data in both PowerSync AND Hive storage...');
+      logDebug('[LOCAL-DATA-CHECK] Checking for local data in Hive storage...');
 
-      // Check PowerSync database for clients
-      final powerSyncResult = await _powerSyncDb.getAll('SELECT COUNT(*) as count FROM clients');
-      final powerSyncClientCount = powerSyncResult.first['count'] as int;
-      logDebug('[LOCAL-DATA-CHECK] PowerSync clients: $powerSyncClientCount');
-
+      // NOTE: PowerSync clients table removed - clients are now synced via REST API
       // Check Hive storage for clients (REST API sync)
       int hiveClientCount = 0;
       try {
@@ -199,11 +196,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         logWarning('[LOCAL-DATA-CHECK] Failed to check Hive storage: $e');
       }
 
-      final totalClientCount = powerSyncClientCount + hiveClientCount;
-      logDebug('[LOCAL-DATA-CHECK] Total local clients: $totalClientCount');
-
-      // If we have ANY local clients (from either source), consider it as having local data
-      final hasData = totalClientCount > 0;
+      final hasData = hiveClientCount > 0;
 
       logDebug('[LOCAL-DATA-CHECK] Has local data: $hasData');
 
@@ -399,12 +392,16 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 }
 
 /// Provider for enhanced sync loading state
-final enhancedSyncLoadingProvider = StateNotifierProvider.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, PowerSyncDatabase>((ref, database) {
-  return EnhancedSyncLoadingNotifier(database);
+final enhancedSyncLoadingProvider = StateNotifierProvider.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, int sessionKey})>((ref, params) {
+  return EnhancedSyncLoadingNotifier(params.database);
 });
 
 /// Provider to prevent duplicate navigation
 final _isNavigatingProvider = StateProvider<bool>((ref) => false);
+
+/// Provider to force refresh sync loading on new login sessions
+/// This key increments on each login to force the provider to reinitialize
+final _syncSessionKeyProvider = StateProvider<int>((ref) => 0);
 
 /// Sync loading page with PowerSync progress
 class SyncLoadingPage extends ConsumerStatefulWidget {
@@ -423,6 +420,8 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
     // The _isNavigatingProvider persists across logouts and needs to be reset
     Future.microtask(() {
       ref.read(_isNavigatingProvider.notifier).state = false;
+      // Increment session key to force sync provider to reinitialize
+      ref.read(_syncSessionKeyProvider.notifier).state++;
     });
   }
 
@@ -430,10 +429,11 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
   Widget build(BuildContext context) {
     final powerSyncDb = ref.watch(powerSyncDatabaseProvider);
     final isNavigating = ref.watch(_isNavigatingProvider);
+    final sessionKey = ref.watch(_syncSessionKeyProvider);
 
     return powerSyncDb.when(
       data: (db) {
-        final syncState = ref.watch(enhancedSyncLoadingProvider(db));
+        final syncState = ref.watch(enhancedSyncLoadingProvider((database: db, sessionKey: sessionKey)));
 
         // FIX: Handle case where sync is already complete on page load (e.g., after logout/login)
         // The ref.listen only fires on state changes, not when state equals a value
@@ -448,7 +448,7 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
         }
 
         // Auto-navigate when sync completes (for state changes during page lifecycle)
-        ref.listen<EnhancedSyncLoadingState>(enhancedSyncLoadingProvider(db), (prev, next) {
+        ref.listen<EnhancedSyncLoadingState>(enhancedSyncLoadingProvider((database: db, sessionKey: sessionKey)), (prev, next) {
           if (next.syncComplete && !isNavigating && mounted) {
             ref.read(_isNavigatingProvider.notifier).state = true;
             // Navigate to home after a short delay
