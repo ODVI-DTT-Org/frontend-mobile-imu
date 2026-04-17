@@ -19,8 +19,8 @@ enum ApprovalStatus {
 enum ApprovalType {
   client('client'),
   clientDelete('client_delete'),
-  clientAddress('client_address'),
-  clientPhone('client_phone'),
+  clientAddress('address_add'),
+  clientPhone('phone_add'),
   udi('udi');
 
   final String value;
