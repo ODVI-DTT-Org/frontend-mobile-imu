@@ -392,7 +392,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 }
 
 /// Provider for enhanced sync loading state
-final enhancedSyncLoadingProvider = StateNotifierProvider.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, int sessionKey})>((ref, params) {
+final enhancedSyncLoadingProvider = StateNotifierProvider.autoDispose.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, int sessionKey})>((ref, params) {
   return EnhancedSyncLoadingNotifier(params.database);
 });
 
