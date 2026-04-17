@@ -18,6 +18,7 @@ import '../../../../shared/providers/app_providers.dart' show
     addressRepositoryProvider,
     phoneNumberRepositoryProvider,
     clientMutationServiceProvider;
+import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
@@ -418,12 +419,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (confirmed == true && mounted) {
       HapticUtils.delete();
 
+      ClientMutationResult? deleteResult;
       await LoadingHelper.withLoading(
         ref: ref,
         message: 'Deleting client...',
         operation: () async {
           final mutationService = ref.read(clientMutationServiceProvider);
-          await mutationService.deleteClient(widget.clientId);
+          deleteResult = await mutationService.deleteClient(widget.clientId);
         },
         onError: (e) {
           if (mounted) {
@@ -432,9 +434,18 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         },
       );
 
-      if (mounted) {
-        AppNotification.showSuccess(context, 'Client deleted');
-        context.pop();
+      if (mounted && deleteResult != null) {
+        switch (deleteResult!) {
+          case ClientMutationResult.success:
+            AppNotification.showSuccess(context, 'Client deleted');
+            context.pop();
+          case ClientMutationResult.requiresApproval:
+            AppNotification.showSuccess(context, 'Client deletion submitted for approval');
+            context.pop();
+          case ClientMutationResult.queued:
+            AppNotification.showSuccess(context, 'Client deleted (will sync when online)');
+            context.pop();
+        }
       }
     }
   }

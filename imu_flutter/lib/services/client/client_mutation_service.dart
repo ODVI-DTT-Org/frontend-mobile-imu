@@ -71,15 +71,18 @@ class ClientMutationService {
     return ClientMutationResult.queued;
   }
 
-  Future<void> deleteClient(String clientId) async {
-    // Remove from Hive immediately so it disappears from UI
-    await _hive.deleteClient(clientId);
-
+  Future<ClientMutationResult> deleteClient(String clientId) async {
     if (_connectivity.isOnline) {
-      await _api.deleteClient(clientId);
-      return;
+      final deleted = await _api.deleteClient(clientId);
+      if (deleted) {
+        await _hive.deleteClient(clientId);
+        return ClientMutationResult.success;
+      }
+      return ClientMutationResult.requiresApproval;
     }
 
+    // Optimistic removal for offline queue — will sync when back online
+    await _hive.deleteClient(clientId);
     await _pending.enqueue(PendingClientOperation(
       id: _uuid.v4(),
       operation: ClientOperationType.delete,
@@ -88,5 +91,6 @@ class ClientMutationService {
       createdAt: DateTime.now(),
     ));
     logDebug('ClientMutationService: queued delete for client $clientId');
+    return ClientMutationResult.queued;
   }
 }

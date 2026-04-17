@@ -459,11 +459,20 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
     try {
       final mutationService = ref.read(clientMutationServiceProvider);
-      await mutationService.deleteClient(widget.clientId);
+      final result = await mutationService.deleteClient(widget.clientId);
 
       if (mounted) {
-        AppNotification.showSuccess(context, 'Client deleted');
-        context.pop(true);
+        switch (result) {
+          case ClientMutationResult.success:
+            AppNotification.showSuccess(context, 'Client deleted');
+            context.pop(true);
+          case ClientMutationResult.requiresApproval:
+            AppNotification.showSuccess(context, 'Client deletion submitted for approval');
+            context.pop(true);
+          case ClientMutationResult.queued:
+            AppNotification.showSuccess(context, 'Client deleted (will sync when online)');
+            context.pop(true);
+        }
       }
     } catch (e) {
       debugPrint('[EditClientPage] Delete error: $e');

@@ -638,6 +638,7 @@ class BackgroundSyncService extends ChangeNotifier {
               }
             case ClientOperationType.delete:
               await clientApi.deleteClient(op.clientId);
+              // requiresApproval (false) or success (true) — either way, op is submitted
           }
           await pendingService.removeAllForClient(op.clientId);
         } catch (e) {

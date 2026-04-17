@@ -629,8 +629,8 @@ class ClientApiService {
     }
   }
 
-  /// Delete a client
-  Future<void> deleteClient(String id) async {
+  /// Delete a client. Returns true if deleted directly, false if requires approval.
+  Future<bool> deleteClient(String id) async {
     try {
       debugPrint('ClientApiService: Deleting client $id...');
 
@@ -653,7 +653,13 @@ class ClientApiService {
       );
 
       if (response.statusCode == 200) {
+        final responseData = response.data;
+        if (responseData is Map<String, dynamic> && responseData['requires_approval'] == true) {
+          debugPrint('ClientApiService: Client deletion requires approval');
+          return false;
+        }
         debugPrint('ClientApiService: Client deleted successfully');
+        return true;
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to delete client: ${response.statusCode}');
@@ -759,8 +765,12 @@ class ClientApiService {
         data: requestData,
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final addressData = response.data as Map<String, dynamic>;
+        if (addressData['requires_approval'] == true) {
+          debugPrint('ClientApiService: Address creation requires approval');
+          return null;
+        }
         debugPrint('ClientApiService: Address added successfully');
         return Address.fromJson(addressData);
       } else {
@@ -818,8 +828,12 @@ class ClientApiService {
         data: requestData,
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final phoneData = response.data as Map<String, dynamic>;
+        if (phoneData['requires_approval'] == true) {
+          debugPrint('ClientApiService: Phone number creation requires approval');
+          return null;
+        }
         debugPrint('ClientApiService: Phone number added successfully');
         return PhoneNumber.fromJson(phoneData);
       } else {

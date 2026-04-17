@@ -267,7 +267,10 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
             province: _selectedProvince ?? (provinceInput.isEmpty ? null : provinceInput),
             isPrimary: true,
           );
-          await clientApi.addAddress(createdClient.id!, address);
+          final addedAddress = await clientApi.addAddress(createdClient.id!, address);
+          if (addedAddress == null) {
+            debugPrint('[AddProspectClientPage] Address submitted for approval');
+          }
 
           // Add phone number via API
           final phone = PhoneNumber(
@@ -277,7 +280,10 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
             label: 'Mobile',
             isPrimary: true,
           );
-          await clientApi.addPhoneNumber(createdClient.id!, phone);
+          final addedPhone = await clientApi.addPhoneNumber(createdClient.id!, phone);
+          if (addedPhone == null) {
+            debugPrint('[AddProspectClientPage] Phone number submitted for approval');
+          }
         } else {
           // Offline mode: Save to Hive
           final clientId = DateTime.now().millisecondsSinceEpoch.toString();
