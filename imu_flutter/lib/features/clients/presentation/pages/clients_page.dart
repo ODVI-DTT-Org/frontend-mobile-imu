@@ -32,6 +32,7 @@ import '../../../../shared/widgets/location_filter_chips.dart';
 import '../../../../shared/widgets/location_filter_bottom_sheet.dart';
 import '../../../../shared/widgets/filters/client_attribute_filter_bottom_sheet_dropdown.dart';
 import '../../../../shared/widgets/filters/attribute_filter_chip.dart';
+import '../../../../shared/widgets/filters/touchpoint_filter_chips.dart';
 import '../../../../shared/widgets/filters/client_attribute_filter_helpers.dart';
 import '../widgets/client_filter_icon_button.dart';
 import '../../../../models/client_status.dart';
@@ -422,6 +423,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                   ),
                 ),
 
+                const SizedBox(height: 8),
+                const TouchpointFilterChips(),
+
                 // Active filter chips
                 const LocationFilterChips(),
 
@@ -645,6 +649,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                   ),
                 ),
               ),
+
+              const SizedBox(height: 8),
+              const TouchpointFilterChips(),
 
               const SizedBox(height: 12),
 
