@@ -72,7 +72,7 @@ class MyDayApiService {
   Future<bool> addToMyDay(String clientId, {
     DateTime? scheduledDate,
     String? scheduledTime,
-    int priority = 5,
+    String priority = 'normal',
     String? notes,
   }) async {
     try {
@@ -101,7 +101,7 @@ class MyDayApiService {
           scheduledDateStr,
           scheduledTime,
           'pending',
-          priority.toString(),
+          priority,
           notes,
           userId,
           now,
