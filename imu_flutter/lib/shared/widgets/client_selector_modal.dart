@@ -10,13 +10,14 @@ import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointType;
 import '../../features/clients/data/models/address_model.dart' show Address;
 import '../../models/client_status.dart';
-import '../../services/api/my_day_api_service.dart';
+import '../../features/my_day/data/repositories/my_day_repository.dart';
 import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
 import '../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/sync/powersync_service.dart';
 import '../../shared/providers/app_providers.dart' show
+    myDayRepositoryProvider,
     assignedClientsProvider,
     onlineClientsProvider,
     assignedClientSearchQueryProvider,
@@ -28,7 +29,6 @@ import '../../shared/providers/app_providers.dart' show
     currentUserIdProvider,
     assignedMunicipalitiesProvider,
     clientTouchpointCountsProvider,
-    myDayApiServiceProvider,
     locationFilterProvider,
     clientAttributeFilterProvider;
 import '../providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
@@ -246,8 +246,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   Future<void> _loadStatusesFromAPI(DateTime today) async {
     try {
-      final myDayApi = MyDayApiService();
-      final todayClients = await myDayApi.fetchMyDayClients(today);
+      final myDayRepo = ref.read(myDayRepositoryProvider);
+      final userId = ref.read(currentUserIdProvider) ?? '';
+      final todayClients = await myDayRepo.getClientsByDate(userId, today);
 
       final clientsAsync = _clientFilter == 'assigned'
           ? ref.read(assignedClientsProvider)

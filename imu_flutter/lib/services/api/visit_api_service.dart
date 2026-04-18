@@ -152,29 +152,6 @@ class VisitApiService {
     }
   }
 
-  /// Fetch all visits for a specific client
-  Future<List<Map<String, dynamic>>> getVisitsByClientId(String clientId) async {
-    try {
-      final token = _authService.accessToken;
-      if (token == null) throw ApiException(message: 'Not authenticated');
-
-      final response = await _dio.get(
-        '${AppConfig.postgresApiUrl}/visits',
-        queryParameters: {'client_id': clientId, 'source': 'CMS', 'limit': 100},
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data is List) return List<Map<String, dynamic>>.from(data);
-        return [];
-      }
-      return [];
-    } on DioException catch (e) {
-      debugPrint('VisitApiService: getVisitsByClientId error - ${e.message}');
-      return [];
-    }
-  }
 }
 
 /// Provider for VisitApiService

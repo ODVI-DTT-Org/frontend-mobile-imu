@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
-import '../../../../../services/api/visit_api_service.dart';
+import '../../../../../features/visits/data/repositories/visit_repository.dart';
 
 final _cmsVisitsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, clientId) => ref.read(visitApiServiceProvider).getVisitsByClientId(clientId),
+  (ref, clientId) async {
+    final repo = ref.read(visitRepositoryProvider);
+    final visits = await repo.getByClientId(clientId);
+    return visits.map((v) => v.toMap()).toList();
+  },
 );
 
 /// CMS Visit History Expansion Panel

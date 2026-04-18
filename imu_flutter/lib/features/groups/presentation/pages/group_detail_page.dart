@@ -6,39 +6,24 @@ import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/local_storage/hive_service.dart';
-import '../../../../services/api/groups_api_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/group_model.dart';
+import '../../data/repositories/group_repository.dart';
 
-/// Group detail provider
+/// Group detail provider — reads from local PowerSync SQLite with Hive fallback.
 final groupDetailProvider = FutureProvider.family<ClientGroup?, String>((ref, groupId) async {
-  final groupsApi = ref.watch(groupsApiServiceProvider);
-  final isOnline = ref.watch(isOnlineProvider);
+  // Try PowerSync first (works offline after initial sync)
+  final repo = ref.read(groupRepositoryProvider);
+  final group = await repo.getById(groupId);
+  if (group != null) return group;
 
-  if (isOnline) {
-    try {
-      return await groupsApi.fetchGroup(groupId);
-    } catch (e) {
-      // Fall back to local cache
-      final hiveService = HiveService();
-      if (!hiveService.isInitialized) await hiveService.init();
-      final localGroup = await hiveService.getGroup(groupId);
-      if (localGroup != null) {
-        return ClientGroup.fromJson(localGroup);
-      }
-      return null;
-    }
-  } else {
-    // Offline - use local cache
-    final hiveService = HiveService();
-    if (!hiveService.isInitialized) await hiveService.init();
-    final localGroup = await hiveService.getGroup(groupId);
-    if (localGroup != null) {
-      return ClientGroup.fromJson(localGroup);
-    }
-    return null;
-  }
+  // Fall back to Hive cache (pre-PowerSync legacy)
+  final hiveService = HiveService();
+  if (!hiveService.isInitialized) await hiveService.init();
+  final localGroup = await hiveService.getGroup(groupId);
+  if (localGroup != null) return ClientGroup.fromJson(localGroup);
+  return null;
 });
 
 class GroupDetailPage extends ConsumerStatefulWidget {
@@ -75,6 +60,19 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
           await _hiveService.init();
         }
 
+        // Try PowerSync first
+        final repo = ref.read(groupRepositoryProvider);
+        final group = await repo.getById(widget.groupId);
+        if (group != null && mounted) {
+          setState(() {
+            _group = group;
+            _members = _loadMembers();
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Fall back to Hive cache
         final groupData = await _hiveService.getGroup(widget.groupId);
         if (groupData != null && mounted) {
           setState(() {
@@ -83,22 +81,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
             _isLoading = false;
           });
         } else {
-          // Try API
-          final groupsApi = ref.read(groupsApiServiceProvider);
-          try {
-            final group = await groupsApi.fetchGroup(widget.groupId);
-            if (group != null && mounted) {
-              setState(() {
-                _group = group;
-                _members = _loadMembers();
-                _isLoading = false;
-              });
-            }
-          } catch (e) {
-            if (mounted) {
-              setState(() => _isLoading = false);
-            }
-          }
+          if (mounted) setState(() => _isLoading = false);
         }
       },
     );
@@ -211,7 +194,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                 message: 'Updating group...',
                 operation: () async {
                   await _hiveService.updateGroup(updatedGroup.toJson());
-                  ref.invalidate(groupsProvider);
+                  ref.invalidate(powersyncGroupsProvider);
                 },
                 onError: (e) {
                   if (mounted) {

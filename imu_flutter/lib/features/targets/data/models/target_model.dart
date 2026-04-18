@@ -127,6 +127,34 @@ class Target {
     'updatedAt': updatedAt?.toIso8601String(),
   };
 
+  factory Target.fromRow(Map<String, dynamic> row) {
+    final period = TargetPeriod.values.firstWhere(
+      (e) => e.name == (row['period'] as String? ?? 'monthly'),
+      orElse: () => TargetPeriod.monthly,
+    );
+    final year = (row['year'] as num).toInt();
+    final month = row['month'] != null ? (row['month'] as num).toInt() : DateTime.now().month;
+
+    // Compute periodStart/periodEnd from year/month for compatibility with existing UI
+    final periodStart = DateTime(year, month, 1);
+    final periodEnd = DateTime(year, month + 1, 0); // last day of month
+
+    return Target(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      period: period,
+      clientVisitsTarget: (row['target_visits'] as num?)?.toInt() ?? 0,
+      touchpointsTarget: (row['target_touchpoints'] as num?)?.toInt() ?? 0,
+      newClientsTarget: (row['target_clients'] as num?)?.toInt() ?? 0,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      updatedAt: row['updated_at'] != null
+          ? DateTime.tryParse(row['updated_at'] as String)
+          : null,
+    );
+  }
+
   factory Target.fromJson(Map<String, dynamic> json) {
     return Target(
       id: json['id'] ?? '',

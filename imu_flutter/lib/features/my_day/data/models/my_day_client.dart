@@ -97,6 +97,9 @@ class MyDayClient {
     'Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'
   ];
 
+  /// Alias for [fromPowerSync] — used by MyDayRepository.
+  factory MyDayClient.fromRow(Map<String, dynamic> row) => MyDayClient.fromPowerSync(row);
+
   /// Create from PowerSync JOIN row (itineraries + clients tables)
   factory MyDayClient.fromPowerSync(Map<String, dynamic> row) {
     final clientId = row['client_id'] as String?;

@@ -58,6 +58,17 @@ export '../../features/clients/data/repositories/address_repository.dart' show
   addressRepositoryProvider;
 export '../../features/clients/data/repositories/phone_number_repository.dart' show
   phoneNumberRepositoryProvider;
+// Re-export PowerSync feature repository providers
+export './app_providers.dart' show
+  visitRepositoryProvider,
+  attendanceRepositoryProvider,
+  groupRepositoryProvider,
+  targetRepositoryProvider,
+  myDayRepositoryProvider,
+  visitsByClientProvider,
+  currentMonthTargetProvider,
+  myDayClientsProvider,
+  powersyncGroupsProvider;
 // Re-export client attribute filter providers
 export 'client_attribute_filter_provider.dart' show
   clientAttributeFilterProvider,
@@ -91,12 +102,10 @@ import '../../services/connectivity_service.dart';
 import '../../services/api/client_api_service.dart';
 import '../../services/api/touchpoint_api_service.dart';
 import '../../services/api/itinerary_api_service.dart';
-import '../../services/api/targets_api_service.dart';
 import '../../services/api/attendance_api_service.dart' hide AttendanceRecord;
 import '../../services/api/profile_api_service.dart' hide UserProfile;
 import '../../services/api/my_day_api_service.dart';
 import '../../services/api/approvals_api_service.dart';
-import '../../services/api/groups_api_service.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/touchpoint/touchpoint_creation_service.dart';
@@ -115,6 +124,14 @@ import '../models/client_attribute_filter.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 import 'client_attribute_filter_provider.dart' show clientAttributeFilterProvider;
 import 'touchpoint_filter_provider.dart' show touchpointFilterProvider;
+import '../../features/visits/data/models/visit_model.dart';
+import '../../features/visits/data/repositories/visit_repository.dart';
+import '../../features/attendance/data/repositories/attendance_repository.dart';
+import '../../features/groups/data/models/group_model.dart';
+import '../../features/groups/data/repositories/group_repository.dart';
+import '../../features/targets/data/repositories/target_repository.dart';
+import '../../features/my_day/data/models/my_day_client.dart';
+import '../../features/my_day/data/repositories/my_day_repository.dart';
 
 // ==================== Service Providers ====================
 
@@ -805,6 +822,45 @@ final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
 });
 
+// ==================== PowerSync Repository Providers ====================
+
+/// Repository providers for reading from local PowerSync SQLite
+final visitRepositoryProvider = Provider<VisitRepository>((_) => VisitRepository());
+final attendanceRepositoryProvider = Provider<AttendanceRepository>((_) => AttendanceRepository());
+final groupRepositoryProvider = Provider<GroupRepository>((_) => GroupRepository());
+final targetRepositoryProvider = Provider<TargetRepository>((_) => TargetRepository());
+final myDayRepositoryProvider = Provider<MyDayRepository>((_) => MyDayRepository());
+
+/// Visits for a specific client — live stream from PowerSync SQLite.
+final visitsByClientProvider = StreamProvider.family<List<Visit>, String>((ref, clientId) {
+  final repo = ref.watch(visitRepositoryProvider);
+  return repo.watchByClientId(clientId);
+});
+
+/// Current month's target — live stream from PowerSync SQLite.
+final currentMonthTargetProvider = StreamProvider<Target?>((ref) async* {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) { yield null; return; }
+  final repo = ref.watch(targetRepositoryProvider);
+  yield* repo.watchCurrentMonthTarget(userId);
+});
+
+/// Today's My Day clients — live stream from PowerSync SQLite.
+final myDayClientsProvider = StreamProvider<List<MyDayClient>>((ref) async* {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) { yield <MyDayClient>[]; return; }
+  final repo = ref.watch(myDayRepositoryProvider);
+  yield* repo.watchTodayClients(userId);
+});
+
+/// Groups for the current user — live stream from PowerSync SQLite.
+final powersyncGroupsProvider = StreamProvider<List<ClientGroup>>((ref) async* {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) { yield <ClientGroup>[]; return; }
+  final repo = ref.watch(groupRepositoryProvider);
+  yield* repo.watchGroups(userId);
+});
+
 // ==================== Target Providers ====================
 
 /// Selected target period
@@ -812,22 +868,12 @@ final targetPeriodProvider = StateProvider<TargetPeriod>((ref) {
   return TargetPeriod.weekly;
 });
 
-/// Current targets - uses API when online
+/// Current targets - reads from PowerSync SQLite (works offline).
 final targetsProvider = FutureProvider<List<Target>>((ref) async {
-  final isOnline = ref.watch(isOnlineProvider);
-
-  if (isOnline) {
-    try {
-      final targetsApi = ref.watch(targetsApiServiceProvider);
-      final targets = await targetsApi.fetchTargets();
-      if (targets.isNotEmpty) return targets;
-    } catch (e) {
-      debugPrint('Failed to fetch targets from API: $e');
-    }
-  }
-
-  // Return empty list if no targets available
-  return [];
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return [];
+  final repo = ref.watch(targetRepositoryProvider);
+  return repo.getAllTargets(userId);
 });
 
 /// Current period target

@@ -66,6 +66,55 @@ class AttendanceRecord {
     'status': status.name,
   };
 
+  factory AttendanceRecord.fromRow(Map<String, dynamic> row) {
+    DateTime? checkInTime;
+    DateTime? checkOutTime;
+
+    if (row['time_in'] != null) {
+      checkInTime = DateTime.tryParse(row['time_in'] as String);
+    }
+    if (row['time_out'] != null) {
+      checkOutTime = DateTime.tryParse(row['time_out'] as String);
+    }
+
+    final inLat = row['location_in_lat'] != null ? (row['location_in_lat'] as num).toDouble() : null;
+    final inLng = row['location_in_lng'] != null ? (row['location_in_lng'] as num).toDouble() : null;
+    final outLat = row['location_out_lat'] != null ? (row['location_out_lat'] as num).toDouble() : null;
+    final outLng = row['location_out_lng'] != null ? (row['location_out_lng'] as num).toDouble() : null;
+
+    AttendanceStatus status;
+    if (checkInTime != null && checkOutTime != null) {
+      status = AttendanceStatus.checkedOut;
+    } else if (checkInTime != null) {
+      status = AttendanceStatus.checkedIn;
+    } else {
+      status = AttendanceStatus.absent;
+    }
+
+    return AttendanceRecord(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      date: DateTime.parse(row['date'] as String),
+      checkInTime: checkInTime,
+      checkOutTime: checkOutTime,
+      checkInLocation: (inLat != null && inLng != null)
+          ? AttendanceLocation(
+              latitude: inLat,
+              longitude: inLng,
+              timestamp: checkInTime ?? DateTime.now(),
+            )
+          : null,
+      checkOutLocation: (outLat != null && outLng != null)
+          ? AttendanceLocation(
+              latitude: outLat,
+              longitude: outLng,
+              timestamp: checkOutTime ?? DateTime.now(),
+            )
+          : null,
+      status: status,
+    );
+  }
+
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
     return AttendanceRecord(
       id: json['id'] ?? '',
