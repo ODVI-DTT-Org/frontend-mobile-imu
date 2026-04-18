@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'jwt_auth_service.dart';
+import 'offline_auth_service.dart';
 import '../sync/powersync_service.dart';
 import '../sync/powersync_connector.dart';
 import '../../core/utils/logger.dart';
@@ -61,6 +62,14 @@ class AuthService {
 
   /// Get current user role
   String? get currentUserRole => _jwtAuth.currentUser?.role.apiValue;
+
+  /// Restore session from a cached token (for offline re-login)
+  Future<JwtUser> restoreFromToken(String token) async {
+    await _jwtAuth.updateCachedTokens(accessToken: token);
+    await _jwtAuth.initialize();
+    if (_jwtAuth.currentUser == null) throw Exception('Failed to restore session from cached token');
+    return _jwtAuth.currentUser!;
+  }
 
   /// Get authorization header
   String? get authHeader => _jwtAuth.authHeader;
@@ -238,6 +247,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Trigger initial sync after successful login and PowerSync connection
       _onLoginSuccess?.call();
 
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// Login offline using cached credential hash and JWT.
+  /// Used when network is unavailable but the user has logged in before.
+  Future<bool> loginOffline(String email, String password) async {
+    if (!mounted) return false;
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final offlineAuth = OfflineAuthService();
+      final result = await offlineAuth.authenticateWithCredentials(email, password);
+
+      if (!result.success) {
+        if (!mounted) return false;
+        state = state.copyWith(isLoading: false, error: result.error);
+        return false;
+      }
+
+      // Restore JwtAuthService state from the cached token
+      final user = await _authService.restoreFromToken(result.token!);
+
+      if (!mounted) return false;
+      state = state.copyWith(
+        isAuthenticated: true,
+        user: user,
+        isLoading: false,
+      );
+
+      _onLoginSuccess?.call();
       return true;
     } catch (e) {
       if (!mounted) return false;

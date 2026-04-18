@@ -271,6 +271,14 @@ class JwtAuthService {
       await secureStorage.saveLastOnlineLoginTime();
       await secureStorage.saveLastLoginTime();
 
+      // Save credential hash + offline JWT so re-login works after logout (offline)
+      try {
+        await secureStorage.saveOfflineCredentials(email, password, _accessToken!);
+        logDebug('Offline credentials saved for post-logout offline login');
+      } catch (e) {
+        logError('Failed to save offline credentials (non-critical)', e);
+      }
+
       // Fetch and cache user permissions from backend
       try {
         final permissionService = RemotePermissionService();

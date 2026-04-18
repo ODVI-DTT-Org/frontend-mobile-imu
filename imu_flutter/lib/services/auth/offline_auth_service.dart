@@ -13,9 +13,71 @@ class OfflineAuthService {
   final SecureStorageService _secureStorage = SecureStorageService();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  /// Check if offline login is possible
+  /// Check if offline login is possible using stored credentials
   Future<bool> canLoginOffline() async {
-    return await _secureStorage.canLoginOffline();
+    return await _secureStorage.hasOfflineCredentials();
+  }
+
+  /// Authenticate with email + password offline (validates against stored hash)
+  Future<OfflineAuthResult> authenticateWithCredentials(String email, String password) async {
+    try {
+      final isValid = await _secureStorage.verifyOfflineCredentials(email, password);
+      if (!isValid) {
+        return OfflineAuthResult(
+          success: false,
+          error: 'Incorrect email or password',
+          requiresReauth: true,
+        );
+      }
+
+      final token = await _secureStorage.getOfflineToken();
+      if (token == null) {
+        return OfflineAuthResult(
+          success: false,
+          error: 'No cached session. Please login online.',
+          requiresReauth: true,
+        );
+      }
+
+      // Check token expiry
+      try {
+        final decoded = JwtDecoder.decode(token);
+        final exp = decoded['exp'] as int?;
+        if (exp != null) {
+          final expiryTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+          if (DateTime.now().isAfter(expiryTime)) {
+            return OfflineAuthResult(
+              success: false,
+              error: 'Session expired. Please login online to continue.',
+              requiresReauth: true,
+            );
+          }
+        }
+      } catch (e) {
+        return OfflineAuthResult(
+          success: false,
+          error: 'Invalid cached session. Please login online.',
+          requiresReauth: true,
+        );
+      }
+
+      final user = _getUserFromToken(token);
+      await _secureStorage.saveLastLoginTime();
+
+      logDebug('Offline credential auth successful for ${user.email}');
+      return OfflineAuthResult(
+        success: true,
+        user: user,
+        token: token,
+      );
+    } catch (e) {
+      logError('Offline credential authentication failed', e);
+      return OfflineAuthResult(
+        success: false,
+        error: 'Authentication failed: $e',
+        requiresReauth: true,
+      );
+    }
   }
 
   /// Authenticate with PIN (works offline)

@@ -30,6 +30,10 @@ class SecureStorageService {
   static const String _deviceIdKey = 'device_id';
   static const String _lastLoginTimeKey = 'last_login_time';
   static const String _lastOnlineLoginKey = 'last_online_login_time';
+  // Offline credential keys — persist across logout (not deleted by clearSession)
+  static const String _offlineCredHashKey = 'offline_cred_hash';
+  static const String _offlineCredSaltKey = 'offline_cred_salt';
+  static const String _offlineJwtKey = 'offline_jwt';
 
   // Offline grace period: 8 hours
   static const Duration offlineGracePeriod = Duration(hours: 8);
@@ -163,6 +167,37 @@ class SecureStorageService {
     }
   }
 
+  // ===== OFFLINE CREDENTIALS (survive logout) =====
+
+  /// Save credential hash and offline JWT after successful online login.
+  /// These keys are intentionally excluded from clearSession() so offline
+  /// re-login works after logout.
+  Future<void> saveOfflineCredentials(String email, String password, String token) async {
+    final salt = _generateSalt();
+    final hash = _hashPin(email + password, salt);
+    await _storage.write(key: _offlineCredHashKey, value: hash);
+    await _storage.write(key: _offlineCredSaltKey, value: salt);
+    await _storage.write(key: _offlineJwtKey, value: token);
+    debugPrint('SecureStorageService: Offline credentials saved');
+  }
+
+  Future<bool> verifyOfflineCredentials(String email, String password) async {
+    final hash = await _storage.read(key: _offlineCredHashKey);
+    final salt = await _storage.read(key: _offlineCredSaltKey);
+    if (hash == null || salt == null) return false;
+    return _hashPin(email + password, salt) == hash;
+  }
+
+  Future<String?> getOfflineToken() async {
+    return await _storage.read(key: _offlineJwtKey);
+  }
+
+  Future<bool> hasOfflineCredentials() async {
+    final hash = await _storage.read(key: _offlineCredHashKey);
+    final token = await _storage.read(key: _offlineJwtKey);
+    return hash != null && token != null;
+  }
+
   // ===== OFFLINE AUTHENTICATION =====
 
   /// Save last login time (both online and PIN-based logins)
@@ -193,24 +228,9 @@ class SecureStorageService {
     return DateTime.tryParse(timeStr);
   }
 
-  /// Check if offline login is allowed (within grace period)
+  /// Check if offline login is possible using stored credentials.
   Future<bool> canLoginOffline() async {
-    // Must have a PIN set up
-    final hasPinSetup = await isPinSetupComplete();
-    if (!hasPinSetup) return false;
-
-    // Must have cached auth token
-    final hasToken = await getToken() != null;
-    if (!hasToken) return false;
-
-    // Check if within grace period (8 hours from last online login)
-    final lastOnlineLogin = await getLastOnlineLoginTime();
-    if (lastOnlineLogin == null) return false;
-
-    final now = DateTime.now();
-    final timeSinceLastOnline = now.difference(lastOnlineLogin);
-
-    return timeSinceLastOnline < offlineGracePeriod;
+    return await hasOfflineCredentials();
   }
 
   /// Get remaining offline grace period

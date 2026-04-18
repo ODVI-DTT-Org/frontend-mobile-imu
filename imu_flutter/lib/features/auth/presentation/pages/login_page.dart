@@ -58,29 +58,33 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     HapticUtils.lightImpact();
 
+    final isOnline = ref.read(isOnlineProvider);
+
     await LoadingHelper.withLoading(
       ref: ref,
-      message: 'Signing in...',
+      message: isOnline ? 'Signing in...' : 'Signing in offline...',
       operation: () async {
-        await ref.read(authNotifierProvider.notifier).login(
-              _emailController.text.trim(),
-              _passwordController.text,
-              rememberMe: _rememberMe,
-            );
+        if (!isOnline && _canLoginOffline) {
+          await ref.read(authNotifierProvider.notifier).loginOffline(
+                _emailController.text.trim(),
+                _passwordController.text,
+              );
+        } else {
+          await ref.read(authNotifierProvider.notifier).login(
+                _emailController.text.trim(),
+                _passwordController.text,
+                rememberMe: _rememberMe,
+              );
+        }
       },
       onError: (e) {
         HapticUtils.error();
       },
     );
-
-    // Navigation is handled automatically by the router based on auth state
-    // No manual navigation needed here
   }
 
   // PIN/OFFLINE LOGIN DISABLED - Commenting out to focus on core authentication
@@ -349,7 +353,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: authState.isLoading || !isOnline
+                    onPressed: authState.isLoading || (!isOnline && !_canLoginOffline)
                         ? null
                         : _handleLogin,
                     child: authState.isLoading
