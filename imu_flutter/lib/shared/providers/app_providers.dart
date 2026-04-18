@@ -978,7 +978,7 @@ const _attendanceBox = 'attendance';
 
 /// Today's attendance record
 final todayAttendanceProvider = StateNotifierProvider<TodayAttendanceNotifier, AttendanceRecord?>((ref) {
-  return TodayAttendanceNotifier(ref.watch(hiveServiceProvider), ref);
+  return TodayAttendanceNotifier(ref);
 });
 
 /// Is user currently checked in
@@ -1038,13 +1038,12 @@ final attendanceStatsProvider = Provider<Map<String, dynamic>>((ref) {
   );
 });
 
-/// Today's Attendance Notifier
+/// Today's Attendance Notifier — writes to PowerSync SQLite
 class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
-  final HiveService _hiveService;
   final Ref _ref;
   bool _isLoading = false;
 
-  TodayAttendanceNotifier(this._hiveService, this._ref) : super(null) {
+  TodayAttendanceNotifier(this._ref) : super(null) {
     _loadToday();
   }
 
@@ -1053,99 +1052,82 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
   Future<void> _loadToday() async {
     _isLoading = true;
     try {
-      if (!_hiveService.isInitialized) await _hiveService.init();
-      final today = _formatDate(DateTime.now());
-      final box = Hive.box<String>(_attendanceBox);
-      final data = box.get(today);
-
-      if (data != null) {
-        state = AttendanceRecord.fromJson(
-          Map<String, dynamic>.from(const JsonDecoder().convert(data)),
-        );
-      } else {
-        state = null;
-      }
+      final repo = _ref.read(attendanceRepositoryProvider);
+      state = await repo.getTodayAttendance();
     } finally {
       _isLoading = false;
     }
   }
 
   Future<void> checkIn(AttendanceLocation location) async {
-    final now = DateTime.now();
     final userId = _ref.read(currentUserIdProvider);
-
     if (userId == null) {
-      debugPrint('TodayAttendanceNotifier: Cannot check in - no user ID available');
+      debugPrint('TodayAttendanceNotifier: Cannot check in - no user ID');
       return;
     }
 
-    final record = AttendanceRecord(
-      id: _formatDate(now),
+    final db = await PowerSyncService.database;
+    final now = DateTime.now();
+    final today = _formatDate(now);
+    final id = '$userId-$today';
+
+    await db.execute(
+      '''INSERT OR REPLACE INTO attendance
+         (id, user_id, date, time_in, location_in_lat, location_in_lng, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+      [
+        id,
+        userId,
+        today,
+        now.toIso8601String(),
+        location.latitude,
+        location.longitude,
+        location.address,
+        now.toIso8601String(),
+      ],
+    );
+
+    debugPrint('TodayAttendanceNotifier: Check-in written to SQLite');
+
+    state = AttendanceRecord(
+      id: id,
       userId: userId,
       date: DateTime(now.year, now.month, now.day),
       checkInTime: now,
       checkInLocation: location,
       status: AttendanceStatus.checkedIn,
     );
-
-    // ✅ FIXED: Call API to sync to database when online
-    final isOnline = _ref.read(isOnlineProvider);
-    if (isOnline) {
-      try {
-        final attendanceApi = _ref.read(attendanceApiServiceProvider);
-        final apiRecord = await attendanceApi.checkIn(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          notes: location.address,
-        );
-        debugPrint('TodayAttendanceNotifier: Check-in synced to database');
-      } catch (e) {
-        debugPrint('TodayAttendanceNotifier: Failed to sync check-in to database: $e');
-        // Continue with local save even if API fails
-      }
-    }
-
-    await _saveRecord(record);
-    state = record;
   }
 
   Future<void> checkOut(AttendanceLocation location) async {
     if (state == null) return;
 
+    final db = await PowerSyncService.database;
     final now = DateTime.now();
-    final record = state!.copyWith(
+
+    await db.execute(
+      '''UPDATE attendance
+         SET time_out=?, location_out_lat=?, location_out_lng=?
+         WHERE id=?''',
+      [
+        now.toIso8601String(),
+        location.latitude,
+        location.longitude,
+        state!.id,
+      ],
+    );
+
+    debugPrint('TodayAttendanceNotifier: Check-out written to SQLite');
+
+    state = state!.copyWith(
       checkOutTime: now,
       checkOutLocation: location,
       status: AttendanceStatus.checkedOut,
     );
-
-    // ✅ FIXED: Call API to sync to database when online
-    final isOnline = _ref.read(isOnlineProvider);
-    if (isOnline) {
-      try {
-        final attendanceApi = _ref.read(attendanceApiServiceProvider);
-        final apiRecord = await attendanceApi.checkOut(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          notes: location.address,
-        );
-        debugPrint('TodayAttendanceNotifier: Check-out synced to database');
-      } catch (e) {
-        debugPrint('TodayAttendanceNotifier: Failed to sync check-out to database: $e');
-        // Continue with local save even if API fails
-      }
-    }
-
-    await _saveRecord(record);
-    state = record;
   }
 
-  Future<void> _saveRecord(AttendanceRecord record) async {
-    final box = Hive.box<String>(_attendanceBox);
-    await box.put(record.id, const JsonEncoder().convert(record.toJson()));
-  }
-
-  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
 // ==================== Profile Providers ====================
