@@ -77,9 +77,7 @@ class ClientApiService {
         debugPrint('[CLIENT-API] Got ${items.length} clients from API (page $page of $totalPages, total: $totalItems)');
 
         final clients = items.map((item) {
-          final clientData = item as Map<String, dynamic>;
-          // Use fromRow to handle snake_case from API
-          return Client.fromRow(clientData);
+          return Client.fromJson(item as Map<String, dynamic>);
         }).toList();
 
         return ClientsResponse(
@@ -166,8 +164,7 @@ class ClientApiService {
         debugPrint('[CLIENT-API] Got ${items.length} assigned clients from API (page $page of $totalPages, total: $totalItems)');
 
         final clients = items.map((item) {
-          final clientData = item as Map<String, dynamic>;
-          return Client.fromRow(clientData);
+          return Client.fromJson(item as Map<String, dynamic>);
         }).toList();
 
         return ClientsResponse(
@@ -238,8 +235,7 @@ class ClientApiService {
         return items.map((item) {
           final clientData = item as Map<String, dynamic>;
           debugPrint('ClientApiService: Processing client: ${clientData['first_name']} ${clientData['last_name']}');
-          // Use fromRow to handle snake_case from API
-          return Client.fromRow(clientData);
+          return Client.fromJson(clientData);
         }).toList();
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
@@ -297,7 +293,7 @@ class ClientApiService {
       if (response.statusCode == 200) {
         final clientData = response.data as Map<String, dynamic>;
         debugPrint('ClientApiService: Client assigned successfully: ${clientData['first_name']} ${clientData['last_name']}');
-        return Client.fromRow(clientData);
+        return Client.fromJson(clientData);
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to assign client: ${response.statusCode}');
@@ -412,7 +408,7 @@ class ClientApiService {
 
         final clients = items.map((item) {
           final clientData = item as Map<String, dynamic>;
-          return Client.fromRow(clientData);
+          return Client.fromJson(clientData);
         }).toList();
 
         return ClientsResponse(
@@ -507,7 +503,7 @@ class ClientApiService {
         // Direct creation (admin users)
         final clientData = responseData;
         debugPrint('ClientApiService: Client created successfully: ${clientData['first_name']} ${clientData['last_name']}');
-        return Client.fromRow(clientData);
+        return Client.fromJson(clientData);
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to create client: ${response.statusCode}');
@@ -605,7 +601,7 @@ class ClientApiService {
 
         // Admin users get full client data
         debugPrint('ClientApiService: Client updated successfully: ${clientData['first_name'] ?? 'N/A'} ${clientData['last_name'] ?? 'N/A'}');
-        return Client.fromRow(clientData);
+        return Client.fromJson(clientData);
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to update client: ${response.statusCode}');
@@ -710,7 +706,7 @@ class ClientApiService {
       if (response.statusCode == 200) {
         final clientData = response.data as Map<String, dynamic>;
         debugPrint('ClientApiService: Loan released successfully for client: ${clientData['first_name']} ${clientData['last_name']}');
-        return Client.fromRow(clientData);
+        return Client.fromJson(clientData);
       } else {
         debugPrint('ClientApiService: API returned status ${response.statusCode}');
         throw ApiException(message: 'Failed to release loan: ${response.statusCode}');
