@@ -26,6 +26,7 @@ class ItineraryItem {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? createdBy;
+  final String? assignedByName;
 
   // Previous touchpoint info
   final int? previousTouchpointNumber; // Last completed touchpoint number
@@ -50,6 +51,7 @@ class ItineraryItem {
     required this.createdAt,
     this.updatedAt,
     this.createdBy,
+    this.assignedByName,
     this.previousTouchpointNumber,
     this.previousTouchpointReason,
     this.previousTouchpointType,
@@ -139,6 +141,9 @@ class ItineraryItem {
           ? DateTime.parse(json['updated'] ?? json['updated_at'])
           : null,
       createdBy: json['created_by'],
+      assignedByName: (json['expand'] != null && json['expand']['created_by'] != null)
+          ? json['expand']['created_by']['name'] as String?
+          : null,
       previousTouchpointNumber: validatedPreviousNumber,
       previousTouchpointReason: json['previous_touchpoint_reason'],
       previousTouchpointType: json['previous_touchpoint_type'],
@@ -217,6 +222,7 @@ class ItineraryItem {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBy,
+    String? assignedByName,
     int? previousTouchpointNumber,
     String? previousTouchpointReason,
     String? previousTouchpointType,
@@ -239,6 +245,7 @@ class ItineraryItem {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
+      assignedByName: assignedByName ?? this.assignedByName,
       previousTouchpointNumber: previousTouchpointNumber ?? this.previousTouchpointNumber,
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
