@@ -129,6 +129,8 @@ const Schema _powerSyncSchema = Schema([
     Column.text('source'),
     Column.text('created_at'),
     Column.text('updated_at'),
+    // Local-only: stores temp file path before S3 upload; stripped by connector before sending to backend
+    Column.text('_local_photo_path'),
   ]),
   Table('calls', [
     Column.text('client_id'),

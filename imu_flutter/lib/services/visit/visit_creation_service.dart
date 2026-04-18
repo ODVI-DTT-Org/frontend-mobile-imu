@@ -24,15 +24,15 @@ class VisitCreationService {
     final id = _uuid.v4();
     final now = DateTime.now().toIso8601String();
 
-    if (photoFile != null) await _saveFile(photoFile);
+    final savedPhotoPath = photoFile != null ? await _saveFile(photoFile) : null;
 
     debugPrint('VisitCreationService: Writing visit $id to SQLite');
 
     await db.execute(
       '''INSERT INTO visits
          (id, client_id, user_id, type, time_in, time_out,
-          odometer_arrival, odometer_departure, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          odometer_arrival, odometer_departure, _local_photo_path, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         clientId,
@@ -42,6 +42,7 @@ class VisitCreationService {
         timeOut,
         odometerArrival,
         odometerDeparture,
+        savedPhotoPath,
         notes,
         now,
       ],
