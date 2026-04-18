@@ -193,6 +193,123 @@ class MyDayApiService {
     }
   }
 
+  /// Fetch clients for My Day list
+  Future<List<MyDayClient>> fetchMyDayClients(DateTime date) async {
+    try {
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      // Enhanced debug logging
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      debugPrint('MyDayApiService: Fetching my day clients');
+      debugPrint('  Requested date: $date');
+      debugPrint('  Requested date string: $dateStr');
+      debugPrint('  Today date string: $todayStr');
+      debugPrint('  Dates match: $dateStr == $todayStr');
+
+      final token = _authService.accessToken;
+      if (token == null) {
+        debugPrint('MyDayApiService: No access token available');
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/my-day/tasks',
+        queryParameters: {'date': dateStr},
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final tasksData = data['tasks'] as List<dynamic>? ?? [];
+        debugPrint('MyDayApiService: Got ${tasksData.length} tasks from API');
+
+        // Filter out completed clients - they should not appear in My Day after visit is recorded
+        const completedStatus = 'completed';
+        final activeTasks = tasksData.where((item) {
+          final taskData = item as Map<String, dynamic>;
+          final status = taskData['status'] as String?;
+          if (status == null) {
+            debugPrint('Warning: Task ${taskData['id']} has null status, including in list');
+            return true; // Include tasks with null status for visibility
+          }
+          return status != completedStatus;
+        }).toList();
+
+        debugPrint('MyDayApiService: Filtered to ${activeTasks.length} active tasks (excluding completed)');
+
+        return activeTasks.map((item) {
+          final taskData = item as Map<String, dynamic>;
+          final clientData = taskData['client'] as Map<String, dynamic>? ?? {};
+
+          // Get clientId from task data (preferred) or client data (fallback)
+          final clientId = taskData['client_id'] as String? ??
+                          (clientData['id'] as String?);
+
+          if (clientId == null || clientId.isEmpty) {
+            debugPrint('Warning: Task ${taskData['id']} has missing or empty clientId, skipping');
+            return null; // Skip this task
+          }
+
+          // Get addresses from client data (now included in backend response)
+          final addresses = clientData['addresses'] as List<dynamic>? ?? [];
+          final location = addresses.isNotEmpty
+              ? (addresses.first as Map<String, dynamic>)['street'] as String?
+              : null;
+
+          return MyDayClient(
+            id: taskData['id'] ?? '',
+            clientId: clientId,
+            fullName: '${clientData['first_name'] ?? ''} ${clientData['last_name'] ?? ''}'.trim(),
+            agencyName: clientData['agency'] as String?,
+            location: location,
+            touchpointNumber: taskData['touchpoint_number'] ?? 0,
+            touchpointType: taskData['touchpoint_type'] ?? 'visit',
+            isTimeIn: taskData['time_in'] != null,
+            priority: taskData['priority'] ?? 'normal',
+            notes: taskData['notes'] as String?,
+            status: taskData['status'] as String?,
+            scheduledTime: taskData['scheduled_time'] as String?,
+            assignedByName: taskData['assigned_by_name'] as String?,
+          );
+        }).where((client) => client != null).cast<MyDayClient>().toList();
+      } else {
+        debugPrint('MyDayApiService: API returned status ${response.statusCode}');
+        throw ApiException(message: 'Failed to fetch my day clients: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      debugPrint('MyDayApiService: DioException - ${e.message}');
+      debugPrint('MyDayApiService: Response - ${e.response?.data}');
+
+      // Extract error message from backend response
+      String errorMessage = 'Network error: ${e.message}';
+      if (e.response?.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        if (data.containsKey('message')) {
+          errorMessage = data['message'].toString();
+        } else if (data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        }
+      }
+
+      throw ApiException(
+        message: errorMessage,
+        originalError: e,
+      );
+    } catch (e) {
+      debugPrint('MyDayApiService: Unexpected error - $e');
+      throw ApiException(
+        message: 'Failed to fetch my day clients',
+        originalError: e,
+      );
+    }
+  }
+
   /// Set time in for a client
   Future<bool> setTimeIn(String clientId, {double? latitude, double? longitude}) async {
     try {
