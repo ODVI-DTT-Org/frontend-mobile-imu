@@ -17,7 +17,6 @@ import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/sync/powersync_service.dart';
 import '../../shared/providers/app_providers.dart' show
-    myDayRepositoryProvider,
     assignedClientsProvider,
     onlineClientsProvider,
     assignedClientSearchQueryProvider,

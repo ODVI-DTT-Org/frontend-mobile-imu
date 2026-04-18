@@ -74,6 +74,9 @@ class AuthService {
   /// Get authorization header
   String? get authHeader => _jwtAuth.authHeader;
 
+  /// Check if a token exists but has expired (used to show session expired UI)
+  bool get hasExpiredToken => _jwtAuth.hasExpiredToken;
+
   /// Check if token needs refresh
   bool get needsRefresh => _jwtAuth.needsRefresh;
 

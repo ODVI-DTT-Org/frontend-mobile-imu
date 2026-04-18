@@ -13,7 +13,7 @@ export '../../services/api/release_api_service.dart' show releaseApiServiceProvi
 // Re-export background sync providers
 export '../../services/api/background_sync_service.dart' show backgroundSyncServiceProvider, backgroundSyncStatusProvider, BackgroundSyncStatus, BackgroundSyncService;
 // Re-export auth providers
-export '../../services/auth/jwt_auth_service.dart' show jwtAuthProvider;
+export '../../services/auth/auth_service.dart' show jwtAuthProvider;
 export '../../services/auth/offline_auth_service.dart' show offlineAuthProvider;
 export './app_providers.dart' show authNotifierProvider;
 // Re-export permission providers
@@ -840,8 +840,10 @@ class TodayAttendanceNotifier extends StateNotifier<AttendanceRecord?> {
   Future<void> _loadToday() async {
     _isLoading = true;
     try {
+      final userId = _ref.read(currentUserIdProvider);
+      if (userId == null) return;
       final repo = _ref.read(attendanceRepositoryProvider);
-      state = await repo.getTodayAttendance();
+      state = await repo.getTodayAttendance(userId);
     } finally {
       _isLoading = false;
     }

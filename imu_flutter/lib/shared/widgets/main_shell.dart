@@ -5,7 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/connectivity_service.dart';
-import '../../services/auth/jwt_auth_service.dart' show jwtAuthProvider;
+import '../../services/auth/auth_service.dart' show jwtAuthProvider;
 import 'background_sync_indicator.dart';
 import 'offline_banner.dart';
 

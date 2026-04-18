@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../data/repositories/client_repository.dart' show clientRepositoryProvider;
-import '../../../../services/touchpoint/touchpoint_validation_service.dart';
+import '../../../../services/touchpoint/touchpoint_validation_service.dart' hide UserRole;
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
 import 'dart:convert';

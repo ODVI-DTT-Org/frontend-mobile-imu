@@ -5,7 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../shared/providers/app_providers.dart';
+import '../../../../shared/providers/app_providers.dart' hide groupRepositoryProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../data/models/group_model.dart';
