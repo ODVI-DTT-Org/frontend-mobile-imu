@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
+import '../providers/app_providers.dart' show powerSyncDatabaseProvider, jwtAuthProvider;
 
-/// PSGC (Philippine Standard Geographic Code) Selector
-/// Cascading dropdown: Region → Province → City/Municipality → Barangay
-class PSGCSelector extends HookWidget {
+/// Cascading location selector: Province → City/Municipality → Barangay (text)
+/// Province and municipality are loaded from user_locations (already synced).
+/// Barangay is a free-text field — too granular for a dropdown.
+class PSGCSelector extends HookConsumerWidget {
   final String? initialPsgcId;
   final Function(PsgcData) onPsgcSelected;
   final bool enabled;
@@ -17,675 +20,148 @@ class PSGCSelector extends HookWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final selectedRegion = useState<String?>(null);
+  Widget build(BuildContext context, WidgetRef ref) {
     final selectedProvince = useState<String?>(null);
     final selectedMunicipality = useState<String?>(null);
-    final selectedBarangay = useState<String?>(null);
-    final isLoading = useState(false);
+    final barangayController = useTextEditingController();
+    final provinces = useState<List<String>>([]);
+    final municipalities = useState<List<String>>([]);
+    final isLoading = useState(true);
 
-    // TODO: Load PSGC data from database/PowerSync
-    // For now, using mock data
-    final regions = useMemoized(() => [
-      'National Capital Region (NCR)',
-      'Cordillera Administrative Region (CAR)',
-      'Region I - Ilocos Region',
-      'Region II - Cagayan Valley',
-      'Region III - Central Luzon',
-      'Region IV-A - CALABARZON',
-      'Region IV-B - MIMAROPA',
-      'Region V - Bicol Region',
-      'Region VI - Western Visayas',
-      'Region VII - Central Visayas',
-      'Region VIII - Eastern Visayas',
-      'Region IX - Zamboanga Peninsula',
-      'Region X - Northern Mindanao',
-      'Region XI - Davao Region',
-      'Region XII - SOCCSKSARGEN',
-      'Region XIII - Caraga',
-      'Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)',
-    ]);
+    final db = ref.watch(powerSyncDatabaseProvider).value;
+    final currentUser = ref.read(jwtAuthProvider).currentUser;
 
-    final provinces = useMemoized(() {
-      if (selectedRegion.value == null) return <String>[];
-      // Mock data - in production, load from database
-      final provinceMap = {
-        'National Capital Region (NCR)': [
-          'Metro Manila',
-          'Quezon City',
-          'Manila',
-          'Caloocan',
-        ],
-        'Cordillera Administrative Region (CAR)': [
-          'Abra',
-          'Apayao',
-          'Benguet',
-          'Ifugao',
-          'Kalinga',
-          'Mountain Province',
-        ],
-        'Region I - Ilocos Region': [
-          'Ilocos Norte',
-          'Ilocos Sur',
-          'La Union',
-          'Pangasinan',
-        ],
-        'Region II - Cagayan Valley': [
-          'Batanes',
-          'Cagayan',
-          'Isabela',
-          'Nueva Vizcaya',
-          'Quirino',
-        ],
-        'Region III - Central Luzon': [
-          'Aurora',
-          'Bataan',
-          'Bulacan',
-          'Nueva Ecija',
-          'Pampanga',
-          'Tarlac',
-          'Zambales',
-        ],
-        'Region IV-A - CALABARZON': [
-          'Cavite',
-          'Laguna',
-          'Batangas',
-          'Rizal',
-          'Quezon',
-        ],
-        'Region IV-B - MIMAROPA': [
-          'Marinduque',
-          'Occidental Mindoro',
-          'Oriental Mindoro',
-          'Palawan',
-          'Romblon',
-        ],
-        'Region V - Bicol Region': [
-          'Albay',
-          'Camarines Norte',
-          'Camarines Sur',
-          'Catanduanes',
-          'Masbate',
-          'Sorsogon',
-        ],
-        'Region VI - Western Visayas': [
-          'Aklan',
-          'Antique',
-          'Capiz',
-          'Guimaras',
-          'Iloilo',
-          'Negros Occidental',
-        ],
-        'Region VII - Central Visayas': [
-          'Bohol',
-          'Cebu',
-          'Negros Oriental',
-          'Siquijor',
-        ],
-        'Region VIII - Eastern Visayas': [
-          'Biliran',
-          'Eastern Samar',
-          'Leyte',
-          'Northern Samar',
-          'Samar',
-          'Southern Leyte',
-        ],
-        'Region IX - Zamboanga Peninsula': [
-          'Zamboanga del Norte',
-          'Zamboanga del Sur',
-          'Zamboanga Sibugay',
-        ],
-        'Region X - Northern Mindanao': [
-          'Bukidnon',
-          'Camiguin',
-          'Lanao del Norte',
-          'Misamis Occidental',
-          'Misamis Oriental',
-        ],
-        'Region XI - Davao Region': [
-          'Compostela Valley',
-          'Davao del Norte',
-          'Davao del Sur',
-          'Davao Occidental',
-        ],
-        'Region XII - SOCCSKSARGEN': [
-          'North Cotabato',
-          'Sarangani',
-          'South Cotabato',
-          'Sultan Kudarat',
-        ],
-        'Region XIII - Caraga': [
-          'Agusan del Norte',
-          'Agusan del Sur',
-          'Dinagat Islands',
-          'Surigao del Norte',
-          'Surigao del Sur',
-        ],
-        'Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)': [
-          'Basilan',
-          'Lanao del Sur',
-          'Maguindanao',
-          'Sulu',
-          'Tawi-Tawi',
-        ],
-      };
-      return provinceMap[selectedRegion.value] ?? <String>[];
-    }, [selectedRegion.value]);
+    // Load provinces from user_locations for this user
+    useEffect(() {
+      if (db == null || currentUser == null) {
+        isLoading.value = false;
+        return null;
+      }
+      Future(() async {
+        try {
+          final rows = await db.getAll(
+            'SELECT DISTINCT province FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY province',
+            [currentUser.id],
+          );
+          provinces.value = rows.map((r) => r['province'] as String).toList();
+        } catch (_) {
+          provinces.value = [];
+        } finally {
+          isLoading.value = false;
+        }
+      });
+      return null;
+    }, [db, currentUser?.id]);
 
-    final municipalities = useMemoized(() {
-      if (selectedProvince.value == null) return <String>[];
-      // Mock data - in production, load from database
-      final municipalityMap = {
-        'Metro Manila': [
-          'Manila',
-          'Makati',
-          'Pasig',
-          'Taguig',
-          'Pasay',
-        ],
-        'Quezon City': [
-          'Quezon City',
-        ],
-        'Manila': [
-          'Manila',
-        ],
-        'Caloocan': [
-          'Caloocan',
-        ],
-        'Abra': [
-          'Bangued',
-          'Boliney',
-          'Bucay',
-        ],
-        'Apayao': [
-          'Calanasan',
-          'Conner',
-          'Kabugao',
-        ],
-        'Benguet': [
-          'Baguio',
-          'La Trinidad',
-          'Itogon',
-        ],
-        'Ifugao': [
-          'Lagawe',
-          'Lamut',
-          'Kiangan',
-        ],
-        'Kalinga': [
-          'Tabuk',
-          'Rizal',
-          'Tanudan',
-        ],
-        'Mountain Province': [
-          'Bontoc',
-          'Sadanga',
-          'Barlig',
-        ],
-        'Ilocos Norte': [
-          'Laoag',
-          'Batac',
-          'San Nicolas',
-        ],
-        'Ilocos Sur': [
-          'Vigan',
-          'Candon',
-          'Bantay',
-        ],
-        'La Union': [
-          'San Fernando',
-          'Agoo',
-          'Bauang',
-        ],
-        'Pangasinan': [
-          'Lingayen',
-          'Dagupan',
-          'San Carlos',
-        ],
-        'Batanes': [
-          'Basco',
-          'Itbayat',
-          'Sabtang',
-        ],
-        'Cagayan': [
-          'Tuguegarao',
-          'Aparri',
-          'Gonzaga',
-        ],
-        'Isabela': [
-          'Ilagan',
-          'Cauayan',
-          'Santiago',
-        ],
-        'Nueva Vizcaya': [
-          'Bayombong',
-          'Solano',
-          'Bambang',
-        ],
-        'Quirino': [
-          'Cabarroguis',
-          'Diffun',
-          'Maddela',
-        ],
-        'Aurora': [
-          'Baler',
-          'Maria Aurora',
-          'San Luis',
-        ],
-        'Bataan': [
-          'Balanga',
-          'Dinalupihan',
-          'Mariveles',
-        ],
-        'Bulacan': [
-          'Malolos',
-          'Meycauayan',
-          'San Jose del Monte',
-        ],
-        'Nueva Ecija': [
-          'Palayan',
-          'Cabanatuan',
-          'Gapan',
-        ],
-        'Pampanga': [
-          'San Fernando',
-          'Angeles',
-          'Mabalacat',
-        ],
-        'Tarlac': [
-          'Tarlac',
-          'Concepcion',
-          'Capas',
-        ],
-        'Zambales': [
-          'Olongapo',
-          'Iba',
-          'Subic',
-        ],
-        'Cavite': [
-          'Dasmariñas',
-          'Bacoor',
-          'Imus',
-          'Dasmariñas City',
-        ],
-        'Laguna': [
-          'Santa Cruz',
-          'San Pedro',
-          'Biñan',
-        ],
-        'Batangas': [
-          'Batangas',
-          'Lipa',
-          'Tanauan',
-        ],
-        'Rizal': [
-          'Antipolo',
-          'Taytay',
-          'Cainta',
-        ],
-        'Quezon': [
-          'Lucena',
-          'Tayabas',
-          'Sariaya',
-        ],
-        'Marinduque': [
-          'Boac',
-          'Gasan',
-          'Santa Cruz',
-        ],
-        'Occidental Mindoro': [
-          'Mamburao',
-          'San Jose',
-          'Sablayan',
-        ],
-        'Oriental Mindoro': [
-          'Calapan',
-          'Puerto Galera',
-          'Baco',
-        ],
-        'Palawan': [
-          'Puerto Princesa',
-          'Coron',
-          'El Nido',
-        ],
-        'Romblon': [
-          'Romblon',
-          'Odiongan',
-          'San Agustin',
-        ],
-        'Albay': [
-          'Legazpi',
-          'Tabaco',
-          'Ligao',
-        ],
-        'Camarines Norte': [
-          'Daet',
-          'Vinzons',
-          'Basud',
-        ],
-        'Camarines Sur': [
-          'Naga',
-          'Iriga',
-          'Pili',
-        ],
-        'Catanduanes': [
-          'Virac',
-          'Bato',
-          'San Miguel',
-        ],
-        'Masbate': [
-          'Masbate',
-          'Cataingan',
-          'Milagros',
-        ],
-        'Sorsogon': [
-          'Sorsogon',
-          'Bulan',
-          'Gubat',
-        ],
-        'Aklan': [
-          'Kalibo',
-          'Boracay',
-          'New Washington',
-        ],
-        'Antique': [
-          'San Jose',
-          'Sibalom',
-          'Belison',
-        ],
-        'Capiz': [
-          'Roxas',
-          'Panay',
-          'Tapaz',
-        ],
-        'Guimaras': [
-          'Jordan',
-          'Buenavista',
-          'Nueva Valencia',
-        ],
-        'Iloilo': [
-          'Iloilo',
-          'Passi',
-          'Oton',
-        ],
-        'Negros Occidental': [
-          'Bacolod',
-          'Silay',
-          'Bago',
-        ],
-        'Bohol': [
-          'Tagbilaran',
-          'Carmen',
-          'Jagna',
-        ],
-        'Cebu': [
-          'Cebu',
-          'Mandaue',
-          'Lapu-Lapu',
-        ],
-        'Negros Oriental': [
-          'Dumaguete',
-          'Bais',
-          'Canlaon',
-        ],
-        'Siquijor': [
-          'Siquijor',
-          'Lazi',
-          'San Juan',
-        ],
-        'Biliran': [
-          'Naval',
-          'Caibiran',
-          'Culaba',
-        ],
-        'Eastern Samar': [
-          'Borongan',
-          'Guiuan',
-          'Salcedo',
-        ],
-        'Leyte': [
-          'Tacloban',
-          'Ormoc',
-          'Baybay',
-        ],
-        'Northern Samar': [
-          'Catarman',
-          'Allen',
-          'Laoang',
-        ],
-        'Samar': [
-          'Catbalogan',
-          'Calbayog',
-          'Gandara',
-        ],
-        'Southern Leyte': [
-          'Maasin',
-          'Sogod',
-          'Bontoc',
-        ],
-        'Zamboanga del Norte': [
-          'Dipolog',
-          'Dapitan',
-          'Sindangan',
-        ],
-        'Zamboanga del Sur': [
-          'Zamboanga',
-          'Pagadian',
-          'Ipil',
-        ],
-        'Zamboanga Sibugay': [
-          'Ipil',
-          'Kabasalan',
-          'Naga',
-        ],
-        'Bukidnon': [
-          'Malaybalay',
-          'Valencia',
-          'Maramag',
-        ],
-        'Camiguin': [
-          'Mambajao',
-          'Catarman',
-          'Mahinog',
-        ],
-        'Lanao del Norte': [
-          'Iligan',
-          'Tubod',
-          'Lala',
-        ],
-        'Misamis Occidental': [
-          'Oroquieta',
-          'Ozamiz',
-          'Tangub',
-        ],
-        'Misamis Oriental': [
-          'Cagayan de Oro',
-          'Gingoog',
-          'El Salvador',
-        ],
-        'Compostela Valley': [
-          'Nabunturan',
-          'Monkayo',
-          'Compostela',
-        ],
-        'Davao del Norte': [
-          'Tagum',
-          'Panabo',
-          'Samal',
-        ],
-        'Davao del Sur': [
-          'Davao',
-          'Digos',
-          'Mati',
-        ],
-        'Davao Occidental': [
-          'Malita',
-          'Jose Abad Santos',
-          'Santa Maria',
-        ],
-        'North Cotabato': [
-          'Kidapawan',
-          'Midsayap',
-          'Kabacan',
-        ],
-        'Sarangani': [
-          'Alabel',
-          'Glan',
-          'Kiamba',
-        ],
-        'South Cotabato': [
-          'Koronadal',
-          'General Santos',
-          'Polomolok',
-        ],
-        'Sultan Kudarat': [
-          'Isulan',
-          'Tacurong',
-          'President Quirino',
-        ],
-        'Agusan del Norte': [
-          'Cabadbaran',
-          'Butuan',
-          'Carmen',
-        ],
-        'Agusan del Sur': [
-          'Prosperidad',
-          'Bayugan',
-          'San Francisco',
-        ],
-        'Dinagat Islands': [
-          'Dinagat',
-          'Libjo',
-          'Tubajon',
-        ],
-        'Surigao del Norte': [
-          'Surigao',
-          'Siargao',
-          'Claver',
-        ],
-        'Surigao del Sur': [
-          'Tandag',
-          'Bislig',
-          'Carrascal',
-        ],
-        'Basilan': [
-          'Lamitan',
-          'Isabela',
-          'Tipo-Tipo',
-        ],
-        'Lanao del Sur': [
-          'Marawi',
-          'Lumba-Bayabao',
-          'Butig',
-        ],
-        'Maguindanao': [
-          'Shariff Aguak',
-          'Buldon',
-          'Datu Odin Sinsuat',
-        ],
-        'Sulu': [
-          'Jolo',
-          'Talipao',
-          'Pata',
-        ],
-        'Tawi-Tawi': [
-          'Bongao',
-          'Mapun',
-          'Sitangkai',
-        ],
-      };
-      return municipalityMap[selectedProvince.value] ?? <String>[];
-    }, [selectedProvince.value]);
+    // Load municipalities when province changes
+    useEffect(() {
+      if (db == null || currentUser == null || selectedProvince.value == null) {
+        municipalities.value = [];
+        return null;
+      }
+      Future(() async {
+        try {
+          final rows = await db.getAll(
+            'SELECT DISTINCT municipality FROM user_locations WHERE user_id = ? AND province = ? AND deleted_at IS NULL ORDER BY municipality',
+            [currentUser.id, selectedProvince.value],
+          );
+          municipalities.value = rows.map((r) => r['municipality'] as String).toList();
+        } catch (_) {
+          municipalities.value = [];
+        }
+      });
+      return null;
+    }, [db, currentUser?.id, selectedProvince.value]);
 
-    final barangays = useMemoized(() {
-      if (selectedMunicipality.value == null) return <String>[];
-      // Mock data - generate default barangays for any municipality
-      final municipalityName = selectedMunicipality.value!;
-      final defaultBarangays = List.generate(10, (index) => 'Barangay ${index + 1}');
-      return defaultBarangays;
-    }, [selectedMunicipality.value]);
+    void _notifyIfComplete() {
+      if (selectedProvince.value != null &&
+          selectedMunicipality.value != null &&
+          barangayController.text.trim().isNotEmpty) {
+        onPsgcSelected(PsgcData(
+          region: '',
+          province: selectedProvince.value!,
+          municipality: selectedMunicipality.value!,
+          barangay: barangayController.text.trim(),
+        ));
+      }
+    }
+
+    if (isLoading.value) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Region Dropdown
+        // Province dropdown
         _buildDropdown(
-          label: 'Region *',
-          value: selectedRegion.value,
-          items: regions,
-          hint: 'Select Region',
-          icon: LucideIcons.map,
-          enabled: enabled,
-          onChanged: enabled
-              ? (value) {
-                  selectedRegion.value = value;
-                  selectedProvince.value = null;
-                  selectedMunicipality.value = null;
-                  selectedBarangay.value = null;
-                }
-              : null,
-        ),
-
-        const SizedBox(height: 12),
-
-        // Province Dropdown
-        _buildDropdown(
-          label: 'Province',
+          label: 'Province *',
           value: selectedProvince.value,
-          items: provinces,
-          hint: selectedRegion.value == null ? 'Select region first' : 'Select Province',
+          items: provinces.value,
+          hint: provinces.value.isEmpty ? 'No locations assigned' : 'Select Province',
           icon: LucideIcons.map,
-          enabled: enabled && selectedRegion.value != null,
-          onChanged: enabled && selectedRegion.value != null
+          enabled: enabled && provinces.value.isNotEmpty,
+          onChanged: enabled
               ? (value) {
                   selectedProvince.value = value;
                   selectedMunicipality.value = null;
-                  selectedBarangay.value = null;
+                  barangayController.clear();
                 }
               : null,
         ),
 
         const SizedBox(height: 12),
 
-        // City/Municipality Dropdown
+        // Municipality dropdown
         _buildDropdown(
-          label: 'City/Municipality',
+          label: 'City/Municipality *',
           value: selectedMunicipality.value,
-          items: municipalities,
+          items: municipalities.value,
           hint: selectedProvince.value == null ? 'Select province first' : 'Select City/Municipality',
           icon: LucideIcons.building,
-          enabled: enabled && selectedProvince.value != null,
+          enabled: enabled && selectedProvince.value != null && municipalities.value.isNotEmpty,
           onChanged: enabled && selectedProvince.value != null
               ? (value) {
                   selectedMunicipality.value = value;
-                  selectedBarangay.value = null;
+                  barangayController.clear();
                 }
               : null,
         ),
 
         const SizedBox(height: 12),
 
-        // Barangay Dropdown
-        _buildDropdown(
-          label: 'Barangay',
-          value: selectedBarangay.value,
-          items: barangays,
-          hint: selectedMunicipality.value == null ? 'Select city first' : 'Select Barangay',
-          icon: LucideIcons.users,
-          enabled: enabled && selectedMunicipality.value != null,
-          onChanged: enabled && selectedMunicipality.value != null
-              ? (value) {
-                  selectedBarangay.value = value;
-                  // Emit PSGC data
-                  final psgcData = PsgcData(
-                    region: selectedRegion.value!,
-                    province: selectedProvince.value!,
-                    municipality: selectedMunicipality.value!,
-                    barangay: selectedBarangay.value!,
-                  );
-                  onPsgcSelected(psgcData);
-                }
-              : null,
+        // Barangay text field
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Barangay *',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 4),
+            TextFormField(
+              controller: barangayController,
+              enabled: enabled && selectedMunicipality.value != null,
+              decoration: InputDecoration(
+                hintText: selectedMunicipality.value == null
+                    ? 'Select city/municipality first'
+                    : 'Enter barangay name',
+                prefixIcon: const Icon(LucideIcons.users, size: 18),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                border: const OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                filled: !(enabled && selectedMunicipality.value != null),
+                fillColor: Colors.grey.shade100,
+              ),
+              textCapitalization: TextCapitalization.words,
+              onChanged: (_) => _notifyIfComplete(),
+            ),
+          ],
         ),
       ],
     );
@@ -751,8 +227,6 @@ class PsgcData {
     required this.barangay,
   });
 
-  /// Generate a unique ID for PSGC data
-  /// In production, this should match the actual PSGC ID from the database
   String get id {
     return '${region}_${province}_${municipality}_${barangay}'
         .replaceAll(' ', '_')
@@ -761,18 +235,11 @@ class PsgcData {
         .toLowerCase();
   }
 
-  /// Get full address string
   String get fullAddress {
-    final parts = [
-      barangay,
-      municipality,
-      province,
-    ];
+    final parts = [barangay, municipality, province];
     return parts.join(', ');
   }
 
   @override
-  String toString() {
-    return 'PsgcData($fullAddress)';
-  }
+  String toString() => 'PsgcData($fullAddress)';
 }
