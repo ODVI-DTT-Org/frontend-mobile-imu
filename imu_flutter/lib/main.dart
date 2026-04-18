@@ -20,15 +20,6 @@ import 'shared/widgets/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize PostHog analytics
-  // Note: Will be configured after AppConfig.initialize() in _initializeApp()
-  // This is a no-op placeholder - actual setup happens in IMUAppWithSplash
-  runApp(const ProviderScope(child: IMUAppWithSplash()));
-}
-
-  // No local seeding - use Digital Ocean data via PowerSync
-  // Run app with splash screen
   runApp(const ProviderScope(child: IMUAppWithSplash()));
 }
 
