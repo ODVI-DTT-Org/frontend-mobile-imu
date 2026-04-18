@@ -7,6 +7,7 @@ import '../../../../core/utils/app_notification.dart';
 import '../../../../services/auth/session_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
+import '../../../../services/sync/sync_service.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
@@ -52,6 +53,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       setState(() {
         _lastSyncTime = time;
       });
+    }
+  }
+
+  Future<void> _removePendings() async {
+    final syncService = ref.read(syncServiceProvider);
+    final count = syncService.pendingCount;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Pending Changes?'),
+        content: Text(
+          'This will discard $count unsynced item${count == 1 ? '' : 's'}. '
+          'These changes will be permanently lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await syncService.removePendings();
+      if (mounted) {
+        AppNotification.showSuccess(context, 'Pending changes removed');
+      }
     }
   }
 
@@ -260,6 +295,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         _performManualSync();
                       },
               ),
+              _buildDivider(),
+              Builder(builder: (context) {
+                final pendingCount = ref.watch(syncPendingCountProvider);
+                return _buildSettingsTile(
+                  icon: LucideIcons.trash2,
+                  title: 'Remove Pendings',
+                  subtitle: pendingCount > 0
+                      ? '$pendingCount unsynced item${pendingCount == 1 ? '' : 's'} queued'
+                      : 'No pending changes',
+                  onTap: pendingCount > 0
+                      ? () {
+                          HapticUtils.mediumImpact();
+                          _removePendings();
+                        }
+                      : null,
+                );
+              }),
               _buildDivider(),
               // RBAC: Test PowerSync is admin-only
               PermissionWidget(
