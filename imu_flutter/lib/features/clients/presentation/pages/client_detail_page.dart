@@ -1670,8 +1670,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     onAddAddress: _addAddress,
                   ),
 
-                  // 3. CMS Visit History (Legacy PCNICMS visits)
-                  const CmsVisitHistoryExpansionPanel(),
+                  // 3. CMS Visit History
+                  CmsVisitHistoryExpansionPanel(clientId: widget.clientId),
 
                   // 4. Touchpoint History (7-step sequence)
                   TouchpointHistoryExpansionPanel(

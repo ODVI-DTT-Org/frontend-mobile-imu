@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
+import '../../../../../services/api/visit_api_service.dart';
+
+final _cmsVisitsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, clientId) => ref.read(visitApiServiceProvider).getVisitsByClientId(clientId),
+);
 
 /// CMS Visit History Expansion Panel
-/// Displays historical CMS visits from the old system (PCNICMS)
-/// These are separate from the 7-step touchpoint system
-class CmsVisitHistoryExpansionPanel extends StatelessWidget {
+/// Displays physical visits recorded for a client from the visits table.
+class CmsVisitHistoryExpansionPanel extends ConsumerWidget {
+  final String clientId;
+
   const CmsVisitHistoryExpansionPanel({
     super.key,
+    required this.clientId,
   });
 
   @override
-  Widget build(BuildContext context) {
-    // TODO: Load CMS visit data from backend API or local storage
-    // For now, showing empty state
+  Widget build(BuildContext context, WidgetRef ref) {
+    final visitsAsync = ref.watch(_cmsVisitsProvider(clientId));
+
     return ExpansionTile(
       title: Text(
         'CMS VISIT HISTORY',
@@ -23,37 +32,33 @@ class CmsVisitHistoryExpansionPanel extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        'Legacy (Read Only)',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[600],
-        ),
+        'Read Only',
+        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
       ),
       initiallyExpanded: false,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'HISTORICAL CMS VISITS (OLD SYSTEM)',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                ),
+          child: visitsAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
               ),
-              const SizedBox(height: 16),
-              _buildEmptyState(),
-            ],
+            ),
+            error: (_, __) => _buildEmptyState('Failed to load visit history'),
+            data: (visits) => visits.isEmpty
+                ? _buildEmptyState('No CMS visit history recorded')
+                : Column(
+                    children: visits.map((v) => _buildVisitTile(v)).toList(),
+                  ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(String message) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -62,27 +67,11 @@ class CmsVisitHistoryExpansionPanel extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(
-            LucideIcons.history,
-            size: 48,
-            color: Colors.grey[400],
-          ),
+          Icon(LucideIcons.history, size: 48, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
-            'No CMS visit history available',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'CMS visits from the old system (PCNICMS) will appear here once imported.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
+            message,
+            style: TextStyle(fontSize: 14, color: Colors.grey[700], fontWeight: FontWeight.w500),
             textAlign: TextAlign.center,
           ),
         ],
@@ -90,93 +79,72 @@ class CmsVisitHistoryExpansionPanel extends StatelessWidget {
     );
   }
 
-  /// Example of how to display a CMS visit (for future implementation)
-  Widget _buildCmsVisitTile({
-    required String date,
-    required String type,
-    required String agent,
-    required String remarks,
-  }) {
+  Widget _buildVisitTile(Map<String, dynamic> visit) {
+    final type = visit['type'] == 'release_loan' ? 'Loan Release' : 'Regular Visit';
+    final source = visit['source'] as String?;
+    final timeIn = visit['time_in'] != null
+        ? DateFormat('MMM d, y h:mm a').format(DateTime.parse(visit['time_in']).toLocal())
+        : null;
+    final agentFirst = visit['agent_first_name'] as String?;
+    final agentLast = visit['agent_last_name'] as String?;
+    final agentName = (agentFirst != null || agentLast != null)
+        ? '${agentFirst ?? ''} ${agentLast ?? ''}'.trim()
+        : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey[300]!,
-          width: 1,
-        ),
+        border: Border(left: BorderSide(color: Colors.blue[400]!, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(LucideIcons.calendar, size: 16, color: Colors.grey[700]),
-              const SizedBox(width: 6),
-              Text(
-                date,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[900],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.blue[100],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  type,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue[800]),
                 ),
               ),
+              if (source != null) ...[
+                const SizedBox(width: 6),
+                Text('via $source', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+              ],
+              const Spacer(),
+              if (timeIn != null)
+                Text(timeIn, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Type: $type',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
+          if (visit['reason'] != null) ...[
+            const SizedBox(height: 6),
+            Text('Reason: ${visit['reason']}', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+          ],
+          if (visit['status'] != null) ...[
+            const SizedBox(height: 2),
+            Text('Status: ${visit['status']}', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+          ],
+          if (visit['notes'] != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              visit['notes'] as String,
+              style: TextStyle(fontSize: 12, color: Colors.grey[700], fontStyle: FontStyle.italic),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Agent: $agent',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Remarks: $remarks',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
-              fontStyle: FontStyle.italic,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () {
-              // TODO: Show CMS visit details dialog
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'View Details',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  LucideIcons.chevronRight,
-                  size: 14,
-                  color: Colors.blue[700],
-                ),
-              ],
-            ),
-          ),
+          ],
+          if (agentName != null) ...[
+            const SizedBox(height: 4),
+            Text('Agent: $agentName', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+          ],
         ],
       ),
     );
