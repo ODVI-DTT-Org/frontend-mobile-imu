@@ -725,13 +725,9 @@ final pendingClientServiceProvider = Provider<PendingClientService>((ref) {
   return PendingClientService();
 });
 
-/// Client mutation service provider — online → API, offline → Hive queue
+/// Client mutation service provider
 final clientMutationServiceProvider = Provider<ClientMutationService>((ref) {
-  final connectivity = ref.watch(connectivityServiceProvider);
-  final api = ref.watch(clientApiServiceProvider);
-  final pending = ref.watch(pendingClientServiceProvider);
-  final hive = ref.watch(hiveServiceProvider);
-  return ClientMutationService(connectivity, api, pending, hive);
+  return ClientMutationService();
 });
 
 // ==================== Sync Providers ====================
