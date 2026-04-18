@@ -712,13 +712,12 @@ final pendingReleaseServiceProvider = Provider<PendingReleaseService>((ref) {
   return PendingReleaseService();
 });
 
-/// Release creation service provider — online → API, offline → Hive queue
+/// Release creation service provider
 final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
   final connectivity = ref.watch(connectivityServiceProvider);
   final releaseApi = ref.watch(releaseApiServiceProvider);
   final visitApi = ref.watch(visitApiServiceProvider);
-  final pending = ref.watch(pendingReleaseServiceProvider);
-  return ReleaseCreationService(connectivity, releaseApi, visitApi, pending);
+  return ReleaseCreationService(connectivity, releaseApi, visitApi);
 });
 
 /// Pending client service provider
