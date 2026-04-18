@@ -702,12 +702,9 @@ final pendingVisitServiceProvider = Provider<PendingVisitService>((ref) {
   return PendingVisitService();
 });
 
-/// Visit creation service provider — online → API, offline → Hive queue
+/// Visit creation service provider
 final visitCreationServiceProvider = Provider<VisitCreationService>((ref) {
-  final connectivity = ref.watch(connectivityServiceProvider);
-  final api = ref.watch(visitApiServiceProvider);
-  final pending = ref.watch(pendingVisitServiceProvider);
-  return VisitCreationService(connectivity, api, pending);
+  return VisitCreationService();
 });
 
 /// Pending release service provider

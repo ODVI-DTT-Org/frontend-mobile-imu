@@ -3,18 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:imu_flutter/services/connectivity_service.dart';
-import 'package:imu_flutter/services/api/visit_api_service.dart';
-import 'pending_visit_service.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 
-/// Creates visits: online → REST API, offline → Hive pending queue
+/// Creates visits by writing directly to local SQLite.
+/// PowerSync CRUD queue handles delivery to the backend when online.
 class VisitCreationService {
-  final ConnectivityService _connectivity;
-  final VisitApiService _api;
-  final PendingVisitService _pending;
   final Uuid _uuid = const Uuid();
-
-  VisitCreationService(this._connectivity, this._api, this._pending);
 
   Future<void> createVisit({
     required String clientId,
@@ -26,37 +20,37 @@ class VisitCreationService {
     String? notes,
     String type = 'regular_visit',
   }) async {
-    if (_connectivity.isOnline) {
-      debugPrint('VisitCreationService: Online - calling API');
-      await _api.createVisit(
-        clientId: clientId,
-        timeIn: timeIn,
-        timeOut: timeOut,
-        odometerArrival: odometerArrival,
-        odometerDeparture: odometerDeparture,
-        photoFile: photoFile,
-        notes: notes,
-        type: type,
-      );
-    } else {
-      debugPrint('VisitCreationService: Offline - storing locally');
-      final savedPhotoPath = photoFile != null ? await _saveFileForOffline(photoFile) : null;
-      await _pending.addPendingVisit(
-        clientId: clientId,
-        timeIn: timeIn,
-        timeOut: timeOut,
-        odometerArrival: odometerArrival,
-        odometerDeparture: odometerDeparture,
-        photoPath: savedPhotoPath,
-        notes: notes,
-        type: type,
-      );
-    }
+    final db = await PowerSyncService.database;
+    final id = _uuid.v4();
+    final now = DateTime.now().toIso8601String();
+
+    if (photoFile != null) await _saveFile(photoFile);
+
+    debugPrint('VisitCreationService: Writing visit $id to SQLite');
+
+    await db.execute(
+      '''INSERT INTO visits
+         (id, client_id, user_id, type, time_in, time_out,
+          odometer_arrival, odometer_departure, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      [
+        id,
+        clientId,
+        null, // user_id filled by backend from JWT
+        type,
+        timeIn,
+        timeOut,
+        odometerArrival,
+        odometerDeparture,
+        notes,
+        now,
+      ],
+    );
   }
 
-  Future<String> _saveFileForOffline(File file) async {
-    final dir = await getTemporaryDirectory();
-    final filename = 'pending_visit_${_uuid.v4()}_${path.basename(file.path)}';
+  Future<String> _saveFile(File file) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final filename = 'visit_${_uuid.v4()}_${path.basename(file.path)}';
     final newPath = path.join(dir.path, filename);
     await file.copy(newPath);
     return newPath;
