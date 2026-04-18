@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/psgc_api_service.dart' show PsgcRegion, PsgcProvince, PsgcMunicipality, PsgcBarangay, psgcApiServiceProvider;
-import '../../../../shared/providers/app_providers.dart' show assignedClientsProvider, isOnlineProvider, clientApiServiceProvider;
+import '../../../../shared/providers/app_providers.dart' show assignedClientsProvider, isOnlineProvider, clientApiServiceProvider, clientMutationServiceProvider;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/client_model.dart';
 
@@ -19,7 +18,6 @@ class AddProspectClientPage extends ConsumerStatefulWidget {
 
 class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
   final _formKey = GlobalKey<FormState>();
-  final _hiveService = HiveService();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _middleNameController = TextEditingController();
@@ -285,78 +283,40 @@ class _AddProspectClientPageState extends ConsumerState<AddProspectClientPage> {
             debugPrint('[AddProspectClientPage] Phone number submitted for approval');
           }
         } else {
-          // Offline mode: Save to Hive
-          final clientId = DateTime.now().millisecondsSinceEpoch.toString();
+          // Offline mode: write directly to PowerSync SQLite (syncs when back online)
           final now = DateTime.now();
-
-          final clientData = {
-            'id': clientId,
-            'firstName': _firstNameController.text.trim(),
-            'middleName': _middleNameController.text.trim().isEmpty
-                ? null
-                : _middleNameController.text.trim(),
-            'lastName': _lastNameController.text.trim(),
-            'agencyName': _selectedAgency,
-            'department': _departmentController.text.trim().isEmpty
-                ? null
-                : _departmentController.text.trim(),
-            'position': _positionController.text.trim().isEmpty
-                ? null
-                : _positionController.text.trim(),
-            'employmentStatus': _selectedEmploymentStatus,
-            'payrollDate': _selectedPayrollDate,
-            'tenure': _tenureController.text.trim().isEmpty
-                ? null
-                : int.tryParse(_tenureController.text.trim()),
-            'birthDate': _selectedBirthDate?.toIso8601String(),
-            'contactNumber': _contactNumberController.text.trim(),
-            'email': _emailController.text.trim().isEmpty
-                ? null
-                : _emailController.text.trim(),
-            'facebookLink': _facebookController.text.trim().isEmpty
-                ? null
-                : _facebookController.text.trim(),
-            'remarks': _remarksController.text.trim().isEmpty
-                ? null
-                : _remarksController.text.trim(),
-            'pan': _panController.text.trim().isEmpty
-                ? null
-                : _panController.text.trim(),
-            'region': _selectedRegion,
-            'province': _selectedProvince,
-            'municipality': _selectedMunicipality,
-            'barangay': _selectedBarangay,
-            'psgcId': null,
-            'clientType': 'potential',
-            'marketType': _selectedMarketType.toLowerCase(),
-            'productType': _selectedProductType.toLowerCase().replaceAll(' ', ''),
-            'pensionType': _selectedPensionType.toLowerCase(),
-            'addresses': [
-              {
-                'id': '${clientId}_addr_1',
-                'type': 'home',
-                'street': _streetController.text.trim(),
-                'barangay': _selectedBarangay ?? _barangayController.text.trim(),
-                'city': _selectedMunicipality ?? _cityController.text.trim(),
-                'province': _selectedProvince ?? _provinceController.text.trim(),
-                'isPrimary': true,
-              }
-            ],
-            'phoneNumbers': [
-              {
-                'id': '${clientId}_phone_1',
-                'type': 'mobile',
-                'number': _contactNumberController.text.trim(),
-                'label': 'Mobile',
-                'isPrimary': true,
-              }
-            ],
-            'touchpoints': [],
-            'createdAt': now.toIso8601String(),
-            'updatedAt': now.toIso8601String(),
-          };
-
-          await _hiveService.saveClient(clientId, clientData);
+          final offlineClient = Client(
+            firstName: _firstNameController.text.trim(),
+            middleName: _middleNameController.text.trim().isEmpty ? null : _middleNameController.text.trim(),
+            lastName: _lastNameController.text.trim(),
+            agencyName: _selectedAgency,
+            department: _departmentController.text.trim().isEmpty ? null : _departmentController.text.trim(),
+            position: _positionController.text.trim().isEmpty ? null : _positionController.text.trim(),
+            employmentStatus: _selectedEmploymentStatus,
+            payrollDate: _selectedPayrollDate,
+            tenure: _tenureController.text.trim().isEmpty ? null : int.tryParse(_tenureController.text.trim()),
+            birthDate: _selectedBirthDate,
+            phone: _contactNumberController.text.trim().isEmpty ? null : _contactNumberController.text.trim(),
+            email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+            facebookLink: _facebookController.text.trim().isEmpty ? null : _facebookController.text.trim(),
+            remarks: _remarksController.text.trim().isEmpty ? null : _remarksController.text.trim(),
+            pan: _panController.text.trim().isEmpty ? null : _panController.text.trim(),
+            region: _selectedRegion,
+            province: _selectedProvince,
+            municipality: _selectedMunicipality,
+            barangay: _selectedBarangay,
+            clientType: ClientType.potential,
+            marketType: _parseMarketType(_selectedMarketType),
+            productType: _parseProductType(_selectedProductType),
+            pensionType: _parsePensionType(_selectedPensionType),
+            touchpoints: [],
+            createdAt: now,
+            updatedAt: now,
+            isStarred: false,
+            loanReleased: false,
+          );
+          final mutationService = ref.read(clientMutationServiceProvider);
+          await mutationService.createClient(offlineClient);
         }
 
         // Refresh client list
