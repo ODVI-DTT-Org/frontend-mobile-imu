@@ -25,6 +25,7 @@ import 'client_api_service.dart' show ClientApiService;
 import '../../features/clients/data/models/client_model.dart' show Client;
 import 'visit_api_service.dart' show VisitApiService;
 import 'release_api_service.dart' show ReleaseApiService;
+import '../local_storage/hive_service.dart';
 
 /// Background sync service for automatic data synchronization
 ///

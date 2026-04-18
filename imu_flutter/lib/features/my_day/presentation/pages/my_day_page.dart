@@ -169,9 +169,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     if (confirmed != true) return;
 
     final repo = ref.read(itineraryRepositoryProvider);
-    final selectedClients = ref.read(myDayStateProvider).clients
-        .where((c) => _selectedClientIds.contains(c.id))
-        .toList();
     for (final client in selectedClients) {
       await repo.deleteItinerary(client.id);
     }
