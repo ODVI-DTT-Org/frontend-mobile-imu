@@ -80,10 +80,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../services/search/fuzzy_search_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
-import '../../services/local_storage/hive_service.dart';
 import '../../services/sync/sync_service.dart';
 import '../../services/location/geolocation_service.dart';
 import '../../core/services/location_service.dart';
@@ -119,6 +117,7 @@ import 'touchpoint_filter_provider.dart' show touchpointFilterProvider;
 import '../../features/visits/data/models/visit_model.dart';
 import '../../features/visits/data/repositories/visit_repository.dart';
 import '../../features/attendance/data/repositories/attendance_repository.dart';
+import '../../features/clients/data/repositories/client_repository.dart';
 import '../../features/groups/data/models/group_model.dart';
 import '../../features/groups/data/repositories/group_repository.dart';
 import '../../features/targets/data/repositories/target_repository.dart';
@@ -127,10 +126,6 @@ import '../../features/my_day/data/repositories/my_day_repository.dart';
 
 // ==================== Service Providers ====================
 
-/// Hive service provider
-final hiveServiceProvider = Provider<HiveService>((ref) {
-  return HiveService();
-});
 
 /// Sync service provider - re-exported from sync_service.dart
 // This is now defined in lib/services/sync/sync_service.dart
@@ -162,8 +157,7 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
     try {
       debugPrint('[INITIAL SYNC] Login successful - triggering initial client sync...');
 
-      // Invalidate assigned clients provider to trigger sync
-      // This will fetch all assigned clients from API and cache to Hive
+      // Invalidate assigned clients provider to trigger fresh load from PowerSync
       ref.invalidate(assignedClientsProvider);
 
       debugPrint('[INITIAL SYNC] Initial client sync triggered');
@@ -241,21 +235,13 @@ final offlineAuthProvider = Provider<OfflineAuthService>((ref) {
 
 // ==================== Client Providers ====================
 
-/// Client by ID provider - fetches a single client from Hive cache
+/// Client by ID provider - fetches a single client from PowerSync SQLite
 /// Used by router for deep linking to client detail pages and forms
 final clientByIdProvider = FutureProvider.family<Client, String>((ref, clientId) async {
-  final hiveService = ref.watch(hiveServiceProvider);
-
-  if (!hiveService.isInitialized) {
-    await hiveService.init();
-  }
-
-  final clientData = hiveService.getClient(clientId);
-  if (clientData == null) {
-    throw Exception('Client not found: $clientId');
-  }
-
-  return Client.fromJson(clientData);
+  final clientRepo = ref.watch(clientRepositoryProvider);
+  final client = await clientRepo.getClient(clientId);
+  if (client == null) throw Exception('Client not found: $clientId');
+  return client;
 });
 
 // ==================== Online-Only Client Providers ====================
@@ -366,99 +352,23 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   }
 });
 
-/// Assigned clients - Uses Hive cache with API refresh in background
-/// This is used for "Assigned Clients" mode to show clients in user's territory
-///
-/// Strategy:
-/// 1. Load from Hive cache immediately (fast, works offline)
-/// 2. Apply pagination locally
-/// 3. If cache is empty AND online, fetch immediately from API (not background)
-/// 4. If cache has data AND online, trigger background refresh from API
-/// 5. Update Hive cache when API returns
+/// Assigned clients — reads from PowerSync SQLite, applies filters/search/pagination locally.
+/// PowerSync automatically keeps the clients table in sync with the server.
 final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
-  final isOnline = ref.watch(isOnlineProvider);
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
   final page = ref.watch(assignedClientPageProvider);
   final locationFilter = ref.watch(locationFilterProvider);
   final attributeFilter = ref.watch(clientAttributeFilterProvider);
   final touchpointFilter = ref.watch(touchpointFilterProvider);
-  final hiveService = ref.watch(hiveServiceProvider);
 
   debugPrint('=== ASSIGNED CLIENTS FETCH ===');
-  debugPrint('Is Online: $isOnline');
   debugPrint('Search query: "$searchQuery", Page: $page');
-  debugPrint('Location filter: ${locationFilter.toQueryParams()}');
-  debugPrint('Attribute filter: ${attributeFilter.toQueryParams()}');
 
-  // Initialize Hive if needed
-  if (!hiveService.isInitialized) {
-    await hiveService.init();
-  }
+  // Load from PowerSync SQLite (works online and offline)
+  final clientRepo = ref.watch(clientRepositoryProvider);
+  var cachedClients = await clientRepo.getClients();
 
-  // Step 1: Load from Hive cache immediately
-  debugPrint('assignedClientsProvider: Loading from Hive cache...');
-  final clientsData = hiveService.getAllClients();
-
-  // Parse clients with error handling to skip invalid records
-  var cachedClients = <Client>[];
-  for (final data in clientsData) {
-    try {
-      final client = Client.fromJson(data);
-      cachedClients.add(client);
-    } catch (e) {
-      debugPrint('assignedClientsProvider: Error parsing client data - $e');
-      debugPrint('assignedClientsProvider: Skipping invalid client record');
-      // Continue with next client instead of failing entire provider
-    }
-  }
-
-  debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from Hive cache');
-
-  // Step 2: If cache is empty AND online, fetch immediately from API (not background)
-  // This ensures data is loaded even if background refresh fails or is skipped
-  if (cachedClients.isEmpty && isOnline) {
-    debugPrint('assignedClientsProvider: Cache empty and online - fetching IMMEDIATELY from API...');
-    try {
-      final clientApi = ref.read(clientApiServiceProvider);
-      final queryParams = attributeFilter.toQueryParams();
-      final response = await clientApi.fetchAssignedClients(
-        page: 1,
-        perPage: 100,
-        search: searchQuery.isNotEmpty ? searchQuery : null,
-        clientType: queryParams['client_type'],
-        marketType: queryParams['market_type'],
-        pensionType: queryParams['pension_type'],
-        productType: queryParams['product_type'],
-        province: locationFilter.province,
-        municipality: locationFilter.municipalities?.join(','),
-      );
-
-      final fetchedClients = response.items;
-      debugPrint('assignedClientsProvider: Immediate fetch - Got ${fetchedClients.length} clients from API');
-
-      // Update Hive cache with fetched data
-      if (fetchedClients.isNotEmpty) {
-        for (final client in fetchedClients) {
-          final clientJson = client.toJson();
-          final clientId = client.id;
-          if (clientJson != null && clientId != null) {
-            await hiveService.saveClient(clientId, clientJson);
-          }
-        }
-        debugPrint('assignedClientsProvider: Immediate fetch - Cached ${fetchedClients.length} clients to Hive');
-
-        // Update cached clients with fetched data
-        cachedClients = fetchedClients;
-      }
-    } catch (e) {
-      debugPrint('assignedClientsProvider: Immediate fetch failed - $e');
-      // Fall back to empty cache - UI will show empty state
-    }
-  } else if (isOnline) {
-    // Step 3: If cache has data AND online, trigger background refresh from API
-    // Don't wait - trigger in background
-    _refreshAssignedClientsFromApi(ref, hiveService, searchQuery, locationFilter, attributeFilter);
-  }
+  debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from PowerSync SQLite');
 
   // Apply location filter locally if needed
   if (locationFilter.hasFilter) {
@@ -523,70 +433,6 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   );
 });
 
-/// Background refresh function - fetches from API and updates Hive cache
-/// Includes location filter support for province/municipality filtering
-/// Includes client attribute filter support (client_type, market_type, pension_type, product_type)
-void _refreshAssignedClientsFromApi(
-  FutureProviderRef<ClientsResponse> ref,
-  HiveService hiveService,
-  String searchQuery,
-  LocationFilter locationFilter,
-  ClientAttributeFilter attributeFilter,
-) async {
-  try {
-    debugPrint('assignedClientsProvider: Background refresh from API...');
-    debugPrint('assignedClientsProvider: Background refresh - Location filter: ${locationFilter.toQueryParams()}');
-    debugPrint('assignedClientsProvider: Background refresh - Attribute filter: ${attributeFilter.toQueryParams()}');
-
-    final clientApi = ref.read(clientApiServiceProvider);
-    final queryParams = attributeFilter.toQueryParams();
-
-    // Fetch all pages from /clients/assigned
-    final allClients = <Client>[];
-    int currentPage = 1;
-    int totalFetched = 0;
-    int totalCount = 0;
-    const int perPage = 100; // Fetch more per page to reduce API calls
-
-    do {
-      final response = await clientApi.fetchAssignedClients(
-        page: currentPage,
-        perPage: perPage,
-        search: searchQuery.isNotEmpty ? searchQuery : null,
-        clientType: queryParams['client_type'],
-        marketType: queryParams['market_type'],
-        pensionType: queryParams['pension_type'],
-        productType: queryParams['product_type'],
-        province: locationFilter.province,
-        municipality: locationFilter.municipalities?.join(','),
-      );
-
-      totalCount = response.totalItems.toInt();
-      final clients = response.items;
-      totalFetched += clients.length;
-      allClients.addAll(clients);
-
-      debugPrint('assignedClientsProvider: Background refresh - Fetched page $currentPage - ${clients.length} clients (total: $totalFetched/$totalCount)');
-
-      currentPage++;
-    } while (totalFetched < totalCount);
-
-    // Update Hive cache
-    if (allClients.isNotEmpty) {
-      for (final client in allClients) {
-        final clientJson = client.toJson();
-        final clientId = client.id;
-        if (clientJson != null && clientId != null) {
-          await hiveService.saveClient(clientId, clientJson);
-        }
-      }
-      debugPrint('assignedClientsProvider: Background refresh - Cached ${allClients.length} clients to Hive');
-    }
-  } catch (e) {
-    debugPrint('assignedClientsProvider: Background refresh failed - $e');
-    // Silently fail - UI will continue using cached data
-  }
-}
 
 /// Provider for user's assigned municipality IDs
 /// Fetches and caches the user's assigned municipalities from the backend
@@ -634,20 +480,12 @@ final selectedClientProvider = Provider<Client?>((ref) {
 
 // ==================== Touchpoint Providers ====================
 
-/// Touchpoints for selected client from Hive (used by touchpoint form)
-/// Kept for offline touchpoint creation
+/// Touchpoints for selected client from PowerSync (used by touchpoint form)
 final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
   final clientId = ref.watch(selectedClientIdProvider);
   if (clientId == null) return [];
-
-  final hiveService = ref.watch(hiveServiceProvider);
-
-  if (!hiveService.isInitialized) {
-    await hiveService.init();
-  }
-
-  final touchpointsData = hiveService.getTouchpointsForClient(clientId);
-  return touchpointsData.map((data) => Touchpoint.fromJson(data)).toList();
+  final client = await ref.watch(clientRepositoryProvider).getClient(clientId);
+  return client?.touchpointSummary ?? [];
 });
 
 /// Touchpoint counts for multiple clients from PowerSync (with API fallback)

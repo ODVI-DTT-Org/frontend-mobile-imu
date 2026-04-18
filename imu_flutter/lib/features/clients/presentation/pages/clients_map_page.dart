@@ -6,8 +6,8 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../data/models/client_model.dart';
+import '../../data/repositories/client_repository.dart' show clientRepositoryProvider;
 
 /// Full-screen map page for viewing all clients
 class ClientsMapPage extends ConsumerStatefulWidget {
@@ -18,7 +18,6 @@ class ClientsMapPage extends ConsumerStatefulWidget {
 }
 
 class _ClientsMapPageState extends ConsumerState<ClientsMapPage> {
-  final HiveService _hiveService = HiveService();
   List<Client> _clients = [];
   bool _isLoading = true;
 
@@ -33,12 +32,8 @@ class _ClientsMapPageState extends ConsumerState<ClientsMapPage> {
       ref: ref,
       message: 'Loading client locations...',
       operation: () async {
-        if (!_hiveService.isInitialized) {
-          await _hiveService.init();
-        }
-
-        final clientsData = _hiveService.getAllClients();
-        final clients = clientsData.map((data) => Client.fromJson(data)).toList();
+        final clientRepo = ref.read(clientRepositoryProvider);
+        final clients = await clientRepo.getClients();
 
         // Filter clients with valid coordinates
         final clientsWithLocations = clients.where((client) {

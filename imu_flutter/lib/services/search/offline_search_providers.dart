@@ -9,8 +9,8 @@ import '../../../models/client_model.dart' show Client;
 import '../../shared/providers/app_providers.dart'
     show
         assignedClientsProvider,
-        hiveServiceProvider,
         powerSyncDatabaseProvider;
+import '../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
 import 'client_search_service.dart' show ClientSearchService, SearchResult;
 import 'powersync_search_service.dart' show PowerSyncSearchService;
 
@@ -68,9 +68,9 @@ final powerSyncSearchResultsProvider =
     final searchService = await ref.watch(powerSyncOfflineSearchProvider.future);
     return await searchService.searchClients(query.trim(), limit: 50);
   } catch (e) {
-    // Fallback to Hive-based search if PowerSync fails
-    final hiveService = ref.watch(hiveServiceProvider);
-    final clients = await hiveService.getClients();
+    // Fallback to PowerSync SQLite if search service fails
+    final clientRepo = ref.watch(clientRepositoryProvider);
+    final clients = await clientRepo.getClients();
 
     final searchService = ClientSearchService();
     return searchService.searchClients(clients, query.trim());
@@ -97,11 +97,11 @@ final hybridOfflineSearchProvider =
     // PowerSync failed, continue to Hive fallback
   }
 
-  // If PowerSync didn't return enough results, try Hive
+  // If PowerSync didn't return enough results, try direct SQLite query
   if (results.length < (params.minResults ?? 10)) {
     try {
-      final hiveService = ref.watch(hiveServiceProvider);
-      final clients = await hiveService.getClients();
+      final clientRepo = ref.watch(clientRepositoryProvider);
+      final clients = await clientRepo.getClients();
 
       final searchService = ClientSearchService();
       final hiveResults = searchService.searchClients(
@@ -143,22 +143,23 @@ final searchStatsProvider = FutureProvider.autoDispose<SearchStats>((ref) async 
     powerSyncAvailable = false;
   }
 
-  // Check Hive availability
+  // Check local SQLite availability
+  bool localAvailable = false;
   try {
-    final hiveService = ref.watch(hiveServiceProvider);
-    final clients = await hiveService.getClients();
-    hiveAvailable = clients.isNotEmpty;
+    final clientRepo = ref.watch(clientRepositoryProvider);
+    final clients = await clientRepo.getClients();
+    localAvailable = clients.isNotEmpty;
     if (!powerSyncAvailable) {
       totalClients = clients.length;
     }
   } catch (e) {
-    hiveAvailable = false;
+    localAvailable = false;
   }
 
   return SearchStats(
     totalClients: totalClients,
     powerSyncAvailable: powerSyncAvailable,
-    hiveAvailable: hiveAvailable,
+    hiveAvailable: localAvailable,
     lastUpdated: DateTime.now(),
   );
 });

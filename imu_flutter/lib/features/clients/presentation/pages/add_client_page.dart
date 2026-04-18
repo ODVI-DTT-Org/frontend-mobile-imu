@@ -5,7 +5,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/models/user_role.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../data/models/client_model.dart';
@@ -27,7 +26,6 @@ class AddClientPage extends ConsumerStatefulWidget {
 
 class _AddClientPageState extends ConsumerState<AddClientPage> {
   final _formKey = GlobalKey<FormState>();
-  final _hiveService = HiveService();
   final _scrollController = ScrollController();
 
   // Loading states
