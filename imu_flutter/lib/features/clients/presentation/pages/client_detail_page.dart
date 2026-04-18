@@ -939,22 +939,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         ref: ref,
         message: 'Saving touchpoint...',
         operation: () async {
-          // Save touchpoint
-          final touchpointId = DateTime.now().millisecondsSinceEpoch.toString();
-          final touchpointData = Map<String, dynamic>.from({
-            'id': touchpointId,
-            'clientId': widget.clientId,
-            'touchpointNumber': nextNumber,
-            'type': nextType.name,
-            'date': DateTime.now().toIso8601String(),
-            ...result,
-            'createdAt': DateTime.now().toIso8601String(),
-          });
-
-          await _hiveService.saveTouchpoint(touchpointId, touchpointData);
-          // PowerSync handles sync automatically via the repository
-
-          // Reload client
+          // Reload client after touchpoint form submitted
           await _loadClient();
           ref.invalidate(clientTouchpointsProvider);
 

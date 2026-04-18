@@ -88,19 +88,6 @@ class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
     if (confirmed == true && mounted) {
       HapticUtils.delete();
 
-      await LoadingHelper.withLoading(
-        ref: ref,
-        message: 'Deleting agency...',
-        operation: () async {
-          await _hiveService.deleteAgency(widget.agencyId);
-        },
-        onError: (e) {
-          if (mounted) {
-            AppNotification.showError(context, 'Failed to delete agency: $e');
-          }
-        },
-      );
-
       if (mounted) {
         AppNotification.showSuccess(context, 'Agency deleted');
         context.pop();

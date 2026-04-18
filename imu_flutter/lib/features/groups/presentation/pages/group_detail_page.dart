@@ -7,6 +7,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
+import '../../../../services/sync/powersync_service.dart';
 import '../../data/models/group_model.dart';
 import '../../data/repositories/group_repository.dart';
 
@@ -93,7 +94,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
         ref: ref,
         message: 'Deleting group...',
         operation: () async {
-          await _hiveService.deleteGroup(widget.groupId);
+          final db = await PowerSyncService.database;
+          await db.execute('DELETE FROM groups WHERE id = ?', [widget.groupId]);
         },
         onError: (e) {
           if (mounted) {
@@ -164,7 +166,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                 ref: ref,
                 message: 'Updating group...',
                 operation: () async {
-                  await _hiveService.updateGroup(updatedGroup.toJson());
+                  final db = await PowerSyncService.database;
+                  await db.execute(
+                    'UPDATE groups SET name=?, description=? WHERE id=?',
+                    [updatedGroup.name, updatedGroup.description, updatedGroup.id],
+                  );
                   ref.invalidate(powersyncGroupsProvider);
                 },
                 onError: (e) {
