@@ -693,13 +693,8 @@ final pendingTouchpointServiceProvider = Provider<PendingTouchpointService>((ref
 });
 
 /// Touchpoint creation service provider
-/// Handles online/offline touchpoint creation logic
 final touchpointCreationServiceProvider = Provider<TouchpointCreationService>((ref) {
-  final connectivity = ref.watch(connectivityServiceProvider);
-  final api = ref.watch(touchpointApiServiceProvider);
-  final pending = ref.watch(pendingTouchpointServiceProvider);
-
-  return TouchpointCreationService(connectivity, api, pending);
+  return TouchpointCreationService();
 });
 
 /// Pending visit service provider

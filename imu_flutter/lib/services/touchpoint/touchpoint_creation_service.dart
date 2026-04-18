@@ -1,82 +1,57 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:flutter/material.dart';
-import 'package:imu_flutter/services/connectivity_service.dart';
-import 'package:imu_flutter/services/api/touchpoint_api_service.dart';
-import 'package:imu_flutter/services/touchpoint/pending_touchpoint_service.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 
-/// Service for creating touchpoints with online/offline logic
-/// - Online: Calls backend API directly
-/// - Offline: Stores in PendingTouchpointService for later sync
+/// Creates touchpoints by writing directly to local SQLite.
+/// PowerSync CRUD queue handles delivery to the backend when online.
 class TouchpointCreationService {
-  final ConnectivityService _connectivity;
-  final TouchpointApiService _api;
-  final PendingTouchpointService _pending;
   final Uuid _uuid = const Uuid();
 
-  TouchpointCreationService(
-    this._connectivity,
-    this._api,
-    this._pending,
-  );
-
-  /// Create a touchpoint
-  /// - If online: Calls backend API directly
-  /// - If offline: Stores in pending_touchpoints Hive box
   Future<void> createTouchpoint(
     String clientId,
     Touchpoint touchpoint, {
     File? photo,
     File? audio,
   }) async {
-    if (_connectivity.isOnline) {
-      // Online: Call backend API directly
-      debugPrint('TouchpointCreationService: Online - calling API');
+    final db = await PowerSyncService.database;
+    final id = _uuid.v4();
+    final now = DateTime.now().toIso8601String();
 
-      if (photo != null) {
-        // Use FormData endpoint for photo upload
-        await _api.createTouchpointWithPhoto(touchpoint, photoFile: photo);
-      } else {
-        // Use JSON endpoint for touchpoint without photo
-        // Note: audio-only uploads need to be handled separately
-        await _api.createTouchpoint(touchpoint);
-      }
-    } else {
-      // Offline: Store in pending_touchpoints Hive box
-      debugPrint('TouchpointCreationService: Offline - storing locally');
+    if (photo != null) await _saveFile(photo, 'photo');
+    if (audio != null) await _saveFile(audio, 'audio');
 
-      // Save photo/audio to cache directory
-      final photoPath = photo != null
-        ? await _saveFileForOffline(photo)
-        : null;
-      final audioPath = audio != null
-        ? await _saveFileForOffline(audio)
-        : null;
+    debugPrint('TouchpointCreationService: Writing touchpoint $id to SQLite');
 
-      await _pending.addPendingTouchpoint(
+    await db.execute(
+      '''INSERT INTO touchpoints
+         (id, client_id, user_id, touchpoint_number, type, date, status,
+          next_visit_date, notes, is_legacy, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      [
+        id,
         clientId,
-        touchpoint,
-        photoPath: photoPath,
-        audioPath: audioPath,
-      );
-    }
+        touchpoint.userId,
+        touchpoint.touchpointNumber,
+        touchpoint.type.apiValue,
+        touchpoint.date.toIso8601String(),
+        touchpoint.status.apiValue,
+        touchpoint.nextVisitDate?.toIso8601String(),
+        touchpoint.remarks,
+        0,
+        now,
+      ],
+    );
   }
 
-  /// Save file to temporary directory for offline storage
-  Future<String> _saveFileForOffline(File file) async {
-    try {
-      final dir = await getTemporaryDirectory();
-      final filename = 'pending_${_uuid.v4()}_${file.path.split(Platform.pathSeparator).last}';
-      final newPath = path.join(dir.path, filename);
-      await file.copy(newPath);
-      debugPrint('TouchpointCreationService: Saved file for offline: $newPath');
-      return newPath;
-    } catch (e) {
-      debugPrint('TouchpointCreationService: Failed to save file for offline: $e');
-      rethrow;
-    }
+  Future<String> _saveFile(File file, String prefix) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final filename = '${prefix}_${_uuid.v4()}_${path.basename(file.path)}';
+    final newPath = path.join(dir.path, filename);
+    await file.copy(newPath);
+    return newPath;
   }
 }
