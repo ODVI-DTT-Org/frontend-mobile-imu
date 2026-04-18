@@ -193,36 +193,6 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
     );
   }
 
-  void _addMember() {
-    HapticUtils.lightImpact();
-    // TODO: Show member selection dialog - stub implementation
-    LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Loading members...',
-      operation: () async {
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          AppNotification.showNeutral(context, 'Add member - Coming soon');
-        }
-      },
-    );
-  }
-
-  void _removeMember(String memberId) {
-    HapticUtils.lightImpact();
-    // TODO: Remove member from group - stub implementation
-    LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Removing member...',
-      operation: () async {
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          AppNotification.showNeutral(context, 'Remove member - Coming soon');
-        }
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -329,23 +299,6 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
               ),
             ),
 
-            // Quick actions
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _QuickActionButton(
-                      icon: LucideIcons.userPlus,
-                      label: 'Add Member',
-                      onTap: _addMember,
-                      isPrimary: true,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             // Group Information Section
             const _Section(title: 'Group Information'),
             Padding(
@@ -399,16 +352,6 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                           fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _addMember,
-                        icon: const Icon(LucideIcons.userPlus, size: 18),
-                        label: const Text('Add First Member'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -421,10 +364,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                 itemCount: _members.length,
                 itemBuilder: (context, index) {
                   final member = _members[index];
-                  return _MemberListTile(
-                    member: member,
-                    onRemove: () => _removeMember(member['id']),
-                  );
+                  return _MemberListTile(member: member);
                 },
               ),
 
@@ -582,12 +522,8 @@ class _QuickActionButton extends StatelessWidget {
 
 class _MemberListTile extends StatelessWidget {
   final Map<String, dynamic> member;
-  final VoidCallback onRemove;
 
-  const _MemberListTile({
-    required this.member,
-    required this.onRemove,
-  });
+  const _MemberListTile({required this.member});
 
   @override
   Widget build(BuildContext context) {
@@ -638,33 +574,6 @@ class _MemberListTile extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.x, size: 18),
-            color: Colors.grey[500],
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Remove Member'),
-                  content: Text('Remove $fullName from this group?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onRemove();
-                      },
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Remove'),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
         ],
       ),

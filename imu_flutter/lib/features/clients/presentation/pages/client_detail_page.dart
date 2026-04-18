@@ -757,25 +757,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
   }
 
-  void _callClient(String? phone) {
-    if (phone == null || phone.isEmpty) {
-      AppNotification.showError(context, 'No phone number available');
-      return;
-    }
-    HapticUtils.lightImpact();
-    // Stub implementation - TODO: Integrate with actual phone call functionality
-    LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Initiating call...',
-      operation: () async {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          AppNotification.showNeutral(context, 'Calling $phone...');
-        }
-      },
-    );
-  }
-
   void _navigateToAddress(String? address) {
     if (address == null || address.isEmpty) {
       AppNotification.showError(context, 'No address available');
