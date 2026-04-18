@@ -185,146 +185,156 @@ class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
   Widget build(BuildContext context) {
     final syncService = ref.watch(syncServiceProvider);
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      builder: (context, scrollController) => SingleChildScrollView(
-        controller: scrollController,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Sync Status',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 8, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Sync Status',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildStatusRow(
-            icon: syncService.status == SyncStatusEnum.offline
-                ? Icons.cloud_off
-                : Icons.cloud_done,
-            label: 'Connection',
-            value: syncService.status == SyncStatusEnum.offline
-                ? 'Offline'
-                : 'Connected',
-            color: syncService.status == SyncStatusEnum.offline
-                ? Colors.orange
-                : Colors.green,
+          const Divider(height: 1),
+          // Status rows (scrollable)
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatusRow(
+                  icon: syncService.status == SyncStatusEnum.offline
+                      ? Icons.cloud_off
+                      : Icons.cloud_done,
+                  label: 'Connection',
+                  value: syncService.status == SyncStatusEnum.offline
+                      ? 'Offline'
+                      : 'Connected',
+                  color: syncService.status == SyncStatusEnum.offline
+                      ? Colors.orange
+                      : Colors.green,
+                ),
+                const SizedBox(height: 12),
+                _buildStatusRow(
+                  icon: Icons.sync,
+                  label: 'Status',
+                  value: syncService.statusMessage,
+                  color: _getStatusColor(syncService.status),
+                ),
+                const SizedBox(height: 12),
+                _buildStatusRow(
+                  icon: Icons.pending_actions,
+                  label: 'Pending',
+                  value: '${syncService.pendingCount} items',
+                  color: syncService.pendingCount > 0 ? Colors.orange : Colors.green,
+                ),
+                const SizedBox(height: 12),
+                _buildStatusRow(
+                  icon: Icons.schedule,
+                  label: 'Last Sync',
+                  value: syncService.lastSyncFormatted,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildStatusRow(
-            icon: Icons.sync,
-            label: 'Status',
-            value: syncService.statusMessage,
-            color: _getStatusColor(syncService.status),
-          ),
-          const SizedBox(height: 12),
-          _buildStatusRow(
-            icon: Icons.pending_actions,
-            label: 'Pending',
-            value: '${syncService.pendingCount} items',
-            color: syncService.pendingCount > 0 ? Colors.orange : Colors.green,
-          ),
-          const SizedBox(height: 12),
-          _buildStatusRow(
-            icon: Icons.schedule,
-            label: 'Last Sync',
-            value: syncService.lastSyncFormatted,
-            color: Colors.grey,
-          ),
-          const SizedBox(height: 24),
-          if (syncService.pendingCount > 0 &&
-              syncService.status != SyncStatusEnum.offline)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: syncService.isSyncing
-                    ? null
-                    : () async {
-                        await LoadingHelper.withLoading(
-                          ref: ref,
-                          message: 'Syncing ${syncService.pendingCount} items...',
-                          operation: () => syncService.syncNow(),
-                          onError: (e) {
-                            if (mounted) {
-                              AppNotification.showError(context, 'Sync failed: ${e.toString()}');
+          const Divider(height: 1),
+          // Buttons — always visible at bottom
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              24, 12, 24, MediaQuery.of(context).padding.bottom + 16),
+            child: Column(
+              children: [
+                if (syncService.pendingCount > 0 &&
+                    syncService.status != SyncStatusEnum.offline) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: syncService.isSyncing
+                          ? null
+                          : () async {
+                              await LoadingHelper.withLoading(
+                                ref: ref,
+                                message: 'Syncing ${syncService.pendingCount} items...',
+                                operation: () => syncService.syncNow(),
+                                onError: (e) {
+                                  if (mounted) {
+                                    AppNotification.showError(context, 'Sync failed: ${e.toString()}');
+                                  }
+                                },
+                              );
+                            },
+                      icon: const Icon(Icons.sync),
+                      label: const Text('Sync Now'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: (syncService.pendingCount == 0 || syncService.isSyncing)
+                        ? null
+                        : () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Remove Pending Changes?'),
+                                content: Text(
+                                  'This will discard ${syncService.pendingCount} unsynced '
+                                  'item${syncService.pendingCount == 1 ? '' : 's'}. '
+                                  'These changes will be permanently lost.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Remove'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed == true && mounted) {
+                              await syncService.removePendings();
+                              if (mounted) {
+                                AppNotification.showSuccess(context, 'Pending changes removed');
+                              }
                             }
                           },
-                        );
-                      },
-                icon: const Icon(Icons.sync),
-                label: const Text('Sync Now'),
-              ),
-            ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: (syncService.pendingCount == 0 || syncService.isSyncing)
-                  ? null
-                  : () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Remove Pending Changes?'),
-                          content: Text(
-                            'This will discard ${syncService.pendingCount} unsynced '
-                            'item${syncService.pendingCount == 1 ? '' : 's'}. '
-                            'These changes will be permanently lost.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              style: TextButton.styleFrom(foregroundColor: Colors.red),
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Remove'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirmed == true && mounted) {
-                        await syncService.removePendings();
-                        if (mounted) {
-                          AppNotification.showSuccess(context, 'Pending changes removed');
-                        }
-                      }
-                    },
-              icon: const Icon(Icons.delete_outline),
-              label: Text(
-                syncService.pendingCount > 0
-                    ? 'Remove Pendings (${syncService.pendingCount})'
-                    : 'Remove Pendings',
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: BorderSide(
-                  color: syncService.pendingCount > 0 ? Colors.red : Colors.grey,
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(
+                      syncService.pendingCount > 0
+                          ? 'Remove Pendings (${syncService.pendingCount})'
+                          : 'Remove Pendings',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: BorderSide(
+                        color: syncService.pendingCount > 0 ? Colors.red : Colors.grey,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
