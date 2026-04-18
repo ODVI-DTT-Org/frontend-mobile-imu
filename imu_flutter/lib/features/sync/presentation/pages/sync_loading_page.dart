@@ -84,12 +84,22 @@ class EnhancedSyncLoadingState {
   }
 }
 
-/// Tables to sync with display names (aligned with current sync rules)
+/// Tables to sync with display names — mirrors PowerSync schema (excludes
+/// error_logs which is device→server only, and user_locations which is
+/// PSGC reference data not user content).
 const Map<String, String> _tableDisplayNames = {
   'clients': 'Clients',
-  'user_locations': 'User Locations',
+  'addresses': 'Addresses',
+  'phone_numbers': 'Phone Numbers',
   'itineraries': 'Itineraries',
+  'visits': 'Visits',
+  'calls': 'Calls',
+  'touchpoints': 'Touchpoints',
+  'groups': 'Groups',
+  'targets': 'Targets',
+  'attendance': 'Attendance',
   'approvals': 'Approvals',
+  'user_profiles': 'User Profiles',
 };
 
 /// Enhanced sync loading state notifier
