@@ -147,13 +147,34 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
       await batch.complete();
       logDebug('Upload batch completed successfully');
     } on DioException catch (e, stackTrace) {
+      final status = e.response?.statusCode;
+      // 4xx (except 401) = bad data that will never succeed — skip it.
+      // 401 = auth issue — rethrow so PowerSync can refresh credentials.
+      // 5xx / network errors = transient — rethrow so PowerSync retries.
+      if (status != null && status >= 400 && status < 500 && status != 401) {
+        logError('Permanent upload error ($status) — skipping batch item: ${e.message}');
+        await ErrorLoggingHelper.logNonCriticalError(
+          operation: 'PowerSync data upload (skipped)',
+          error: e,
+          stackTrace: stackTrace,
+          context: {
+            'responseStatus': status.toString(),
+            'responseData': e.response?.data?.toString(),
+            'table': batch.crud.isNotEmpty ? batch.crud.first.table : 'unknown',
+            'opId': batch.crud.isNotEmpty ? batch.crud.first.id : 'unknown',
+          },
+        );
+        // Complete the batch to remove the bad item from the queue.
+        await batch.complete();
+        return;
+      }
       logError('Upload failed with DioException: ${e.message}');
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'PowerSync data upload',
         error: e,
         stackTrace: stackTrace,
         context: {
-          'responseStatus': e.response?.statusCode?.toString(),
+          'responseStatus': status?.toString(),
           'responseData': e.response?.data?.toString(),
         },
       );
