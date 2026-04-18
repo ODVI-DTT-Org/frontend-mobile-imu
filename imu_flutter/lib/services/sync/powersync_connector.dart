@@ -252,7 +252,8 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         if (op.op == UpdateType.put) {
           final photoPath = data['_local_photo_path'] as String?;
           final visitData = Map<String, dynamic>.from(data)
-            ..remove('_local_photo_path');
+            ..remove('_local_photo_path')
+            ..['id'] = op.id;
           if (photoPath != null) {
             await _uploadVisitWithPhoto(
               visitData: visitData,
