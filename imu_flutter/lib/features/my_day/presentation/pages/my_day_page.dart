@@ -48,13 +48,19 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   final Set<String> _selectedClientIds = {};
   bool _isMultiSelectMode = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Clear any stale global loading overlay that may have been stuck from a
+    // previous navigation away while a refresh was in-flight.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) LoadingHelper.hide(ref);
+    });
+  }
+
   Future<void> _handleRefresh() async {
     HapticUtils.pullToRefresh();
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Refreshing...',
-      operation: () => ref.read(myDayStateProvider.notifier).refresh(),
-    );
+    await ref.read(myDayStateProvider.notifier).refresh();
   }
 
   // Multi-select helper methods

@@ -89,8 +89,18 @@ class MyDayApiService {
 
       debugPrint('MyDayApiService: Adding client $clientId to itinerary in SQLite ($scheduledDateStr)');
 
+      // Prevent duplicates: check if an entry already exists for this user/client/date
+      final existing = await db.execute(
+        'SELECT id FROM itineraries WHERE user_id = ? AND client_id = ? AND DATE(scheduled_date) = ?',
+        [userId, clientId, scheduledDateStr],
+      );
+      if (existing.isNotEmpty) {
+        debugPrint('MyDayApiService: Client $clientId already in itinerary for $scheduledDateStr, skipping');
+        return false;
+      }
+
       await db.execute(
-        '''INSERT OR REPLACE INTO itineraries
+        '''INSERT INTO itineraries
            (id, user_id, client_id, scheduled_date, scheduled_time,
             status, priority, notes, created_by, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
