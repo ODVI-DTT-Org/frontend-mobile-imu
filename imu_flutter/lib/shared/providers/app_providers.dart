@@ -27,13 +27,11 @@ export 'permission_providers.dart' show
   canDeleteProvider;
 // Re-export user providers
 export './app_providers.dart' show currentUserRoleProvider;
-// Re-export touchpoint creation service provider
-export './app_providers.dart' show touchpointCreationServiceProvider, pendingTouchpointServiceProvider;
-// Re-export visit/release creation service providers
-export './app_providers.dart' show visitCreationServiceProvider, pendingVisitServiceProvider;
-export './app_providers.dart' show releaseCreationServiceProvider, pendingReleaseServiceProvider;
-// Re-export client mutation service providers
-export './app_providers.dart' show clientMutationServiceProvider, pendingClientServiceProvider;
+// Re-export creation service providers
+export './app_providers.dart' show touchpointCreationServiceProvider;
+export './app_providers.dart' show visitCreationServiceProvider;
+export './app_providers.dart' show releaseCreationServiceProvider;
+export './app_providers.dart' show clientMutationServiceProvider;
 // Re-export area filter providers
 export '../../services/area/area_filter_service.dart' show
   areaFilterServiceProvider;
