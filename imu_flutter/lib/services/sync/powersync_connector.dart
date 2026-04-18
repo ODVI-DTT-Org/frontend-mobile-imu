@@ -271,9 +271,10 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
 
       case 'calls':
         if (op.op == UpdateType.put) {
+          final callData = Map<String, dynamic>.from(data)..['id'] = op.id;
           await _httpClient.post(
             '$_apiUrl/calls',
-            data: data,
+            data: callData,
             options: Options(headers: headers),
           );
         } else if (op.op == UpdateType.delete) {
@@ -310,9 +311,10 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
 
       case 'releases':
         if (op.op == UpdateType.put) {
+          final releaseData = Map<String, dynamic>.from(data)..['id'] = op.id;
           await _httpClient.post(
             '$_apiUrl/releases',
-            data: data,
+            data: releaseData,
             options: Options(headers: headers),
           );
         }
@@ -341,7 +343,8 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
   }) async {
     switch (op.op) {
       case UpdateType.put:
-        await _httpClient.post(postUrl, data: data, options: Options(headers: headers));
+        final postData = Map<String, dynamic>.from(data)..['id'] = op.id;
+        await _httpClient.post(postUrl, data: postData, options: Options(headers: headers));
       case UpdateType.patch:
         await _httpClient.put(putUrl, data: data, options: Options(headers: headers));
       case UpdateType.delete:
