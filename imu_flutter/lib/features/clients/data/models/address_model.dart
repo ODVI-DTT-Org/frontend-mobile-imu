@@ -58,30 +58,29 @@ class Address {
   String get fullAddress {
     final parts = <String>[
       streetAddress,
-      if (barangay != null && barangay!.isNotEmpty) 'Brgy. $barangay!',
+      if (barangay != null && barangay!.isNotEmpty) 'Brgy. ${barangay!}',
       if (municipality != null && municipality!.isNotEmpty) municipality!,
       if (province != null && province!.isNotEmpty) province!,
     ];
     return parts.where((p) => p.isNotEmpty).join(', ');
   }
 
-  // Factory from PowerSync database row
+  // Factory from PowerSync database row (PostgreSQL column names)
   factory Address.fromSyncMap(Map<String, dynamic> map) {
     return Address(
       id: map['id'] as String,
       clientId: map['client_id'] as String,
-      psgcId: map['psgc_id'] as int,
-      label: AddressLabel.fromString(map['label'] as String? ?? 'other'),
-      streetAddress: map['street_address'] as String? ?? '',
+      psgcId: 0, // not stored in addresses table
+      label: AddressLabel.fromString(map['type'] as String? ?? 'other'),
+      streetAddress: map['street'] as String? ?? '',
       postalCode: map['postal_code'] as String?,
       latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,
       longitude: map['longitude'] != null ? (map['longitude'] as num).toDouble() : null,
       isPrimary: (map['is_primary'] as int? ?? 0) == 1,
       createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()),
-      updatedAt: DateTime.parse(map['updated_at'] as String? ?? DateTime.now().toIso8601String()),
-      region: map['region'] as String?,
+      updatedAt: DateTime.now(),
       province: map['province'] as String?,
-      municipality: map['municipality'] as String?,
+      municipality: map['city'] as String?,
       barangay: map['barangay'] as String?,
     );
   }
@@ -107,12 +106,14 @@ class Address {
     );
   }
 
-  // Convert to JSON for API requests
+  // Convert to JSON for API requests (PostgreSQL column names)
   Map<String, dynamic> toJson() {
     return {
-      'psgc_id': psgcId,
-      'label': label.name,
-      'street_address': streetAddress,
+      'type': label.name,
+      'street': streetAddress,
+      if (barangay != null) 'barangay': barangay,
+      if (municipality != null) 'city': municipality,
+      if (province != null) 'province': province,
       if (postalCode != null) 'postal_code': postalCode,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,

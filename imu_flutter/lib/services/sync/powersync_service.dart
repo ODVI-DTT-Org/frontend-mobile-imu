@@ -40,6 +40,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('barangay'),
     Column.integer('is_starred'),
     Column.integer('loan_released'),
+    Column.text('loan_released_at'),
     Column.text('udi'),
     Column.text('full_address'),
     // Touchpoint summary fields - NEW (denormalized from backend)
@@ -55,17 +56,16 @@ const Schema _powerSyncSchema = Schema([
   ]),
   Table('addresses', [
     Column.text('client_id'),
-    Column.integer('psgc_id'), // Foreign key to PSGC table
-    Column.text('label'), // Address label (home, work, relative, other)
-    Column.text('street_address'), // Full street address
+    Column.text('type'),
+    Column.text('street'),
+    Column.text('barangay'),
+    Column.text('city'),
+    Column.text('province'),
     Column.text('postal_code'),
     Column.real('latitude'),
     Column.real('longitude'),
     Column.integer('is_primary'),
-    // Audit fields
     Column.text('created_at'),
-    Column.text('updated_at'),
-    Column.text('deleted_at'),
   ]),
   Table('phone_numbers', [
     Column.text('client_id'),
