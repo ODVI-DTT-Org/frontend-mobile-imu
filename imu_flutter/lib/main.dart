@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'app.dart';
 import 'core/config/app_config.dart';
 import 'core/config/map_config.dart';
@@ -18,6 +19,13 @@ import 'shared/widgets/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize PostHog analytics
+  final posthogConfig = PostHogConfig('phc_PldqJxlMvgkMyh1zRnRaiQP7llFMRgWUYuW1I6b4Ddc')
+    ..host = 'https://us.i.posthog.com'
+    ..captureApplicationLifecycleEvents = true
+    ..debug = !kReleaseMode;
+  await Posthog().setup(posthogConfig);
 
   // No local seeding - use Digital Ocean data via PowerSync
   // Run app with splash screen

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/user_role.dart' as core_models;
@@ -310,6 +311,22 @@ class JwtAuthService {
       }
 
       logDebug('Login successful for ${_currentUser!.id}');
+
+      // Identify user in PostHog for analytics
+      try {
+        await Posthog().identify(
+          userId: _currentUser!.id,
+          userProperties: {
+            'email': _currentUser!.email,
+            'name': _currentUser!.fullName,
+            'role': _currentUser!.role.apiValue,
+            'platform': 'mobile',
+          },
+        );
+      } catch (e) {
+        logDebug('PostHog identify failed (non-critical): $e');
+      }
+
       return _currentUser!;
     } on DioException catch (e) {
       final message = e.response?.data['message'] ?? 'Login failed';
@@ -339,6 +356,13 @@ class JwtAuthService {
     _refreshToken = null;
     _currentUser = null;
     _isInitialized = false; // Reset initialization flag so it can be re-initialized
+
+    // Reset PostHog identity on logout
+    try {
+      await Posthog().reset();
+    } catch (e) {
+      logDebug('PostHog reset failed (non-critical): $e');
+    }
 
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
