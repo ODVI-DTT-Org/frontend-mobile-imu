@@ -1273,18 +1273,18 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Visit Only button
+          // Visit Only button — always enabled for caravan role
           Expanded(
             child: _buildActionButton(
               label: 'VISIT ONLY',
               color: Colors.blue[700]!,
-              enabled: canCreateVisit && canRecordTouchpoint && !loanReleased,
-              loanReleased: loanReleased,
+              enabled: canCreateVisit,
+              loanReleased: false,
               onPressed: () => _handleRecordVisitOnly(),
             ),
           ),
           const SizedBox(width: 12),
-          // Touchpoint button
+          // Touchpoint button — disabled by loan release OR touchpoint business rules
           Expanded(
             child: _buildActionButton(
               label: 'TOUCHPOINT',
@@ -1295,19 +1295,19 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Release Loan button
+          // Release Loan button — always enabled for caravan role
           Expanded(
             child: ElevatedButton(
-              onPressed: loanReleased ? null : () => _handleReleaseLoanBottomSheet(),
+              onPressed: canCreateVisit ? () => _handleReleaseLoanBottomSheet() : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: loanReleased ? Colors.grey[300] : Colors.orange[700],
-                foregroundColor: loanReleased ? Colors.grey[600] : Colors.white,
+                backgroundColor: canCreateVisit ? Colors.orange[700] : Colors.grey[300],
+                foregroundColor: canCreateVisit ? Colors.white : Colors.grey[600],
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text(loanReleased ? 'RELEASED' : 'RELEASE LOAN'),
+              child: const Text('RELEASE LOAN'),
             ),
           ),
         ],
