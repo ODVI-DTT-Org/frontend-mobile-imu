@@ -35,6 +35,8 @@ class ClientListCard extends ConsumerWidget {
   final List<Touchpoint>? overrideTouchpoints;
   final bool? overrideLoanReleased;
   final String? overrideUdi;
+  final String? priority;
+  final String? assignedByName;
 
   const ClientListCard({
     super.key,
@@ -53,6 +55,8 @@ class ClientListCard extends ConsumerWidget {
     this.overrideTouchpoints,
     this.overrideLoanReleased,
     this.overrideUdi,
+    this.priority,
+    this.assignedByName,
   });
 
   /// Factory constructor for MyDayClient compatibility
@@ -67,6 +71,8 @@ class ClientListCard extends ConsumerWidget {
     String? previousTouchpointReason,
     String? previousTouchpointType,
     DateTime? previousTouchpointDate,
+    String? priority,
+    String? assignedByName,
     VoidCallback? onTap,
     VoidCallback? onLongPress,
     VoidCallback? onRemove,
@@ -124,6 +130,8 @@ class ClientListCard extends ConsumerWidget {
       overrideTouchpoints: syntheticTouchpoints,
       overrideLoanReleased: false,
       overrideUdi: null,
+      priority: priority,
+      assignedByName: assignedByName,
     );
   }
 
@@ -476,6 +484,47 @@ class ClientListCard extends ConsumerWidget {
                         ),
                       ],
                     ),
+                    // Priority badge + assigned-by (when provided from MyDay/Itinerary context)
+                    if (priority != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _getPriorityColor(priority!).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: _getPriorityColor(priority!).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              _formatPriority(priority!),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _getPriorityColor(priority!),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          if (assignedByName != null) ...[
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'By $assignedByName',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                     // Touchpoint summary (if not first time)
                     if (!isFirstTime && latestTouchpoint != null) ...[
                       const SizedBox(height: 4),
@@ -579,6 +628,22 @@ class ClientListCard extends ConsumerWidget {
     final type = touchpoint.type == TouchpointType.visit ? 'Visit' : 'Call';
     final timeAgo = _getTimeAgo(touchpoint.date);
     return '$ordinal $type - $timeAgo';
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high': return const Color(0xFFEF4444);
+      case 'low': return const Color(0xFF94A3B8);
+      default: return const Color(0xFF3B82F6);
+    }
+  }
+
+  String _formatPriority(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high': return 'HIGH';
+      case 'low': return 'LOW';
+      default: return 'NORMAL';
+    }
   }
 
   String _getTimeAgo(DateTime date) {

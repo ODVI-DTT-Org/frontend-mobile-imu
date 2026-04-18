@@ -957,6 +957,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                   previousTouchpointReason: client.previousTouchpointReason,
                   previousTouchpointType: client.previousTouchpointType,
                   previousTouchpointDate: client.previousTouchpointDate,
+                  priority: client.priority,
+                  assignedByName: client.assignedByName,
                   onTap: () => _onClientTap(client),
                   onRemove: () => _confirmRemoveClient(client),
                   onLongPress: () => _onClientLongPress(client),
