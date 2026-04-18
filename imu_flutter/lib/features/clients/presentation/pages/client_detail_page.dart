@@ -1301,6 +1301,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
     final canRecordTouchpoint = client.touchpointStatus?.canCreateTouchpoint ?? true;
+    final loanReleased = client.loanReleased;
 
     // Check role-based permissions for quick actions
     final canCreateVisit = userRole?.canCreateVisitTouchpoints ?? false;
@@ -1311,61 +1312,101 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         children: [
           // Visit Only button
           Expanded(
-            child: ElevatedButton(
-              onPressed: (canCreateVisit && canRecordTouchpoint)
-                  ? () => _handleRecordVisitOnly()
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: (canCreateVisit && canRecordTouchpoint)
-                    ? Colors.blue[700]
-                    : Colors.grey[300],
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('VISIT ONLY'),
+            child: _buildActionButton(
+              label: 'VISIT ONLY',
+              color: Colors.blue[700]!,
+              enabled: canCreateVisit && canRecordTouchpoint && !loanReleased,
+              loanReleased: loanReleased,
+              onPressed: () => _handleRecordVisitOnly(),
             ),
           ),
           const SizedBox(width: 12),
           // Touchpoint button
           Expanded(
-            child: ElevatedButton(
-              onPressed: canRecordTouchpoint
-                  ? () => _handleRecordTouchpoint()
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: canRecordTouchpoint
-                    ? Colors.green[700]
-                    : Colors.grey[300],
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('TOUCHPOINT'),
+            child: _buildActionButton(
+              label: 'TOUCHPOINT',
+              color: Colors.green[700]!,
+              enabled: canRecordTouchpoint && !loanReleased,
+              loanReleased: loanReleased,
+              onPressed: () => _handleRecordTouchpoint(),
             ),
           ),
           const SizedBox(width: 12),
-          // Release Loan button (available to all roles)
+          // Release Loan button
           Expanded(
             child: ElevatedButton(
-              onPressed: () => _handleReleaseLoanBottomSheet(),
+              onPressed: loanReleased ? null : () => _handleReleaseLoanBottomSheet(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange[700],
-                foregroundColor: Colors.white,
+                backgroundColor: loanReleased ? Colors.grey[300] : Colors.orange[700],
+                foregroundColor: loanReleased ? Colors.grey[600] : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('RELEASE LOAN'),
+              child: Text(loanReleased ? 'RELEASED' : 'RELEASE LOAN'),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Builds an action button that shows a red "Loan Released" badge when disabled due to loan release.
+  Widget _buildActionButton({
+    required String label,
+    required Color color,
+    required bool enabled,
+    required bool loanReleased,
+    required VoidCallback onPressed,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: enabled ? onPressed : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: enabled ? color : Colors.grey[300],
+              foregroundColor: enabled ? Colors.white : Colors.grey[600],
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(label),
+          ),
+        ),
+        if (loanReleased)
+          Positioned(
+            top: -8,
+            right: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red[600],
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Text(
+                'Loan Released',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
