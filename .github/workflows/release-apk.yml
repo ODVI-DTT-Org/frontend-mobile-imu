@@ -1,0 +1,92 @@
+name: Release APK to Google Drive
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('imu_flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        working-directory: imu_flutter
+        run: flutter pub get
+
+      - name: Build release APK
+        working-directory: imu_flutter
+        run: flutter build apk --release
+
+      - name: Rename and stage APK
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          APK_NAME="imu-${DATE}-b${{ github.run_number }}.apk"
+          mv imu_flutter/build/app/outputs/flutter-apk/app-release.apk "${APK_NAME}"
+          echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
+          echo "BUILD_DATE=${DATE}" >> $GITHUB_ENV
+
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone
+        run: |
+          echo '${{ secrets.GDRIVE_SERVICE_ACCOUNT_KEY }}' > /tmp/sa.json
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << 'RCLONE_EOF'
+          [gdrive]
+          type = drive
+          scope = drive
+          service_account_file = /tmp/sa.json
+          RCLONE_EOF
+
+      - name: Upload APK to Google Drive
+        run: |
+          rclone copy "${{ env.APK_NAME }}" "gdrive:/" \
+            --drive-root-folder-id "${{ secrets.GDRIVE_FOLDER_ID }}" \
+            --drive-upload-cutoff 100M \
+            -v
+          echo "Uploaded: ${{ env.APK_NAME }}"
+
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ IMU APK Build #${{ github.run_number }} — Ready on Google Drive"
+          to: egonzaga@oakdriveventures.com
+          from: ${{ secrets.MAIL_USERNAME }}
+          body: |
+            A new IMU APK has been built and uploaded to Google Drive.
+
+            Build: #${{ github.run_number }}
+            Date: ${{ env.BUILD_DATE }}
+            File: ${{ env.APK_NAME }}
+            Drive folder: https://drive.google.com/drive/folders/${{ secrets.GDRIVE_FOLDER_ID }}
+
+            Triggered by: push to main
+            Commit: ${{ github.sha }}
