@@ -693,7 +693,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           child: SafeArea(
             child: Column(
           children: [
-            const OfflineBanner(),
             // Header - centered title (per Figma)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),

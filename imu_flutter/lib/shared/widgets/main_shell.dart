@@ -6,6 +6,7 @@ import '../../core/utils/haptic_utils.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/connectivity_service.dart';
 import 'background_sync_indicator.dart';
+import 'offline_banner.dart';
 
 class MainShell extends StatelessWidget {
   final Widget child;
@@ -23,6 +24,7 @@ class MainShell extends StatelessWidget {
           // Main content
           Column(
             children: [
+              const OfflineBanner(),
               Expanded(child: child),
               const BottomNavBar(),
             ],

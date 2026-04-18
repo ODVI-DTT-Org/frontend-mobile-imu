@@ -685,7 +685,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           child: SafeArea(
             child: Column(
               children: [
-                const OfflineBanner(),
                 Expanded(
                   child: PullToRefresh(
                     onRefresh: _handleRefresh,
