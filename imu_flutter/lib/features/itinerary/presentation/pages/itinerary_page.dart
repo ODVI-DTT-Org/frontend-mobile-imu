@@ -1212,60 +1212,71 @@ class _VisitCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Right side: Priority and Status badges (optional, can be removed)
-          if (visit.priority != 'normal' || visit.status != 'pending')
-            SizedBox(
-              width: 80,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (visit.priority != 'normal') ...[
-                    // Priority badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getPriorityColor(visit.priority).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: _getPriorityColor(visit.priority).withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        _formatPriority(visit.priority),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: _getPriorityColor(visit.priority),
-                          letterSpacing: 0.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+          // Right side: Priority, Status, and assigned-by
+          SizedBox(
+            width: 80,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Priority badge (always shown)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getPriorityColor(visit.priority).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _getPriorityColor(visit.priority).withOpacity(0.3),
+                      width: 1,
                     ),
-                    const SizedBox(height: 4),
-                  ],
-                  if (visit.status != 'pending')
-                    // Status badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(visit.status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _formatStatus(visit.status),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: _getStatusColor(visit.status),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                  ),
+                  child: Text(
+                    _formatPriority(visit.priority),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: _getPriorityColor(visit.priority),
+                      letterSpacing: 0.5,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                if (visit.status != 'pending') ...[
+                  const SizedBox(height: 4),
+                  // Status badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(visit.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _formatStatus(visit.status),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: _getStatusColor(visit.status),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ],
-              ),
+                if (visit.assignedByName != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'By ${visit.assignedByName}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
