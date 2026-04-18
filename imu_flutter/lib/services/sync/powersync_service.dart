@@ -306,6 +306,7 @@ class PowerSyncService {
       _isConnected = true;
       _isConnecting = false;
       logDebug('✅ [PowerSync Connect] Connected to PowerSync successfully');
+      await debugLocalSyncState();
     } catch (e, stackTrace) {
       _isConnecting = false;
       logError('❌ [PowerSync Connect] Failed to connect to PowerSync', e);
@@ -418,11 +419,11 @@ class PowerSyncService {
     // Listen to sync status
     subscription = db.statusStream.listen((status) {
       if (status.connected && !status.downloading) {
-        // Sync has completed or is not downloading
         logDebug('Initial sync completed');
         timeoutTimer.cancel();
         subscription?.cancel();
         if (!completer.isCompleted) {
+          debugLocalSyncState();
           completer.complete();
         }
       }
@@ -468,6 +469,41 @@ class PowerSyncService {
   ]) async {
     final db = await database;
     await db.execute(sql, parameters);
+  }
+
+  /// Log row counts for all synced tables — call after connect or sync to verify what's local
+  static Future<void> debugLocalSyncState() async {
+    if (_database == null) {
+      logDebug('[SyncDebug] Database not initialized');
+      return;
+    }
+    final db = _database!;
+    final tables = [
+      'clients',
+      'addresses',
+      'phone_numbers',
+      'user_profiles',
+      'user_locations',
+      'visits',
+      'calls',
+      'touchpoints',
+      'itineraries',
+      'groups',
+      'targets',
+      'attendance',
+      'approvals',
+    ];
+    logDebug('========== LOCAL SYNC STATE ==========');
+    for (final table in tables) {
+      try {
+        final result = await db.getAll('SELECT COUNT(*) as cnt FROM $table');
+        final count = result.isNotEmpty ? result.first['cnt'] : 0;
+        logDebug('[SyncDebug] $table: $count rows');
+      } catch (e) {
+        logDebug('[SyncDebug] $table: ERROR - $e');
+      }
+    }
+    logDebug('======================================');
   }
 
   /// Close the database

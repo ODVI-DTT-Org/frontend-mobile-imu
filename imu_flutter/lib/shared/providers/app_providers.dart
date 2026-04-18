@@ -363,7 +363,7 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   debugPrint('=== ASSIGNED CLIENTS FETCH ===');
   debugPrint('Search query: "$searchQuery", Page: $page');
 
-  // Load from PowerSync SQLite (works online and offline)
+  // Load from PowerSync SQLite (PowerSync sync rules already filter to assigned territory)
   final clientRepo = ref.watch(clientRepositoryProvider);
   var cachedClients = await clientRepo.getClients();
 

@@ -564,6 +564,14 @@ class Client {
     return false;
   }
 
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   /// Parse ClientType from string, return null if unknown (no default)
   static ClientType _parseClientType(dynamic value) {
     if (value == null) return ClientType.potential;
@@ -695,8 +703,8 @@ class Client {
       accountCode: json['accountCode'] ?? json['account_code'],
       accountNumber: json['accountNumber'] ?? json['account_number'],
       rank: json['rank'],
-      monthlyPensionAmount: json['monthlyPensionAmount'] ?? json['monthly_pension_amount'],
-      monthlyPensionGross: json['monthlyPensionGross'] ?? json['monthly_pension_gross'],
+      monthlyPensionAmount: _parseDouble(json['monthlyPensionAmount'] ?? json['monthly_pension_amount']),
+      monthlyPensionGross: _parseDouble(json['monthlyPensionGross'] ?? json['monthly_pension_gross']),
       atmNumber: json['atmNumber'] ?? json['atm_number'],
       applicableRepublicAct: json['applicableRepublicAct'] ?? json['applicable_republic_act'],
       unitCode: json['unitCode'] ?? json['unit_code'],
@@ -807,8 +815,8 @@ class Client {
       touchpointStatus: row['touchpoint_status'] != null
           ? ClientTouchpointStatus.fromRow(row)
           : null,
-      isStarred: (row['is_starred'] as bool?) ?? false,
-      loanReleased: (row['loan_released'] as bool?) ?? false,
+      isStarred: _parseBool(row['is_starred']),
+      loanReleased: _parseBool(row['loan_released']),
       loanReleasedAt: row['loan_released_at'] != null
           ? DateTime.parse(row['loan_released_at'] as String)
           : null,
