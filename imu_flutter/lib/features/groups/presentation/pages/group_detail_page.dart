@@ -5,25 +5,14 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/group_model.dart';
 import '../../data/repositories/group_repository.dart';
 
-/// Group detail provider — reads from local PowerSync SQLite with Hive fallback.
 final groupDetailProvider = FutureProvider.family<ClientGroup?, String>((ref, groupId) async {
-  // Try PowerSync first (works offline after initial sync)
   final repo = ref.read(groupRepositoryProvider);
-  final group = await repo.getById(groupId);
-  if (group != null) return group;
-
-  // Fall back to Hive cache (pre-PowerSync legacy)
-  final hiveService = HiveService();
-  if (!hiveService.isInitialized) await hiveService.init();
-  final localGroup = await hiveService.getGroup(groupId);
-  if (localGroup != null) return ClientGroup.fromJson(localGroup);
-  return null;
+  return repo.getById(groupId);
 });
 
 class GroupDetailPage extends ConsumerStatefulWidget {
@@ -39,8 +28,6 @@ class GroupDetailPage extends ConsumerStatefulWidget {
 }
 
 class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
-  final _hiveService = HiveService();
-
   ClientGroup? _group;
   bool _isLoading = true;
   List<Map<String, dynamic>> _members = [];
@@ -56,11 +43,6 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
       ref: ref,
       message: 'Loading group...',
       operation: () async {
-        if (!_hiveService.isInitialized) {
-          await _hiveService.init();
-        }
-
-        // Try PowerSync first
         final repo = ref.read(groupRepositoryProvider);
         final group = await repo.getById(widget.groupId);
         if (group != null && mounted) {
@@ -71,18 +53,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
           });
           return;
         }
-
-        // Fall back to Hive cache
-        final groupData = await _hiveService.getGroup(widget.groupId);
-        if (groupData != null && mounted) {
-          setState(() {
-            _group = ClientGroup.fromJson(groupData);
-            _members = _loadMembers();
-            _isLoading = false;
-          });
-        } else {
-          if (mounted) setState(() => _isLoading = false);
-        }
+        if (mounted) setState(() => _isLoading = false);
       },
     );
   }
