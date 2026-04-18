@@ -14,6 +14,11 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
   final String _powersyncUrl;
   final String _apiUrl;
 
+  // Tracks transient-error retry count per CRUD batch (keyed by "table:id" of first entry).
+  // After _maxTransientRetries failures the batch is skipped so the queue can advance.
+  static final Map<String, int> _transientRetryCount = {};
+  static const int _maxTransientRetries = 10;
+
   IMUPowerSyncConnector({
     required JwtAuthService authService,
     required String powersyncUrl,
@@ -139,10 +144,17 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
 
     logDebug('Uploading ${batch.crud.length} operations to backend');
 
+    // Use "table:id" of first entry as a stable key for retry tracking.
+    final batchKey = batch.crud.isNotEmpty
+        ? '${batch.crud.first.table}:${batch.crud.first.id}'
+        : 'empty';
+
     try {
       for (final op in batch.crud) {
         await _uploadOperation(op, token);
       }
+      // Success — clear retry counter and complete.
+      _transientRetryCount.remove(batchKey);
       await batch.complete();
       logDebug('Upload batch completed successfully');
     } on DioException catch (e) {
@@ -155,6 +167,7 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         // Skip it by completing the batch. Do NOT write to error_logs via
         // PowerSync here: that would add a new CRUD entry and re-trigger this
         // same loop, causing the pending count to grow on every retry/reopen.
+        _transientRetryCount.remove(batchKey);
         logError(
           'Permanent upload error ($status) — skipping: '
           'table=${batch.crud.isNotEmpty ? batch.crud.first.table : "?"} '
@@ -164,13 +177,32 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         await batch.complete();
         return;
       }
-      // Transient error (5xx / network) — log to console only, then rethrow
-      // so PowerSync retries. Do NOT write to error_logs via PowerSync: that
-      // would create a new CRUD entry each retry, stacking up the queue.
-      logError('Upload failed with DioException (transient): ${e.message}');
+      // Transient error (5xx / network) — track retries and skip after max.
+      final retries = (_transientRetryCount[batchKey] ?? 0) + 1;
+      _transientRetryCount[batchKey] = retries;
+      if (retries >= _maxTransientRetries) {
+        _transientRetryCount.remove(batchKey);
+        logWarning(
+          'Transient upload error after $retries retries — skipping: '
+          'table=${batch.crud.isNotEmpty ? batch.crud.first.table : "?"} '
+          'id=${batch.crud.isNotEmpty ? batch.crud.first.id : "?"} '
+          'status=$status',
+        );
+        await batch.complete();
+        return;
+      }
+      logError('Upload failed with DioException (attempt $retries/$_maxTransientRetries): ${e.message}');
       rethrow;
     } catch (e) {
-      logError('Upload failed: $e');
+      final retries = (_transientRetryCount[batchKey] ?? 0) + 1;
+      _transientRetryCount[batchKey] = retries;
+      if (retries >= _maxTransientRetries) {
+        _transientRetryCount.remove(batchKey);
+        logWarning('Upload error after $retries retries — skipping: $e');
+        await batch.complete();
+        return;
+      }
+      logError('Upload failed (attempt $retries/$_maxTransientRetries): $e');
       rethrow;
     }
   }
