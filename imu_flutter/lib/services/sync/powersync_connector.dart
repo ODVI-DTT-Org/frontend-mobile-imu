@@ -111,18 +111,8 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         userId: userId,
         expiresAt: expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : null,
       );
-    } catch (e, stackTrace) {
+    } catch (e) {
       logError('Failed to fetch PowerSync credentials', e);
-      // Log non-critical error - PowerSync credential fetch doesn't block app workflow
-      await ErrorLoggingHelper.logNonCriticalError(
-        operation: 'PowerSync credentials fetch',
-        error: e,
-        stackTrace: stackTrace,
-        context: {
-          'isAuthenticated': _authService.isAuthenticated,
-          'hasAccessToken': _authService.accessToken != null,
-        },
-      );
       return null;
     }
   }
