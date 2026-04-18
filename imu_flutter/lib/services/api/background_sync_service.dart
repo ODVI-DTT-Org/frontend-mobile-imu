@@ -41,7 +41,7 @@ class BackgroundSyncService extends ChangeNotifier {
   // Configuration
   Duration _syncInterval = const Duration(minutes: 5); // Default 5 minutes
   Duration _pendingCheckInterval = const Duration(seconds: 30); // Check pending count every 30s
-  static const int _maxSyncRetries = 3;
+  static const int _maxSyncRetries = 10;
   int _currentSyncRetry = 0;
 
   // Sync status callbacks
