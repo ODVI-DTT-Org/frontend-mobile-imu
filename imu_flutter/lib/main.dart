@@ -22,11 +22,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize PostHog analytics
-  final posthogConfig = PostHogConfig('phc_PldqJxlMvgkMyh1zRnRaiQP7llFMRgWUYuW1I6b4Ddc')
-    ..host = 'https://us.i.posthog.com'
-    ..captureApplicationLifecycleEvents = true
-    ..debug = !kReleaseMode;
-  await Posthog().setup(posthogConfig);
+  // Note: Will be configured after AppConfig.initialize() in _initializeApp()
+  // This is a no-op placeholder - actual setup happens in IMUAppWithSplash
+  runApp(const ProviderScope(child: IMUAppWithSplash()));
+}
 
   // No local seeding - use Digital Ocean data via PowerSync
   // Run app with splash screen
@@ -77,6 +76,19 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
 
       await AppConfig.initialize(environment: env);
       await MapConfig.initialize(environment: env);
+
+      // Initialize PostHog analytics if configured
+      if (AppConfig.isPosthogConfigured) {
+        final posthogConfig = PostHogConfig(AppConfig.posthogKey)
+          ..host = AppConfig.posthogHost
+          ..captureApplicationLifecycleEvents = true
+          ..debug = !kReleaseMode;
+        await Posthog().setup(posthogConfig);
+        debugPrint('PostHog analytics initialized');
+      } else {
+        debugPrint('PostHog not configured - analytics disabled');
+      }
+
       await Future.delayed(const Duration(milliseconds: 300)); // Smooth transition
 
       setState(() {

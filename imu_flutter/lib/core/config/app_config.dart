@@ -49,6 +49,10 @@ class AppConfig {
   static late String _logLevel;
   static String _environment = 'dev';
 
+  // Analytics (PostHog)
+  static late String _posthogKey;
+  static late String _posthogHost;
+
   /// Initialize configuration from environment file
   static Future<void> initialize({String environment = 'dev'}) async {
     _environment = environment;
@@ -113,6 +117,10 @@ class AppConfig {
       _appName = dotenv.env['APP_NAME'] ?? 'IMU';
       _debugMode = dotenv.env['DEBUG_MODE'] == 'true';
       _logLevel = dotenv.env['LOG_LEVEL'] ?? 'info';
+
+      // PostHog Analytics
+      _posthogKey = dotenv.env['POSTHOG_KEY'] ?? '';
+      _posthogHost = dotenv.env['POSTHOG_HOST'] ?? 'https://us.i.posthog.com';
     }
 
     debugPrint('AppConfig initialized:');
@@ -186,4 +194,14 @@ class AppConfig {
 
   /// Check if JWT secret is properly configured
   static bool get isJwtSecretConfigured => _jwtSecret.isNotEmpty && _jwtSecret.length >= 32;
+
+  // PostHog Analytics
+  /// PostHog API key
+  static String get posthogKey => _posthogKey;
+
+  /// PostHog host URL
+  static String get posthogHost => _posthogHost;
+
+  /// Check if PostHog is properly configured
+  static bool get isPosthogConfigured => _posthogKey.isNotEmpty;
 }
