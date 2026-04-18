@@ -5,9 +5,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/models/user_role.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
+import '../../data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../../data/models/client_model.dart';
 import '../../../psgc/data/models/psgc_models.dart';
 import '../../../psgc/data/repositories/psgc_repository.dart';
@@ -23,7 +23,6 @@ class EditClientPage extends ConsumerStatefulWidget {
 
 class _EditClientPageState extends ConsumerState<EditClientPage> {
   final _formKey = GlobalKey<FormState>();
-  final _hiveService = HiveService();
   final _scrollController = ScrollController();
 
   bool _isLoading = true;
@@ -109,26 +108,8 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
       final psgcRepository = await ref.read(psgcRepositoryProvider.future);
       final regions = await psgcRepository.getRegions();
 
-      if (!_hiveService.isInitialized) {
-        await _hiveService.init();
-      }
-
-      Client? client;
-      final clientData = _hiveService.getClient(widget.clientId);
-      if (clientData != null) {
-        try {
-          client = Client.fromRow(clientData);
-        } catch (e) {
-          debugPrint('[EditClientPage] fromRow failed, trying fromJson: $e');
-          client = Client.fromJson(clientData);
-        }
-      }
-
-      final isOnline = ref.read(isOnlineProvider);
-      if (client == null && isOnline) {
-        final clientApi = ref.read(clientApiServiceProvider);
-        client = await clientApi.fetchClient(widget.clientId);
-      }
+      final clientRepo = ref.read(clientRepositoryProvider);
+      Client? client = await clientRepo.getClient(widget.clientId);
 
       if (client != null && mounted) {
         _client = client;
