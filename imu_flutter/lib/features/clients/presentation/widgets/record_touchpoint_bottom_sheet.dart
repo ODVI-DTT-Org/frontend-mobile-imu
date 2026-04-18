@@ -8,7 +8,7 @@ import 'package:imu_flutter/features/clients/presentation/widgets/client_action_
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/odometer_field.dart';
 import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/time_picker_field.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show
-    touchpointApiServiceProvider;
+    touchpointCreationServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
@@ -65,19 +65,9 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
     final remarks = useTextEditingController();
     final photoPath = useState<String?>(null);
     final isSubmitting = useState<bool>(false);
-    final nextTouchpointNumber = useState<int>(1);
+    final nextTouchpointNumber = useState<int>(client.nextTouchpointNumber ?? 1);
 
     final imagePicker = useMemoized(() => ImagePicker());
-
-    useEffect(() {
-      final touchpointApi = ref.read(touchpointApiServiceProvider);
-      touchpointApi.getNextTouchpointInfo(client.id!).then((info) {
-        if (info?.nextTouchpointNumber != null) {
-          nextTouchpointNumber.value = info!.nextTouchpointNumber!;
-        }
-      }).catchError((_) {});
-      return null;
-    }, const []);
 
     Future<void> pickPhoto() async {
       final picked = await imagePicker.pickImage(
@@ -178,12 +168,14 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           odometerDeparture: odometerDeparture.value,
         );
 
-        // Submit to API with photo file (single FormData request)
-        final touchpointApi = ref.read(touchpointApiServiceProvider);
-        final success = await touchpointApi.createTouchpointWithPhoto(
+        // Submit via TouchpointCreationService (online → API, offline → Hive queue)
+        final touchpointService = ref.read(touchpointCreationServiceProvider);
+        await touchpointService.createTouchpoint(
+          client.id!,
           touchpoint,
-          photoFile: photoFile,
-        ) != null;
+          photo: photoFile,
+        );
+        const success = true;
 
         if (success && context.mounted) {
           AppNotification.showSuccess(context, 'Touchpoint recorded successfully');
