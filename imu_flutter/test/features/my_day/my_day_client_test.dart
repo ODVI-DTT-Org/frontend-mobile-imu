@@ -73,4 +73,33 @@ void main() {
       expect(() => MyDayClient.fromPowerSync(row), throwsArgumentError);
     });
   });
+
+  group('MyDayClient.fromJson', () {
+    test('parses assignedByName', () {
+      final json = {
+        'id': 'item-1',
+        'client_id': 'client-1',
+        'full_name': 'Dela Cruz, Juan',
+        'touchpoint_number': 1,
+        'touchpoint_type': 'visit',
+        'priority': 'high',
+        'assigned_by_name': 'Maria Santos',
+      };
+      final client = MyDayClient.fromJson(json);
+      expect(client.assignedByName, 'Maria Santos');
+    });
+
+    test('handles missing assignedByName gracefully', () {
+      final json = {
+        'id': 'item-2',
+        'client_id': 'client-1',
+        'full_name': 'Dela Cruz, Juan',
+        'touchpoint_number': 1,
+        'touchpoint_type': 'visit',
+        'priority': 'normal',
+      };
+      final client = MyDayClient.fromJson(json);
+      expect(client.assignedByName, isNull);
+    });
+  });
 }
