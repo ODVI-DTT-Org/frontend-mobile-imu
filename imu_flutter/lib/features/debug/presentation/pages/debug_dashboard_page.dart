@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/services/location_service.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
@@ -22,7 +21,6 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
   late TabController _tabController;
 
   // Services
-  final _hiveService = HiveService();
   late final LocationService _locationService;
 
   // State
@@ -75,7 +73,7 @@ class _DebugDashboardPageState extends ConsumerState<DebugDashboardPage>
             controller: _tabController,
             children: [
               _GpsTrackerTab(locationService: _locationService),
-              _SystemInfoTab(hiveService: _hiveService),
+              const _SystemInfoTab(),
             ],
           ),
           if (_statusMessage != null)
@@ -424,9 +422,7 @@ class _GpsTrackerTabState extends State<_GpsTrackerTab> {
 
 // System Info Tab
 class _SystemInfoTab extends ConsumerStatefulWidget {
-  final HiveService hiveService;
-
-  const _SystemInfoTab({required this.hiveService});
+  const _SystemInfoTab();
 
   @override
   ConsumerState<_SystemInfoTab> createState() => _SystemInfoTabState();
@@ -450,7 +446,7 @@ class _SystemInfoTabState extends ConsumerState<_SystemInfoTab> {
     setState(() => _isLoadingCounts = true);
 
     try {
-      final tables = ['clients', 'addresses', 'phone_numbers', 'touchpoints', 'user_locations', 'psgc', 'touchpoint_reasons', 'approvals'];
+      final tables = ['clients', 'addresses', 'phone_numbers', 'touchpoints', 'user_locations', 'approvals', 'attendance', 'calls', 'visits'];
       final counts = <String, int>{};
 
       for (final table in tables) {
@@ -474,7 +470,6 @@ class _SystemInfoTabState extends ConsumerState<_SystemInfoTab> {
   @override
   Widget build(BuildContext context) {
     final isConnected = PowerSyncService.isConnected;
-    final hiveService = widget.hiveService;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -507,9 +502,9 @@ class _SystemInfoTabState extends ConsumerState<_SystemInfoTab> {
           _buildInfoCard(
             title: 'Storage',
             items: [
-              {'Database': 'Hive (NoSQL)'},
-              {'Initialized': widget.hiveService.isInitialized ? 'Yes' : 'No'},
-              {'Encryption': 'Enabled'},
+              {'Database': 'PowerSync SQLite'},
+              {'Offline Mode': 'Enabled'},
+              {'Settings': 'Hive (encrypted)'},
             ],
           ),
           const SizedBox(height: 16),

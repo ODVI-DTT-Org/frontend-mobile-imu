@@ -5,7 +5,9 @@ import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 import 'package:imu_flutter/features/clients/data/models/address_model.dart';
 import 'package:imu_flutter/features/clients/data/repositories/address_repository.dart';
 import 'package:imu_flutter/shared/widgets/psgc_selector.dart';
-import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider, jwtAuthProvider;
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
+import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider, jwtAuthProvider, powerSyncDatabaseProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import '../../../../core/models/user_role.dart';
 
@@ -59,7 +61,16 @@ class AddAddressPage extends HookConsumerWidget {
           'is_primary': isPrimary.value,
         };
 
-        await addressRepo.createAddress(clientId, data);
+        if (requiresApproval) {
+          final db = ref.read(powerSyncDatabaseProvider).value;
+          if (db == null) throw Exception('Database not available');
+          await db.execute(
+            'INSERT INTO approvals (id, type, status, client_id, user_id, role, reason, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [const Uuid().v4(), 'address_add', 'pending', clientId, currentUser!.id, currentUser.role.apiValue, 'Add Address Request', jsonEncode(data)],
+          );
+        } else {
+          await addressRepo.createAddress(clientId, data);
+        }
 
         if (context.mounted) {
           final message = requiresApproval

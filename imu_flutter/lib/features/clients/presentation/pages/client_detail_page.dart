@@ -9,13 +9,18 @@ import '../../data/repositories/client_repository.dart' show clientRepositoryPro
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import '../../../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     touchpointApiServiceProvider,
     authNotifierProvider,
     addressRepositoryProvider,
     phoneNumberRepositoryProvider,
-    clientMutationServiceProvider;
+    clientMutationServiceProvider,
+    jwtAuthProvider,
+    powerSyncDatabaseProvider;
+import '../../../../core/models/user_role.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
@@ -703,6 +708,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _addPhoneNumber() async {
     HapticUtils.lightImpact();
     final phoneRepo = ref.read(phoneNumberRepositoryProvider);
+    final currentUser = ref.read(jwtAuthProvider).currentUser;
+    final requiresApproval = currentUser?.role == UserRole.tele || currentUser?.role == UserRole.caravan;
 
     final result = await showModalBottomSheet<PhoneNumber>(
       context: context,
@@ -710,15 +717,30 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       builder: (context) => AddPhoneModal(
         clientId: widget.clientId,
         onSubmit: (clientId, data) async {
+          if (requiresApproval) {
+            final db = ref.read(powerSyncDatabaseProvider).value;
+            if (db == null) throw Exception('Database not available');
+            final approvalId = const Uuid().v4();
+            await db.execute(
+              'INSERT INTO approvals (id, type, status, client_id, user_id, role, reason, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [approvalId, 'phone_add', 'pending', clientId, currentUser!.id, currentUser.role.apiValue, 'Add Phone Number Request', jsonEncode(data)],
+            );
+            return PhoneNumber(
+              id: approvalId,
+              clientId: clientId,
+              label: PhoneLabel.fromString(data['label'] as String? ?? 'mobile'),
+              number: data['number'] as String? ?? '',
+              isPrimary: data['is_primary'] as bool? ?? false,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+          }
           return await phoneRepo.createPhoneNumber(clientId, data);
         },
       ),
     );
 
     if (result != null) {
-      if (mounted) {
-        AppNotification.showSuccess(context, 'Phone number added');
-      }
       _loadClient();
     }
   }
