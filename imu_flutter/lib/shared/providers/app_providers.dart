@@ -944,9 +944,6 @@ final missedVisitsCountProvider = Provider<Map<MissedVisitPriority, int>>((ref) 
 
 // ==================== Attendance Providers ====================
 
-/// Attendance records box name
-const _attendanceBox = 'attendance';
-
 /// Today's attendance record
 final todayAttendanceProvider = StateNotifierProvider<TodayAttendanceNotifier, AttendanceRecord?>((ref) {
   return TodayAttendanceNotifier(ref);
@@ -958,30 +955,13 @@ final isCheckedInProvider = Provider<bool>((ref) {
   return today?.status == AttendanceStatus.checkedIn;
 });
 
-/// Attendance history (last 14 days)
+/// Attendance history (last 30 days)
 final attendanceHistoryProvider = FutureProvider<List<AttendanceRecord>>((ref) async {
-  final hiveService = ref.watch(hiveServiceProvider);
-  if (!hiveService.isInitialized) await hiveService.init();
-
-  final records = <AttendanceRecord>[];
-  final box = Hive.box<String>(_attendanceBox);
-
-  final twoWeeksAgo = DateTime.now().subtract(const Duration(days: 14));
-
-  for (final key in box.keys) {
-    final data = box.get(key);
-    if (data != null) {
-      final record = AttendanceRecord.fromJson(
-        Map<String, dynamic>.from(const JsonDecoder().convert(data)),
-      );
-      if (record.date.isAfter(twoWeeksAgo)) {
-        records.add(record);
-      }
-    }
-  }
-
-  records.sort((a, b) => b.date.compareTo(a.date));
-  return records;
+  final repo = ref.watch(attendanceRepositoryProvider);
+  final authState = ref.watch(authNotifierProvider);
+  final userId = authState.user?.id;
+  if (userId == null) return [];
+  return repo.getHistory(userId, limit: 30);
 });
 
 /// Attendance stats for current month
