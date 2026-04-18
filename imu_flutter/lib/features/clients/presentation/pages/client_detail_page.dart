@@ -382,32 +382,94 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Future<void> _navigateToClient() async {
     if (_client == null) return;
-
     final client = _client!;
-    final address = client.addresses.isNotEmpty ? client.addresses.first : null;
-
-    if (address != null && (address.latitude != null && address.longitude != null)) {
-      // Use GPS coordinates from address
-      final url = 'https://www.google.com/maps/search/?api=1&query=${address.latitude},${address.longitude}';
-      if (!await launchUrl(Uri.parse(url))) {
-        if (mounted) {
-          AppNotification.showError(context, 'Could not open maps');
-        }
-      }
-    } else if (client.municipality != null && client.province != null) {
-      // Use municipality and province
-      final query = '${client.municipality}, ${client.province}';
-      final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}';
-      if (!await launchUrl(Uri.parse(url))) {
-        if (mounted) {
-          AppNotification.showError(context, 'Could not open maps');
-        }
-      }
-    } else {
-      if (mounted) {
-        AppNotification.showError(context, 'No location information available');
+    Address? primaryAddress;
+    if (client.addresses.isNotEmpty) {
+      try {
+        primaryAddress = client.addresses.firstWhere((a) => a.isPrimary);
+      } catch (_) {
+        primaryAddress = client.addresses.first;
       }
     }
+
+    if (primaryAddress?.latitude != null && primaryAddress?.longitude != null) {
+      await _openNavigationPicker(
+        latitude: primaryAddress!.latitude!,
+        longitude: primaryAddress.longitude!,
+        label: client.fullName,
+      );
+    } else if (client.municipality != null && client.province != null) {
+      final query = Uri.encodeComponent('${client.municipality}, ${client.province}');
+      final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+      if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+        if (mounted) AppNotification.showError(context, 'Could not open maps');
+      }
+    } else {
+      if (mounted) AppNotification.showError(context, 'No location information available');
+    }
+  }
+
+  Future<void> _navigateToAddress(Address address) async {
+    if (address.latitude != null && address.longitude != null) {
+      await _openNavigationPicker(
+        latitude: address.latitude!,
+        longitude: address.longitude!,
+        label: address.fullAddress,
+      );
+    } else if (address.fullAddress.isNotEmpty) {
+      final query = Uri.encodeComponent(address.fullAddress);
+      final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+      if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+        if (mounted) AppNotification.showError(context, 'Could not open maps');
+      }
+    } else {
+      if (mounted) AppNotification.showError(context, 'No address available');
+    }
+  }
+
+  Future<void> _openNavigationPicker({
+    required double latitude,
+    required double longitude,
+    required String label,
+  }) async {
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Navigate with', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.map),
+              title: const Text('Google Maps'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final ok = await MapService().openGoogleMapsNavigation(latitude: latitude, longitude: longitude, label: label);
+                if (!ok && mounted) AppNotification.showError(context, 'Could not open Google Maps');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.navigation),
+              title: const Text('Waze'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final ok = await MapService().openWazeNavigation(latitude: latitude, longitude: longitude);
+                if (!ok && mounted) AppNotification.showError(context, 'Could not open Waze');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _editClient() async {
@@ -525,6 +587,14 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                 ),
               ],
               const Spacer(),
+              IconButton(
+                icon: const Icon(LucideIcons.navigation, size: 18),
+                onPressed: () async {
+                  HapticUtils.lightImpact();
+                  await _navigateToAddress(address);
+                },
+                tooltip: 'Navigate',
+              ),
               if (!address.isPrimary)
                 IconButton(
                   icon: const Icon(Icons.star, size: 18),
@@ -757,113 +827,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
   }
 
-  void _navigateToAddress(String? address) {
-    if (address == null || address.isEmpty) {
-      AppNotification.showError(context, 'No address available');
-      return;
-    }
-    HapticUtils.lightImpact();
-
-    // Show navigation options
-    final primaryAddress = _client!.addresses.isNotEmpty
-        ? _client!.addresses.first
-        : null;
-
-    if (primaryAddress?.latitude != null && primaryAddress?.longitude != null) {
-      // Open Google Maps directly with coordinates
-      _openGoogleMapsNavigation(primaryAddress!);
-    } else {
-      // If no coordinates, search by address string
-      _openGoogleMapsSearch(address);
-    }
-  }
-
-  Future<void> _openGoogleMapsNavigation(Address address) async {
-    final latitude = address.latitude;
-    final longitude = address.longitude;
-    final url = 'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude';
-
-    try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (mounted) {
-        AppNotification.showError(context, 'Could not open Google Maps: $e');
-      }
-    }
-  }
-
-  Future<void> _openGoogleMapsSearch(String address) async {
-    final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}';
-
-    try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (mounted) {
-        AppNotification.showError(context, 'Could not open Google Maps: $e');
-      }
-    }
-  }
-
-  void _showMapForAddress(Address address) {
-    if (address.latitude == null || address.longitude == null) {
-      AppNotification.showError(context, 'Location coordinates not available');
-      return;
-    }
-
-    HapticUtils.lightImpact();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            AppBar(
-              title: Text(address.fullAddress),
-              automaticallyImplyLeading: false,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            Expanded(
-              child: ClientMapView(
-                clients: [_client!],
-                showControls: true,
-                showSearch: false,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openNavigation(Address address) async {
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: 'Opening navigation...',
-      operation: () async {
-        // Import and use MapService
-        final mapService = MapService();
-        await mapService.openGoogleMapsNavigation(
-          latitude: address.latitude!,
-          longitude: address.longitude!,
-          label: _client!.fullName,
-        );
-      },
-      onError: (e) {
-        if (mounted) {
-          AppNotification.showError(context, 'Failed to open navigation: $e');
-        }
-      },
-    );
-  }
 
   Future<void> _startTouchpoint() async {
     if (_client == null) return;

@@ -124,7 +124,7 @@ class AddAddressModal extends HookWidget {
                     PSGCSelector(
                       initialPsgcId: psgcId.value,
                       onPsgcSelected: (psgc) {
-                        psgcId.value = psgc.id;
+                        psgcId.value = psgc.psgcId;
                       },
                     ),
 
