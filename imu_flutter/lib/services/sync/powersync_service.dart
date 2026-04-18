@@ -217,28 +217,6 @@ const Schema _powerSyncSchema = Schema([
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
-  // PSGC geographic data (single table with all locations)
-  // Note: PowerSync automatically adds an 'id' column, so we don't define it here
-  Table('psgc', [
-    Column.text('region'),
-    Column.text('province'),
-    Column.text('mun_city_kind'),
-    Column.text('mun_city'),
-    Column.text('barangay'),
-    Column.text('pin_location'),
-    Column.text('zip_code'),
-  ]),
-  // Touchpoint reasons (global data)
-  // Note: PowerSync automatically adds an 'id' column, so we don't define it here
-  Table('touchpoint_reasons', [
-    Column.text('reason_code'),
-    Column.text('label'),
-    Column.text('touchpoint_type'),
-    Column.text('role'),
-    Column.text('category'),
-    Column.integer('sort_order'),
-    Column.integer('is_active'),
-  ]),
   // Error logs for non-critical error queuing
   Table('error_logs', [
     Column.text('code'),
