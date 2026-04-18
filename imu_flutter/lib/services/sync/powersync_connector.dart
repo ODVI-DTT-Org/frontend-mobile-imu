@@ -241,6 +241,20 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
           }
         }
 
+      case 'calls':
+        if (op.op == UpdateType.put) {
+          await _httpClient.post(
+            '$_apiUrl/calls',
+            data: data,
+            options: Options(headers: headers),
+          );
+        } else if (op.op == UpdateType.delete) {
+          await _httpClient.delete(
+            '$_apiUrl/calls/${op.id}',
+            options: Options(headers: headers),
+          );
+        }
+
       case 'touchpoints':
         await _uploadCrud(
           op: op,
