@@ -12,20 +12,6 @@ import '../sync/powersync_connector.dart';
 import '../error_logging_helper.dart';
 import '../../core/utils/logger.dart';
 import '../../core/config/app_config.dart';
-import '../touchpoint/pending_touchpoint_service.dart';
-import '../api/touchpoint_api_service.dart';
-import '../visit/pending_visit_service.dart';
-import '../visit/models/pending_visit.dart';
-import '../release/pending_release_service.dart';
-import '../release/models/pending_release.dart';
-import '../client/pending_client_service.dart';
-import '../client/client_mutation_service.dart';
-import '../client/models/pending_client_operation.dart';
-import 'client_api_service.dart' show ClientApiService;
-import '../../features/clients/data/models/client_model.dart' show Client;
-import 'visit_api_service.dart' show VisitApiService;
-import 'release_api_service.dart' show ReleaseApiService;
-import '../local_storage/hive_service.dart';
 
 /// Background sync service for automatic data synchronization
 ///
@@ -258,18 +244,7 @@ class BackgroundSyncService extends ChangeNotifier {
 
     try {
       // PowerSync automatically handles both upload and download
-      // We just need to wait for pending uploads to complete
       await _waitForPendingUploads();
-
-      // Sync pending touchpoints created while offline
-      await _syncPendingTouchpoints();
-
-      // Sync pending visits and releases created while offline
-      await _syncPendingVisits();
-      await _syncPendingReleases();
-
-      // Sync pending client mutations created while offline
-      await _syncPendingClients();
 
       _lastSyncTime = DateTime.now();
       _lastSyncError = null;
@@ -374,282 +349,21 @@ class BackgroundSyncService extends ChangeNotifier {
     }
   }
 
-  /// Update pending count from PowerSync
+  /// Update pending count from PowerSync CRUD queue
   Future<void> _updatePendingCount() async {
     try {
-      final powerSyncPending = await PowerSyncService.pendingUploadCount;
-      final hiveTouchpoints = await PendingTouchpointService().getPendingCount();
-      final hiveVisits = await PendingVisitService().getPendingCount();
-      final hiveReleases = await PendingReleaseService().getPendingCount();
-      final hiveClients = await PendingClientService().getPendingCount();
-      _pendingCount = powerSyncPending + hiveTouchpoints + hiveVisits + hiveReleases + hiveClients;
+      _pendingCount = await PowerSyncService.pendingUploadCount;
       if (_pendingCount > 0) {
-        logDebug('BackgroundSyncService: $_pendingCount pending uploads');
+        logDebug('BackgroundSyncService: $_pendingCount pending uploads in PowerSync queue');
       }
       notifyListeners();
     } catch (e, stackTrace) {
       logError('BackgroundSyncService: Failed to update pending count', e);
-      // Log non-critical error - pending count update doesn't block workflow
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'pending count update',
         error: e,
         stackTrace: stackTrace,
       );
-    }
-  }
-
-  /// Sync pending touchpoints created while offline
-  ///
-  /// This method:
-  /// 1. Fetches all pending touchpoints from Hive storage
-  /// 2. Attempts to sync each touchpoint to the backend API
-  /// 3. Removes successfully synced touchpoints from pending storage
-  /// 4. Handles errors for failed sync attempts
-  Future<void> _syncPendingTouchpoints() async {
-    try {
-      logDebug('BackgroundSyncService: Checking for pending touchpoints...');
-
-      final pendingService = PendingTouchpointService();
-      final pendingTouchpoints = await pendingService.getPendingTouchpoints();
-
-      if (pendingTouchpoints.isEmpty) {
-        logDebug('BackgroundSyncService: No pending touchpoints to sync');
-        return;
-      }
-
-      logDebug('BackgroundSyncService: Found ${pendingTouchpoints.length} pending touchpoints');
-
-      // Import API service (lazy import to avoid circular dependency)
-      final touchpointApi = TouchpointApiService();
-
-      int syncedCount = 0;
-      int failedCount = 0;
-
-      for (final pending in pendingTouchpoints) {
-        try {
-          logDebug('BackgroundSyncService: Syncing touchpoint for client ${pending.clientId}');
-
-          // Reconstruct File objects from saved paths if they exist
-          File? photoFile;
-          File? audioFile;
-
-          if (pending.photoPath != null) {
-            photoFile = File(pending.photoPath!);
-            if (!await photoFile.exists()) {
-              logWarning('BackgroundSyncService: Photo file not found: ${pending.photoPath}');
-              photoFile = null;
-            }
-          }
-
-          if (pending.audioPath != null) {
-            audioFile = File(pending.audioPath!);
-            if (!await audioFile.exists()) {
-              logWarning('BackgroundSyncService: Audio file not found: ${pending.audioPath}');
-              audioFile = null;
-            }
-          }
-
-          // Call API to create touchpoint
-          if (photoFile != null) {
-            await touchpointApi.createTouchpointWithPhoto(
-              pending.touchpoint,
-              photoFile: photoFile,
-            );
-          } else {
-            await touchpointApi.createTouchpoint(pending.touchpoint);
-          }
-
-          // Remove from pending storage after successful sync
-          await pendingService.removePendingTouchpoint(pending.id);
-
-          // Clean up saved files
-          if (pending.photoPath != null) {
-            try {
-              await File(pending.photoPath!).delete();
-              logDebug('BackgroundSyncService: Deleted saved photo: ${pending.photoPath}');
-            } catch (e) {
-              logWarning('BackgroundSyncService: Failed to delete saved photo: $e');
-            }
-          }
-
-          if (pending.audioPath != null) {
-            try {
-              await File(pending.audioPath!).delete();
-              logDebug('BackgroundSyncService: Deleted saved audio: ${pending.audioPath}');
-            } catch (e) {
-              logWarning('BackgroundSyncService: Failed to delete saved audio: $e');
-            }
-          }
-
-          syncedCount++;
-          logDebug('BackgroundSyncService: Successfully synced touchpoint ${pending.touchpoint.id}');
-        } catch (e, stackTrace) {
-          failedCount++;
-          logError('BackgroundSyncService: Failed to sync pending touchpoint ${pending.id}', e, stackTrace);
-          // Continue with next touchpoint instead of failing entire batch
-        }
-      }
-
-      logDebug('BackgroundSyncService: Pending touchpoints sync complete - $syncedCount synced, $failedCount failed');
-
-      if (failedCount > 0) {
-        // Log non-critical error - some touchpoints failed to sync but will be retried
-        await ErrorLoggingHelper.logNonCriticalError(
-          operation: 'pending touchpoints sync',
-          error: Exception('$failedCount of ${pendingTouchpoints.length} touchpoints failed to sync'),
-          stackTrace: StackTrace.current,
-          context: {
-            'syncedCount': syncedCount.toString(),
-            'failedCount': failedCount.toString(),
-            'totalPending': pendingTouchpoints.length.toString(),
-          },
-        );
-      }
-    } catch (e, stackTrace) {
-      logError('BackgroundSyncService: Failed to sync pending touchpoints', e, stackTrace);
-      // Log non-critical error - pending touchpoints sync doesn't block main sync
-      await ErrorLoggingHelper.logNonCriticalError(
-        operation: 'pending touchpoints sync',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
-  /// Sync pending visits stored while offline
-  Future<void> _syncPendingVisits() async {
-    try {
-      final pendingService = PendingVisitService();
-      final pendingVisits = await pendingService.getPendingVisits();
-
-      if (pendingVisits.isEmpty) return;
-
-      logDebug('BackgroundSyncService: Syncing ${pendingVisits.length} pending visits');
-      final visitApi = VisitApiService();
-      int syncedCount = 0;
-
-      for (final pending in pendingVisits) {
-        try {
-          File? photoFile;
-          if (pending.photoPath != null) {
-            final f = File(pending.photoPath!);
-            if (await f.exists()) photoFile = f;
-          }
-
-          await visitApi.createVisit(
-            clientId: pending.clientId,
-            timeIn: pending.timeIn,
-            timeOut: pending.timeOut,
-            odometerArrival: pending.odometerArrival,
-            odometerDeparture: pending.odometerDeparture,
-            photoFile: photoFile,
-            notes: pending.notes,
-            type: pending.type,
-          );
-
-          await pendingService.removePendingVisit(pending.id);
-          if (pending.photoPath != null) {
-            try { await File(pending.photoPath!).delete(); } catch (_) {}
-          }
-          syncedCount++;
-        } catch (e) {
-          logError('BackgroundSyncService: Failed to sync pending visit ${pending.id}', e);
-        }
-      }
-
-      logDebug('BackgroundSyncService: Visits sync complete - $syncedCount/${pendingVisits.length} synced');
-    } catch (e, stackTrace) {
-      logError('BackgroundSyncService: Failed to sync pending visits', e, stackTrace);
-    }
-  }
-
-  /// Sync pending loan releases stored while offline
-  Future<void> _syncPendingReleases() async {
-    try {
-      final pendingService = PendingReleaseService();
-      final pendingReleases = await pendingService.getPendingReleases();
-
-      if (pendingReleases.isEmpty) return;
-
-      logDebug('BackgroundSyncService: Syncing ${pendingReleases.length} pending releases');
-      final releaseApi = ReleaseApiService();
-      int syncedCount = 0;
-
-      for (final pending in pendingReleases) {
-        try {
-          await releaseApi.createCompleteLoanRelease(
-            clientId: pending.clientId,
-            timeIn: pending.timeIn,
-            timeOut: pending.timeOut,
-            odometerArrival: pending.odometerArrival,
-            odometerDeparture: pending.odometerDeparture,
-            productType: pending.productType,
-            loanType: pending.loanType,
-            udiNumber: pending.udiNumber,
-            remarks: pending.remarks,
-            photoPath: pending.photoPath,
-          );
-
-          await pendingService.removePendingRelease(pending.id);
-          if (pending.photoPath != null) {
-            try { await File(pending.photoPath!).delete(); } catch (_) {}
-          }
-          syncedCount++;
-        } catch (e) {
-          logError('BackgroundSyncService: Failed to sync pending release ${pending.id}', e);
-        }
-      }
-
-      logDebug('BackgroundSyncService: Releases sync complete - $syncedCount/${pendingReleases.length} synced');
-    } catch (e, stackTrace) {
-      logError('BackgroundSyncService: Failed to sync pending releases', e, stackTrace);
-    }
-  }
-
-  /// Sync pending client mutations (create/update/delete) stored while offline
-  Future<void> _syncPendingClients() async {
-    try {
-      final pendingService = PendingClientService();
-      final allOps = await pendingService.getAll();
-
-      if (allOps.isEmpty) return;
-
-      final collapsed = pendingService.collapse(allOps);
-      logDebug('BackgroundSyncService: Syncing ${collapsed.length} collapsed client ops (${allOps.length} raw)');
-
-      final clientApi = ClientApiService();
-      final hiveService = HiveService();
-      if (!hiveService.isInitialized) await hiveService.init();
-
-      for (final op in collapsed) {
-        try {
-          switch (op.operation) {
-            case ClientOperationType.create:
-              final client = Client.fromJson(op.clientData!);
-              final result = await clientApi.createClient(client);
-              if (result?.id != null) {
-                await hiveService.deleteClient(op.clientId);
-                await hiveService.saveClient(result!.id!, result.toJson());
-              }
-            case ClientOperationType.update:
-              final client = Client.fromJson(op.clientData!);
-              final result = await clientApi.updateClient(client);
-              if (result != null) {
-                await hiveService.saveClient(result.id!, result.toJson());
-              }
-            case ClientOperationType.delete:
-              await clientApi.deleteClient(op.clientId);
-              // requiresApproval (false) or success (true) — either way, op is submitted
-          }
-          await pendingService.removeAllForClient(op.clientId);
-        } catch (e) {
-          logError('BackgroundSyncService: Failed to sync client op ${op.id}', e);
-        }
-      }
-
-      logDebug('BackgroundSyncService: Clients sync complete');
-    } catch (e, stackTrace) {
-      logError('BackgroundSyncService: Failed to sync pending clients', e, stackTrace);
     }
   }
 

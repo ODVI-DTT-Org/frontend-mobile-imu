@@ -48,8 +48,6 @@ export '../../services/touchpoint/touchpoint_count_service.dart' show
 // Re-export touchpoint creation service provider
 export '../../services/touchpoint/touchpoint_creation_service.dart' show
   TouchpointCreationService;
-export '../../services/touchpoint/pending_touchpoint_service.dart' show
-  PendingTouchpointService;
 // Re-export PowerSync database provider
 export '../../services/sync/powersync_service.dart' show
   powerSyncDatabaseProvider;
@@ -109,12 +107,8 @@ import '../../services/api/approvals_api_service.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/touchpoint/touchpoint_creation_service.dart';
-import '../../services/touchpoint/pending_touchpoint_service.dart';
 import '../../services/visit/visit_creation_service.dart';
-import '../../services/visit/pending_visit_service.dart';
 import '../../services/release/release_creation_service.dart';
-import '../../services/release/pending_release_service.dart';
-import '../../services/client/pending_client_service.dart';
 import '../../services/client/client_mutation_service.dart';
 import '../../services/api/visit_api_service.dart' show VisitApiService, visitApiServiceProvider;
 import '../../services/api/release_api_service.dart' show releaseApiServiceProvider;
@@ -686,30 +680,14 @@ final clientTouchpointCountsProvider = FutureProvider.autoDispose<Map<String, in
   return await service.fetchCounts(clientIds);
 });
 
-/// Pending touchpoint service provider
-/// Manages offline touchpoint storage in Hive
-final pendingTouchpointServiceProvider = Provider<PendingTouchpointService>((ref) {
-  return PendingTouchpointService();
-});
-
 /// Touchpoint creation service provider
 final touchpointCreationServiceProvider = Provider<TouchpointCreationService>((ref) {
   return TouchpointCreationService();
 });
 
-/// Pending visit service provider
-final pendingVisitServiceProvider = Provider<PendingVisitService>((ref) {
-  return PendingVisitService();
-});
-
 /// Visit creation service provider
 final visitCreationServiceProvider = Provider<VisitCreationService>((ref) {
   return VisitCreationService();
-});
-
-/// Pending release service provider
-final pendingReleaseServiceProvider = Provider<PendingReleaseService>((ref) {
-  return PendingReleaseService();
 });
 
 /// Release creation service provider
@@ -718,11 +696,6 @@ final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
   final releaseApi = ref.watch(releaseApiServiceProvider);
   final visitApi = ref.watch(visitApiServiceProvider);
   return ReleaseCreationService(connectivity, releaseApi, visitApi);
-});
-
-/// Pending client service provider
-final pendingClientServiceProvider = Provider<PendingClientService>((ref) {
-  return PendingClientService();
 });
 
 /// Client mutation service provider
