@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:powersync/powersync.dart' hide Column, SyncStatus;
-import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -88,14 +86,10 @@ class EnhancedSyncLoadingState {
 
 /// Tables to sync with display names (aligned with current sync rules)
 const Map<String, String> _tableDisplayNames = {
-  'psgc': 'PSGC (Locations)',
-  'touchpoint_reasons': 'Touchpoint Reasons',
+  'clients': 'Clients',
   'user_locations': 'User Locations',
   'itineraries': 'Itineraries',
   'approvals': 'Approvals',
-  // NOTE: Clients and touchpoints removed from PowerSync sync
-  // Clients are synced via REST API (/clients/assigned) and stored in Hive cache
-  // Touchpoint data is available via clients.touchpoint_summary (denormalized JSON array)
 };
 
 /// Enhanced sync loading state notifier
@@ -184,19 +178,18 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     try {
       logDebug('[LOCAL-DATA-CHECK] Checking for local data in Hive storage...');
 
-      // NOTE: PowerSync clients table removed - clients are now synced via REST API
-      // Check Hive storage for clients (REST API sync)
-      int hiveClientCount = 0;
+      logDebug('[LOCAL-DATA-CHECK] Checking for local data in PowerSync SQLite...');
+
+      int clientCount = 0;
       try {
-        await Hive.initFlutter();
-        final clientsBox = await Hive.openBox<String>('clients');
-        hiveClientCount = clientsBox.length;
-        logDebug('[LOCAL-DATA-CHECK] Hive clients: $hiveClientCount');
+        final result = await _powerSyncDb.getAll('SELECT COUNT(*) as cnt FROM clients');
+        clientCount = (result.first['cnt'] as int?) ?? 0;
+        logDebug('[LOCAL-DATA-CHECK] PowerSync clients: $clientCount');
       } catch (e) {
-        logWarning('[LOCAL-DATA-CHECK] Failed to check Hive storage: $e');
+        logWarning('[LOCAL-DATA-CHECK] Failed to check PowerSync storage: $e');
       }
 
-      final hasData = hiveClientCount > 0;
+      final hasData = clientCount > 0;
 
       logDebug('[LOCAL-DATA-CHECK] Has local data: $hasData');
 
