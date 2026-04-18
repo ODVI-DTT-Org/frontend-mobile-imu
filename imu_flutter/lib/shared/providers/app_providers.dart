@@ -166,7 +166,14 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
     }
   }
 
-  final notifier = AuthNotifier(authService, onLoginSuccess: onLoginSuccess);
+  void onLogout() {
+    // Invalidate the cached PowerSync database so the next login gets a fresh instance.
+    // Without this, login → logout → login reuses a closed database and hangs on sync page.
+    ref.invalidate(powerSyncDatabaseProvider);
+    debugPrint('[AUTH] powerSyncDatabaseProvider invalidated on logout');
+  }
+
+  final notifier = AuthNotifier(authService, onLoginSuccess: onLoginSuccess, onLogout: onLogout);
 
   debugPrint('[AUTH-PROVIDER] Calling checkAuthStatus() (without await)...');
   // Check auth status on initialization

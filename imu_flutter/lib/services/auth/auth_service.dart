@@ -156,10 +156,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   IMUPowerSyncConnector? _powerSyncConnector;
   Future<void> Function()? _onLoginSuccess;
+  void Function()? _onLogout;
   bool _disposed = false;
 
-  AuthNotifier(this._authService, {Future<void> Function()? onLoginSuccess})
+  AuthNotifier(this._authService, {Future<void> Function()? onLoginSuccess, void Function()? onLogout})
       : _onLoginSuccess = onLoginSuccess,
+        _onLogout = onLogout,
         super(AuthState.initial());
 
   /// Check if the notifier is still mounted (not disposed)
@@ -316,6 +318,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (!mounted) return;
     // Fix: Set isLoading: false after logout to prevent login button being disabled
     state = AuthState.initial().copyWith(isLoading: false);
+    // Invalidate PowerSync database provider so next login gets a fresh instance
+    _onLogout?.call();
   }
 
   /// Refresh authentication
