@@ -545,7 +545,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     }
 
     // Default label
-    return isPrimary ? 'Add to Today' : 'Add with Date';
+    return isPrimary ? 'Schedule Today' : 'Schedule Itinerary';
   }
 
   Future<void> _showDatePicker(Client client) async {
