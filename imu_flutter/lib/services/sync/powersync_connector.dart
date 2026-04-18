@@ -5,7 +5,6 @@ import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
 import '../auth/auth_service.dart';
 import '../auth/jwt_auth_service.dart';
-import '../error_logging_helper.dart';
 
 /// Backend connector for PowerSync
 /// Handles authentication credentials and data upload to PostgreSQL backend
@@ -146,47 +145,32 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
       }
       await batch.complete();
       logDebug('Upload batch completed successfully');
-    } on DioException catch (e, stackTrace) {
+    } on DioException catch (e) {
       final status = e.response?.statusCode;
       // 4xx (except 401) = bad data that will never succeed — skip it.
       // 401 = auth issue — rethrow so PowerSync can refresh credentials.
       // 5xx / network errors = transient — rethrow so PowerSync retries.
       if (status != null && status >= 400 && status < 500 && status != 401) {
-        logError('Permanent upload error ($status) — skipping batch item: ${e.message}');
-        await ErrorLoggingHelper.logNonCriticalError(
-          operation: 'PowerSync data upload (skipped)',
-          error: e,
-          stackTrace: stackTrace,
-          context: {
-            'responseStatus': status.toString(),
-            'responseData': e.response?.data?.toString(),
-            'table': batch.crud.isNotEmpty ? batch.crud.first.table : 'unknown',
-            'opId': batch.crud.isNotEmpty ? batch.crud.first.id : 'unknown',
-          },
+        // Permanent failure — bad data that will never succeed.
+        // Skip it by completing the batch. Do NOT write to error_logs via
+        // PowerSync here: that would add a new CRUD entry and re-trigger this
+        // same loop, causing the pending count to grow on every retry/reopen.
+        logError(
+          'Permanent upload error ($status) — skipping: '
+          'table=${batch.crud.isNotEmpty ? batch.crud.first.table : "?"} '
+          'id=${batch.crud.isNotEmpty ? batch.crud.first.id : "?"} '
+          'body=${e.response?.data}',
         );
-        // Complete the batch to remove the bad item from the queue.
         await batch.complete();
         return;
       }
-      logError('Upload failed with DioException: ${e.message}');
-      await ErrorLoggingHelper.logNonCriticalError(
-        operation: 'PowerSync data upload',
-        error: e,
-        stackTrace: stackTrace,
-        context: {
-          'responseStatus': status?.toString(),
-          'responseData': e.response?.data?.toString(),
-        },
-      );
+      // Transient error (5xx / network) — log to console only, then rethrow
+      // so PowerSync retries. Do NOT write to error_logs via PowerSync: that
+      // would create a new CRUD entry each retry, stacking up the queue.
+      logError('Upload failed with DioException (transient): ${e.message}');
       rethrow;
-    } catch (e, stackTrace) {
+    } catch (e) {
       logError('Upload failed: $e');
-      await ErrorLoggingHelper.logNonCriticalError(
-        operation: 'PowerSync data upload',
-        error: e,
-        stackTrace: stackTrace,
-        context: {'errorType': e.runtimeType.toString()},
-      );
       rethrow;
     }
   }
