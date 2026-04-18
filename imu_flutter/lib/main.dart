@@ -10,7 +10,6 @@ import 'core/config/map_config.dart';
 import 'services/location/geolocation_service.dart';
 import 'services/connectivity_service.dart';
 import 'core/utils/notification_utils.dart';
-import 'features/touchpoints/services/form_draft_service.dart';
 import 'services/sync/powersync_service.dart';
 import 'services/sync/powersync_connector.dart';
 import 'services/auth/jwt_auth_service.dart';
@@ -146,14 +145,6 @@ Future<void> _initializeServices() async {
   // Initialize notifications
   final notificationService = NotificationService();
   await notificationService.init();
-
-  // Initialize form draft service (now safe because Hive is initialized)
-  try {
-    await FormDraftService.initialize();
-  } catch (e) {
-    debugPrint('FormDraftService initialization error: $e');
-    // Continue without form drafts - not critical for app
-  }
 
   // Pre-warm geolocation (mobile only)
   if (!kIsWeb) {
