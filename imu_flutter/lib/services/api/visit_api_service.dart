@@ -160,7 +160,7 @@ class VisitApiService {
 
       final response = await _dio.get(
         '${AppConfig.postgresApiUrl}/visits',
-        queryParameters: {'client_id': clientId, 'limit': 100},
+        queryParameters: {'client_id': clientId, 'source': 'CMS', 'limit': 100},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
