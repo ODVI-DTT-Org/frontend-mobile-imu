@@ -45,9 +45,15 @@ class LoadingHelper {
 
   /// Hide loading overlay
   static void hide(WidgetRef ref) {
-    ref.read(isLoadingOverlayVisibleProvider.notifier).state = false;
-    ref.read(loadingMessageProvider.notifier).state = null;
-    debugPrint('✅ Loading hidden');
+    try {
+      ref.read(isLoadingOverlayVisibleProvider.notifier).state = false;
+      ref.read(loadingMessageProvider.notifier).state = null;
+      debugPrint('✅ Loading hidden');
+    } on StateError {
+      // Widget was disposed before hide() ran (e.g. navigation completed during
+      // an async login). The destination page clears the stale overlay on init.
+      debugPrint('⚠️ Loading hide skipped — ref disposed (widget navigated away)');
+    }
   }
 
   /// Update loading message without hiding the overlay

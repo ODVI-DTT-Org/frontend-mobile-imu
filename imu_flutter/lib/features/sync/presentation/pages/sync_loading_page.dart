@@ -9,6 +9,7 @@ import '../../../../services/api/background_sync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/logger.dart';
+import '../../../../shared/providers/app_providers.dart' show isLoadingOverlayVisibleProvider, loadingMessageProvider;
 
 /// Table sync status
 class TableSyncStatus {
@@ -425,6 +426,10 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
       ref.read(_isNavigatingProvider.notifier).state = false;
       // Increment session key to force sync provider to reinitialize
       ref.read(_syncSessionKeyProvider.notifier).state++;
+      // Clear any stale loading overlay left by LoginPage — it can't clear it
+      // itself because its ref is disposed the moment navigation completes.
+      ref.read(isLoadingOverlayVisibleProvider.notifier).state = false;
+      ref.read(loadingMessageProvider.notifier).state = null;
     });
   }
 
