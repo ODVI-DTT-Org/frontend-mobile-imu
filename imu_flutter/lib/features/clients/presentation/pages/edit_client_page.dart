@@ -105,7 +105,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     setState(() => _isLoading = true);
 
     try {
-      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final psgcRepository = ref.read(psgcRepositoryProvider);
       final regions = await psgcRepository.getRegions();
 
       final clientRepo = ref.read(clientRepositoryProvider);
@@ -138,7 +138,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     if (_client == null) return;
 
     try {
-      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final psgcRepository = ref.read(psgcRepositoryProvider);
 
       if (_client!.region != null && _client!.region!.isNotEmpty) {
         if (mounted) setState(() => _isLoadingProvinces = true);
@@ -212,7 +212,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   Future<void> _loadBarangays(String municipality) async {
     try {
-      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final psgcRepository = ref.read(psgcRepositoryProvider);
       final barangays = await psgcRepository.getBarangaysByMunicipality(municipality);
       if (mounted) {
         setState(() {
@@ -897,7 +897,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
             if (region != null) {
               try {
-                final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                final psgcRepository = ref.read(psgcRepositoryProvider);
                 final provinces = await psgcRepository.getProvincesByRegion(region.name);
                 if (mounted) setState(() { _provinces = provinces; _isLoadingProvinces = false; });
               } catch (e) {
@@ -937,7 +937,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
               if (province != null) {
                 try {
-                  final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                  final psgcRepository = ref.read(psgcRepositoryProvider);
                   final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
                   if (mounted) setState(() { _municipalities = municipalities; _isLoadingMunicipalities = false; });
                 } catch (e) {

@@ -116,7 +116,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
     try {
       // Load PSGC regions
-      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final psgcRepository = ref.read(psgcRepositoryProvider);
       final regions = await psgcRepository.getRegions();
 
       if (mounted) {
@@ -136,7 +136,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
   Future<void> _loadBarangays(String municipality) async {
     try {
-      final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+      final psgcRepository = ref.read(psgcRepositoryProvider);
       final barangays = await psgcRepository.getBarangaysByMunicipality(municipality);
       if (mounted) {
         setState(() {
@@ -722,7 +722,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
             if (region != null) {
               try {
-                final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                final psgcRepository = ref.read(psgcRepositoryProvider);
                 final provinces = await psgcRepository.getProvincesByRegion(region.name);
                 if (mounted) {
                   setState(() {
@@ -791,7 +791,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
                     if (province != null) {
                       try {
-                        final psgcRepository = await ref.read(psgcRepositoryProvider.future);
+                        final psgcRepository = ref.read(psgcRepositoryProvider);
                         final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
                         if (mounted) {
                           setState(() {
