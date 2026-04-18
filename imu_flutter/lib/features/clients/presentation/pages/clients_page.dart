@@ -49,6 +49,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   String _searchQuery = '';
   bool _showAssignedClientsOnly = true; // true = Assigned Clients (API with municipality filter, cached), false = All Clients (API, no filter)
 
+  // Optimistic set of client IDs scheduled today — prevents button re-enabling during provider reload
+  final Set<String> _scheduledTodayIds = {};
+
   // Pagination - server-side
   final int _itemsPerPage = 10;
   int _currentPage = 1;
@@ -941,19 +944,22 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     final todayItineraryAsync = ref.watch(todayItineraryProvider);
     final today = DateTime.now();
 
-    bool isInMyDay = false;
-    todayItineraryAsync.when(
-      data: (items) {
-        isInMyDay = items.any((item) =>
-          item.clientId == client.id &&
-          item.scheduledDate.year == today.year &&
-          item.scheduledDate.month == today.month &&
-          item.scheduledDate.day == today.day
-        );
-      },
-      loading: () => isInMyDay = false,
-      error: (_, __) => isInMyDay = false,
-    );
+    // Optimistic: already scheduled in this session
+    bool isInMyDay = _scheduledTodayIds.contains(client.id);
+    if (!isInMyDay) {
+      todayItineraryAsync.when(
+        data: (items) {
+          isInMyDay = items.any((item) =>
+            item.clientId == client.id &&
+            item.scheduledDate.year == today.year &&
+            item.scheduledDate.month == today.month &&
+            item.scheduledDate.day == today.day
+          );
+        },
+        loading: () {},  // keep optimistic value, don't flip to false while reloading
+        error: (_, __) => isInMyDay = false,
+      );
+    }
 
     // Build action buttons
     final actionButtons = [
@@ -1078,6 +1084,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       if (mounted) {
         if (success) {
           if (scheduledDate == null) {
+            setState(() { _scheduledTodayIds.add(client.id!); });
             showToast('Added to today\'s itinerary');
           } else {
             showToast('Added to itinerary for ${DateFormat('MMM dd').format(scheduledDate)}');
