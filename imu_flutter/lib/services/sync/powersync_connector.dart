@@ -123,95 +123,198 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
     }
   }
 
-  /// Upload local changes to the backend
+  /// Upload local changes to the backend, routing each CRUD op to the correct REST endpoint.
   @override
   Future<void> uploadData(PowerSyncDatabase database) async {
+    final token = _authService.accessToken;
+    if (token == null) {
+      logDebug('No access token - skipping upload');
+      return;
+    }
+
+    final batch = await database.getCrudBatch();
+    if (batch == null) {
+      logDebug('No pending uploads');
+      return;
+    }
+
+    logDebug('Uploading ${batch.crud.length} operations to backend');
+
     try {
-      final token = _authService.accessToken;
-      if (token == null) {
-        logDebug('No access token - skipping upload');
-        return;
+      for (final op in batch.crud) {
+        await _uploadOperation(op, token);
       }
-
-      // Get pending CRUD operations
-      final batch = await database.getCrudBatch();
-      if (batch == null) {
-        logDebug('No pending uploads');
-        return;
-      }
-
-      logDebug('Uploading ${batch.crud.length} operations to backend');
-      logDebug('Upload endpoint: $_apiUrl/upload');
-      logDebug('Token length: ${token.length}');
-
-      // Prepare operations for upload
-      final operations = batch.crud.map((op) {
-        return {
-          'table': op.table,
-          'op': op.op,
-          'id': op.id,
-          'data': op.opData,
-        };
-      }).toList();
-
-      logDebug('Operations prepared: ${operations.length}');
-
-      // Send to backend upload endpoint
-      final response = await _httpClient.post(
-        '$_apiUrl/upload',
-        data: {'operations': operations},
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-
-      logDebug('Upload response status: ${response.statusCode}');
-      logDebug('Upload response data: ${response.data}');
-
-      if (response.statusCode == 200) {
-        // Mark batch as complete
-        await batch.complete();
-        logDebug('Upload completed successfully');
-      } else {
-        logError('Upload failed with status: ${response.statusCode}');
-        logError('Upload response body: ${response.data}');
-        throw Exception('Upload failed: ${response.statusCode}');
-      }
+      await batch.complete();
+      logDebug('Upload batch completed successfully');
     } on DioException catch (e, stackTrace) {
-      logError('Upload failed with DioException', e);
-      logError('DioException type: ${e.type}');
-      logError('DioException message: ${e.message}');
-      logError('DioException response: ${e.response}');
-      logError('DioException response data: ${e.response?.data}');
-      // Log non-critical error - upload failures don't block app workflow
+      logError('Upload failed with DioException: ${e.message}');
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'PowerSync data upload',
         error: e,
         stackTrace: stackTrace,
         context: {
-          'errorType': 'DioException',
           'responseStatus': e.response?.statusCode?.toString(),
           'responseData': e.response?.data?.toString(),
         },
       );
-      // Don't complete the batch - will retry on next sync
       rethrow;
     } catch (e, stackTrace) {
-      logError('Upload failed', e);
-      logError('Upload error type: ${e.runtimeType}');
-      logError('Upload error message: ${e.toString()}');
-      // Log non-critical error - upload failures don't block app workflow
+      logError('Upload failed: $e');
       await ErrorLoggingHelper.logNonCriticalError(
         operation: 'PowerSync data upload',
         error: e,
         stackTrace: stackTrace,
-        context: {
-          'errorType': e.runtimeType.toString(),
-          'errorMessage': e.toString(),
-        },
+        context: {'errorType': e.runtimeType.toString()},
       );
       rethrow;
     }
+  }
+
+  Future<void> _uploadOperation(CrudEntry op, String token) async {
+    final data = op.opData ?? {};
+    final headers = {'Authorization': 'Bearer $token'};
+
+    logDebug('Uploading op: table=${op.table}, op=${op.op}, id=${op.id}');
+
+    switch (op.table) {
+      case 'clients':
+        await _uploadCrud(
+          op: op,
+          postUrl: '$_apiUrl/clients',
+          putUrl: '$_apiUrl/clients/${op.id}',
+          deleteUrl: '$_apiUrl/clients/${op.id}',
+          data: data,
+          headers: headers,
+        );
+
+      case 'addresses':
+        final clientId = data['client_id'] as String?;
+        if (clientId == null) throw Exception('addresses op missing client_id');
+        await _uploadCrud(
+          op: op,
+          postUrl: '$_apiUrl/clients/$clientId/addresses',
+          putUrl: '$_apiUrl/clients/$clientId/addresses/${op.id}',
+          deleteUrl: '$_apiUrl/clients/$clientId/addresses/${op.id}',
+          data: data,
+          headers: headers,
+        );
+
+      case 'phone_numbers':
+        final clientId = data['client_id'] as String?;
+        if (clientId == null) throw Exception('phone_numbers op missing client_id');
+        await _uploadCrud(
+          op: op,
+          postUrl: '$_apiUrl/clients/$clientId/phones',
+          putUrl: '$_apiUrl/clients/$clientId/phones/${op.id}',
+          deleteUrl: '$_apiUrl/clients/$clientId/phones/${op.id}',
+          data: data,
+          headers: headers,
+        );
+
+      case 'itineraries':
+        await _uploadCrud(
+          op: op,
+          postUrl: '$_apiUrl/itineraries',
+          putUrl: '$_apiUrl/itineraries/${op.id}',
+          deleteUrl: '$_apiUrl/itineraries/${op.id}',
+          data: data,
+          headers: headers,
+        );
+
+      case 'visits':
+        if (op.op == UpdateType.put) {
+          final photoPath = data['_local_photo_path'] as String?;
+          final visitData = Map<String, dynamic>.from(data)
+            ..remove('_local_photo_path');
+          if (photoPath != null) {
+            await _uploadVisitWithPhoto(
+              visitData: visitData,
+              photoPath: photoPath,
+              headers: headers,
+            );
+          } else {
+            await _httpClient.post(
+              '$_apiUrl/visits',
+              data: visitData,
+              options: Options(headers: headers),
+            );
+          }
+        }
+
+      case 'touchpoints':
+        await _uploadCrud(
+          op: op,
+          postUrl: '$_apiUrl/touchpoints',
+          putUrl: '$_apiUrl/touchpoints/${op.id}',
+          deleteUrl: '$_apiUrl/touchpoints/${op.id}',
+          data: data,
+          headers: headers,
+        );
+
+      case 'attendance':
+        if (op.op == UpdateType.put) {
+          await _httpClient.post(
+            '$_apiUrl/attendance/check-in',
+            data: data,
+            options: Options(headers: headers),
+          );
+        } else if (op.op == UpdateType.patch) {
+          await _httpClient.post(
+            '$_apiUrl/attendance/check-out',
+            data: data,
+            options: Options(headers: headers),
+          );
+        }
+
+      case 'releases':
+        if (op.op == UpdateType.put) {
+          await _httpClient.post(
+            '$_apiUrl/releases',
+            data: data,
+            options: Options(headers: headers),
+          );
+        }
+
+      default:
+        logWarning('uploadData: unhandled table "${op.table}" — skipping');
+    }
+  }
+
+  Future<void> _uploadCrud({
+    required CrudEntry op,
+    required String postUrl,
+    required String putUrl,
+    required String deleteUrl,
+    required Map<String, dynamic> data,
+    required Map<String, String> headers,
+  }) async {
+    switch (op.op) {
+      case UpdateType.put:
+        await _httpClient.post(postUrl, data: data, options: Options(headers: headers));
+      case UpdateType.patch:
+        await _httpClient.put(putUrl, data: data, options: Options(headers: headers));
+      case UpdateType.delete:
+        await _httpClient.delete(deleteUrl, options: Options(headers: headers));
+    }
+  }
+
+  Future<void> _uploadVisitWithPhoto({
+    required Map<String, dynamic> visitData,
+    required String photoPath,
+    required Map<String, String> headers,
+  }) async {
+    final formData = FormData.fromMap({
+      ...visitData,
+      'photo': await MultipartFile.fromFile(
+        photoPath,
+        filename: photoPath.split('/').last,
+      ),
+    });
+    await _httpClient.post(
+      '$_apiUrl/visits',
+      data: formData,
+      options: Options(headers: headers),
+    );
   }
 
   /// Get the PowerSync URI
