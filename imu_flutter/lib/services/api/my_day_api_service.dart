@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
 import 'package:imu_flutter/features/my_day/data/models/my_day_client.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 
 /// Task status for My Day
 enum TaskStatus { pending, inProgress, completed, cancelled }
@@ -65,7 +67,8 @@ class MyDayApiService {
       : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
         _authService = authService ?? JwtAuthService();
 
-  /// Add client to today's itinerary or custom date
+  /// Add client to today's itinerary.
+  /// Writes to local SQLite; PowerSync queues the insert for backend sync.
   Future<bool> addToMyDay(String clientId, {
     DateTime? scheduledDate,
     String? scheduledTime,
@@ -73,102 +76,71 @@ class MyDayApiService {
     String? notes,
   }) async {
     try {
-      final token = _authService.accessToken;
-      if (token == null) {
-        throw ApiException(message: 'Not authenticated');
-      }
+      if (_authService.accessToken == null) throw ApiException(message: 'Not authenticated');
 
-      // Default to today's local date if not provided
-      // IMPORTANT: Always send a date to backend to avoid timezone issues with CURRENT_DATE
+      final userId = _authService.currentUser?.id;
+      if (userId == null) throw ApiException(message: 'No user ID');
+
+      final db = await PowerSyncService.database;
       final localDate = scheduledDate ?? DateTime.now();
       final scheduledDateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
+      final id = const Uuid().v4();
+      final now = DateTime.now().toIso8601String();
 
-      debugPrint('MyDayApiService: Adding client $clientId to my day');
-      debugPrint('MyDayApiService: scheduledDate (local): $scheduledDate');
-      debugPrint('MyDayApiService: localDate (used): $localDate');
-      debugPrint('MyDayApiService: scheduledDate (string): $scheduledDateStr');
+      debugPrint('MyDayApiService: Adding client $clientId to itinerary in SQLite ($scheduledDateStr)');
 
-      final response = await _dio.post(
-        '${AppConfig.postgresApiUrl}/my-day/add-client',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-        data: {
-          'client_id': clientId,
-          'scheduled_date': scheduledDateStr, // Always send date
-          if (scheduledTime != null) 'scheduled_time': scheduledTime,
-          'priority': priority,
-          if (notes != null) 'notes': notes,
-        },
+      await db.execute(
+        '''INSERT OR REPLACE INTO itineraries
+           (id, user_id, client_id, scheduled_date, scheduled_time,
+            status, priority, notes, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        [
+          id,
+          userId,
+          clientId,
+          scheduledDateStr,
+          scheduledTime,
+          'pending',
+          priority.toString(),
+          notes,
+          userId,
+          now,
+        ],
       );
 
-      return response.data['message'] == 'Client added to My Day';
-    } on DioException catch (e) {
-      debugPrint('Error adding to my day: ${e.message}');
-      debugPrint('Error adding to my day: Response - ${e.response?.data}');
-
-      // Extract error message from backend response
-      String errorMessage = 'Network error: ${e.message}';
-      if (e.response?.data is Map<String, dynamic>) {
-        final data = e.response!.data as Map<String, dynamic>;
-        if (data.containsKey('message')) {
-          errorMessage = data['message'].toString();
-        } else if (data.containsKey('detail')) {
-          errorMessage = data['detail'].toString();
-        }
-      }
-
-      throw ApiException(
-        message: errorMessage,
-        originalError: e,
-      );
+      return true;
     } catch (e) {
       debugPrint('Error adding to my day: $e');
+      if (e is ApiException) rethrow;
       throw ApiException.fromError(e);
     }
   }
 
-  /// Remove client from today's itinerary
+  /// Remove client from today's itinerary.
+  /// Deletes from local SQLite; PowerSync queues the delete for backend sync.
   Future<bool> removeFromMyDay(String clientId) async {
     try {
-      final token = _authService.accessToken;
-      if (token == null) {
-        throw ApiException(message: 'Not authenticated');
-      }
+      if (_authService.accessToken == null) throw ApiException(message: 'Not authenticated');
 
-      // Always send local date to avoid timezone issues with CURRENT_DATE on backend
+      final userId = _authService.currentUser?.id;
+      if (userId == null) throw ApiException(message: 'No user ID');
+
+      final db = await PowerSyncService.database;
       final localDate = DateTime.now();
       final scheduledDateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
-      debugPrint('MyDayApiService: Removing client $clientId from my day');
-      debugPrint('MyDayApiService: scheduled_date being sent: $scheduledDateStr');
+      debugPrint('MyDayApiService: Removing client $clientId from itinerary in SQLite');
 
-      final response = await _dio.delete(
-        '${AppConfig.postgresApiUrl}/my-day/remove-client/$clientId',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-        data: {
-          'client_id': clientId,
-          'scheduled_date': scheduledDateStr,
-        },
+      await db.execute(
+        '''DELETE FROM itineraries
+           WHERE user_id=? AND client_id=? AND scheduled_date=?''',
+        [userId, clientId, scheduledDateStr],
       );
 
-      return response.data['message'] == 'Client removed from My Day';
-    } on DioException catch (e) {
-      debugPrint('Error removing from my day: ${e.message}');
-      throw ApiException(
-        message: 'Network error: ${e.message}',
-        originalError: e,
-      );
+      return true;
     } catch (e) {
       debugPrint('Error removing from my day: $e');
+      if (e is ApiException) rethrow;
       throw ApiException.fromError(e);
     }
   }
