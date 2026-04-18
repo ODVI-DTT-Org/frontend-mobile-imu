@@ -142,6 +142,34 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               children: [
                 const SizedBox(height: 48),
 
+                // Session expired notice
+                if (authState.sessionExpired)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock_clock, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Your session has expired. Please log in again to continue.',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Offline banner with login option
                 if (!isOnline)
                   Container(

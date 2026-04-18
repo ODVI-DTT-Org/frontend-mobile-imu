@@ -5,10 +5,11 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../services/sync/powersync_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/auth/jwt_auth_service.dart' show jwtAuthProvider;
 import 'background_sync_indicator.dart';
 import 'offline_banner.dart';
 
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   final Widget child;
 
   const MainShell({
@@ -17,7 +18,7 @@ class MainShell extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Stack(
         children: [
@@ -25,6 +26,7 @@ class MainShell extends StatelessWidget {
           Column(
             children: [
               const OfflineBanner(),
+              const _SessionExpiryWarning(),
               Expanded(child: child),
               const BottomNavBar(),
             ],
@@ -60,6 +62,65 @@ class _SyncStatusOverlay extends ConsumerWidget {
       child: const BackgroundSyncIndicator(
         showLabel: false,
         showPendingCount: true,
+      ),
+    );
+  }
+}
+
+/// Amber warning when the JWT token will expire within 2 hours and device is offline.
+/// Once online the token refreshes automatically and this banner disappears.
+class _SessionExpiryWarning extends ConsumerWidget {
+  const _SessionExpiryWarning();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connectivityAsync = ref.watch(connectivityStatusProvider);
+    final jwtAuth = ref.watch(jwtAuthProvider);
+
+    final isOffline = connectivityAsync.when(
+      data: (s) => s == ConnectivityStatus.offline,
+      loading: () => false,
+      error: (_, __) => false,
+    );
+
+    if (!isOffline) return const SizedBox.shrink();
+
+    final expiresAt = jwtAuth.currentUser?.expiresAt;
+    if (expiresAt == null) return const SizedBox.shrink();
+
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining.isNegative || remaining > const Duration(hours: 2)) {
+      return const SizedBox.shrink();
+    }
+
+    final label = remaining.inMinutes < 60
+        ? '${remaining.inMinutes} min'
+        : '${remaining.inHours}h ${remaining.inMinutes % 60}min';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      color: Colors.amber.shade700,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.lock_clock, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Session expires in $label. Connect to internet to refresh.',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

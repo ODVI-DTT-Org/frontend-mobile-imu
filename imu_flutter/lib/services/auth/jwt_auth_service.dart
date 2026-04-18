@@ -134,6 +134,9 @@ class JwtAuthService {
   /// Check if user is authenticated with valid token
   bool get isAuthenticated => _accessToken != null && _currentUser?.isValid == true;
 
+  /// True when a token exists in storage but has expired (session lapsed)
+  bool get hasExpiredToken => _accessToken != null && _currentUser?.isExpired == true;
+
   /// Initialize service by loading stored tokens
   Future<void> initialize() async {
     // Prevent multiple simultaneous initialization attempts

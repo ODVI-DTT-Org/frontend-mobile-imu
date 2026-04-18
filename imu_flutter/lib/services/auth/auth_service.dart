@@ -113,17 +113,19 @@ class AuthState {
   final bool isLoading;
   final String? error;
   final JwtUser? user;
+  final bool sessionExpired;
 
   const AuthState({
     required this.isAuthenticated,
     required this.isLoading,
     this.error,
     this.user,
+    this.sessionExpired = false,
   });
 
   factory AuthState.initial() => const AuthState(
     isAuthenticated: false,
-    isLoading: true,  // Start in loading state to prevent premature router redirect
+    isLoading: true,
   );
 
   AuthState copyWith({
@@ -131,12 +133,14 @@ class AuthState {
     bool? isLoading,
     String? error,
     JwtUser? user,
+    bool? sessionExpired,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       user: user ?? this.user,
+      sessionExpired: sessionExpired ?? this.sessionExpired,
     );
   }
 
@@ -182,7 +186,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // PIN FUNCTIONALITY DISABLED - Only check JWT token validity
       // Consider authenticated if JWT token is valid
       final isAuth = _authService.isAuthenticated;
-      debugPrint('[AUTH-NOTIFIER] isAuthenticated: $isAuth');
+      final sessionExpired = !isAuth && _authService.hasExpiredToken;
+      debugPrint('[AUTH-NOTIFIER] isAuthenticated: $isAuth, sessionExpired: $sessionExpired');
 
       if (!mounted) return;
       debugPrint('[AUTH-NOTIFIER] Setting final state: isAuthenticated=$isAuth, isLoading=false');
@@ -190,6 +195,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isAuthenticated: isAuth,
         user: _authService.currentUser,
         isLoading: false,
+        sessionExpired: sessionExpired,
       );
       debugPrint('[AUTH-NOTIFIER] checkAuthStatus() END - SUCCESS');
     } catch (e) {
