@@ -22,13 +22,12 @@ import '../../../../features/itineraries/data/repositories/itinerary_repository.
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     authNotifierProvider,
-    hiveServiceProvider,
     touchpointApiServiceProvider,
     releaseApiServiceProvider,
     uploadApiServiceProvider;
+import '../../../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
@@ -336,16 +335,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _handleRecordTouchpoint(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
-    // Fetch full client by ID
-    final hiveService = ref.read(hiveServiceProvider);
-    final clientData = hiveService.getClient(visit.clientId);
-    if (clientData == null) {
+    final clientRepo = ref.read(clientRepositoryProvider);
+    final fullClient = await clientRepo.getClient(visit.clientId);
+    if (fullClient == null) {
       if (mounted) {
         AppNotification.showError(context, 'Client not found');
       }
       return;
     }
-    final fullClient = Client.fromJson(clientData);
 
     // Show as bottom sheet instead of full screen
     final result = await showModalBottomSheet<bool>(
@@ -363,16 +360,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
-    // Fetch full client by ID
-    final hiveService = ref.read(hiveServiceProvider);
-    final clientData = hiveService.getClient(visit.clientId);
-    if (clientData == null) {
+    final clientRepo = ref.read(clientRepositoryProvider);
+    final fullClient = await clientRepo.getClient(visit.clientId);
+    if (fullClient == null) {
       if (mounted) {
         AppNotification.showError(context, 'Client not found');
       }
       return;
     }
-    final fullClient = Client.fromJson(clientData);
 
     // Show as bottom sheet instead of full screen
     final result = await showModalBottomSheet<bool>(
@@ -390,16 +385,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _handleReleaseLoan(ItineraryItem visit) async {
     HapticUtils.lightImpact();
 
-    // Fetch full client by ID
-    final hiveService = ref.read(hiveServiceProvider);
-    final clientData = hiveService.getClient(visit.clientId);
-    if (clientData == null) {
+    final clientRepo = ref.read(clientRepositoryProvider);
+    final fullClient = await clientRepo.getClient(visit.clientId);
+    if (fullClient == null) {
       if (mounted) {
         AppNotification.showError(context, 'Client not found');
       }
       return;
     }
-    final fullClient = Client.fromJson(clientData);
 
     // Show as bottom sheet instead of full screen
     final result = await showModalBottomSheet<bool>(
