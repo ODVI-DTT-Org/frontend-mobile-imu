@@ -5,22 +5,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/agency_model.dart';
 
-/// Agency detail provider
 final agencyDetailProvider = FutureProvider.family<Agency?, String>((ref, agencyId) async {
-  final hiveService = HiveService();
-  if (!hiveService.isInitialized) await hiveService.init();
-
-  // Try to get from local storage
-  final agencyData = await hiveService.getAgency(agencyId);
-  if (agencyData != null) {
-    return Agency.fromJson(agencyData);
-  }
-
-  // Return mock data for demonstration
   return _getMockAgency(agencyId);
 });
 
@@ -51,8 +39,6 @@ class AgencyDetailPage extends ConsumerStatefulWidget {
 }
 
 class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
-  final _hiveService = HiveService();
-
   Agency? _agency;
   bool _isLoading = true;
 
@@ -67,24 +53,11 @@ class _AgencyDetailPageState extends ConsumerState<AgencyDetailPage> {
       ref: ref,
       message: 'Loading agency...',
       operation: () async {
-        if (!_hiveService.isInitialized) {
-          await _hiveService.init();
-        }
-
-        final agencyData = await _hiveService.getAgency(widget.agencyId);
-        if (agencyData != null && mounted) {
+        if (mounted) {
           setState(() {
-            _agency = Agency.fromJson(agencyData);
+            _agency = _getMockAgency(widget.agencyId);
             _isLoading = false;
           });
-        } else {
-          // Use mock data
-          if (mounted) {
-            setState(() {
-              _agency = _getMockAgency(widget.agencyId);
-              _isLoading = false;
-            });
-          }
         }
       },
     );
