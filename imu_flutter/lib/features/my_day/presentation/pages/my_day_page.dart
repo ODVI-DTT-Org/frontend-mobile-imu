@@ -19,13 +19,12 @@ import '../../../../services/api/approvals_api_service.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     authNotifierProvider,
-    hiveServiceProvider,
     touchpointApiServiceProvider,
     releaseApiServiceProvider,
     uploadApiServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
-import '../../../../services/local_storage/hive_service.dart';
+import '../../../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../providers/my_day_provider.dart';
 import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider;
 import '../widgets/header_buttons.dart';
@@ -418,14 +417,12 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _handleRecordTouchpoint(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    // Fetch full client by ID
-    final hiveService = ref.read(hiveServiceProvider);
-    final clientData = hiveService.getClient(client.clientId);
-    if (clientData == null) {
+    final clientRepo = ref.read(clientRepositoryProvider);
+    final fullClient = await clientRepo.getClient(client.clientId);
+    if (fullClient == null) {
       if (mounted) showToast('Client not found');
       return;
     }
-    final fullClient = Client.fromJson(clientData);
 
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -446,14 +443,12 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _handleRecordVisitOnly(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    // Fetch full client by ID
-    final hiveService = ref.read(hiveServiceProvider);
-    final clientData = hiveService.getClient(client.clientId);
-    if (clientData == null) {
+    final clientRepo = ref.read(clientRepositoryProvider);
+    final fullClient = await clientRepo.getClient(client.clientId);
+    if (fullClient == null) {
       if (mounted) showToast('Client not found');
       return;
     }
-    final fullClient = Client.fromJson(clientData);
 
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -473,14 +468,12 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _handleReleaseLoan(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    // Fetch full client by ID
-    final hiveService = ref.read(hiveServiceProvider);
-    final clientData = hiveService.getClient(client.clientId);
-    if (clientData == null) {
+    final clientRepo = ref.read(clientRepositoryProvider);
+    final fullClient = await clientRepo.getClient(client.clientId);
+    if (fullClient == null) {
       if (mounted) showToast('Client not found');
       return;
     }
-    final fullClient = Client.fromJson(clientData);
 
     final result = await showModalBottomSheet<bool>(
       context: context,
