@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/config/app_config.dart';
 import 'core/config/map_config.dart';
 import 'services/location/geolocation_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'services/connectivity_service.dart';
 import 'core/utils/notification_utils.dart';
 import 'services/sync/powersync_service.dart';
@@ -178,31 +179,36 @@ Future<void> _initializeServices() async {
 /// Initialize PowerSync connection if user has valid credentials
 Future<void> _initializePowerSyncIfNeeded() async {
   try {
-    // Initialize JWT auth to check for existing session
+    // Check connectivity first — skip all network calls if offline to avoid
+    // a 20-second frozen splash caused by sequential Dio timeouts.
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final isOnline = connectivityResult.any((r) => r != ConnectivityResult.none);
+
+    // Initialize JWT auth from device storage (no network)
     final jwtAuth = JwtAuthService();
     await jwtAuth.initialize();
 
     if (jwtAuth.isAuthenticated) {
-      debugPrint('User already authenticated, connecting to PowerSync...');
+      if (!isOnline) {
+        debugPrint('User authenticated but offline — skipping PowerSync connect');
+        return;
+      }
 
-      // Create connector with config values
+      debugPrint('User already authenticated, connecting to PowerSync...');
       final connector = IMUPowerSyncConnector(
         authService: jwtAuth,
         powersyncUrl: AppConfig.powerSyncUrl,
         apiUrl: AppConfig.postgresApiUrl,
       );
-
-      // Connect to PowerSync with loading feedback
-      debugPrint('Syncing for first time...');
-      // Note: We can't use LoadingHelper here since we're not in a widget context
-      // The loading is shown via the splash screen during initialization
-
       await PowerSyncService.connect(connector);
       debugPrint('PowerSync auto-connected on app start');
     } else {
-      debugPrint('No existing session - checking for stored credentials...');
+      if (!isOnline) {
+        debugPrint('Offline and not authenticated — skipping auto-login');
+        return;
+      }
 
-      // Check for stored credentials and attempt auto-login
+      debugPrint('No existing session - checking for stored credentials...');
       final hasStoredCreds = await jwtAuth.hasStoredCredentials();
       if (hasStoredCreds) {
         debugPrint('Found stored credentials, attempting auto-login...');
@@ -210,14 +216,11 @@ Future<void> _initializePowerSyncIfNeeded() async {
 
         if (autoLoginSuccess && jwtAuth.isAuthenticated) {
           debugPrint('Auto-login successful, connecting to PowerSync...');
-
-          // Create connector with config values
           final connector = IMUPowerSyncConnector(
             authService: jwtAuth,
             powersyncUrl: AppConfig.powerSyncUrl,
             apiUrl: AppConfig.postgresApiUrl,
           );
-
           await PowerSyncService.connect(connector);
           debugPrint('PowerSync connected after auto-login');
         } else {

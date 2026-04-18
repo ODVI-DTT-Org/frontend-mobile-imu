@@ -13,9 +13,27 @@ class OfflineAuthService {
   final SecureStorageService _secureStorage = SecureStorageService();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  /// Check if offline login is possible using stored credentials
+  /// Check if offline login is possible using stored credentials.
+  /// Returns false if no credentials exist or if the cached JWT has expired.
   Future<bool> canLoginOffline() async {
-    return await _secureStorage.hasOfflineCredentials();
+    final hasCredentials = await _secureStorage.hasOfflineCredentials();
+    if (!hasCredentials) return false;
+
+    final token = await _secureStorage.getOfflineToken();
+    if (token == null) return false;
+
+    try {
+      final decoded = JwtDecoder.decode(token);
+      final exp = decoded['exp'] as int?;
+      if (exp != null) {
+        final expiryTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+        if (DateTime.now().isAfter(expiryTime)) return false;
+      }
+    } catch (_) {
+      return false;
+    }
+
+    return true;
   }
 
   /// Authenticate with email + password offline (validates against stored hash)
