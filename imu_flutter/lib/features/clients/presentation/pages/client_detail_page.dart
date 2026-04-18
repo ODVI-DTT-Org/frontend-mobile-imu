@@ -5,14 +5,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../services/local_storage/hive_service.dart';
-import '../../../../services/api/client_api_service.dart';
+import '../../data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
-    isOnlineProvider,
     touchpointApiServiceProvider,
     authNotifierProvider,
     addressRepositoryProvider,
@@ -39,58 +37,15 @@ import '../../../clients/presentation/widgets/touchpoint_history_expansion_panel
 import '../../../clients/presentation/widgets/cms_visit_history_expansion_panel.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
-// Client detail provider
 final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
-  final clientApi = ref.watch(clientApiServiceProvider);
-  final isOnline = ref.watch(isOnlineProvider);
-
-  if (isOnline) {
-    try {
-      return await clientApi.fetchClient(clientId);
-    } catch (e) {
-      // Fall back to local cache
-      final hiveService = HiveService();
-      if (!hiveService.isInitialized) await hiveService.init();
-      final localClient = hiveService.getClient(clientId);
-      if (localClient != null) {
-        return Client.fromJson(localClient);
-      }
-      return null;
-    }
-  } else {
-    // Offline - use local cache
-    final hiveService = HiveService();
-    if (!hiveService.isInitialized) await hiveService.init();
-    final localClient = hiveService.getClient(clientId);
-    if (localClient != null) {
-      return Client.fromJson(localClient);
-    }
-    return null;
-  }
+  final clientRepo = ref.watch(clientRepositoryProvider);
+  return clientRepo.getClient(clientId);
 });
 
-// Touchpoints for client provider
 final clientTouchpointsProvider = FutureProvider.family<List<Touchpoint>, String>((ref, clientId) async {
-  final touchpointApi = ref.watch(touchpointApiServiceProvider);
-  final isOnline = ref.watch(isOnlineProvider);
-
-  if (isOnline) {
-    try {
-      return await touchpointApi.fetchTouchpoints(clientId: clientId);
-    } catch (e) {
-      // Fall back to local cache
-      final hiveService = HiveService();
-      if (!hiveService.isInitialized) await hiveService.init();
-      final localTouchpoints = hiveService.getTouchpointsForClient(clientId);
-      return localTouchpoints.map((data) => Touchpoint.fromJson(data)).toList();
-    }
-  } else {
-    // Offline - use local cache
-    final hiveService = HiveService();
-    if (!hiveService.isInitialized) await hiveService.init();
-    final localTouchpoints = hiveService.getTouchpointsForClient(clientId);
-    return localTouchpoints.map((data) => Touchpoint.fromJson(data)).toList();
-  }
+  final clientRepo = ref.watch(clientRepositoryProvider);
+  final client = await clientRepo.getClient(clientId);
+  return client?.touchpointSummary ?? [];
 });
 
 class ClientDetailPage extends ConsumerStatefulWidget {
@@ -106,8 +61,6 @@ class ClientDetailPage extends ConsumerStatefulWidget {
 }
 
 class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
-  final _hiveService = HiveService();
-
   Client? _client;
   bool _isLoading = true;
 
@@ -122,36 +75,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Future<void> _loadClient() async {
     try {
-      if (!_hiveService.isInitialized) {
-        await _hiveService.init();
-      }
-
-      // Try loading from Hive first
-      var clientData = _hiveService.getClient(widget.clientId);
-      Client? client;
-
-      if (clientData != null) {
-        try {
-          client = Client.fromJson(clientData);
-        } catch (e, stack) {
-          debugPrint('Error parsing client data: $e\n$stack');
-          // Continue to API fetch
-        }
-      }
-
-      // If Hive doesn't have client or parsing failed, try fetching from API
-      if (client == null) {
-        final isOnline = ref.read(isOnlineProvider);
-        if (isOnline) {
-          try {
-            final clientApi = ref.read(clientApiServiceProvider);
-            client = await clientApi.fetchClient(widget.clientId);
-          } catch (e, stack) {
-            debugPrint('Error fetching client from API: $e\n$stack');
-            // Continue to error state
-          }
-        }
-      }
+      final clientRepo = ref.read(clientRepositoryProvider);
+      Client? client = await clientRepo.getClient(widget.clientId);
 
       // Load addresses and phone numbers from PowerSync
       if (client != null) {
