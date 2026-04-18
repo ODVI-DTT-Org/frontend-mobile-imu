@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 import 'package:imu_flutter/features/clients/data/models/phone_number_model.dart';
 import 'package:imu_flutter/core/utils/app_notification.dart';
+import 'package:imu_flutter/shared/providers/app_providers.dart' show jwtAuthProvider;
+import 'package:imu_flutter/core/models/user_role.dart';
 
 /// Bottom sheet for adding or editing a phone number
-class AddPhoneModal extends HookWidget {
+class AddPhoneModal extends HookConsumerWidget {
   final String clientId;
   final PhoneNumber? initialPhone;
   final Future<PhoneNumber> Function(String clientId, Map<String, dynamic> data) onSubmit;
@@ -18,8 +21,10 @@ class AddPhoneModal extends HookWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final currentUser = ref.read(jwtAuthProvider).currentUser;
+    final requiresApproval = currentUser?.role == UserRole.tele || currentUser?.role == UserRole.caravan;
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final label = useState<PhoneLabel>(initialPhone?.label ?? PhoneLabel.mobile);
     final number = useTextEditingController(text: initialPhone?.number ?? '');
@@ -83,7 +88,10 @@ class AddPhoneModal extends HookWidget {
         final result = await onSubmit(clientId, data);
 
         if (context.mounted) {
-          AppNotification.showSuccess(context, 'Phone number added successfully');
+          final message = requiresApproval
+              ? 'Phone number submitted for approval'
+              : 'Phone number added successfully';
+          AppNotification.showSuccess(context, message);
           Navigator.of(context).pop(result);
         }
       } catch (e) {

@@ -289,6 +289,15 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
           );
         }
 
+      case 'approvals':
+        if (op.op == UpdateType.put) {
+          await _httpClient.post(
+            '$_apiUrl/approvals',
+            data: data,
+            options: Options(headers: headers),
+          );
+        }
+
       default:
         logWarning('uploadData: unhandled table "${op.table}" — skipping');
     }

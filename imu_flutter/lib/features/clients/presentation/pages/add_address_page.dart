@@ -5,9 +5,9 @@ import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 import 'package:imu_flutter/features/clients/data/models/address_model.dart';
 import 'package:imu_flutter/features/clients/data/repositories/address_repository.dart';
 import 'package:imu_flutter/shared/widgets/psgc_selector.dart';
-import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider, powerSyncDatabaseProvider;
+import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider, jwtAuthProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
-import '../../../../services/sync/powersync_service.dart' show PowerSyncService;
+import '../../../../core/models/user_role.dart';
 
 /// Full screen page for adding or editing an address
 class AddAddressPage extends HookConsumerWidget {
@@ -24,11 +24,12 @@ class AddAddressPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final addressRepo = ref.read(addressRepositoryProvider);
+    final currentUser = ref.read(jwtAuthProvider).currentUser;
+    final requiresApproval = currentUser?.role == UserRole.tele || currentUser?.role == UserRole.caravan;
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final label = useState<AddressLabel>(initialAddress?.label ?? AddressLabel.home);
     final streetAddress = useTextEditingController(text: initialAddress?.streetAddress ?? '');
     final postalCode = useTextEditingController(text: initialAddress?.postalCode ?? '');
-    final psgcId = useState<String?>(initialAddress?.psgcId.toString());
     final latitude = useState<double?>(initialAddress?.latitude);
     final longitude = useState<double?>(initialAddress?.longitude);
     final isPrimary = useState<bool>(initialAddress?.isPrimary ?? false);
@@ -46,38 +47,25 @@ class AddAddressPage extends HookConsumerWidget {
       isSaving.value = true;
 
       try {
-        // Query the actual PSGC ID from the database
-        final db = ref.read(powerSyncDatabaseProvider).value;
-        if (db == null) {
-          throw Exception('Database not available');
-        }
-
-        final psgcResult = await db.get(
-          'SELECT id FROM psgc WHERE region = ? AND province = ? AND municipality = ? AND barangay = ?',
-          [selectedPsgc.value!.region, selectedPsgc.value!.province, selectedPsgc.value!.municipality, selectedPsgc.value!.barangay],
-        );
-
-        if (psgcResult == null) {
-          throw Exception('PSGC location not found in database');
-        }
-
-        final actualPsgcId = psgcResult['id'] as int;
-
         final data = {
-          'label': label.value.name,
-          'street_address': streetAddress.text.trim(),
+          'type': label.value.name,
+          'street': streetAddress.text.trim(),
+          'barangay': selectedPsgc.value!.barangay,
+          'city': selectedPsgc.value!.municipality,
+          'province': selectedPsgc.value!.province,
           'postal_code': postalCode.text.trim(),
-          'psgc_id': actualPsgcId, // Use actual database ID instead of generated string
           'latitude': latitude.value,
           'longitude': longitude.value,
           'is_primary': isPrimary.value,
         };
 
-        // Call repository to save address
         await addressRepo.createAddress(clientId, data);
 
         if (context.mounted) {
-          AppNotification.showSuccess(context, 'Address added successfully');
+          final message = requiresApproval
+              ? 'Address submitted for approval'
+              : 'Address added successfully';
+          AppNotification.showSuccess(context, message);
           Navigator.of(context).pop(true);
         }
       } catch (e) {
