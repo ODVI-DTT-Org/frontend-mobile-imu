@@ -302,6 +302,63 @@ class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackground
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              // Remove Pendings Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: (syncStatus.pendingCount == 0 || syncStatus.isSyncing)
+                      ? null
+                      : () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Remove Pending Changes?'),
+                              content: Text(
+                                'This will discard ${syncStatus.pendingCount} unsynced '
+                                'item${syncStatus.pendingCount == 1 ? '' : 's'}. '
+                                'These changes will be permanently lost.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Remove'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true && mounted) {
+                            await PowerSyncService.clearPendingUploads();
+                            if (mounted) {
+                              AppNotification.showSuccess(context, 'Pending changes removed');
+                              Navigator.pop(context);
+                            }
+                          }
+                        },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: BorderSide(
+                      color: syncStatus.pendingCount > 0 ? Colors.red : Colors.grey[300]!,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: Text(
+                    syncStatus.pendingCount > 0
+                        ? 'Remove Pendings (${syncStatus.pendingCount})'
+                        : 'Remove Pendings',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
