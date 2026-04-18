@@ -247,6 +247,12 @@ class SyncService extends ChangeNotifier {
     return PowerSyncService.isConnected;
   }
 
+  /// Discard all pending uploads (CRUD queue entries that haven't been synced)
+  Future<void> removePendings() async {
+    await PowerSyncService.clearPendingUploads();
+    await _updatePendingCount();
+  }
+
   /// Queue an item for sync (compatibility method)
   /// With PowerSync, sync is automatic so this is a no-op
   Future<void> queueForSync({

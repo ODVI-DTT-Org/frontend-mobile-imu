@@ -265,6 +265,56 @@ class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
                 label: const Text('Sync Now'),
               ),
             ),
+          if (syncService.pendingCount > 0) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: syncService.isSyncing
+                    ? null
+                    : () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Remove Pending Changes?'),
+                            content: Text(
+                              'This will discard ${syncService.pendingCount} unsynced '
+                              'item${syncService.pendingCount == 1 ? '' : 's'}. '
+                              'These changes will be permanently lost.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Remove'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true && mounted) {
+                          await syncService.removePendings();
+                          if (mounted) {
+                            AppNotification.showSuccess(context, 'Pending changes removed');
+                          }
+                        }
+                      },
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                label: const Text(
+                  'Remove Pendings',
+                  style: TextStyle(color: Colors.red),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -455,6 +455,22 @@ class PowerSyncService {
     }
   }
 
+  /// Discard all pending uploads from the CRUD queue
+  static Future<void> clearPendingUploads() async {
+    if (_database == null) return;
+    try {
+      while (true) {
+        final batch = await _database!.getCrudBatch();
+        if (batch == null || batch.crud.isEmpty) break;
+        await batch.complete();
+      }
+      logDebug('PowerSync: All pending uploads cleared');
+    } catch (e) {
+      logError('Failed to clear pending uploads', e);
+      rethrow;
+    }
+  }
+
   /// Execute a SQL query
   static Future<List<Map<String, dynamic>>> query(
     String sql, [
