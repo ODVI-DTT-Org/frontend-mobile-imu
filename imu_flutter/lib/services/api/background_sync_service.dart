@@ -467,7 +467,7 @@ class SyncResult {
 }
 
 /// Provider for BackgroundSyncService
-final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
+final backgroundSyncServiceProvider = ChangeNotifierProvider<BackgroundSyncService>((ref) {
   final connectivityService = ref.watch(connectivityServiceProvider);
   final jwtAuth = ref.watch(jwtAuthProvider);
 
