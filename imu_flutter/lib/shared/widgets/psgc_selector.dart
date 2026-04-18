@@ -9,12 +9,18 @@ import '../providers/app_providers.dart' show powerSyncDatabaseProvider, jwtAuth
 /// Barangay is a free-text field — too granular for a dropdown.
 class PSGCSelector extends HookConsumerWidget {
   final String? initialPsgcId;
+  final String? initialProvince;
+  final String? initialMunicipality;
+  final String? initialBarangay;
   final Function(PsgcData) onPsgcSelected;
   final bool enabled;
 
   const PSGCSelector({
     super.key,
     this.initialPsgcId,
+    this.initialProvince,
+    this.initialMunicipality,
+    this.initialBarangay,
     required this.onPsgcSelected,
     this.enabled = true,
   });
@@ -23,7 +29,7 @@ class PSGCSelector extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedProvince = useState<String?>(null);
     final selectedMunicipality = useState<String?>(null);
-    final barangayController = useTextEditingController();
+    final barangayController = useTextEditingController(text: initialBarangay ?? '');
     final provinces = useState<List<String>>([]);
     final municipalities = useState<List<String>>([]);
     final isLoading = useState(true);
@@ -43,7 +49,11 @@ class PSGCSelector extends HookConsumerWidget {
             'SELECT DISTINCT province FROM user_locations WHERE user_id = ? AND deleted_at IS NULL ORDER BY province',
             [currentUser.id],
           );
-          provinces.value = rows.map((r) => r['province'] as String).toList();
+          final loaded = rows.map((r) => r['province'] as String).toList();
+          provinces.value = loaded;
+          if (initialProvince != null && loaded.contains(initialProvince)) {
+            selectedProvince.value = initialProvince;
+          }
         } catch (_) {
           provinces.value = [];
         } finally {
@@ -65,7 +75,11 @@ class PSGCSelector extends HookConsumerWidget {
             'SELECT DISTINCT municipality FROM user_locations WHERE user_id = ? AND province = ? AND deleted_at IS NULL ORDER BY municipality',
             [currentUser.id, selectedProvince.value],
           );
-          municipalities.value = rows.map((r) => r['municipality'] as String).toList();
+          final loaded = rows.map((r) => r['municipality'] as String).toList();
+          municipalities.value = loaded;
+          if (initialMunicipality != null && loaded.contains(initialMunicipality)) {
+            selectedMunicipality.value = initialMunicipality;
+          }
         } catch (_) {
           municipalities.value = [];
         }
@@ -85,6 +99,16 @@ class PSGCSelector extends HookConsumerWidget {
         ));
       }
     }
+
+    // Fire initial notification once all pre-populated values are set
+    useEffect(() {
+      if (selectedMunicipality.value != null &&
+          initialBarangay != null &&
+          initialBarangay!.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _notifyIfComplete());
+      }
+      return null;
+    }, [selectedMunicipality.value]);
 
     if (isLoading.value) {
       return const Padding(

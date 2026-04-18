@@ -185,7 +185,6 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
 });
 
 /// Current user record
-/// TODO: Phase 1 - Update to use new user model from Supabase
 final currentUserRecordProvider = Provider<Map<String, dynamic>?>((ref) {
   final authState = ref.watch(authNotifierProvider);
   if (authState.user == null) return null;

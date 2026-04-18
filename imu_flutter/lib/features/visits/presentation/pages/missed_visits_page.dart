@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/missed_visit_model.dart';
+import '../../../../services/sync/powersync_service.dart';
 
 import '../../../../features/clients/data/models/client_model.dart';
 class MissedVisitsPage extends ConsumerStatefulWidget {
@@ -151,8 +153,15 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
           ref: ref,
           message: 'Rescheduling visit...',
           operation: () async {
-            await Future.delayed(const Duration(milliseconds: 500)); // Simulate save
-            // TODO: Save rescheduled date to backend
+            final db = await PowerSyncService.database;
+            final userId = ref.read(jwtAuthProvider).currentUser?.id ?? '';
+            final dateStr =
+                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+            final now = DateTime.now().toIso8601String();
+            await db.execute(
+              'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [const Uuid().v4(), userId, visit.clientId, dateStr, 'scheduled', now, now],
+            );
           },
           onError: (e) {
             if (mounted) {

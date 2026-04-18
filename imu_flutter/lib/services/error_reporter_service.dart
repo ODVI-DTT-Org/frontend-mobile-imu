@@ -2,22 +2,21 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../core/config/app_config.dart';
 import '../models/error_report_model.dart';
+import 'sync/powersync_service.dart';
 
 /// Error Reporter Service
 ///
 /// Collects error reports from the mobile app and sends them to the backend.
 /// Implements offline-first queue with deduplication and rate limiting.
+/// Queue is stored in the PowerSync `error_logs` SQLite table.
 class ErrorReporterService {
   static final ErrorReporterService _instance = ErrorReporterService._internal();
   factory ErrorReporterService() => _instance;
   ErrorReporterService._internal();
 
-  static const String _errorQueueBox = 'error_queue';
   static const int _maxQueueSize = 1000;
-  static const String _lastFingerprintKey = 'last_fingerprints';
 
   late Dio _dio;
   bool _isInitialized = false;
@@ -28,12 +27,6 @@ class ErrorReporterService {
     if (_isInitialized) return;
 
     try {
-      // Open error queue box
-      if (!Hive.isBoxOpen(_errorQueueBox)) {
-        await Hive.openBox<String>(_errorQueueBox);
-      }
-
-      // Initialize Dio with timeout
       _dio = Dio(
         BaseOptions(
           connectTimeout: const Duration(seconds: 10),
@@ -50,9 +43,6 @@ class ErrorReporterService {
   }
 
   /// Report an error
-  ///
-  /// This will queue the error locally and sync it to the backend when online.
-  /// Duplicate errors (within 1 minute) are automatically skipped.
   Future<void> reportError(ErrorReport report) async {
     if (!_isInitialized) {
       debugPrint('[ErrorReporter] Not initialized, skipping error report');
@@ -60,7 +50,6 @@ class ErrorReporterService {
     }
 
     try {
-      // Generate fingerprint if not provided
       if (report.fingerprint == null || report.fingerprint!.isEmpty) {
         report = ErrorReport(
           code: report.code,
@@ -81,21 +70,14 @@ class ErrorReporterService {
         );
       }
 
-      // Check for duplicate in recent fingerprints
-      if (_isDuplicate(report.fingerprint!)) {
+      if (await _isDuplicate(report.fingerprint!)) {
         debugPrint('[ErrorReporter] Skipping duplicate error: ${report.fingerprint}');
         return;
       }
 
-      // Add to queue
       await _addToQueue(report);
-
-      // Store fingerprint for deduplication
-      await _storeFingerprint(report.fingerprint!);
-
       debugPrint('[ErrorReporter] Error queued: ${report.code} (${report.id})');
 
-      // Try to sync immediately if online
       await syncErrors();
     } catch (e) {
       debugPrint('[ErrorReporter] Failed to report error: $e');
@@ -104,50 +86,41 @@ class ErrorReporterService {
 
   /// Sync queued errors to the backend
   Future<void> syncErrors() async {
-    if (!_isInitialized || _isSyncing) {
-      return;
-    }
+    if (!_isInitialized || _isSyncing) return;
 
     _isSyncing = true;
 
     try {
-      final box = Hive.box<String>(_errorQueueBox);
-      final errors = box.keys.toList();
+      final db = await PowerSyncService.database;
+      final rows = await db.getAll(
+        'SELECT * FROM error_logs WHERE is_synced = 0 ORDER BY created_at ASC',
+      );
 
-      if (errors.isEmpty) {
+      if (rows.isEmpty) {
         debugPrint('[ErrorReporter] No errors to sync');
         return;
       }
 
-      debugPrint('[ErrorReporter] Syncing ${errors.length} errors...');
+      debugPrint('[ErrorReporter] Syncing ${rows.length} errors...');
+      int synced = 0, failed = 0;
 
-      // Sync errors in batches of 10
-      const batchSize = 10;
-      int synced = 0;
-      int failed = 0;
+      for (final row in rows) {
+        try {
+          final report = _reportFromRow(row);
+          final response = await _sendError(report);
 
-      for (int i = 0; i < errors.length; i += batchSize) {
-        final batch = errors.skip(i).take(batchSize).toList();
-
-        for (final errorId in batch) {
-          try {
-            final errorJson = box.get(errorId);
-            if (errorJson == null) continue;
-
-            final report = ErrorReport.fromJsonString(errorJson);
-            final response = await _sendError(report);
-
-            if (response.logged || response.reason == 'duplicate') {
-              // Remove from queue on success or duplicate
-              await box.delete(errorId);
-              synced++;
-            } else {
-              failed++;
-            }
-          } catch (e) {
-            debugPrint('[ErrorReporter] Failed to sync error $errorId: $e');
+          if (response.logged || response.reason == 'duplicate') {
+            await db.execute(
+              'UPDATE error_logs SET is_synced = 1 WHERE id = ?',
+              [row['id']],
+            );
+            synced++;
+          } else {
             failed++;
           }
+        } catch (e) {
+          debugPrint('[ErrorReporter] Failed to sync error ${row['id']}: $e');
+          failed++;
         }
       }
 
@@ -159,153 +132,145 @@ class ErrorReporterService {
     }
   }
 
-  /// Get queue size
+  /// Get queue size (unsent errors)
   Future<int> getQueueSize() async {
     if (!_isInitialized) return 0;
 
     try {
-      final box = Hive.box<String>(_errorQueueBox);
-      return box.length;
+      final db = await PowerSyncService.database;
+      final result = await db.get(
+        'SELECT COUNT(*) as count FROM error_logs WHERE is_synced = 0',
+      );
+      return (result['count'] as int? ?? 0);
     } catch (e) {
       debugPrint('[ErrorReporter] Failed to get queue size: $e');
       return 0;
     }
   }
 
-  /// Clear all queued errors
+  /// Clear all unsent queued errors
   Future<void> clearQueue() async {
     if (!_isInitialized) return;
 
     try {
-      final box = Hive.box<String>(_errorQueueBox);
-      await box.clear();
+      final db = await PowerSyncService.database;
+      await db.execute('DELETE FROM error_logs WHERE is_synced = 0');
       debugPrint('[ErrorReporter] Queue cleared');
     } catch (e) {
       debugPrint('[ErrorReporter] Failed to clear queue: $e');
     }
   }
 
-  /// Generate SHA-256 fingerprint for deduplication
   String _generateFingerprint(String code, String message, String? stackTrace) {
     final content = stackTrace != null && stackTrace.isNotEmpty
         ? '$code:$message:$stackTrace'
         : '$code:$message';
 
-    final bytes = utf8.encode(content);
-    final hash = sha256.convert(bytes);
-    return hash.toString();
+    return sha256.convert(utf8.encode(content)).toString();
   }
 
-  /// Check if fingerprint is a recent duplicate
-  bool _isDuplicate(String fingerprint) {
+  Future<bool> _isDuplicate(String fingerprint) async {
     try {
-      final box = Hive.box<String>(_errorQueueBox);
-      final lastFingerprintsJson = box.get(_lastFingerprintKey, defaultValue: '{}');
-
-      if (lastFingerprintsJson == null || lastFingerprintsJson.isEmpty) {
-        return false;
-      }
-
-      final lastFingerprints = jsonDecode(lastFingerprintsJson) as Map<String, dynamic>;
-      final lastSeen = lastFingerprints[fingerprint] as String?;
-
-      if (lastSeen == null || lastSeen.isEmpty) {
-        return false;
-      }
-
-      // Check if seen within last 60 seconds
-      final lastSeenTime = DateTime.parse(lastSeen);
-      final diff = DateTime.now().difference(lastSeenTime);
-
-      return diff.inSeconds < 60;
+      final db = await PowerSyncService.database;
+      final cutoff = DateTime.now()
+          .subtract(const Duration(seconds: 60))
+          .toIso8601String();
+      final result = await db.getOptional(
+        'SELECT id FROM error_logs WHERE fingerprint = ? AND created_at > ? LIMIT 1',
+        [fingerprint, cutoff],
+      );
+      return result != null;
     } catch (e) {
       debugPrint('[ErrorReporter] Failed to check duplicate: $e');
       return false;
     }
   }
 
-  /// Store fingerprint for deduplication
-  Future<void> _storeFingerprint(String fingerprint) async {
-    try {
-      final box = Hive.box<String>(_errorQueueBox);
-      final lastFingerprintsJson = box.get(_lastFingerprintKey, defaultValue: '{}');
-
-      Map<String, dynamic> lastFingerprints = {};
-      if (lastFingerprintsJson != null && lastFingerprintsJson.isNotEmpty) {
-        try {
-          lastFingerprints = jsonDecode(lastFingerprintsJson) as Map<String, dynamic>;
-        } catch (e) {
-          debugPrint('[ErrorReporter] Failed to parse last fingerprints: $e');
-        }
-      }
-
-      // Add current fingerprint
-      lastFingerprints[fingerprint] = DateTime.now().toIso8601String();
-
-      // Clean up old fingerprints (older than 60 seconds)
-      final now = DateTime.now();
-      lastFingerprints.removeWhere((key, value) {
-        try {
-          final valueStr = value as String?;
-          if (valueStr == null) return true; // Remove null entries
-          final timestamp = DateTime.parse(valueStr);
-          return now.difference(timestamp).inSeconds > 60;
-        } catch (e) {
-          return true; // Remove invalid entries
-        }
-      });
-
-      // Keep only last 100 fingerprints to prevent memory bloat
-      if (lastFingerprints.length > 100) {
-        final entries = lastFingerprints.entries.toList()
-          ..sort((a, b) {
-            final aValue = a.value as String?;
-            final bValue = b.value as String?;
-            if (aValue == null) return 1;
-            if (bValue == null) return -1;
-            return aValue.compareTo(bValue);
-          });
-        final toRemove = entries.take(lastFingerprints.length - 100);
-        for (final entry in toRemove) {
-          lastFingerprints.remove(entry.key);
-        }
-      }
-
-      await box.put(_lastFingerprintKey, jsonEncode(lastFingerprints));
-    } catch (e) {
-      debugPrint('[ErrorReporter] Failed to store fingerprint: $e');
-    }
-  }
-
-  /// Add error to queue with FIFO eviction
   Future<void> _addToQueue(ErrorReport report) async {
     try {
-      final box = Hive.box<String>(_errorQueueBox);
+      final db = await PowerSyncService.database;
 
-      // Check queue size and evict oldest if necessary
-      if (box.length >= _maxQueueSize) {
-        final oldestKey = box.keys.first;
-        await box.delete(oldestKey);
-        debugPrint('[ErrorReporter] Queue full, evicted oldest error: $oldestKey');
+      final countResult = await db.get(
+        'SELECT COUNT(*) as c FROM error_logs WHERE is_synced = 0',
+      );
+      final count = (countResult['c'] as int? ?? 0);
+
+      if (count >= _maxQueueSize) {
+        final oldest = await db.getOptional(
+          'SELECT id FROM error_logs WHERE is_synced = 0 ORDER BY created_at ASC LIMIT 1',
+        );
+        if (oldest != null) {
+          await db.execute('DELETE FROM error_logs WHERE id = ?', [oldest['id']]);
+          debugPrint('[ErrorReporter] Queue full, evicted oldest error');
+        }
       }
 
-      // Add new error
-      await box.put(report.id, report.toJsonString());
+      await db.execute(
+        'INSERT INTO error_logs (id, code, message, platform, stack_trace, user_id, request_id, fingerprint, app_version, os_version, device_info, details, is_synced, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
+        [
+          report.id,
+          report.code,
+          report.message,
+          report.platform.value,
+          report.stackTrace,
+          report.userId,
+          report.requestId,
+          report.fingerprint,
+          report.appVersion,
+          report.osVersion,
+          report.deviceInfo != null ? jsonEncode(report.deviceInfo) : null,
+          report.details != null ? jsonEncode(report.details) : null,
+          report.createdAt.toIso8601String(),
+        ],
+      );
     } catch (e) {
       debugPrint('[ErrorReporter] Failed to add to queue: $e');
     }
   }
 
-  /// Send error to backend
+  ErrorReport _reportFromRow(Map<String, dynamic> row) {
+    Map<String, dynamic>? deviceInfo;
+    Map<String, dynamic>? details;
+
+    try {
+      final deviceInfoStr = row['device_info'] as String?;
+      if (deviceInfoStr != null) {
+        deviceInfo = jsonDecode(deviceInfoStr) as Map<String, dynamic>?;
+      }
+    } catch (_) {}
+
+    try {
+      final detailsStr = row['details'] as String?;
+      if (detailsStr != null) {
+        details = jsonDecode(detailsStr) as Map<String, dynamic>?;
+      }
+    } catch (_) {}
+
+    return ErrorReport(
+      code: row['code'] as String? ?? 'UNKNOWN',
+      message: row['message'] as String? ?? '',
+      platform: ErrorPlatform.fromString(row['platform'] as String? ?? 'mobile'),
+      stackTrace: row['stack_trace'] as String?,
+      userId: row['user_id'] as String?,
+      requestId: row['request_id'] as String?,
+      fingerprint: row['fingerprint'] as String?,
+      appVersion: row['app_version'] as String?,
+      osVersion: row['os_version'] as String?,
+      deviceInfo: deviceInfo,
+      details: details,
+      createdAt: row['created_at'] != null
+          ? DateTime.tryParse(row['created_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
   Future<ErrorReportResponse> _sendError(ErrorReport report) async {
     try {
       final response = await _dio.post(
         '${AppConfig.backendApiUrl}/errors',
         data: report.toJson(),
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: {'Content-Type': 'application/json'},
         ),
       );
 

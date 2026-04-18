@@ -36,7 +36,18 @@ class AddAddressPage extends HookConsumerWidget {
     final longitude = useState<double?>(initialAddress?.longitude);
     final isPrimary = useState<bool>(initialAddress?.isPrimary ?? false);
     final isSaving = useState<bool>(false);
-    final selectedPsgc = useState<PsgcData?>(null);
+    final selectedPsgc = useState<PsgcData?>(
+      initialAddress != null &&
+              (initialAddress!.province?.isNotEmpty ?? false) &&
+              (initialAddress!.municipality?.isNotEmpty ?? false)
+          ? PsgcData(
+              region: initialAddress!.region ?? '',
+              province: initialAddress!.province!,
+              municipality: initialAddress!.municipality!,
+              barangay: initialAddress!.barangay ?? '',
+            )
+          : null,
+    );
 
     Future<void> handleSubmit() async {
       if (!formKey.currentState!.validate()) return;
@@ -134,6 +145,9 @@ class AddAddressPage extends HookConsumerWidget {
                 const SizedBox(height: 8),
                 PSGCSelector(
                   initialPsgcId: initialAddress?.psgcId.toString(),
+                  initialProvince: initialAddress?.province,
+                  initialMunicipality: initialAddress?.municipality,
+                  initialBarangay: initialAddress?.barangay,
                   onPsgcSelected: (psgc) {
                     selectedPsgc.value = psgc;
                   },
