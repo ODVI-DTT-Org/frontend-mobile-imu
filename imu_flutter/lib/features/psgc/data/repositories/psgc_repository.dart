@@ -2,16 +2,24 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/config/app_config.dart';
+import '../../../../services/auth/jwt_auth_service.dart';
 import '../models/psgc_models.dart';
 
 /// Repository for PSGC geographic data — fetches from REST API.
 /// The psgc table was removed from PowerSync; data is served by the backend.
 class PsgcRepository {
   final String _baseUrl;
+  final JwtAuthService _authService;
 
-  PsgcRepository(this._baseUrl);
+  PsgcRepository(this._baseUrl, this._authService);
 
-  Map<String, String> get _headers => {'Content-Type': 'application/json'};
+  Map<String, String> get _headers {
+    final token = _authService.accessToken;
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
   Future<List<PsgcRegion>> getRegions() async {
     final res = await http.get(Uri.parse('$_baseUrl/psgc/regions'), headers: _headers);
@@ -134,7 +142,8 @@ class PsgcRepository {
 /// Provider for PSGC repository
 final psgcRepositoryProvider = Provider<PsgcRepository>((ref) {
   final baseUrl = AppConfig.postgresApiUrl;
-  return PsgcRepository(baseUrl);
+  final authService = JwtAuthService();
+  return PsgcRepository(baseUrl, authService);
 });
 
 /// Provider for all regions

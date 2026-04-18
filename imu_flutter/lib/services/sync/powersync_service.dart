@@ -72,6 +72,8 @@ const Schema _powerSyncSchema = Schema([
     Column.text('number'),
     Column.text('label'),
     Column.integer('is_primary'),
+    Column.text('created_at'),
+    Column.text('deleted_at'),
   ]),
   // NOTE: Touchpoints table removed from PowerSync schema
   // Touchpoint data is now available via clients.touchpoint_summary (denormalized JSON array)
