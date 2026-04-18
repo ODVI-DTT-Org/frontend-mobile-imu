@@ -69,7 +69,6 @@ const Schema _powerSyncSchema = Schema([
   ]),
   Table('phone_numbers', [
     Column.text('client_id'),
-    Column.text('type'),
     Column.text('number'),
     Column.text('label'),
     Column.integer('is_primary'),
