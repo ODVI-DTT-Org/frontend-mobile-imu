@@ -68,12 +68,32 @@ enum ActivityType { approval, touchpoint, visit, call }
 
 enum ActivityStatus { pending, syncing, completed, approved, rejected, failed }
 
+enum ActivitySubtype {
+  // Approvals
+  clientCreate,
+  clientEdit,
+  clientDelete,
+  addressAdd,
+  addressEdit,
+  addressDelete,
+  phoneAdd,
+  phoneEdit,
+  phoneDelete,
+  loanRelease,
+  // Touchpoints
+  touchpointVisit,
+  touchpointCall,
+  // Visits / Calls
+  visit,
+  call,
+}
+
 class ActivityItem {
   final String id;
   final ActivityType type;
-  final String subtype;       // e.g. 'client_create', 'touchpoint_visit', 'address_add'
-  final String? clientName;
-  final String? detail;       // reason, "Touchpoint #3 • Visit", etc.
+  final ActivitySubtype subtype;
+  final String? clientName;   // resolved via JOIN on local clients table
+  final String? detail;       // e.g. "Touchpoint #3 • Visit", rejection reason
   final ActivityStatus status;
   final DateTime createdAt;
 }
@@ -93,7 +113,7 @@ Filter icon opens a right-side sheet.
 ```
 [Approvals ×]  [Last 7 days ×]
 ```
-Each chip is dismissible (tapping × resets that filter to default).
+Each chip is dismissible (tapping × resets that filter to default). Chips only appear for **non-default** selections — "All types" and "Last 7 days" do not produce chips since they are the default state.
 
 ### Feed
 Flat chronological list, most recent first, grouped by date header ("Today", "Yesterday", "Mon Apr 14", etc.).
@@ -159,13 +179,13 @@ class ActivityFeedState {
   final List<ActivityItem> items;
   final bool isLoading;
   final String? error;
-  final DateRange dateRange;      // default: last 7 days
+  final DateTimeRange dateRange;  // default: last 7 days
   final ActivityType? typeFilter; // null = All
   final bool hasMore;
 }
 ```
 
-**`ActivityRepository`** — handles raw SQLite queries, one method per table, merges and sorts results. Injected into the notifier.
+**`ActivityRepository`** — handles raw SQLite queries, one method per table, each using a LEFT JOIN on the local `clients` table to resolve `clientName`. Results merged and sorted by the notifier. Injected into the notifier.
 
 **Data flow:**
 1. On page open, notifier queries 4 tables filtered by `dateRange` and `typeFilter`
@@ -200,6 +220,14 @@ lib/features/activity/
 | `lib/core/router/app_router.dart` | Add `/activity` route → `ActivityPage` |
 | `lib/features/home/presentation/pages/home_page.dart` | Add 8th grid tile: history icon, "My Activity", `/activity` |
 | `lib/features/approvals/presentation/pages/pending_approvals_page.dart` | Delete — superseded |
+
+---
+
+## Implementation-Time Verification
+
+Before implementing the repository queries, verify:
+- **`approvals` in PowerSync publication** — check migration `081_add_tables_to_powersync_publication.sql` confirms `approvals` is published to caravan/tele devices. If not, a new migration is needed before approval items can appear in the feed.
+- **PowerSync pending queue API** — confirm the Flutter PowerSync SDK exposes a way to query pending/failed upload rows (e.g. `db.getAll('SELECT * FROM ps_crud WHERE ...')`). If not, syncing/failed status falls back to always showing "completed" for non-approval items.
 
 ---
 
