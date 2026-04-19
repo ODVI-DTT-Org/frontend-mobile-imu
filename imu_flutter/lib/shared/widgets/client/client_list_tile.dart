@@ -53,10 +53,11 @@ class ClientListTile extends ConsumerWidget {
     }
 
     // Touchpoint progress
-    // nextTouchpointNumber comes from REST API; PowerSync only syncs touchpointNumber (same value).
-    // Fall back to touchpointNumber when nextTouchpointNumber is absent (PowerSync clients).
+    // nextTouchpointNumber is the next step to record (e.g. 3 if 2 are done).
+    // touchpointNumber is the completed count — add +1 for the fallback so it
+    // matches the semantics of nextTouchpointNumber (completed + 1 = next step).
     final nextNumber = client.nextTouchpointNumber ??
-        (client.touchpointNumber >= 1 && client.touchpointNumber <= 7 ? client.touchpointNumber : null);
+        (client.touchpointNumber >= 0 && client.touchpointNumber < 7 ? client.touchpointNumber + 1 : null);
     final nextType = client.nextTouchpointType;
     final isCompleted = client.completedTouchpoints >= 7;
     String touchpointInfo;

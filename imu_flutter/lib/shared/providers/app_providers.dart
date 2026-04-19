@@ -165,6 +165,8 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
       final clients = await clientApiService.fetchAllAssignedClients();
       final clientJsons = clients.map((c) => c.toJson()).toList();
       await hiveService.saveAllClients(clientJsons);
+      await hiveService.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
+      await hiveService.saveSetting('clients_cache_version', 2);
 
       ref.invalidate(assignedClientsProvider);
 
