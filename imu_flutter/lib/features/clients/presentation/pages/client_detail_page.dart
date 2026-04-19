@@ -90,8 +90,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           final addressRepo = ref.read(addressRepositoryProvider);
           final phoneRepo = ref.read(phoneNumberRepositoryProvider);
 
-          final addresses = await addressRepo.getAddresses(widget.clientId);
-          final phoneNumbers = await phoneRepo.getPhoneNumbers(widget.clientId);
+          final addressesFuture = addressRepo.getAddresses(widget.clientId);
+          final phoneNumbersFuture = phoneRepo.getPhoneNumbers(widget.clientId);
+          final addresses = await addressesFuture;
+          final phoneNumbers = await phoneNumbersFuture;
 
           // Update client with addresses and phone numbers
           client = client.copyWith(
