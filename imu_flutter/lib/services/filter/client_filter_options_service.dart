@@ -65,34 +65,38 @@ class ClientFilterOptionsService {
       throw PowerSyncUnavailableException('PowerSync database is not available');
     }
 
-    // Fetch each filter type separately for better performance and NULL handling
-    final clientTypesResult = await _powerSync!.getAll('''
-      SELECT DISTINCT client_type
-      FROM clients
-      WHERE client_type IS NOT NULL
-      ORDER BY client_type
-    ''');
+    // Fetch all filter types concurrently
+    final queryResults = await Future.wait([
+      _powerSync!.getAll('''
+        SELECT DISTINCT client_type
+        FROM clients
+        WHERE client_type IS NOT NULL
+        ORDER BY client_type
+      '''),
+      _powerSync!.getAll('''
+        SELECT DISTINCT market_type
+        FROM clients
+        WHERE market_type IS NOT NULL
+        ORDER BY market_type
+      '''),
+      _powerSync!.getAll('''
+        SELECT DISTINCT pension_type
+        FROM clients
+        WHERE pension_type IS NOT NULL
+        ORDER BY pension_type
+      '''),
+      _powerSync!.getAll('''
+        SELECT DISTINCT product_type
+        FROM clients
+        WHERE product_type IS NOT NULL
+        ORDER BY product_type
+      '''),
+    ]);
 
-    final marketTypesResult = await _powerSync!.getAll('''
-      SELECT DISTINCT market_type
-      FROM clients
-      WHERE market_type IS NOT NULL
-      ORDER BY market_type
-    ''');
-
-    final pensionTypesResult = await _powerSync!.getAll('''
-      SELECT DISTINCT pension_type
-      FROM clients
-      WHERE pension_type IS NOT NULL
-      ORDER BY pension_type
-    ''');
-
-    final productTypesResult = await _powerSync!.getAll('''
-      SELECT DISTINCT product_type
-      FROM clients
-      WHERE product_type IS NOT NULL
-      ORDER BY product_type
-    ''');
+    final clientTypesResult = queryResults[0];
+    final marketTypesResult = queryResults[1];
+    final pensionTypesResult = queryResults[2];
+    final productTypesResult = queryResults[3];
 
     final clientTypes = <ClientType>{};
     final marketTypes = <MarketType>{};
