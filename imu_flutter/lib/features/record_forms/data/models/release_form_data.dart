@@ -210,7 +210,7 @@ class ReleaseFormData extends FormData {
       'address': gpsAddress,
       'reason': reason?.apiValue,
       'status': status?.apiValue,
-      'notes': remarks,
+      'remarks': remarks,
     };
   }
 
