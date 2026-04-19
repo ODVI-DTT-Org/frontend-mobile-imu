@@ -396,10 +396,16 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final hiveService = HiveService();
   var rawClients = hiveService.getAllClients();
 
-  // Startup hydration: fetch from API if cache is empty OR if a previous fetch
-  // was never completed (app killed mid-fetch leaves clients in Hive but no timestamp).
+  // Bump this when the API response shape changes so stale caches are cleared.
+  const kCacheVersion = 2;
+
+  // Startup hydration: fetch from API if:
+  //  - cache is empty
+  //  - previous fetch was killed mid-way (no timestamp written)
+  //  - cache schema version is outdated (stale data from a prior API shape)
   final lastFetchMs = hiveService.getSetting<int>('clients_last_fetch_ms');
-  if (rawClients.isEmpty || lastFetchMs == null) {
+  final cacheVersion = hiveService.getSetting<int>('clients_cache_version');
+  if (rawClients.isEmpty || lastFetchMs == null || cacheVersion != kCacheVersion) {
     final isOnline = ref.read(isOnlineProvider);
     final jwtAuth = ref.read(jwtAuthProvider);
     if (isOnline && jwtAuth.isAuthenticated) {
@@ -410,6 +416,7 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
         final clientJsons = clients.map((c) => c.toJson()).toList();
         await hiveService.saveAllClients(clientJsons);
         await hiveService.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
+        await hiveService.saveSetting('clients_cache_version', kCacheVersion);
         rawClients = hiveService.getAllClients();
         debugPrint('assignedClientsProvider: Hydrated ${rawClients.length} clients from API');
       } catch (e) {
