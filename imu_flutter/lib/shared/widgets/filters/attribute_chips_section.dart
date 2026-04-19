@@ -80,7 +80,9 @@ class AttributeChipsSection extends StatelessWidget {
         const SizedBox(height: 12),
         _FilterGroup(
           label: 'Loan Type',
-          values: options.loanTypes,
+          values: options.loanTypes.isNotEmpty
+              ? options.loanTypes
+              : const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM'],
           selected: draftFilter.loanTypes?.toSet() ?? {},
           labelOf: _label,
           onToggle: (v) {
