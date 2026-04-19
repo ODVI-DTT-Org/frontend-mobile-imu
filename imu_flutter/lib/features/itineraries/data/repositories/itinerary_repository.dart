@@ -359,10 +359,10 @@ Map<String, dynamic> _enrichItineraryRowFromHive(Map<String, dynamic> row) {
     return row;
   }
 
-  debugPrint('[ItineraryRepo] client_id=$clientId found: first_name=${cached['first_name']}, last_name=${cached['last_name']}');
+  debugPrint('[ItineraryRepo] client_id=$clientId found: firstName=${cached['firstName']}, lastName=${cached['lastName']}');
   final enriched = Map<String, dynamic>.from(row);
-  enriched['first_name'] = cached['first_name'];
-  enriched['last_name'] = cached['last_name'];
+  enriched['first_name'] = cached['firstName'] ?? cached['first_name'];
+  enriched['last_name'] = cached['lastName'] ?? cached['last_name'];
   enriched['municipality'] = cached['municipality'];
   enriched['province'] = cached['province'];
   return enriched;

@@ -24,16 +24,16 @@ Map<String, dynamic> _enrichRowFromHive(Map<String, dynamic> row) {
     return row;
   }
 
-  debugPrint('[MyDayRepo] client_id=$clientId found in Hive: first_name=${cached['first_name']}, last_name=${cached['last_name']}');
+  debugPrint('[MyDayRepo] client_id=$clientId found in Hive: firstName=${cached['firstName']}, lastName=${cached['lastName']}');
 
   final enriched = Map<String, dynamic>.from(row);
-  enriched['first_name'] = cached['first_name'];
-  enriched['last_name'] = cached['last_name'];
+  enriched['first_name'] = cached['firstName'] ?? cached['first_name'];
+  enriched['last_name'] = cached['lastName'] ?? cached['last_name'];
   enriched['municipality'] = cached['municipality'];
   enriched['province'] = cached['province'];
-  enriched['product_type'] = cached['product_type'];
-  enriched['pension_type'] = cached['pension_type'];
-  enriched['loan_type'] = cached['loan_type'];
+  enriched['product_type'] = cached['productType'] ?? cached['product_type'];
+  enriched['pension_type'] = cached['pensionType'] ?? cached['pension_type'];
+  enriched['loan_type'] = cached['loanType'] ?? cached['loan_type'];
   enriched['touchpoint_number'] = cached['touchpoint_number'];
   enriched['next_touchpoint'] = cached['next_touchpoint'];
   enriched['touchpoint_summary'] = cached['touchpoint_summary'];
