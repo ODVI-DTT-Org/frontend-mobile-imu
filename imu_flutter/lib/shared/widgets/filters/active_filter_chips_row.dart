@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/providers/client_attribute_filter_provider.dart';
 import '../../../shared/providers/location_filter_providers.dart';
-import '../filters/client_attribute_filter_helpers.dart' show formatLoanType;
 
 class ActiveFilterChipsRow extends ConsumerWidget {
   const ActiveFilterChipsRow({super.key});
@@ -41,11 +40,8 @@ class ActiveFilterChipsRow extends ConsumerWidget {
     for (final v in attrs.productTypes ?? []) {
       chips.add(_ActiveChip(label: _label(v), onRemove: () => attrNotifier.toggleProductType(v)));
     }
-    for (final t in attrs.loanTypes ?? []) {
-      chips.add(_ActiveChip(
-        label: formatLoanType(t),
-        onRemove: () => attrNotifier.toggleLoanType(t),
-      ));
+    for (final v in attrs.loanTypes ?? []) {
+      chips.add(_ActiveChip(label: _label(v), onRemove: () => attrNotifier.toggleLoanType(v)));
     }
 
     if (chips.isEmpty) return const SizedBox.shrink();

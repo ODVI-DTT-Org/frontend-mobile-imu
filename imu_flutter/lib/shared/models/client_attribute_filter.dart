@@ -6,7 +6,7 @@ class ClientAttributeFilter {
   final List<String>? marketTypes;
   final List<String>? pensionTypes;
   final List<String>? productTypes;
-  final List<LoanType>? loanTypes;
+  final List<String>? loanTypes;
 
   const ClientAttributeFilter({
     this.clientTypes,
@@ -52,7 +52,8 @@ class ClientAttributeFilter {
       if (!productTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (loanTypes != null && loanTypes!.isNotEmpty) {
-      if (!loanTypes!.contains(client.loanType)) return false;
+      final raw = (client.loanTypeRaw ?? '').toUpperCase().trim();
+      if (!loanTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     return true;
   }
@@ -72,22 +73,9 @@ class ClientAttributeFilter {
       params['product_type'] = productTypes!.join(',');
     }
     if (loanTypes != null && loanTypes!.isNotEmpty) {
-      params['loan_type'] = loanTypes!.map((t) => _loanTypeApiValue(t)).join(',');
+      params['loan_type'] = loanTypes!.join(',');
     }
     return params;
-  }
-
-  String _loanTypeApiValue(LoanType type) {
-    switch (type) {
-      case LoanType.firstLoan:
-        return 'NEW';
-      case LoanType.additional:
-        return 'ADDITIONAL';
-      case LoanType.renewal:
-        return 'RENEWAL';
-      case LoanType.preterm:
-        return 'PRETERM';
-    }
   }
 
   static const _absent = Object();
@@ -104,7 +92,7 @@ class ClientAttributeFilter {
       marketTypes: identical(marketTypes, _absent) ? this.marketTypes : marketTypes as List<String>?,
       pensionTypes: identical(pensionTypes, _absent) ? this.pensionTypes : pensionTypes as List<String>?,
       productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<String>?,
-      loanTypes: identical(loanTypes, _absent) ? this.loanTypes : loanTypes as List<LoanType>?,
+      loanTypes: identical(loanTypes, _absent) ? this.loanTypes : loanTypes as List<String>?,
     );
   }
 

@@ -18,6 +18,7 @@ class ClientFilterApiService {
       {'table': 'clients', 'column': 'market_type'},
       {'table': 'clients', 'column': 'pension_type'},
       {'table': 'clients', 'column': 'product_type'},
+      {'table': 'clients', 'column': 'loan_type'},
     ];
 
     final token = _authService.accessToken;

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../features/clients/data/models/client_model.dart' show LoanType;
 import '../../../shared/models/client_attribute_filter.dart';
 import '../../../shared/models/client_filter_options.dart';
-import '../filters/client_attribute_filter_helpers.dart' show formatLoanType;
 
 const int _dropdownThreshold = 4;
 
@@ -20,12 +18,6 @@ class AttributeChipsSection extends StatelessWidget {
 
   List<String> _toggle(List<String>? current, String value) {
     final list = List<String>.from(current ?? []);
-    list.contains(value) ? list.remove(value) : list.add(value);
-    return list;
-  }
-
-  List<T> _toggleEnum<T>(List<T>? current, T value) {
-    final list = List<T>.from(current ?? []);
     list.contains(value) ? list.remove(value) : list.add(value);
     return list;
   }
@@ -86,13 +78,13 @@ class AttributeChipsSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
-        _EnumChipsRow<LoanType>(
+        _FilterGroup(
           label: 'Loan Type',
-          values: LoanType.values,
+          values: options.loanTypes,
           selected: draftFilter.loanTypes?.toSet() ?? {},
-          labelOf: formatLoanType,
-          onToggle: (t) {
-            final updated = _toggleEnum(draftFilter.loanTypes, t);
+          labelOf: _label,
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.loanTypes, v);
             onChanged(draftFilter.copyWith(loanTypes: updated.isEmpty ? null : updated));
           },
         ),
@@ -385,62 +377,3 @@ class _PickerSheetState extends State<_PickerSheet> {
   }
 }
 
-/// Enum-based chip group (for LoanType and similar fixed-option filters)
-class _EnumChipsRow<T> extends StatelessWidget {
-  final String label;
-  final List<T> values;
-  final Set<T> selected;
-  final String Function(T) labelOf;
-  final void Function(T) onToggle;
-
-  const _EnumChipsRow({
-    required this.label,
-    required this.values,
-    required this.selected,
-    required this.labelOf,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Colors.black54,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: values.map((value) {
-            final isSelected = selected.contains(value);
-            return FilterChip(
-              label: Text(labelOf(value)),
-              selected: isSelected,
-              onSelected: (_) => onToggle(value),
-              visualDensity: VisualDensity.compact,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                color: isSelected ? Colors.white : null,
-              ),
-              selectedColor: theme.colorScheme.primary,
-              checkmarkColor: Colors.white,
-              showCheckmark: false,
-              side: BorderSide(
-                color: isSelected ? theme.colorScheme.primary : Colors.grey[350]!,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-}

@@ -1,35 +1,24 @@
-const _kDefaultClientTypes  = ['POTENTIAL', 'EXISTING'];
-const _kDefaultMarketTypes  = ['RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL'];
-const _kDefaultPensionTypes = ['SSS', 'GSIS', 'PRIVATE', 'NONE'];
-const _kDefaultProductTypes = ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP'];
-
 class ClientFilterOptions {
   final List<String> clientTypes;
   final List<String> marketTypes;
   final List<String> pensionTypes;
   final List<String> productTypes;
+  final List<String> loanTypes;
 
   const ClientFilterOptions({
     this.clientTypes = const [],
     this.marketTypes = const [],
     this.pensionTypes = const [],
     this.productTypes = const [],
+    this.loanTypes = const [],
   });
-
-  /// Returns options merged with hardcoded defaults — any empty list is filled
-  /// with known-valid values so the filter UI always shows something.
-  ClientFilterOptions withFallbackDefaults() => ClientFilterOptions(
-    clientTypes:  clientTypes.isNotEmpty  ? clientTypes  : _kDefaultClientTypes,
-    marketTypes:  marketTypes.isNotEmpty  ? marketTypes  : _kDefaultMarketTypes,
-    pensionTypes: pensionTypes.isNotEmpty ? pensionTypes : _kDefaultPensionTypes,
-    productTypes: productTypes.isNotEmpty ? productTypes : _kDefaultProductTypes,
-  );
 
   bool get isNotEmpty =>
       clientTypes.isNotEmpty ||
       marketTypes.isNotEmpty ||
       pensionTypes.isNotEmpty ||
-      productTypes.isNotEmpty;
+      productTypes.isNotEmpty ||
+      loanTypes.isNotEmpty;
 
   /// Parse from API response (/api/filters/batch)
   factory ClientFilterOptions.fromAPIResponse(Map<String, dynamic> data) {
@@ -39,6 +28,7 @@ class ClientFilterOptions {
     final marketTypes = <String>[];
     final pensionTypes = <String>[];
     final productTypes = <String>[];
+    final loanTypes = <String>[];
 
     for (final result in results) {
       if (result is! Map) continue;
@@ -69,6 +59,9 @@ class ClientFilterOptions {
           case 'product_type':
             if (!productTypes.contains(normalized)) productTypes.add(normalized);
             break;
+          case 'loan_type':
+            if (!loanTypes.contains(normalized)) loanTypes.add(normalized);
+            break;
         }
       }
     }
@@ -78,6 +71,7 @@ class ClientFilterOptions {
       marketTypes: marketTypes,
       pensionTypes: pensionTypes,
       productTypes: productTypes,
+      loanTypes: loanTypes,
     );
   }
 }

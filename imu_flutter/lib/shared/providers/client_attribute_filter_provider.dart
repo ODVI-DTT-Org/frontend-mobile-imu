@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_attribute_filter.dart';
 import '../models/location_filter.dart';
-import '../../features/clients/data/models/client_model.dart' show LoanType;
 import '../../services/filter_preferences_service.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 
@@ -22,21 +21,7 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     final marketTypes = await _prefs.getMarketTypes();
     final pensionTypes = await _prefs.getPensionTypes();
     final productTypes = await _prefs.getProductTypes();
-    final loanTypeStrs = await _prefs.getLoanTypes();
-
-    List<LoanType> parseLoanTypes(List<String> strs) =>
-        strs
-            .map((s) {
-              try {
-                return LoanType.values.firstWhere((e) => e.name.toLowerCase() == s.toLowerCase());
-              } catch (_) {
-                return null;
-              }
-            })
-            .whereType<LoanType>()
-            .toList();
-
-    final loanTypes = parseLoanTypes(loanTypeStrs);
+    final loanTypes = await _prefs.getLoanTypes();
 
     if (clientTypes.isNotEmpty || marketTypes.isNotEmpty ||
         pensionTypes.isNotEmpty || productTypes.isNotEmpty || loanTypes.isNotEmpty) {
@@ -79,9 +64,9 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     updateFilter(state.copyWith(productTypes: current.isEmpty ? null : current));
   }
 
-  void toggleLoanType(LoanType type) {
-    final current = List<LoanType>.from(state.loanTypes ?? []);
-    current.contains(type) ? current.remove(type) : current.add(type);
+  void toggleLoanType(String value) {
+    final current = List<String>.from(state.loanTypes ?? []);
+    current.contains(value) ? current.remove(value) : current.add(value);
     updateFilter(state.copyWith(loanTypes: current.isEmpty ? null : current));
   }
 
@@ -95,7 +80,7 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     _prefs.setMarketTypes(filter.marketTypes ?? []);
     _prefs.setPensionTypes(filter.pensionTypes ?? []);
     _prefs.setProductTypes(filter.productTypes ?? []);
-    _prefs.setLoanTypes(filter.loanTypes?.map((t) => t.name).toList() ?? []);
+    _prefs.setLoanTypes(filter.loanTypes ?? []);
   }
 }
 

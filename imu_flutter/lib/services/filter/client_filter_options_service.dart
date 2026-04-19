@@ -25,7 +25,8 @@ class ClientFilterOptionsService {
             '${options.clientTypes.length} client types, '
             '${options.marketTypes.length} market types, '
             '${options.pensionTypes.length} pension types, '
-            '${options.productTypes.length} product types');
+            '${options.productTypes.length} product types, '
+            '${options.loanTypes.length} loan types');
         return options;
       } else {
         debugPrint('[ClientFilterOptionsService] PowerSync returned empty, falling back to API');
@@ -77,6 +78,12 @@ class ClientFilterOptionsService {
         WHERE product_type IS NOT NULL AND TRIM(product_type) != ''
         ORDER BY val
       '''),
+      _powerSync!.getAll('''
+        SELECT DISTINCT UPPER(TRIM(loan_type)) as val
+        FROM clients
+        WHERE loan_type IS NOT NULL AND TRIM(loan_type) != ''
+        ORDER BY val
+      '''),
     ]);
 
     List<String> toStrings(List<Map<String, dynamic>> rows) {
@@ -96,6 +103,7 @@ class ClientFilterOptionsService {
       marketTypes: toStrings(queryResults[1]),
       pensionTypes: toStrings(queryResults[2]),
       productTypes: toStrings(queryResults[3]),
+      loanTypes: toStrings(queryResults[4]),
     );
   }
 }
