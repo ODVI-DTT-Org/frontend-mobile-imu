@@ -1,3 +1,8 @@
+const _kDefaultClientTypes  = ['POTENTIAL', 'EXISTING'];
+const _kDefaultMarketTypes  = ['RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL'];
+const _kDefaultPensionTypes = ['SSS', 'GSIS', 'PRIVATE', 'NONE'];
+const _kDefaultProductTypes = ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP'];
+
 class ClientFilterOptions {
   final List<String> clientTypes;
   final List<String> marketTypes;
@@ -10,6 +15,15 @@ class ClientFilterOptions {
     this.pensionTypes = const [],
     this.productTypes = const [],
   });
+
+  /// Returns options merged with hardcoded defaults — any empty list is filled
+  /// with known-valid values so the filter UI always shows something.
+  ClientFilterOptions withFallbackDefaults() => ClientFilterOptions(
+    clientTypes:  clientTypes.isNotEmpty  ? clientTypes  : _kDefaultClientTypes,
+    marketTypes:  marketTypes.isNotEmpty  ? marketTypes  : _kDefaultMarketTypes,
+    pensionTypes: pensionTypes.isNotEmpty ? pensionTypes : _kDefaultPensionTypes,
+    productTypes: productTypes.isNotEmpty ? productTypes : _kDefaultProductTypes,
+  );
 
   bool get isNotEmpty =>
       clientTypes.isNotEmpty ||

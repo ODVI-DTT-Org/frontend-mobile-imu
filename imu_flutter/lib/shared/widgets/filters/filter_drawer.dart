@@ -92,16 +92,17 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                       optionsAsync.when(
                         data: (options) => AttributeChipsSection(
                           draftFilter: _draftAttrs,
-                          options: options,
+                          options: options.withFallbackDefaults(),
                           onChanged: (f) => setState(() => _draftAttrs = f),
                         ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
+                        loading: () => AttributeChipsSection(
+                          draftFilter: _draftAttrs,
+                          options: const ClientFilterOptions().withFallbackDefaults(),
+                          onChanged: (f) => setState(() => _draftAttrs = f),
                         ),
                         error: (_, __) => AttributeChipsSection(
                           draftFilter: _draftAttrs,
-                          options: const ClientFilterOptions(),
+                          options: const ClientFilterOptions().withFallbackDefaults(),
                           onChanged: (f) => setState(() => _draftAttrs = f),
                         ),
                       ),
