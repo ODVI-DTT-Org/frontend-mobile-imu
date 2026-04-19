@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/sync/sync_service.dart';
+import '../providers/app_providers.dart' show refreshAssignedClientsProvider, isOnlineProvider;
 import '../utils/loading_helper.dart';
 import '../../core/utils/app_notification.dart';
 
@@ -181,9 +182,61 @@ class SyncStatusSheet extends ConsumerStatefulWidget {
 }
 
 class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
+  bool _isFreshSyncing = false;
+
+  Future<void> _handleFreshSync() async {
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      AppNotification.showNeutral(context, 'No internet connection.');
+      return;
+    }
+    setState(() => _isFreshSyncing = true);
+    try {
+      await ref.read(refreshAssignedClientsProvider)();
+      if (mounted) {
+        AppNotification.showSuccess(context, 'Client list refreshed from server.');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) AppNotification.showError(context, 'Fresh sync failed: $e');
+    } finally {
+      if (mounted) setState(() => _isFreshSyncing = false);
+    }
+  }
+
+  Future<void> _handleCancelPending(SyncService syncService) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Pending Changes?'),
+        content: Text(
+          'This will discard ${syncService.pendingCount} unsynced '
+          'item${syncService.pendingCount == 1 ? '' : 's'}. '
+          'These changes will be permanently lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await syncService.removePendings();
+      if (mounted) AppNotification.showSuccess(context, 'Pending changes cancelled.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final syncService = ref.watch(syncServiceProvider);
+    final busy = syncService.isSyncing || _isFreshSyncing;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -192,144 +245,108 @@ class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 8, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Sync Status',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
+                const Text('Sync Status',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close, size: 20),
                   onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
           ),
+          const Divider(height: 12),
+
+          // Action buttons — top, always visible
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: (syncService.pendingCount == 0 || busy)
+                        ? null
+                        : () => _handleCancelPending(syncService),
+                    icon: const Icon(Icons.cancel_outlined, size: 16),
+                    label: Text(
+                      syncService.pendingCount > 0
+                          ? 'Cancel Pending (${syncService.pendingCount})'
+                          : 'Cancel Pending',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: BorderSide(
+                        color: (syncService.pendingCount > 0 && !busy)
+                            ? Colors.red
+                            : Colors.grey[300]!,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: busy ? null : _handleFreshSync,
+                    icon: _isFreshSyncing
+                        ? const SizedBox(
+                            width: 14, height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.cloud_download_outlined, size: 16),
+                    label: const Text('Fresh Sync', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[700],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const Divider(height: 1),
-          // Status rows (scrollable)
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+
+          // Status rows
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).padding.bottom + 14),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildStatusRow(
                   icon: syncService.status == SyncStatusEnum.offline
-                      ? Icons.cloud_off
-                      : Icons.cloud_done,
+                      ? Icons.cloud_off : Icons.cloud_done,
                   label: 'Connection',
                   value: syncService.status == SyncStatusEnum.offline
-                      ? 'Offline'
-                      : 'Connected',
+                      ? 'Offline' : 'Connected',
                   color: syncService.status == SyncStatusEnum.offline
-                      ? Colors.orange
-                      : Colors.green,
+                      ? Colors.orange : Colors.green,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _buildStatusRow(
                   icon: Icons.sync,
                   label: 'Status',
                   value: syncService.statusMessage,
                   color: _getStatusColor(syncService.status),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _buildStatusRow(
                   icon: Icons.pending_actions,
                   label: 'Pending',
                   value: '${syncService.pendingCount} items',
                   color: syncService.pendingCount > 0 ? Colors.orange : Colors.green,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _buildStatusRow(
                   icon: Icons.schedule,
                   label: 'Last Sync',
                   value: syncService.lastSyncFormatted,
                   color: Colors.grey,
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          // Buttons — always visible at bottom
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              24, 12, 24, MediaQuery.of(context).padding.bottom + 16),
-            child: Column(
-              children: [
-                if (syncService.pendingCount > 0 &&
-                    syncService.status != SyncStatusEnum.offline) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: syncService.isSyncing
-                          ? null
-                          : () async {
-                              await LoadingHelper.withLoading(
-                                ref: ref,
-                                message: 'Syncing ${syncService.pendingCount} items...',
-                                operation: () => syncService.syncNow(),
-                                onError: (e) {
-                                  if (mounted) {
-                                    AppNotification.showError(context, 'Sync failed: ${e.toString()}');
-                                  }
-                                },
-                              );
-                            },
-                      icon: const Icon(Icons.sync),
-                      label: const Text('Sync Now'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: (syncService.pendingCount == 0 || syncService.isSyncing)
-                        ? null
-                        : () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Remove Pending Changes?'),
-                                content: Text(
-                                  'This will discard ${syncService.pendingCount} unsynced '
-                                  'item${syncService.pendingCount == 1 ? '' : 's'}. '
-                                  'These changes will be permanently lost.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                    onPressed: () => Navigator.pop(ctx, true),
-                                    child: const Text('Remove'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirmed == true && mounted) {
-                              await syncService.removePendings();
-                              if (mounted) {
-                                AppNotification.showSuccess(context, 'Pending changes removed');
-                              }
-                            }
-                          },
-                    icon: const Icon(Icons.delete_outline),
-                    label: Text(
-                      syncService.pendingCount > 0
-                          ? 'Remove Pendings (${syncService.pendingCount})'
-                          : 'Remove Pendings',
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: BorderSide(
-                        color: syncService.pendingCount > 0 ? Colors.red : Colors.grey,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -347,27 +364,17 @@ class _SyncStatusSheetState extends ConsumerState<SyncStatusSheet> {
   }) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 12),
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 10),
         SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
-          ),
+          width: 72,
+          child: Text(label,
+              style: TextStyle(color: Colors.grey[600], fontSize: 13)),
         ),
         Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: color,
-              fontSize: 14,
-            ),
-          ),
+          child: Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.w500, color: color, fontSize: 13)),
         ),
       ],
     );
