@@ -354,7 +354,6 @@ class ApprovalsApiService {
       rethrow;
     }
   }
-}
 
   /// Submit a new client for approval (non-admin users)
   Future<void> submitClientCreation({
