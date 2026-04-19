@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -346,9 +347,19 @@ final itineraryRepositoryProvider = Provider<ItineraryRepository>((ref) {
 /// Merges Hive client data into a PowerSync itinerary row.
 Map<String, dynamic> _enrichItineraryRowFromHive(Map<String, dynamic> row) {
   final clientId = row['client_id'] as String?;
+  debugPrint('[ItineraryRepo] Row client_id=$clientId');
   if (clientId == null) return row;
+
+  final hiveCount = HiveService().cachedClientCount;
+  debugPrint('[ItineraryRepo] Hive cache size: $hiveCount');
+
   final cached = HiveService().getClient(clientId);
-  if (cached == null) return row;
+  if (cached == null) {
+    debugPrint('[ItineraryRepo] client_id=$clientId NOT found in Hive');
+    return row;
+  }
+
+  debugPrint('[ItineraryRepo] client_id=$clientId found: first_name=${cached['first_name']}, last_name=${cached['last_name']}');
   final enriched = Map<String, dynamic>.from(row);
   enriched['first_name'] = cached['first_name'];
   enriched['last_name'] = cached['last_name'];
@@ -375,6 +386,7 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
          ORDER BY i.scheduled_time ASC''',
       parameters: [userId, dateStr],
     )) {
+      debugPrint('[ItineraryRepo] itineraryByDateProvider: ${rows.length} rows from PowerSync');
       yield rows.map((r) => ItineraryItem.fromPowerSync(_enrichItineraryRowFromHive(r))).toList();
     }
   } catch (e) {

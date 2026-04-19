@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/my_day/data/models/my_day_client.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
@@ -7,9 +8,24 @@ import 'package:imu_flutter/services/local_storage/hive_service.dart';
 /// Itineraries only stores scheduling fields — all client fields come from Hive.
 Map<String, dynamic> _enrichRowFromHive(Map<String, dynamic> row) {
   final clientId = row['client_id'] as String?;
-  if (clientId == null) return row;
+  debugPrint('[MyDayRepo] Row client_id=$clientId, raw keys=${row.keys.toList()}');
+
+  if (clientId == null) {
+    debugPrint('[MyDayRepo] No client_id in row — skipping Hive enrichment');
+    return row;
+  }
+
+  final hiveCount = HiveService().cachedClientCount;
+  debugPrint('[MyDayRepo] Hive cache size: $hiveCount');
+
   final cached = HiveService().getClient(clientId);
-  if (cached == null) return row;
+  if (cached == null) {
+    debugPrint('[MyDayRepo] client_id=$clientId NOT found in Hive');
+    return row;
+  }
+
+  debugPrint('[MyDayRepo] client_id=$clientId found in Hive: first_name=${cached['first_name']}, last_name=${cached['last_name']}');
+
   final enriched = Map<String, dynamic>.from(row);
   enriched['first_name'] = cached['first_name'];
   enriched['last_name'] = cached['last_name'];
@@ -25,11 +41,11 @@ Map<String, dynamic> _enrichRowFromHive(Map<String, dynamic> row) {
 }
 
 class MyDayRepository {
-  static const String _joinSql = '''
-    SELECT i.id, i.client_id, i.scheduled_date, i.scheduled_time,
-           i.status, i.priority, i.notes, i.time_in, i.time_out,
-           i.touchpoint_number, i.next_touchpoint, i.touchpoint_summary
-    FROM itineraries i
+  // Only select actual itinerary table columns — client fields come from Hive
+  static const String _sql = '''
+    SELECT id, client_id, scheduled_date, scheduled_time,
+           status, priority, notes, time_in, time_out
+    FROM itineraries
   ''';
 
   /// Stream of today's My Day clients for this user, ordered by scheduled time.
@@ -37,9 +53,12 @@ class MyDayRepository {
     final today = DateTime.now().toIso8601String().substring(0, 10);
     return PowerSyncService.database.asStream().asyncExpand((db) {
       return db.watch(
-        "$_joinSql WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status != 'cancelled' ORDER BY i.scheduled_time ASC",
+        "$_sql WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' ORDER BY scheduled_time ASC",
         parameters: [userId, today],
-      ).map((rows) => rows.map((r) => MyDayClient.fromRow(_enrichRowFromHive(r))).toList());
+      ).map((rows) {
+        debugPrint('[MyDayRepo] watchTodayClients: ${rows.length} rows from PowerSync');
+        return rows.map((r) => MyDayClient.fromRow(_enrichRowFromHive(r))).toList();
+      });
     });
   }
 
@@ -47,9 +66,10 @@ class MyDayRepository {
     final today = DateTime.now().toIso8601String().substring(0, 10);
     final db = await PowerSyncService.database;
     final rows = await db.getAll(
-      "$_joinSql WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status != 'cancelled' ORDER BY i.scheduled_time ASC",
+      "$_sql WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' ORDER BY scheduled_time ASC",
       [userId, today],
     );
+    debugPrint('[MyDayRepo] getTodayClients: ${rows.length} rows from PowerSync');
     return rows.map((r) => MyDayClient.fromRow(_enrichRowFromHive(r))).toList();
   }
 
@@ -57,9 +77,10 @@ class MyDayRepository {
     final dateStr = date.toIso8601String().substring(0, 10);
     final db = await PowerSyncService.database;
     final rows = await db.getAll(
-      '$_joinSql WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? ORDER BY i.scheduled_time ASC',
+      '$_sql WHERE user_id = ? AND DATE(scheduled_date) = ? ORDER BY scheduled_time ASC',
       [userId, dateStr],
     );
+    debugPrint('[MyDayRepo] getClientsByDate: ${rows.length} rows from PowerSync');
     return rows.map((r) => MyDayClient.fromRow(_enrichRowFromHive(r))).toList();
   }
 
