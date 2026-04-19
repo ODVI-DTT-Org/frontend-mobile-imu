@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:powersync/powersync.dart' hide Column, SyncStatus;
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/api/background_sync_service.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/logger.dart';
@@ -184,13 +185,19 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     await _startPowerSyncSync();
   }
 
-  /// Check if we have any local data in the database
+  /// Check if we have any local data (Hive assigned-clients cache OR PowerSync SQLite)
   Future<bool> _checkForLocalData() async {
     try {
-      logDebug('[LOCAL-DATA-CHECK] Checking for local data in Hive storage...');
+      // Check Hive first — it's synchronous and always available
+      final hiveCount = HiveService().cachedClientCount;
+      logDebug('[LOCAL-DATA-CHECK] Hive cached clients: $hiveCount');
+      if (hiveCount > 0) {
+        logDebug('[LOCAL-DATA-CHECK] Has local data: true (Hive)');
+        return true;
+      }
 
+      // Fall back to PowerSync SQLite
       logDebug('[LOCAL-DATA-CHECK] Checking for local data in PowerSync SQLite...');
-
       int clientCount = 0;
       try {
         final result = await _powerSyncDb.getAll('SELECT COUNT(*) as cnt FROM clients');
@@ -201,24 +208,10 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
       }
 
       final hasData = clientCount > 0;
-
       logDebug('[LOCAL-DATA-CHECK] Has local data: $hasData');
-
-      if (hasData) {
-        // Also check when data was last synced
-        final lastSync = await _preferencesService.getLastSyncTime();
-        if (lastSync != null) {
-          final syncAge = DateTime.now().difference(lastSync);
-          logDebug('[LOCAL-DATA-CHECK] Last sync: ${syncAge.inMinutes} minutes ago');
-        } else {
-          logDebug('[LOCAL-DATA-CHECK] No previous sync time recorded');
-        }
-      }
-
       return hasData;
     } catch (e) {
       logError('[LOCAL-DATA-CHECK] Failed to check for local data', e);
-      logDebug('[LOCAL-DATA-CHECK] Error details: ${e.toString()}');
       return false;
     }
   }
