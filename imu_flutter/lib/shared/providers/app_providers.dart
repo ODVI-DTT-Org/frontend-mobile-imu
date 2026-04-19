@@ -5,6 +5,7 @@ export '../../services/api/client_api_service.dart' show clientApiServiceProvide
 export '../../services/api/touchpoint_api_service.dart' show touchpointApiServiceProvider;
 export '../../services/api/attendance_api_service.dart' show attendanceApiServiceProvider;
 export '../../services/api/my_day_api_service.dart' show myDayApiServiceProvider;
+export '../../features/my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
 export '../../services/api/approvals_api_service.dart' show approvalsApiServiceProvider;
 export '../../services/api/bulk_delete_api_service.dart' show bulkDeleteApiServiceProvider;
 export '../../services/api/upload_api_service.dart' show uploadApiServiceProvider;
