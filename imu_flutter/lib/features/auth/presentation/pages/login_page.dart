@@ -7,7 +7,6 @@ import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/services/auth/offline_auth_service.dart';
 import 'package:imu_flutter/services/connectivity_service.dart';
 import 'package:imu_flutter/core/utils/haptic_utils.dart';
-import 'package:imu_flutter/shared/utils/loading_helper.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart' show authNotifierProvider;
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -64,27 +63,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     final isOnline = ref.read(isOnlineProvider);
 
-    await LoadingHelper.withLoading(
-      ref: ref,
-      message: isOnline ? 'Signing in...' : 'Signing in offline...',
-      operation: () async {
-        if (!isOnline && _canLoginOffline) {
-          await ref.read(authNotifierProvider.notifier).loginOffline(
-                _emailController.text.trim(),
-                _passwordController.text,
-              );
-        } else {
-          await ref.read(authNotifierProvider.notifier).login(
-                _emailController.text.trim(),
-                _passwordController.text,
-                rememberMe: _rememberMe,
-              );
-        }
-      },
-      onError: (e) {
-        HapticUtils.error();
-      },
-    );
+    try {
+      if (!isOnline && _canLoginOffline) {
+        await ref.read(authNotifierProvider.notifier).loginOffline(
+              _emailController.text.trim(),
+              _passwordController.text,
+            );
+      } else {
+        await ref.read(authNotifierProvider.notifier).login(
+              _emailController.text.trim(),
+              _passwordController.text,
+              rememberMe: _rememberMe,
+            );
+      }
+    } catch (e) {
+      HapticUtils.error();
+      if (mounted) showToast('Login failed. Please try again.');
+    }
   }
 
   // PIN/OFFLINE LOGIN DISABLED - Commenting out to focus on core authentication
