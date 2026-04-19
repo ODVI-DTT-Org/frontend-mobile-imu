@@ -33,6 +33,7 @@ import '../../../../shared/widgets/filters/filter_drawer.dart';
 import '../../../../shared/widgets/filters/active_filter_chips_row.dart';
 import '../../../../shared/providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
 import '../../../../models/client_status.dart';
+import '../../../my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
 import '../../../../services/api/itinerary_api_service.dart';
@@ -160,6 +161,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         HapticUtils.success();
         showToast('${client.fullName} added to My Day');
         ref.invalidate(todayItineraryProvider);
+        ref.read(myDayStateProvider.notifier).refresh();
       }
     } catch (e) {
       if (mounted) {
@@ -1092,6 +1094,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           if (scheduledDate == null) {
             setState(() { _scheduledTodayIds.add(client.id!); });
             showToast('Added to today\'s itinerary');
+            ref.read(myDayStateProvider.notifier).refresh();
           } else {
             showToast('Added to itinerary for ${DateFormat('MMM dd').format(scheduledDate)}');
           }
