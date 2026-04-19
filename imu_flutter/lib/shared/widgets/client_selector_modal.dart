@@ -208,8 +208,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   List<Client> _getDisplayableClients(List<Client> clients) {
-    // Hide loan released clients from the list
-    return clients.where((client) => !client.loanReleased).toList();
+    return clients;
   }
 
   Future<void> _loadClientStatuses() async {
@@ -1106,7 +1105,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
               hasNoAssignedLocations
                   ? 'You have no assigned locations. Please contact your administrator to assign areas to you.'
                   : (_searchQuery.isEmpty
-                      ? 'All clients have been added to today\'s itinerary'
+                      ? 'No clients match the current filters'
                       : 'Try a different search term'),
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               textAlign: TextAlign.center,
