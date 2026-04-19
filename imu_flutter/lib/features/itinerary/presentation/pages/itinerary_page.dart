@@ -25,7 +25,8 @@ import '../../../../shared/providers/app_providers.dart' show
     authNotifierProvider,
     touchpointApiServiceProvider,
     releaseApiServiceProvider,
-    uploadApiServiceProvider;
+    uploadApiServiceProvider,
+    myDayStateProvider;
 import '../../../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
@@ -431,6 +432,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     if (result == true && visit.id.isNotEmpty) {
       await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
+      ref.invalidate(myDayStateProvider);
     }
   }
 
@@ -459,6 +461,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     if (result == true && visit.id.isNotEmpty) {
       await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
+      ref.invalidate(myDayStateProvider);
     }
   }
 
@@ -468,9 +471,12 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     // Navigate to unified Release Loan form
     final result = await context.push<bool>('/release-loan/${visit.clientId}');
 
-    // If form was submitted successfully, refresh itinerary data
     if (result == true && mounted) {
       HapticUtils.success();
+      if (visit.id.isNotEmpty) {
+        await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
+      }
+      ref.invalidate(myDayStateProvider);
     }
   }
 
