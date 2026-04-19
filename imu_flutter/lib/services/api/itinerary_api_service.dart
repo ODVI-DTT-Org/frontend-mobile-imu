@@ -462,7 +462,7 @@ class ItineraryApiService {
       debugPrint('ItineraryApiService: Sending scheduled_date: $dateStr (from DateTime: $scheduledDate)');
 
       final requestData = {
-        'client_id': clientId,
+        'client_ids': [clientId],
         'scheduled_date': dateStr,
         if (scheduledTime != null) 'scheduled_time': scheduledTime,
         'status': status,

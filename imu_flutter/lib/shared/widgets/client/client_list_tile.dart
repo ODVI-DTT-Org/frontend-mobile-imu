@@ -53,18 +53,21 @@ class ClientListTile extends ConsumerWidget {
     }
 
     // Touchpoint progress
-    final nextNumber = client.nextTouchpointNumber;
+    // nextTouchpointNumber comes from REST API; PowerSync only syncs touchpointNumber (same value).
+    // Fall back to touchpointNumber when nextTouchpointNumber is absent (PowerSync clients).
+    final nextNumber = client.nextTouchpointNumber ??
+        (client.touchpointNumber >= 1 && client.touchpointNumber <= 7 ? client.touchpointNumber : null);
     final nextType = client.nextTouchpointType;
+    final isCompleted = client.completedTouchpoints >= 7;
     String touchpointInfo;
-    if (nextNumber != null && nextType != null) {
-      touchpointInfo = '$nextNumber/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
-    } else if (nextNumber == null && client.completedTouchpoints > 0) {
+    if (isCompleted) {
       touchpointInfo = 'Completed';
+    } else if (nextNumber != null && nextType != null) {
+      touchpointInfo = '$nextNumber/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
     } else {
       touchpointInfo = '0/7 • Visit';
     }
 
-    final isCompleted = nextNumber == null && client.completedTouchpoints > 0;
     final isCall = nextType == TouchpointType.call;
 
     Color progressColor = isCompleted
@@ -75,7 +78,7 @@ class ClientListTile extends ConsumerWidget {
 
     // Role-based: can the user record the next touchpoint?
     bool canRecordNext = true;
-    if (nextNumber != null && nextType != null && userRole != null) {
+    if (!isCompleted && nextNumber != null && nextType != null && userRole != null) {
       final validNumbers = _validNumbers(userRole);
       final validTypes = _validTypes(userRole);
       canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextType);
