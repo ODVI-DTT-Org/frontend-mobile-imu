@@ -25,6 +25,8 @@ class ReleaseCreationService {
     int? udiNumber,
     String? remarks,
     String? photoPath,
+    double? latitude,
+    double? longitude,
   }) async {
     if (!_connectivity.isOnline) {
       throw ApiException(
@@ -44,6 +46,8 @@ class ReleaseCreationService {
       udiNumber: udiNumber,
       remarks: remarks,
       photoPath: photoPath,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 }

@@ -486,7 +486,17 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     final addressRepo = ref.read(addressRepositoryProvider);
 
     // Load addresses from PowerSync
-    final addresses = await addressRepo.getAddresses(widget.clientId);
+    final tableAddresses = await addressRepo.getAddresses(widget.clientId);
+
+    // Include client's legacy address fields if not already represented
+    final addresses = List<Address>.from(tableAddresses);
+    final legacyFull = _client?.fullAddress ?? '';
+    if (legacyFull.isNotEmpty && _client != null) {
+      final alreadyListed = addresses.any((a) => a.fullAddress == legacyFull);
+      if (!alreadyListed) {
+        addresses.add(Address.fromLegacyFields(_client!));
+      }
+    }
 
     if (!mounted) return;
 
@@ -627,6 +637,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _addAddress() async {
     HapticUtils.lightImpact();
     final addressRepo = ref.read(addressRepositoryProvider);
+    final currentUser = ref.read(jwtAuthProvider).currentUser;
+    final requiresApproval = currentUser?.role == UserRole.tele || currentUser?.role == UserRole.caravan;
 
     final result = await showModalBottomSheet<Address>(
       context: context,
@@ -634,6 +646,25 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       builder: (context) => AddAddressModal(
         clientId: widget.clientId,
         onSubmit: (clientId, data) async {
+          if (requiresApproval) {
+            final db = ref.read(powerSyncDatabaseProvider).value;
+            if (db == null) throw Exception('Database not available');
+            final approvalId = const Uuid().v4();
+            await db.execute(
+              'INSERT INTO approvals (id, type, status, client_id, user_id, role, reason, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [approvalId, 'address_add', 'pending', clientId, currentUser!.id, currentUser.role.apiValue, 'Add Address Request', jsonEncode(data)],
+            );
+            return Address(
+              id: approvalId,
+              clientId: clientId,
+              psgcId: 0,
+              label: AddressLabel.other,
+              streetAddress: data['street_address'] as String? ?? '',
+              isPrimary: data['is_primary'] as bool? ?? false,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+          }
           return await addressRepo.createAddress(clientId, data);
         },
       ),
@@ -641,7 +672,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     if (result != null) {
       if (mounted) {
-        AppNotification.showSuccess(context, 'Address added');
+        final message = requiresApproval ? 'Address submitted for approval' : 'Address added';
+        AppNotification.showSuccess(context, message);
       }
       _loadClient();
     }
@@ -652,7 +684,17 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     final phoneRepo = ref.read(phoneNumberRepositoryProvider);
 
     // Load phone numbers from PowerSync
-    final phoneNumbers = await phoneRepo.getPhoneNumbers(widget.clientId);
+    final tablePhones = await phoneRepo.getPhoneNumbers(widget.clientId);
+
+    // Include client's legacy phone field if not already represented
+    final clientPhone = _client?.phone;
+    final phoneNumbers = List<PhoneNumber>.from(tablePhones);
+    if (clientPhone != null && clientPhone.isNotEmpty) {
+      final alreadyListed = phoneNumbers.any((p) => p.number == clientPhone);
+      if (!alreadyListed && _client != null) {
+        phoneNumbers.add(PhoneNumber.fromLegacyField(_client!));
+      }
+    }
 
     if (!mounted) return;
 

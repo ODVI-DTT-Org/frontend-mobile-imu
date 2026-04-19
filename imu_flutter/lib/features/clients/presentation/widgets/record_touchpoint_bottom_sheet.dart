@@ -10,6 +10,8 @@ import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/ti
 import 'package:imu_flutter/shared/providers/app_providers.dart' show
     touchpointCreationServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
+import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/gps_status_indicator.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
 /// Bottom sheet for recording touchpoints with all fields
@@ -66,8 +68,22 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
     final photoPath = useState<String?>(null);
     final isSubmitting = useState<bool>(false);
     final nextTouchpointNumber = useState<int>(client.nextTouchpointNumber ?? 1);
+    final gpsData = useState<GPSData?>(null);
+    final gpsLoading = useState<bool>(true);
+    final gpsError = useState<String?>(null);
 
     final imagePicker = useMemoized(() => ImagePicker());
+
+    useEffect(() {
+      GPSCaptureService().captureLocation().then((data) {
+        gpsData.value = data;
+        gpsLoading.value = false;
+      }).catchError((e) {
+        gpsError.value = e is GPSRequiredException ? e.message : 'Failed to get GPS location';
+        gpsLoading.value = false;
+      });
+      return null;
+    }, const []);
 
     Future<void> pickPhoto() async {
       final picked = await imagePicker.pickImage(
@@ -118,6 +134,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           odometerArrival.value != null &&
           odometerDeparture.value != null &&
           photoPath.value != null &&
+          gpsData.value != null &&
           !isSubmitting.value;
     }
 
@@ -158,9 +175,9 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           audioPath: null,
           timeIn: _parseTime(formatTimeOfDay(timeIn.value!)),
           timeOut: _parseTime(formatTimeOfDay(timeOut.value!)),
-          timeInGpsLat: null,
-          timeInGpsLng: null,
-          timeInGpsAddress: null,
+          timeInGpsLat: gpsData.value?.latitude,
+          timeInGpsLng: gpsData.value?.longitude,
+          timeInGpsAddress: gpsData.value?.address,
           timeOutGpsLat: null,
           timeOutGpsLng: null,
           timeOutGpsAddress: null,
@@ -174,6 +191,9 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           client.id!,
           touchpoint,
           photo: photoFile,
+          latitude: gpsData.value?.latitude,
+          longitude: gpsData.value?.longitude,
+          address: gpsData.value?.address,
         );
         const success = true;
 
@@ -199,6 +219,15 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // GPS Status
+          GpsStatusIndicator(
+            isLoading: gpsLoading.value,
+            gpsData: gpsData.value,
+            error: gpsError.value,
+          ),
+
+          const SizedBox(height: 8),
+
           // Time In/Out - 2 Column Layout
           Row(
             children: [

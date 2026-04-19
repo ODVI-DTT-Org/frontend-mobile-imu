@@ -16,6 +16,9 @@ class TouchpointCreationService {
     Touchpoint touchpoint, {
     File? photo,
     File? audio,
+    double? latitude,
+    double? longitude,
+    String? address,
   }) async {
     final db = await PowerSyncService.database;
     final id = _uuid.v4();
@@ -29,8 +32,8 @@ class TouchpointCreationService {
     await db.execute(
       '''INSERT INTO touchpoints
          (id, client_id, user_id, touchpoint_number, type, date, status,
-          next_visit_date, notes, is_legacy, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          next_visit_date, notes, is_legacy, latitude, longitude, address, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         clientId,
@@ -42,6 +45,9 @@ class TouchpointCreationService {
         touchpoint.nextVisitDate?.toIso8601String(),
         touchpoint.remarks,
         0,
+        latitude,
+        longitude,
+        address,
         now,
       ],
     );

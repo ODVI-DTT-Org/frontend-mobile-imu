@@ -12,6 +12,8 @@ import 'package:imu_flutter/shared/providers/app_providers.dart' show
     releaseApiServiceProvider,
     releaseCreationServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
+import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/gps_status_indicator.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
 /// Bottom sheet for recording loan release with product/loan type selection
@@ -50,8 +52,22 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
     final remarks = useTextEditingController();
     final photoPath = useState<String?>(null);
     final isSubmitting = useState<bool>(false);
+    final gpsData = useState<GPSData?>(null);
+    final gpsLoading = useState<bool>(true);
+    final gpsError = useState<String?>(null);
 
     final imagePicker = useMemoized(() => ImagePicker());
+
+    useEffect(() {
+      GPSCaptureService().captureLocation().then((data) {
+        gpsData.value = data;
+        gpsLoading.value = false;
+      }).catchError((e) {
+        gpsError.value = e is GPSRequiredException ? e.message : 'Failed to get GPS location';
+        gpsLoading.value = false;
+      });
+      return null;
+    }, const []);
 
     Future<void> pickPhoto() async {
       final picked = await imagePicker.pickImage(
@@ -112,6 +128,7 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           odometerDeparture.value != null &&
           udiNumber.text.trim().isNotEmpty &&
           photoPath.value != null &&
+          gpsData.value != null &&
           !isSubmitting.value;
     }
 
@@ -143,6 +160,8 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           udiNumber: int.tryParse(udiNumber.text.trim()),
           remarks: remarks.text.trim(),
           photoPath: photoPath.value,
+          latitude: gpsData.value?.latitude,
+          longitude: gpsData.value?.longitude,
         );
         const success = true;
 
@@ -175,6 +194,15 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
               SizedBox(width: 8),
               AutoSetBadge(label: 'Status:', value: 'Completed'),
             ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // GPS Status
+          GpsStatusIndicator(
+            isLoading: gpsLoading.value,
+            gpsData: gpsData.value,
+            error: gpsError.value,
           ),
 
           const SizedBox(height: 8),

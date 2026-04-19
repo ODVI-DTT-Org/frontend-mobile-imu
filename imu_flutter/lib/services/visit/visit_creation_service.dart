@@ -19,6 +19,9 @@ class VisitCreationService {
     File? photoFile,
     String? notes,
     String type = 'regular_visit',
+    double? latitude,
+    double? longitude,
+    String? address,
   }) async {
     final db = await PowerSyncService.database;
     final id = _uuid.v4();
@@ -31,8 +34,8 @@ class VisitCreationService {
     await db.execute(
       '''INSERT INTO visits
          (id, client_id, user_id, type, time_in, time_out,
-          odometer_arrival, odometer_departure, _local_photo_path, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          odometer_arrival, odometer_departure, _local_photo_path, notes, latitude, longitude, address, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         clientId,
@@ -44,6 +47,9 @@ class VisitCreationService {
         odometerDeparture,
         savedPhotoPath,
         notes,
+        latitude,
+        longitude,
+        address,
         now,
       ],
     );

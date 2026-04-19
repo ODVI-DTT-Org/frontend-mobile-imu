@@ -13,6 +13,8 @@ import 'package:imu_flutter/shared/providers/app_providers.dart' show
     visitCreationServiceProvider,
     releaseApiServiceProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
+import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/features/clients/presentation/widgets/form_fields/gps_status_indicator.dart';
 import 'package:lucide_icons/lucide_icons.dart' show LucideIcons;
 
 /// Bottom sheet for recording visit only with auto-set reason/status
@@ -48,8 +50,22 @@ class RecordVisitOnlyBottomSheet extends HookConsumerWidget {
     final photoPath = useState<String?>(null);
     final isSubmitting = useState<bool>(false);
     final hasAttemptedSubmit = useState<bool>(false); // Track if user tried to submit
+    final gpsData = useState<GPSData?>(null);
+    final gpsLoading = useState<bool>(true);
+    final gpsError = useState<String?>(null);
 
     final imagePicker = useMemoized(() => ImagePicker());
+
+    useEffect(() {
+      GPSCaptureService().captureLocation().then((data) {
+        gpsData.value = data;
+        gpsLoading.value = false;
+      }).catchError((e) {
+        gpsError.value = e is GPSRequiredException ? e.message : 'Failed to get GPS location';
+        gpsLoading.value = false;
+      });
+      return null;
+    }, const []);
 
     Future<void> pickPhoto() async {
       final picked = await imagePicker.pickImage(
@@ -100,6 +116,7 @@ class RecordVisitOnlyBottomSheet extends HookConsumerWidget {
           odometerArrival.value != null &&
           odometerDeparture.value != null &&
           photoPath.value != null &&
+          gpsData.value != null &&
           !isSubmitting.value;
     }
 
@@ -141,6 +158,9 @@ class RecordVisitOnlyBottomSheet extends HookConsumerWidget {
           photoFile: photoFile,
           notes: null,
           type: 'regular_visit',
+          latitude: gpsData.value?.latitude,
+          longitude: gpsData.value?.longitude,
+          address: gpsData.value?.address,
         );
         const success = true;
 
@@ -173,6 +193,15 @@ class RecordVisitOnlyBottomSheet extends HookConsumerWidget {
               SizedBox(width: 8),
               AutoSetBadge(label: 'Status:', value: 'Incomplete'),
             ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // GPS Status
+          GpsStatusIndicator(
+            isLoading: gpsLoading.value,
+            gpsData: gpsData.value,
+            error: gpsError.value,
           ),
 
           const SizedBox(height: 8),

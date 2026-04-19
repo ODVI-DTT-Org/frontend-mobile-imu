@@ -59,7 +59,19 @@ class ContactInformationExpansionPanel extends StatelessWidget {
     );
   }
 
+  List<ph.PhoneNumber> _effectivePhoneNumbers() {
+    final phones = List<ph.PhoneNumber>.from(client.phoneNumbers);
+    if (client.phone != null && client.phone!.isNotEmpty) {
+      final alreadyListed = phones.any((p) => p.number == client.phone);
+      if (!alreadyListed) {
+        phones.add(ph.PhoneNumber.fromLegacyField(client));
+      }
+    }
+    return phones;
+  }
+
   Widget _buildPhoneNumbersSection() {
+    final phones = _effectivePhoneNumbers();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -81,7 +93,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ...client.phoneNumbers.map((phone) => _buildPhoneNumberTile(phone)),
+              ...phones.map((phone) => _buildPhoneNumberTile(phone)),
               const SizedBox(height: 8),
               _buildAddButton('+ Add Phone Number', onAddPhone),
             ],
@@ -223,7 +235,20 @@ class ContactInformationExpansionPanel extends StatelessWidget {
     );
   }
 
+  List<addr.Address> _effectiveAddresses() {
+    final addresses = List<addr.Address>.from(client.addresses);
+    final legacyFull = client.fullAddress;
+    if (legacyFull.isNotEmpty) {
+      final alreadyListed = addresses.any((a) => a.fullAddress == legacyFull);
+      if (!alreadyListed) {
+        addresses.add(addr.Address.fromLegacyFields(client));
+      }
+    }
+    return addresses;
+  }
+
   Widget _buildAddressesSection() {
+    final addresses = _effectiveAddresses();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -245,7 +270,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ...client.addresses.map((address) => _buildAddressTile(address)),
+              ...addresses.map((address) => _buildAddressTile(address)),
               const SizedBox(height: 8),
               _buildAddButton('+ Add Address', onAddAddress),
             ],
