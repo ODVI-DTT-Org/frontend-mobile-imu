@@ -363,6 +363,7 @@ Map<String, dynamic> _enrichItineraryRowFromHive(Map<String, dynamic> row) {
   final enriched = Map<String, dynamic>.from(row);
   enriched['first_name'] = cached['firstName'] ?? cached['first_name'];
   enriched['last_name'] = cached['lastName'] ?? cached['last_name'];
+  enriched['middle_name'] = cached['middleName'] ?? cached['middle_name'];
   enriched['municipality'] = cached['municipality'];
   enriched['province'] = cached['province'];
   return enriched;

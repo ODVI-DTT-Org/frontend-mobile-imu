@@ -29,6 +29,7 @@ Map<String, dynamic> _enrichRowFromHive(Map<String, dynamic> row) {
   final enriched = Map<String, dynamic>.from(row);
   enriched['first_name'] = cached['firstName'] ?? cached['first_name'];
   enriched['last_name'] = cached['lastName'] ?? cached['last_name'];
+  enriched['middle_name'] = cached['middleName'] ?? cached['middle_name'];
   enriched['municipality'] = cached['municipality'];
   enriched['province'] = cached['province'];
   enriched['product_type'] = cached['productType'] ?? cached['product_type'];
@@ -48,13 +49,13 @@ class MyDayRepository {
     FROM itineraries
   ''';
 
-  /// Stream of today's My Day clients for this user, ordered by scheduled time.
-  Stream<List<MyDayClient>> watchTodayClients(String userId) {
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+  /// Stream of My Day clients for this user on the given date (defaults to today).
+  Stream<List<MyDayClient>> watchTodayClients(String userId, {DateTime? date}) {
+    final dateStr = (date ?? DateTime.now()).toIso8601String().substring(0, 10);
     return PowerSyncService.database.asStream().asyncExpand((db) {
       return db.watch(
         "$_sql WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' ORDER BY scheduled_time ASC",
-        parameters: [userId, today],
+        parameters: [userId, dateStr],
       ).map((rows) {
         debugPrint('[MyDayRepo] watchTodayClients: ${rows.length} rows from PowerSync');
         return rows.map((r) => MyDayClient.fromRow(_enrichRowFromHive(r))).toList();

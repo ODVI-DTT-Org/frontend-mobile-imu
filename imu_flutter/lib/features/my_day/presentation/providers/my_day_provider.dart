@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/my_day_client.dart';
-import '../../../../services/sync/powersync_service.dart';
+import '../../data/repositories/my_day_repository.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -68,21 +68,9 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
     );
   }
 
-  Stream<List<MyDayClient>> _buildStream(String userId, String dateStr) async* {
-    final db = await PowerSyncService.database;
-    await for (final rows in db.watch(
-      '''SELECT i.id, i.client_id, i.user_id, i.scheduled_time, i.status,
-                i.priority, i.notes,
-                c.first_name, c.last_name, c.client_type,
-                c.touchpoint_summary
-         FROM itineraries i
-         LEFT JOIN clients c ON c.id = i.client_id
-         WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
-         ORDER BY i.scheduled_time ASC''',
-      parameters: [userId, dateStr],
-    )) {
-      yield rows.map(MyDayClient.fromPowerSync).toList();
-    }
+  Stream<List<MyDayClient>> _buildStream(String userId, String dateStr) {
+    final date = DateTime.parse(dateStr);
+    return MyDayRepository().watchTodayClients(userId, date: date);
   }
 
   Future<void> refresh() async {

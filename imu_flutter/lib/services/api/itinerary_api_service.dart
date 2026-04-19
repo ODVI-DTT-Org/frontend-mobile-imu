@@ -177,7 +177,10 @@ class ItineraryItem {
   factory ItineraryItem.fromPowerSync(Map<String, dynamic> row) {
     final firstName = row['first_name'] as String? ?? '';
     final lastName = row['last_name'] as String? ?? '';
-    final clientName = '$lastName, $firstName'.trim().replaceAll(RegExp(r'^,\s*|,\s*$'), '');
+    final middleName = row['middle_name'] as String? ?? '';
+    final firstMiddle = [if (firstName.isNotEmpty) firstName, if (middleName.isNotEmpty) middleName].join(' ');
+    final clientName = [if (lastName.isNotEmpty) lastName, if (firstMiddle.isNotEmpty) firstMiddle]
+        .join(', ');
 
     final scheduledDateStr = row['scheduled_date'] as String? ?? DateTime.now().toIso8601String();
     DateTime scheduledDate;

@@ -533,6 +533,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       id: c.clientId,
       firstName: firstName,
       lastName: lastName,
+      middleName: c.middleName,
       clientType: ClientType.potential,
       productType: ProductType.bfpActive,
       pensionType: PensionType.none,

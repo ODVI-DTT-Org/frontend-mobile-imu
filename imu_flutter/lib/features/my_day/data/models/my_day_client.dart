@@ -28,6 +28,7 @@ class MyDayClient {
   final DateTime? previousTouchpointDate; // Last completed touchpoint date
 
   // Display fields for ClientListTile
+  final String? middleName;
   final String? productType;  // raw e.g. 'SSS_PENSIONER'
   final String? pensionType;  // raw e.g. 'GSIS'
   final String? loanType;     // raw e.g. 'SALARY'
@@ -53,6 +54,7 @@ class MyDayClient {
     this.previousTouchpointReason,
     this.previousTouchpointType,
     this.previousTouchpointDate,
+    this.middleName,
     this.productType,
     this.pensionType,
     this.loanType,
@@ -116,13 +118,15 @@ class MyDayClient {
     'Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'
   ];
 
-  static String _buildFullName(String? lastName, String? firstName) {
+  static String _buildFullName(String? lastName, String? firstName, {String? middleName}) {
     final last = (lastName ?? '').trim();
     final first = (firstName ?? '').trim();
+    final middle = (middleName ?? '').trim();
     if (last.isEmpty && first.isEmpty) return '';
-    if (last.isEmpty) return first;
-    if (first.isEmpty) return last;
-    return '$last, $first';
+    final firstMiddle = [if (first.isNotEmpty) first, if (middle.isNotEmpty) middle].join(' ');
+    if (last.isEmpty) return firstMiddle;
+    if (firstMiddle.isEmpty) return last;
+    return '$last, $firstMiddle';
   }
 
   /// Alias for [fromPowerSync] — used by MyDayRepository.
@@ -189,7 +193,8 @@ class MyDayClient {
     return MyDayClient(
       id: row['id'] as String,
       clientId: clientId,
-      fullName: _buildFullName(row['last_name'] as String?, row['first_name'] as String?),
+      fullName: _buildFullName(row['last_name'] as String?, row['first_name'] as String?, middleName: row['middle_name'] as String?),
+      middleName: row['middle_name'] as String?,
       agencyName: null,
       location: null,
       touchpointNumber: currentNum,
@@ -204,6 +209,7 @@ class MyDayClient {
       previousTouchpointReason: lastTouchpoint?['reason'] as String?,
       previousTouchpointType: lastTouchpoint?['type'] as String?,
       previousTouchpointDate: previousDate,
+      middleName: row['middle_name'] as String?,
       productType: row['product_type'] as String?,
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,
@@ -257,6 +263,7 @@ class MyDayClient {
     String? previousTouchpointReason,
     String? previousTouchpointType,
     DateTime? previousTouchpointDate,
+    String? middleName,
     String? productType,
     String? pensionType,
     String? loanType,
@@ -282,6 +289,7 @@ class MyDayClient {
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
       previousTouchpointDate: previousTouchpointDate ?? this.previousTouchpointDate,
+      middleName: middleName ?? this.middleName,
       productType: productType ?? this.productType,
       pensionType: pensionType ?? this.pensionType,
       loanType: loanType ?? this.loanType,
