@@ -58,8 +58,10 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final approvals = await _apiService.fetchPendingApprovals();
-      final counts = await _apiService.getApprovalCounts();
+      final approvalsFuture = _apiService.fetchPendingApprovals();
+      final countsFuture = _apiService.getApprovalCounts();
+      final approvals = await approvalsFuture;
+      final counts = await countsFuture;
 
       state = state.copyWith(
         pendingApprovals: approvals,
