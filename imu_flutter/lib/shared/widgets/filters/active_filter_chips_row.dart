@@ -59,7 +59,7 @@ class ActiveFilterChipsRow extends ConsumerWidget {
 
     if (chips.isEmpty) return const SizedBox.shrink();
 
-    if (chips.length >= 3) {
+    if (chips.length >= 2) {
       chips.add(
         TextButton(
           onPressed: () {

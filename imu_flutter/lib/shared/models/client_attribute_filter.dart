@@ -78,17 +78,19 @@ class ClientAttributeFilter {
     }
   }
 
+  static const _absent = Object();
+
   ClientAttributeFilter copyWith({
-    List<ClientType>? clientTypes,
-    List<MarketType>? marketTypes,
-    List<PensionType>? pensionTypes,
-    List<ProductType>? productTypes,
+    Object? clientTypes = _absent,
+    Object? marketTypes = _absent,
+    Object? pensionTypes = _absent,
+    Object? productTypes = _absent,
   }) {
     return ClientAttributeFilter(
-      clientTypes: clientTypes ?? this.clientTypes,
-      marketTypes: marketTypes ?? this.marketTypes,
-      pensionTypes: pensionTypes ?? this.pensionTypes,
-      productTypes: productTypes ?? this.productTypes,
+      clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<ClientType>?,
+      marketTypes: identical(marketTypes, _absent) ? this.marketTypes : marketTypes as List<MarketType>?,
+      pensionTypes: identical(pensionTypes, _absent) ? this.pensionTypes : pensionTypes as List<PensionType>?,
+      productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<ProductType>?,
     );
   }
 
