@@ -287,10 +287,10 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         subtitle: client.location,
         options: [
           ActionOption(
-            icon: LucideIcons.history,
-            title: 'View History',
-            description: 'See all touchpoints',
-            value: 'history',
+            icon: LucideIcons.user,
+            title: 'View Details',
+            description: 'Go to client profile',
+            value: 'details',
           ),
           ActionOption(
             icon: LucideIcons.edit,
@@ -346,8 +346,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         case 'edit':
           await _editClient(client);
           break;
-        case 'history':
-          await _viewHistory(client);
+        case 'details':
+          if (mounted) context.push('/clients/${client.clientId}');
           break;
         case 'navigate':
           await _navigateToClient(client);
