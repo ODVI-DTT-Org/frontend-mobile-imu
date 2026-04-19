@@ -27,6 +27,12 @@ class MyDayClient {
   final String? previousTouchpointType; // Last completed touchpoint type (visit/call)
   final DateTime? previousTouchpointDate; // Last completed touchpoint date
 
+  // Display fields for ClientListTile
+  final String? productType;  // raw e.g. 'SSS_PENSIONER'
+  final String? pensionType;  // raw e.g. 'GSIS'
+  final String? loanType;     // raw e.g. 'SALARY'
+  final String? address;      // flat string e.g. 'San Jose, Ilocos Norte'
+
   MyDayClient({
     required this.id,
     required this.clientId,
@@ -47,6 +53,10 @@ class MyDayClient {
     this.previousTouchpointReason,
     this.previousTouchpointType,
     this.previousTouchpointDate,
+    this.productType,
+    this.pensionType,
+    this.loanType,
+    this.address,
   });
 
   String get touchpointOrdinal {
@@ -94,6 +104,11 @@ class MyDayClient {
       previousTouchpointDate: json['previous_touchpoint_date'] != null
           ? DateTime.parse(json['previous_touchpoint_date'])
           : null,
+      productType: (json['client'] as Map<String, dynamic>?)?['product_type'] as String?,
+      pensionType: (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?,
+      loanType: (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?,
+      address: (json['client'] as Map<String, dynamic>?)?['full_address'] as String?
+          ?? json['address'] as String?,
     );
   }
 
@@ -154,6 +169,14 @@ class MyDayClient {
       } catch (_) {}
     }
 
+    final municipality = row['municipality'] as String?;
+    final province = row['province'] as String?;
+    final addressParts = [
+      if (municipality != null && municipality.isNotEmpty) municipality,
+      if (province != null && province.isNotEmpty) province,
+    ];
+    final addressStr = addressParts.isEmpty ? null : addressParts.join(', ');
+
     return MyDayClient(
       id: row['id'] as String,
       clientId: clientId,
@@ -172,6 +195,10 @@ class MyDayClient {
       previousTouchpointReason: lastTouchpoint?['reason'] as String?,
       previousTouchpointType: lastTouchpoint?['type'] as String?,
       previousTouchpointDate: previousDate,
+      productType: row['product_type'] as String?,
+      pensionType: row['pension_type'] as String?,
+      loanType: row['loan_type'] as String?,
+      address: addressStr,
     );
   }
 
@@ -195,6 +222,10 @@ class MyDayClient {
     'previous_touchpoint_reason': previousTouchpointReason,
     'previous_touchpoint_type': previousTouchpointType,
     'previous_touchpoint_date': previousTouchpointDate?.toIso8601String(),
+    'product_type': productType,
+    'pension_type': pensionType,
+    'loan_type': loanType,
+    'address': address,
   };
 
   MyDayClient copyWith({
@@ -217,6 +248,10 @@ class MyDayClient {
     String? previousTouchpointReason,
     String? previousTouchpointType,
     DateTime? previousTouchpointDate,
+    String? productType,
+    String? pensionType,
+    String? loanType,
+    String? address,
   }) {
     return MyDayClient(
       id: id ?? this.id,
@@ -238,6 +273,10 @@ class MyDayClient {
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
       previousTouchpointDate: previousTouchpointDate ?? this.previousTouchpointDate,
+      productType: productType ?? this.productType,
+      pensionType: pensionType ?? this.pensionType,
+      loanType: loanType ?? this.loanType,
+      address: address ?? this.address,
     );
   }
 
@@ -263,7 +302,11 @@ class MyDayClient {
           other.previousTouchpointNumber == previousTouchpointNumber &&
           other.previousTouchpointReason == previousTouchpointReason &&
           other.previousTouchpointType == previousTouchpointType &&
-          other.previousTouchpointDate == previousTouchpointDate;
+          other.previousTouchpointDate == previousTouchpointDate &&
+          other.productType == productType &&
+          other.pensionType == pensionType &&
+          other.loanType == loanType &&
+          other.address == address;
 
   @override
   int get hashCode => Object.hash(
@@ -286,6 +329,10 @@ class MyDayClient {
         previousTouchpointReason,
         previousTouchpointType,
         previousTouchpointDate,
+        productType,
+        pensionType,
+        loanType,
+        address,
       );
 
   @override
