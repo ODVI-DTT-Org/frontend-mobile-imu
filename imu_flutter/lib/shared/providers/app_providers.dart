@@ -109,6 +109,7 @@ import '../../services/release/release_creation_service.dart';
 import '../../services/client/client_mutation_service.dart';
 import '../../services/api/visit_api_service.dart' show VisitApiService, visitApiServiceProvider;
 import '../../services/api/release_api_service.dart' show releaseApiServiceProvider;
+import '../../services/api/upload_api_service.dart' show UploadApiService, uploadApiServiceProvider;
 import '../../services/area/area_filter_service.dart';
 import '../models/location_filter.dart';
 import '../models/client_attribute_filter.dart';

@@ -73,7 +73,7 @@ class ReleaseCreationService {
       );
     } else {
       // Caravan/Tele: submit for approval via POST /approvals/loan-release-v2
-      debugPrint('ReleaseCreationService: ${_role.value} role — submitting approval request');
+      debugPrint('ReleaseCreationService: ${_role.apiValue} role — submitting approval request');
 
       // Upload photo first to get a URL
       String? photoUrl;
