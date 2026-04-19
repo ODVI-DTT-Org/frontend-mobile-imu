@@ -840,7 +840,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                     ),
                   // Client list
                   Expanded(
-                    child: _buildClientList(displayableClients, totalItems, touchpointCountsAsync),
+                    child: _buildClientList(displayableClients, totalItems, touchpointCountsAsync, scrollController),
                   ),
                 ],
               ),
@@ -973,6 +973,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   // Client list skeleton (only the list shows skeleton)
                   Expanded(
                     child: ListView.builder(
+                      controller: scrollController,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       itemCount: 7, // Show 7 skeleton cards
                       itemBuilder: (context, index) => _buildClientSkeleton(),
@@ -1030,10 +1031,12 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     List<Client> displayableClients,
     int totalItems,
     AsyncValue<Map<String, int>> touchpointCountsAsync,
+    ScrollController scrollController,
   ) {
     // Show skeleton loading while fetching client statuses
     if (_isLoadingStatuses && !_hasStatusError) {
       return ListView.builder(
+        controller: scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         itemCount: 5, // Show 5 skeleton cards
         itemBuilder: (context, index) => _buildClientSkeleton(),
@@ -1121,6 +1124,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     }
 
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: displayableClients.length,
       itemBuilder: (context, index) {
