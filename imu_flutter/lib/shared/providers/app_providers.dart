@@ -350,9 +350,18 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     // Convert attribute filter to API parameters
     final queryParams = attributeFilter.toQueryParams();
 
+    // Convert touchpoint filter to API parameters
+    List<String>? nextTouchpointNumbers;
+    if (touchpointFilter.hasFilter) {
+      nextTouchpointNumbers = touchpointFilter.selectedNumbers.map((n) {
+        return n == 8 ? 'archive' : n.toString();
+      }).toList();
+      debugPrint('onlineClientsProvider: Touchpoint filter: $nextTouchpointNumbers');
+    }
+
     final response = await clientApi.fetchClients(
       page: page,
-      perPage: 10, // Paginate 10 items per page
+      perPage: 10,
       search: searchQuery.isNotEmpty ? searchQuery : null,
       clientType: queryParams['client_type'],
       marketType: queryParams['market_type'],
@@ -360,21 +369,8 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       productType: queryParams['product_type'],
       loanType: queryParams['loan_type'],
       municipalityIds: municipalityIds,
+      nextTouchpointNumbers: nextTouchpointNumbers,
     );
-
-    // Apply touchpoint filter locally on loaded results
-    if (touchpointFilter.hasFilter) {
-      final filteredItems = response.items
-          .where((client) => touchpointFilter.matches(client))
-          .toList();
-      return ClientsResponse(
-        items: filteredItems,
-        page: response.page,
-        perPage: response.perPage,
-        totalItems: filteredItems.length,
-        totalPages: response.totalPages,
-      );
-    }
 
     debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
     return response;

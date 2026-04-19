@@ -28,6 +28,7 @@ class ClientApiService {
     String? productType,
     String? loanType,
     List<String>? municipalityIds,
+    List<String>? nextTouchpointNumbers,
   }) async {
     try {
       debugPrint('[CLIENT-API] Fetching clients from REST API...');
@@ -65,6 +66,8 @@ class ClientApiService {
           if (productType != null && productType.isNotEmpty) 'product_type': productType,
           if (loanType != null && loanType.isNotEmpty) 'loan_type': loanType,
           if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality_ids': municipalityIds.join(','),
+          if (nextTouchpointNumbers != null && nextTouchpointNumbers.isNotEmpty)
+            'next_touchpoint_number': nextTouchpointNumbers,
         },
       );
 
