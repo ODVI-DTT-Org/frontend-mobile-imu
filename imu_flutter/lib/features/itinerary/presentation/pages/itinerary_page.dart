@@ -13,6 +13,7 @@ import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
+import '../../../../shared/widgets/client/client_list_tile.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
@@ -467,6 +468,26 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   Future<void> _editClient(ItineraryItem visit) async {
     HapticUtils.lightImpact();
     context.push('/clients/${visit.clientId}/edit');
+  }
+
+  /// Converts an ItineraryItem to a minimal Client for ClientListTile display.
+  Client _itineraryItemToClient(ItineraryItem item) {
+    final nameParts = item.clientName.trim().split(' ');
+    return Client(
+      id: item.clientId,
+      firstName: nameParts.first,
+      lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+      clientType: ClientType.potential,
+      productType: ProductType.bfpActive,
+      pensionType: PensionType.none,
+      productTypeRaw: item.productType,
+      pensionTypeRaw: item.pensionType,
+      loanType: item.loanType != null ? LoanType.firstLoan : null,
+      loanTypeRaw: item.loanType,
+      nextTouchpointNumber: item.touchpointNumber,
+      municipality: item.address,
+      createdAt: DateTime.now(),
+    );
   }
 
   Future<void> _viewDetails(ItineraryItem visit) async {
@@ -928,12 +949,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                           return GestureDetector(
                             onLongPress: () => _onVisitLongPress(visit),
                             onTap: () => _onVisitTap(visit),
-                            child: ClientListCard.fromItineraryItem(
-                              itineraryItem: visit,
+                            child: ClientListTile(
+                              client: _itineraryItemToClient(visit),
                               onTap: () => _onVisitTap(visit),
-                              onLongPress: () => _onVisitLongPress(visit),
-                              isSelected: _isVisitSelected(visit.id),
-                              isMultiSelectMode: true,
                             ),
                           );
                         }
@@ -951,12 +969,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                             await _onVisitTap(visit);
                           },
                           onLongPress: () => _onVisitLongPress(visit),
-                          child: ClientListCard.fromItineraryItem(
-                            itineraryItem: visit,
+                          child: ClientListTile(
+                            client: _itineraryItemToClient(visit),
                             onTap: () => _onVisitTap(visit),
-                            onLongPress: () => _onVisitLongPress(visit),
-                            isSelected: _isVisitSelected(visit.id),
-                            isMultiSelectMode: false,
                           ),
                         );
                       },
