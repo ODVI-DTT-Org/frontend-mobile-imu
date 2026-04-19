@@ -1172,7 +1172,7 @@ class Touchpoint {
     'reason': reason.apiValue,
     'status': status.apiValue, // New: status field
     'next_visit_date': nextVisitDate?.toIso8601String(),
-    'notes': remarks,
+    'remarks': remarks,
     'photo_url': photoPath, // Changed to photo_url for API compatibility
     'audio_url': audioPath, // Changed to audio_url for API compatibility
     'latitude': latitude,
