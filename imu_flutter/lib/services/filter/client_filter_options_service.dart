@@ -1,50 +1,27 @@
 import 'package:powersync/powersync.dart';
-import '../api/client_filter_api_service.dart';
 import '../../shared/models/client_filter_options.dart';
 import 'package:flutter/foundation.dart';
-import 'client_filter_exceptions.dart';
 
 class ClientFilterOptionsService {
-  final ClientFilterApiService _apiService;
   final PowerSyncDatabase? _powerSync;
 
-  ClientFilterOptionsService(this._apiService, this._powerSync);
+  ClientFilterOptionsService(this._powerSync);
 
   Future<ClientFilterOptions> fetchOptions() async {
     if (_powerSync == null) {
-      debugPrint('[ClientFilterOptionsService] PowerSync not available, using API');
-      return await _apiService.fetchFilterOptions();
+      debugPrint('[ClientFilterOptionsService] PowerSync not available');
+      return const ClientFilterOptions();
     }
 
     try {
       debugPrint('[ClientFilterOptionsService] Fetching from PowerSync...');
-      final options = await _fetchFromPowerSync();
-
-      if (options.isNotEmpty) {
-        debugPrint('[ClientFilterOptionsService] PowerSync success: '
-            '${options.clientTypes.length} client types, '
-            '${options.marketTypes.length} market types, '
-            '${options.pensionTypes.length} pension types, '
-            '${options.productTypes.length} product types, '
-            '${options.loanTypes.length} loan types');
-        return options;
-      } else {
-        debugPrint('[ClientFilterOptionsService] PowerSync returned empty, falling back to API');
-      }
+      return await _fetchFromPowerSync();
     } on PowerSyncUnavailableException catch (e) {
       debugPrint('[ClientFilterOptionsService] PowerSync unavailable: $e');
-      rethrow;
+      return const ClientFilterOptions();
     } catch (e) {
-      debugPrint('[ClientFilterOptionsService] PowerSync failed: $e, falling back to API');
-    }
-
-    try {
-      return await _apiService.fetchFilterOptions();
-    } catch (e) {
-      throw FilterOptionsLoadException(
-        'Failed to load filter options from both PowerSync and API',
-        e,
-      );
+      debugPrint('[ClientFilterOptionsService] PowerSync failed: $e');
+      return const ClientFilterOptions();
     }
   }
 
