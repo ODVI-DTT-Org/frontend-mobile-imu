@@ -10,7 +10,6 @@ import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointType;
 import '../../features/clients/data/models/address_model.dart' show Address;
 import '../../models/client_status.dart';
-import '../../features/my_day/data/repositories/my_day_repository.dart';
 import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
 import '../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../services/api/api_exception.dart';
@@ -245,9 +244,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   Future<void> _loadStatusesFromAPI(DateTime today) async {
     try {
-      final myDayRepo = ref.read(myDayRepositoryProvider);
+      final itineraryRepo = ref.read(itineraryRepositoryProvider);
       final userId = ref.read(currentUserIdProvider) ?? '';
-      final todayClients = await myDayRepo.getClientsByDate(userId, today);
+      final todayClientIds = await itineraryRepo.getClientIdsByDate(userId, today);
 
       final clientsAsync = _clientFilter == 'assigned'
           ? ref.read(assignedClientsProvider)
@@ -258,7 +257,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         data: (data) {
           final clients = data.items;
           for (final client in clients) {
-            final inItinerary = todayClients.any((c) => c.clientId == client.id);
+            final inItinerary = todayClientIds.contains(client.id);
             // Only track inItinerary status, loanReleased is already available from client.loanReleased
             statuses[client.id!] = ClientStatus(
               inItinerary: inItinerary,

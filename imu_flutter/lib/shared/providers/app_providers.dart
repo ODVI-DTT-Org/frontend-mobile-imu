@@ -60,7 +60,6 @@ export './app_providers.dart' show
   attendanceRepositoryProvider,
   groupRepositoryProvider,
   targetRepositoryProvider,
-  myDayRepositoryProvider,
   visitsByClientProvider,
   currentMonthTargetProvider,
   myDayClientsProvider,
@@ -124,7 +123,7 @@ import '../../features/groups/data/models/group_model.dart';
 import '../../features/groups/data/repositories/group_repository.dart';
 import '../../features/targets/data/repositories/target_repository.dart';
 import '../../features/my_day/data/models/my_day_client.dart';
-import '../../features/my_day/data/repositories/my_day_repository.dart';
+import '../../features/my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
 import '../../services/local_storage/hive_service.dart';
 
 // ==================== Service Providers ====================
@@ -715,7 +714,6 @@ final visitRepositoryProvider = Provider<VisitRepository>((_) => VisitRepository
 final attendanceRepositoryProvider = Provider<AttendanceRepository>((_) => AttendanceRepository());
 final groupRepositoryProvider = Provider<GroupRepository>((_) => GroupRepository());
 final targetRepositoryProvider = Provider<TargetRepository>((_) => TargetRepository());
-final myDayRepositoryProvider = Provider<MyDayRepository>((_) => MyDayRepository());
 
 /// Visits for a specific client — live stream from PowerSync SQLite.
 final visitsByClientProvider = StreamProvider.family<List<Visit>, String>((ref, clientId) {
@@ -731,12 +729,9 @@ final currentMonthTargetProvider = StreamProvider<Target?>((ref) async* {
   yield* repo.watchCurrentMonthTarget(userId);
 });
 
-/// Today's My Day clients — live stream from PowerSync SQLite.
-final myDayClientsProvider = StreamProvider<List<MyDayClient>>((ref) async* {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) { yield <MyDayClient>[]; return; }
-  final repo = ref.watch(myDayRepositoryProvider);
-  yield* repo.watchTodayClients(userId);
+/// Today's My Day clients — derived from myDayStateProvider.
+final myDayClientsProvider = Provider<List<MyDayClient>>((ref) {
+  return ref.watch(myDayStateProvider).clients;
 });
 
 /// Groups for the current user — live stream from PowerSync SQLite.

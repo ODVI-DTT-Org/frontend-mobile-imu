@@ -129,7 +129,6 @@ class MyDayClient {
     return '$last, $firstMiddle';
   }
 
-  /// Alias for [fromPowerSync] — used by MyDayRepository.
   factory MyDayClient.fromRow(Map<String, dynamic> row) => MyDayClient.fromPowerSync(row);
 
   /// Create from PowerSync JOIN row (itineraries + clients tables)

@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/my_day_client.dart';
-import '../../data/repositories/my_day_repository.dart';
+import '../../../itineraries/data/repositories/itinerary_repository.dart' show enrichItineraryRowFromHive;
+import '../../../../services/sync/powersync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -68,9 +69,19 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
     );
   }
 
-  Stream<List<MyDayClient>> _buildStream(String userId, String dateStr) {
-    final date = DateTime.parse(dateStr);
-    return MyDayRepository().watchTodayClients(userId, date: date);
+  Stream<List<MyDayClient>> _buildStream(String userId, String dateStr) async* {
+    try {
+      final db = await PowerSyncService.database;
+      await for (final rows in db.watch(
+        "SELECT * FROM itineraries WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' ORDER BY scheduled_time ASC",
+        parameters: [userId, dateStr],
+      )) {
+        yield rows.map((r) => MyDayClient.fromPowerSync(enrichItineraryRowFromHive(r))).toList();
+      }
+    } catch (e) {
+      logError('MyDayNotifier stream error', e);
+      yield [];
+    }
   }
 
   Future<void> refresh() async {

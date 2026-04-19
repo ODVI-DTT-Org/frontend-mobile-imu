@@ -323,6 +323,38 @@ class ItineraryRepository {
     }
   }
 
+  /// Returns client IDs scheduled on a given date for this user (for in-itinerary checks).
+  Future<Set<String>> getClientIdsByDate(String userId, DateTime date) async {
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    try {
+      final db = await PowerSyncService.database;
+      final rows = await db.getAll(
+        "SELECT client_id FROM itineraries WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled'",
+        [userId, dateStr],
+      );
+      return rows.map((r) => r['client_id'] as String).toSet();
+    } catch (e) {
+      logError('Error getting client IDs by date', e);
+      return {};
+    }
+  }
+
+  /// Returns true if the client has an itinerary entry for today.
+  Future<bool> isInMyDay(String userId, String clientId) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    try {
+      final db = await PowerSyncService.database;
+      final rows = await db.getAll(
+        "SELECT id FROM itineraries WHERE user_id = ? AND client_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' LIMIT 1",
+        [userId, clientId, today],
+      );
+      return rows.isNotEmpty;
+    } catch (e) {
+      logError('Error checking isInMyDay', e);
+      return false;
+    }
+  }
+
   /// Get itineraries count for a caravan
   Future<int> getCaravanItinerariesCount(String caravanId) async {
     try {
@@ -345,7 +377,7 @@ final itineraryRepositoryProvider = Provider<ItineraryRepository>((ref) {
 });
 
 /// Merges Hive client data into a PowerSync itinerary row.
-Map<String, dynamic> _enrichItineraryRowFromHive(Map<String, dynamic> row) {
+Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   final clientId = row['client_id'] as String?;
   debugPrint('[ItineraryRepo] Row client_id=$clientId');
   if (clientId == null) return row;
@@ -388,7 +420,7 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
       parameters: [userId, dateStr],
     )) {
       debugPrint('[ItineraryRepo] itineraryByDateProvider: ${rows.length} rows from PowerSync');
-      yield rows.map((r) => ItineraryItem.fromPowerSync(_enrichItineraryRowFromHive(r))).toList();
+      yield rows.map((r) => ItineraryItem.fromPowerSync(enrichItineraryRowFromHive(r))).toList();
     }
   } catch (e) {
     logError('itineraryByDateProvider error', e);
