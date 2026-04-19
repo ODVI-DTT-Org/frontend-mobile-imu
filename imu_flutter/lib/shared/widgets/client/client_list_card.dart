@@ -267,21 +267,25 @@ class ClientListCard extends ConsumerWidget {
       error: (_, __) => isInMyDay = false,
     );
 
-    // Card background: selected > loan-released (green) > my-turn (blue) > default white
+    // selected: blue-100 bg + blue-600 border (clearly distinct from "my turn")
+    // loan released: green-50 bg + green-300 border
+    // my turn: blue-50 bg + blue-200 border
+    // not my turn: grey-100 bg + grey-300 border (no opacity — just muted)
     final Color cardBg = isSelected
-        ? const Color(0xFFEFF6FF)
+        ? const Color(0xFFDBEAFE)   // blue-100
         : isLoanReleased
             ? const Color(0xFFF0FDF4)  // green-50
             : isMyTurn
                 ? const Color(0xFFEFF6FF)  // blue-50
-                : Colors.white;
+                : const Color(0xFFF3F4F6); // grey-100
     final Color cardBorderColor = isSelected
-        ? const Color(0xFF3B82F6)
+        ? const Color(0xFF2563EB)   // blue-600
         : isLoanReleased
             ? const Color(0xFF86EFAC)  // green-300
             : isMyTurn
-                ? const Color(0xFF93C5FD)  // blue-300
-                : Colors.grey.shade200;
+                ? const Color(0xFFBFDBFE)  // blue-200
+                : const Color(0xFFD1D5DB); // grey-300
+    final double cardBorderWidth = isSelected ? 2 : 1;
 
     final cardContent = Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -290,7 +294,7 @@ class ClientListCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: cardBorderColor,
-          width: isSelected ? 2 : 1,
+          width: cardBorderWidth,
         ),
         boxShadow: [
           BoxShadow(
@@ -647,10 +651,10 @@ class ClientListCard extends ConsumerWidget {
         ),
         child: cardContent,
       );
-      return isNotMyTurn ? Opacity(opacity: 0.4, child: dismissible) : dismissible;
+      return dismissible;
     }
 
-    return isNotMyTurn ? Opacity(opacity: 0.4, child: cardContent) : cardContent;
+    return cardContent;
   }
 
   String _getTouchpointSummary(Touchpoint touchpoint) {

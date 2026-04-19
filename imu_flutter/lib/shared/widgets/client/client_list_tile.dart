@@ -89,13 +89,12 @@ class ClientListTile extends ConsumerWidget {
         ? const Color(0xFFF0FDF4)   // green-50
         : (canRecordNext && !isCompleted)
             ? const Color(0xFFEFF6FF)  // blue-50
-            : Colors.white;
+            : const Color(0xFFF3F4F6); // grey-100 — not my turn, no opacity
     final Color cardBorderColor = client.loanReleased
         ? const Color(0xFF86EFAC)   // green-300
         : (canRecordNext && !isCompleted)
-            ? const Color(0xFF93C5FD)  // blue-300
-            : Colors.grey.shade200;
-    final bool greyOut = !isCompleted && !client.loanReleased && !canRecordNext;
+            ? const Color(0xFFBFDBFE)  // blue-200
+            : const Color(0xFFD1D5DB); // grey-300
 
     final card = Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -258,7 +257,7 @@ class ClientListTile extends ConsumerWidget {
       ),
     );
 
-    return greyOut ? Opacity(opacity: 0.4, child: card) : card;
+    return card;
   }
 
   List<int> _validNumbers(UserRole role) {
