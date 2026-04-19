@@ -85,12 +85,24 @@ class ClientListTile extends ConsumerWidget {
       canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextType);
     }
 
-    return Container(
+    final Color cardBg = client.loanReleased
+        ? const Color(0xFFF0FDF4)   // green-50
+        : (canRecordNext && !isCompleted)
+            ? const Color(0xFFEFF6FF)  // blue-50
+            : Colors.white;
+    final Color cardBorderColor = client.loanReleased
+        ? const Color(0xFF86EFAC)   // green-300
+        : (canRecordNext && !isCompleted)
+            ? const Color(0xFF93C5FD)  // blue-300
+            : Colors.grey.shade200;
+    final bool greyOut = !isCompleted && !client.loanReleased && !canRecordNext;
+
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: cardBorderColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -245,6 +257,8 @@ class ClientListTile extends ConsumerWidget {
         ),
       ),
     );
+
+    return greyOut ? Opacity(opacity: 0.4, child: card) : card;
   }
 
   List<int> _validNumbers(UserRole role) {
