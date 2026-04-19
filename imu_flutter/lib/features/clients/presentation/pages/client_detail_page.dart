@@ -1507,10 +1507,9 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Widget _buildTouchpointProgressBadge() {
     final client = _client!;
     final isCompleted = client.completedTouchpoints >= 7;
-    final nextNumber = client.nextTouchpointNumber ??
-        (client.touchpointNumber >= 0 && client.touchpointNumber < 7
-            ? client.touchpointNumber + 1
-            : null);
+    final nextNumber = client.touchpointNumber >= 0 && client.touchpointNumber <= 7
+        ? client.touchpointNumber
+        : null;
     final nextType = client.nextTouchpointType;
 
     final badgeText = isCompleted
