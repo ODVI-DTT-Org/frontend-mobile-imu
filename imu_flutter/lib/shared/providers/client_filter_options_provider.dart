@@ -1,16 +1,18 @@
-// lib/shared/providers/client_filter_options_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/filter/client_filter_options_service.dart';
+import '../../services/api/client_filter_api_service.dart';
+import '../../services/filter_preferences_service.dart';
 import '../models/client_filter_options.dart';
-import 'app_providers.dart' show powerSyncDatabaseProvider;
 
 final clientFilterOptionsServiceProvider =
     Provider<ClientFilterOptionsService>((ref) {
-  final powerSync = ref.watch(powerSyncDatabaseProvider).value;
-  return ClientFilterOptionsService(powerSync);
+  return ClientFilterOptionsService(
+    ClientFilterApiService(),
+    FilterPreferencesService(),
+  );
 });
 
-/// Filter options fetched from local PowerSync only (offline-first)
+/// Filter options — served from local cache, fetched from API on first login
 final clientFilterOptionsProvider =
     FutureProvider.autoDispose<ClientFilterOptions>((ref) async {
   final service = ref.watch(clientFilterOptionsServiceProvider);

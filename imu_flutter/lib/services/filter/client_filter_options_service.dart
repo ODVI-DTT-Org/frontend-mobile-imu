@@ -1,86 +1,46 @@
-import 'package:powersync/powersync.dart';
+import '../api/client_filter_api_service.dart';
 import '../../shared/models/client_filter_options.dart';
+import '../filter_preferences_service.dart';
 import 'package:flutter/foundation.dart';
 
 class ClientFilterOptionsService {
-  final PowerSyncDatabase? _powerSync;
+  final ClientFilterApiService _apiService;
+  final FilterPreferencesService _prefs;
 
-  ClientFilterOptionsService(this._powerSync);
+  ClientFilterOptionsService(this._apiService, this._prefs);
 
   Future<ClientFilterOptions> fetchOptions() async {
-    if (_powerSync == null) {
-      debugPrint('[ClientFilterOptionsService] PowerSync not available');
-      return const ClientFilterOptions();
+    // Serve from local cache if available (works offline)
+    if (await _prefs.hasFilterOptionsCache()) {
+      debugPrint('[ClientFilterOptionsService] Serving from local cache');
+      return ClientFilterOptions(
+        clientTypes: await _prefs.getCachedClientTypeOptions(),
+        marketTypes: await _prefs.getCachedMarketTypeOptions(),
+        pensionTypes: await _prefs.getCachedPensionTypeOptions(),
+        productTypes: await _prefs.getCachedProductTypeOptions(),
+        loanTypes: await _prefs.getCachedLoanTypeOptions(),
+      );
     }
 
+    // Cache miss — fetch from API and save locally
+    debugPrint('[ClientFilterOptionsService] Cache empty, fetching from API');
     try {
-      debugPrint('[ClientFilterOptionsService] Fetching from PowerSync...');
-      return await _fetchFromPowerSync();
-    } on PowerSyncUnavailableException catch (e) {
-      debugPrint('[ClientFilterOptionsService] PowerSync unavailable: $e');
-      return const ClientFilterOptions();
+      final options = await _apiService.fetchFilterOptions();
+      await _prefs.cacheFilterOptions(
+        clientTypes: options.clientTypes,
+        marketTypes: options.marketTypes,
+        pensionTypes: options.pensionTypes,
+        productTypes: options.productTypes,
+        loanTypes: options.loanTypes,
+      );
+      debugPrint('[ClientFilterOptionsService] Cached filter options from API');
+      return options;
     } catch (e) {
-      debugPrint('[ClientFilterOptionsService] PowerSync failed: $e');
+      debugPrint('[ClientFilterOptionsService] API fetch failed: $e');
       return const ClientFilterOptions();
     }
   }
 
-  Future<ClientFilterOptions> _fetchFromPowerSync() async {
-    if (_powerSync == null) {
-      throw PowerSyncUnavailableException('PowerSync database is not available');
-    }
-
-    final queryResults = await Future.wait([
-      _powerSync!.getAll('''
-        SELECT DISTINCT UPPER(TRIM(client_type)) as val
-        FROM clients
-        WHERE client_type IS NOT NULL AND TRIM(client_type) != ''
-        ORDER BY val
-      '''),
-      _powerSync!.getAll('''
-        SELECT DISTINCT UPPER(TRIM(market_type)) as val
-        FROM clients
-        WHERE market_type IS NOT NULL AND TRIM(market_type) != ''
-        ORDER BY val
-      '''),
-      _powerSync!.getAll('''
-        SELECT DISTINCT UPPER(TRIM(pension_type)) as val
-        FROM clients
-        WHERE pension_type IS NOT NULL AND TRIM(pension_type) != ''
-        ORDER BY val
-      '''),
-      _powerSync!.getAll('''
-        SELECT DISTINCT UPPER(TRIM(product_type)) as val
-        FROM clients
-        WHERE product_type IS NOT NULL AND TRIM(product_type) != ''
-        ORDER BY val
-      '''),
-      _powerSync!.getAll('''
-        SELECT DISTINCT UPPER(TRIM(loan_type)) as val
-        FROM clients
-        WHERE loan_type IS NOT NULL AND TRIM(loan_type) != ''
-        ORDER BY val
-      '''),
-    ]);
-
-    List<String> toStrings(List<Map<String, dynamic>> rows) {
-      final seen = <String>{};
-      final result = <String>[];
-      for (final row in rows) {
-        final val = row['val'] as String?;
-        if (val != null && val.isNotEmpty && seen.add(val)) {
-          result.add(val);
-        }
-      }
-      return result;
-    }
-
-    return ClientFilterOptions(
-      clientTypes: toStrings(queryResults[0]),
-      marketTypes: toStrings(queryResults[1]),
-      pensionTypes: toStrings(queryResults[2]),
-      productTypes: toStrings(queryResults[3]),
-      loanTypes: toStrings(queryResults[4]),
-    );
-  }
+  /// Call this on logout to force a fresh fetch on next login
+  Future<void> clearCache() => _prefs.clearFilterOptionsCache();
 }

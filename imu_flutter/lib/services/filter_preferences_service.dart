@@ -19,6 +19,13 @@ class FilterPreferencesService {
   // Touchpoint filter key
   static const String _keyTouchpointNumbers = 'filter_touchpoint_numbers';
 
+  // Filter options cache keys (available values fetched from API on first login)
+  static const String _keyOptionsClientTypes = 'filter_options_client_types';
+  static const String _keyOptionsMarketTypes = 'filter_options_market_types';
+  static const String _keyOptionsPensionTypes = 'filter_options_pension_types';
+  static const String _keyOptionsProductTypes = 'filter_options_product_types';
+  static const String _keyOptionsLoanTypes = 'filter_options_loan_types';
+
   /// Get singleton instance
   static final FilterPreferencesService _instance = FilterPreferencesService._internal();
   factory FilterPreferencesService() => _instance;
@@ -190,6 +197,68 @@ class FilterPreferencesService {
     } else {
       await _prefs?.setString(_keyLoanType, json.encode(values));
     }
+  }
+
+  // ============================================
+  // FILTER OPTIONS CACHE (available values from API)
+  // ============================================
+
+  Future<List<String>> _getOptionsList(String key) async {
+    await init();
+    final jsonStr = _prefs?.getString(key);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      return (json.decode(jsonStr) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _setOptionsList(String key, List<String> values) async {
+    await init();
+    if (values.isEmpty) {
+      await _prefs?.remove(key);
+    } else {
+      await _prefs?.setString(key, json.encode(values));
+    }
+  }
+
+  Future<List<String>> getCachedClientTypeOptions() => _getOptionsList(_keyOptionsClientTypes);
+  Future<List<String>> getCachedMarketTypeOptions() => _getOptionsList(_keyOptionsMarketTypes);
+  Future<List<String>> getCachedPensionTypeOptions() => _getOptionsList(_keyOptionsPensionTypes);
+  Future<List<String>> getCachedProductTypeOptions() => _getOptionsList(_keyOptionsProductTypes);
+  Future<List<String>> getCachedLoanTypeOptions() => _getOptionsList(_keyOptionsLoanTypes);
+
+  Future<void> cacheFilterOptions({
+    required List<String> clientTypes,
+    required List<String> marketTypes,
+    required List<String> pensionTypes,
+    required List<String> productTypes,
+    required List<String> loanTypes,
+  }) async {
+    await Future.wait([
+      _setOptionsList(_keyOptionsClientTypes, clientTypes),
+      _setOptionsList(_keyOptionsMarketTypes, marketTypes),
+      _setOptionsList(_keyOptionsPensionTypes, pensionTypes),
+      _setOptionsList(_keyOptionsProductTypes, productTypes),
+      _setOptionsList(_keyOptionsLoanTypes, loanTypes),
+    ]);
+  }
+
+  Future<bool> hasFilterOptionsCache() async {
+    final clientTypes = await getCachedClientTypeOptions();
+    return clientTypes.isNotEmpty;
+  }
+
+  Future<void> clearFilterOptionsCache() async {
+    await init();
+    await Future.wait([
+      _prefs!.remove(_keyOptionsClientTypes),
+      _prefs!.remove(_keyOptionsMarketTypes),
+      _prefs!.remove(_keyOptionsPensionTypes),
+      _prefs!.remove(_keyOptionsProductTypes),
+      _prefs!.remove(_keyOptionsLoanTypes),
+    ]);
   }
 
   // ============================================
