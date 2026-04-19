@@ -366,7 +366,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           context: context,
           builder: (context) => TouchpointValidationDialog(
             attemptedNumber: nextNumber,
-            attemptedType: nextType,
+            attemptedType: nextType ?? TouchpointType.visit,
             onConfirm: () => Navigator.of(context).pop(),
           ),
         );

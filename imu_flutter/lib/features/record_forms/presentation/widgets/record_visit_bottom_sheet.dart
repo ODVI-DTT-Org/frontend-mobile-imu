@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/features/clients/data/models/client_model.dart' hide TimeOfDay, TouchpointReason, TouchpointStatus;
 import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_data.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/location_card.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/schedule_card.dart';
