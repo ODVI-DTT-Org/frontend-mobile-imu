@@ -546,7 +546,9 @@ class Client {
         }
       }).toList(),
       'touchpoint_number': touchpointNumber,
+      'next_touchpoint_number': nextTouchpointNumber,
       'next_touchpoint': nextTouchpoint,
+      if (touchpointStatus != null) 'touchpoint_status': touchpointStatus!.toJson(),
       'addresses': addresses.map((a) => a.toJson()).toList(),
       'phone_numbers': phoneNumbers.map((p) => p.toJson()).toList(),
       'createdAt': createdAt?.toIso8601String(),
@@ -732,7 +734,8 @@ class Client {
       touchpointSummary: (json['touchpoint_summary'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       touchpointNumber: json['touchpoint_number'] as int? ?? 1,
       nextTouchpoint: json['next_touchpoint'] as String?,
-      nextTouchpointNumber: json['nextTouchpointNumber'] ?? json['next_touchpoint_number'] as int?,
+      nextTouchpointNumber: (json['nextTouchpointNumber'] ?? json['next_touchpoint_number']) as int?
+          ?? (json['touchpoint_status'] as Map<String, dynamic>?)?['next_touchpoint_number'] as int?,
       touchpointStatus: json['touchpoint_status'] != null
           ? ClientTouchpointStatus.fromJson(json['touchpoint_status'] as Map<String, dynamic>)
           : null,
@@ -1497,6 +1500,19 @@ class ClientTouchpointStatus {
           : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'completed_touchpoints': completedTouchpoints,
+        'next_touchpoint_number': nextTouchpointNumber,
+        'next_touchpoint_type': nextTouchpointType,
+        'can_create_touchpoint': canCreateTouchpoint,
+        'expected_role': expectedRole,
+        'is_complete': isComplete,
+        'last_touchpoint_type': lastTouchpointType,
+        'last_touchpoint_agent_name': lastTouchpointAgentName,
+        'loan_released': loanReleased,
+        'loan_released_at': loanReleasedAt?.toIso8601String(),
+      };
 
   /// Create from database row (snake_case columns)
   factory ClientTouchpointStatus.fromRow(Map<String, dynamic> row) {

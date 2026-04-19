@@ -166,7 +166,7 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
       final clientJsons = clients.map((c) => c.toJson()).toList();
       await hiveService.saveAllClients(clientJsons);
       await hiveService.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
-      await hiveService.saveSetting('clients_cache_version', 2);
+      await hiveService.saveSetting('clients_cache_version', 3);
 
       ref.invalidate(assignedClientsProvider);
 
@@ -399,7 +399,7 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   var rawClients = hiveService.getAllClients();
 
   // Bump this when the API response shape changes so stale caches are cleared.
-  const kCacheVersion = 2;
+  const kCacheVersion = 3;
 
   // Startup hydration: fetch from API if:
   //  - cache is empty
