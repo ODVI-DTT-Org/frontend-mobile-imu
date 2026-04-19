@@ -275,20 +275,21 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               _searchQuery = '';
                               _searchController.clear();
                             });
-                            // Defer provider updates until after build cycle
                             Future.microtask(() {
                               if (!mounted) return;
-                              ref.invalidate(onlineClientsProvider);
-                              // Reset shared filters to prevent contamination between modes
+                              // Reset all state to prevent contamination from All Clients mode
+                              ref.read(assignedClientSearchQueryProvider.notifier).state = '';
+                              ref.read(assignedClientPageProvider.notifier).state = 1;
                               ref.read(touchpointFilterProvider.notifier).clear();
                               ref.read(locationFilterProvider.notifier).clear();
                               ref.read(clientAttributeFilterProvider.notifier).clear();
+                              ref.invalidate(onlineClientsProvider);
+                              ref.invalidate(assignedClientsProvider);
                             });
                           }),
                           const SizedBox(width: 8),
                           _buildFilterToggle('All Clients', !_showAssignedClientsOnly, () {
                             HapticUtils.lightImpact();
-                            // Check if online before switching to All Clients
                             final isOnlineNow = ref.read(isOnlineProvider);
                             if (!isOnlineNow) {
                               showToast('Cannot search all clients while offline');
@@ -300,15 +301,14 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                               _searchQuery = '';
                               _searchController.clear();
                             });
-                            // Defer provider updates until after build cycle
                             Future.microtask(() {
                               if (!mounted) return;
                               ref.read(onlineClientSearchQueryProvider.notifier).state = '';
                               ref.read(onlineClientPageProvider.notifier).state = 1;
-                              // Reset shared filters to prevent contamination between modes
                               ref.read(touchpointFilterProvider.notifier).clear();
                               ref.read(locationFilterProvider.notifier).clear();
                               ref.read(clientAttributeFilterProvider.notifier).clear();
+                              ref.invalidate(onlineClientsProvider);
                             });
                           }),
                         ],
@@ -525,10 +525,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                           });
                           Future.microtask(() {
                             if (!mounted) return;
-                            ref.invalidate(onlineClientsProvider);
+                            ref.read(assignedClientSearchQueryProvider.notifier).state = '';
+                            ref.read(assignedClientPageProvider.notifier).state = 1;
                             ref.read(touchpointFilterProvider.notifier).clear();
                             ref.read(locationFilterProvider.notifier).clear();
                             ref.read(clientAttributeFilterProvider.notifier).clear();
+                            ref.invalidate(onlineClientsProvider);
+                            ref.invalidate(assignedClientsProvider);
                           });
                         }),
                         const SizedBox(width: 8),
@@ -552,6 +555,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             ref.read(touchpointFilterProvider.notifier).clear();
                             ref.read(locationFilterProvider.notifier).clear();
                             ref.read(clientAttributeFilterProvider.notifier).clear();
+                            ref.invalidate(onlineClientsProvider);
                           });
                         }),
                       ],

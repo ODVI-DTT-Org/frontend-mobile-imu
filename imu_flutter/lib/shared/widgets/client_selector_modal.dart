@@ -157,10 +157,13 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       if (_clientFilter == 'assigned') {
         ref.read(assignedClientPageProvider.notifier).state = _currentPage;
+        ref.read(assignedClientSearchQueryProvider.notifier).state = '';
+        // Force fresh re-read from Hive to avoid stale/contaminated state
         ref.invalidate(assignedClientsProvider);
       } else {
         // For 'all' mode, use online pagination providers
         ref.read(onlineClientPageProvider.notifier).state = _currentPage;
+        ref.read(onlineClientSearchQueryProvider.notifier).state = '';
         ref.invalidate(onlineClientsProvider);
       }
     });
