@@ -309,7 +309,7 @@ class MyDayClient {
           other.address == address;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
         id,
         clientId,
         fullName,
@@ -333,7 +333,7 @@ class MyDayClient {
         pensionType,
         loanType,
         address,
-      );
+      ]);
 
   @override
   String toString() =>
