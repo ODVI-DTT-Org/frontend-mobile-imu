@@ -214,7 +214,6 @@ class MyDayClient {
       previousTouchpointDate: previousDate,
       firstName: row['first_name'] as String?,
       lastName: row['last_name'] as String?,
-      middleName: row['middle_name'] as String?,
       productType: row['product_type'] as String?,
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,

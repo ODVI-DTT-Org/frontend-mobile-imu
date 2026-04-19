@@ -200,7 +200,7 @@ class ItineraryItem {
     }
 
     // Derive next touchpoint from touchpoint_summary
-    static const _sequence = ['Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'];
+    const sequence = ['Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'];
     int? nextNum;
     String? nextType;
     final summaryJson = row['touchpoint_summary'] as String?;
@@ -219,7 +219,7 @@ class ItineraryItem {
         }
       } catch (_) {}
     }
-    if (nextNum != null) nextType = _sequence[nextNum - 1];
+    if (nextNum != null) nextType = sequence[nextNum - 1];
 
     return ItineraryItem(
       id: row['id'] as String,
