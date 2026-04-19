@@ -885,10 +885,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     HapticUtils.lightImpact();
 
     final nextType = _client!.nextTouchpointType;
-    // Prefer backend-calculated nextTouchpointNumber; fall back to touchpoint_number
-    // (next_touchpoint_number may be absent from Hive-cached API responses)
+    // Prefer backend-calculated nextTouchpointNumber; fall back to touchpointNumber+1
+    // (touchpointNumber is the completed count, so +1 gives the next step number)
     final tp = _client!.touchpointNumber;
-    final nextNumber = _client!.nextTouchpointNumber ?? (tp >= 1 && tp <= 7 ? tp : null);
+    final nextNumber = _client!.nextTouchpointNumber ?? (tp >= 0 && tp < 7 ? tp + 1 : null);
 
     if (nextNumber == null) {
       // All touchpoints completed
@@ -1470,19 +1470,20 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Widget _buildTouchpointProgressBadge() {
     final client = _client!;
-    final completedCount = client.completedTouchpoints;
-    final totalCount = 7;
+    final isCompleted = client.completedTouchpoints >= 7;
+    final nextNumber = client.nextTouchpointNumber ??
+        (client.touchpointNumber >= 0 && client.touchpointNumber < 7
+            ? client.touchpointNumber + 1
+            : null);
+    final nextType = client.nextTouchpointType;
 
-    // Determine next touchpoint type
-    final nextType = completedCount < totalCount
-        ? (completedCount == 0 || completedCount == 3 || completedCount == 6
-            ? 'Visit'
-            : 'Call')
-        : null;
-
-    final badgeText = nextType != null
-        ? '$completedCount/$totalCount • $nextType'
-        : '$completedCount/$totalCount';
+    final badgeText = isCompleted
+        ? 'Completed'
+        : nextNumber != null && nextType != null
+            ? '$nextNumber/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}'
+            : nextNumber != null
+                ? '$nextNumber/7'
+                : '0/7';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
