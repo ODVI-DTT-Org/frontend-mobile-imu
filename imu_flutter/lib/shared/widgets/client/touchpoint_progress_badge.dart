@@ -7,13 +7,13 @@ import '../../../features/clients/data/models/client_model.dart';
 class TouchpointProgressBadge extends StatelessWidget {
   final Client client;
   final bool showCompletedLabel;
-  final int? touchpointCount;  // NEW: Optional pre-fetched count
+  final int? touchpointCount;
 
   const TouchpointProgressBadge({
     super.key,
     required this.client,
     this.showCompletedLabel = true,
-    this.touchpointCount,  // NEW
+    this.touchpointCount,
   });
 
   /// Internal getter that uses provided count or falls back to client.completedTouchpoints
