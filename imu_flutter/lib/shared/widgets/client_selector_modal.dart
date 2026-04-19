@@ -28,7 +28,8 @@ import '../../shared/providers/app_providers.dart' show
     assignedMunicipalitiesProvider,
     clientTouchpointCountsProvider,
     locationFilterProvider,
-    clientAttributeFilterProvider;
+    clientAttributeFilterProvider,
+    touchpointFilterProvider;
 import '../providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
 import 'filters/touchpoint_filter_chips.dart';
 import 'filters/filter_drawer.dart';
@@ -148,6 +149,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     // Defer provider updates until after build cycle
     Future.microtask(() {
       if (!mounted) return;
+
+      // Reset shared filters to prevent contamination between Assigned/All modes
+      ref.read(touchpointFilterProvider.notifier).clear();
+      ref.read(locationFilterProvider.notifier).clear();
+      ref.read(clientAttributeFilterProvider.notifier).clear();
 
       if (_clientFilter == 'assigned') {
         ref.read(assignedClientPageProvider.notifier).state = _currentPage;

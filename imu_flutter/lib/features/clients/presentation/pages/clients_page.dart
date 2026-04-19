@@ -21,6 +21,7 @@ import '../../../../shared/providers/app_providers.dart' show
     currentUserRoleProvider,
     locationFilterProvider,
     clientAttributeFilterProvider,
+    touchpointFilterProvider,
     myDayApiServiceProvider,
     todayItineraryProvider;
 import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
@@ -277,8 +278,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             // Defer provider updates until after build cycle
                             Future.microtask(() {
                               if (!mounted) return;
-                              // Invalidate online provider when switching back to Assigned Clients
                               ref.invalidate(onlineClientsProvider);
+                              // Reset shared filters to prevent contamination between modes
+                              ref.read(touchpointFilterProvider.notifier).clear();
+                              ref.read(locationFilterProvider.notifier).clear();
+                              ref.read(clientAttributeFilterProvider.notifier).clear();
                             });
                           }),
                           const SizedBox(width: 8),
@@ -299,9 +303,12 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             // Defer provider updates until after build cycle
                             Future.microtask(() {
                               if (!mounted) return;
-                              // Reset online search and page to first page when switching
                               ref.read(onlineClientSearchQueryProvider.notifier).state = '';
                               ref.read(onlineClientPageProvider.notifier).state = 1;
+                              // Reset shared filters to prevent contamination between modes
+                              ref.read(touchpointFilterProvider.notifier).clear();
+                              ref.read(locationFilterProvider.notifier).clear();
+                              ref.read(clientAttributeFilterProvider.notifier).clear();
                             });
                           }),
                         ],
@@ -516,17 +523,17 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             _searchQuery = '';
                             _searchController.clear();
                           });
-                          // Defer provider updates until after build cycle
                           Future.microtask(() {
                             if (!mounted) return;
-                            // Invalidate online provider when switching back to Assigned Clients
                             ref.invalidate(onlineClientsProvider);
+                            ref.read(touchpointFilterProvider.notifier).clear();
+                            ref.read(locationFilterProvider.notifier).clear();
+                            ref.read(clientAttributeFilterProvider.notifier).clear();
                           });
                         }),
                         const SizedBox(width: 8),
                         _buildFilterToggle('All Clients', !_showAssignedClientsOnly, () {
                           HapticUtils.lightImpact();
-                          // Check if online before switching to All Clients
                           final isOnlineNow = ref.read(isOnlineProvider);
                           if (!isOnlineNow) {
                             showToast('Cannot search all clients while offline');
@@ -538,12 +545,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                             _searchQuery = '';
                             _searchController.clear();
                           });
-                          // Defer provider updates until after build cycle
                           Future.microtask(() {
                             if (!mounted) return;
-                            // Reset online search and page to first page when switching
                             ref.read(onlineClientSearchQueryProvider.notifier).state = '';
                             ref.read(onlineClientPageProvider.notifier).state = 1;
+                            ref.read(touchpointFilterProvider.notifier).clear();
+                            ref.read(locationFilterProvider.notifier).clear();
+                            ref.read(clientAttributeFilterProvider.notifier).clear();
                           });
                         }),
                       ],

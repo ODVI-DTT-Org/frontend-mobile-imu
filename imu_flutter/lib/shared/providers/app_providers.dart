@@ -69,6 +69,7 @@ export './app_providers.dart' show
 export 'client_attribute_filter_provider.dart' show
   clientAttributeFilterProvider,
   activeFilterCountProvider;
+export 'touchpoint_filter_provider.dart' show touchpointFilterProvider, TouchpointFilterNotifier;
 export 'client_filter_options_provider.dart' show
   clientFilterOptionsProvider,
   clientFilterOptionsServiceProvider;
