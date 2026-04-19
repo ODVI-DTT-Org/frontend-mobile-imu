@@ -226,13 +226,19 @@ class ClientListCard extends ConsumerWidget {
     final effectiveLoanReleased = overrideLoanReleased ?? client.loanReleased;
     final effectiveUdi = overrideUdi ?? client.udi;
 
-    // Gray out clients whose next touchpoint is not actionable for the current role:
-    // Caravan → can only do Visits (1, 4, 7); gray out Call clients (2, 3, 5, 6)
-    // Tele    → can only do Calls  (2, 3, 5, 6); gray out Visit clients (1, 4, 7)
     final role = ref.watch(currentUserRoleProvider);
     final nextTpNum = client.nextTouchpointNumber;
     const callNumbers = {2, 3, 5, 6};
     const visitNumbers = {1, 4, 7};
+
+    // Loan released → green card
+    // My turn (Caravan=Visit, Tele=Call) → blue card
+    // Not my turn → white card + grayed out (opacity)
+    final isLoanReleased = effectiveLoanReleased;
+    final isMyTurn = nextTpNum != null && (
+      (role == UserRole.caravan && visitNumbers.contains(nextTpNum)) ||
+      (role == UserRole.tele   && callNumbers.contains(nextTpNum))
+    );
     final isNotMyTurn = nextTpNum != null && (
       (role == UserRole.caravan && callNumbers.contains(nextTpNum)) ||
       (role == UserRole.tele   && visitNumbers.contains(nextTpNum))
@@ -261,17 +267,29 @@ class ClientListCard extends ConsumerWidget {
       error: (_, __) => isInMyDay = false,
     );
 
+    // Card background: selected > loan-released (green) > my-turn (blue) > default white
+    final Color cardBg = isSelected
+        ? const Color(0xFFEFF6FF)
+        : isLoanReleased
+            ? const Color(0xFFF0FDF4)  // green-50
+            : isMyTurn
+                ? const Color(0xFFEFF6FF)  // blue-50
+                : Colors.white;
+    final Color cardBorderColor = isSelected
+        ? const Color(0xFF3B82F6)
+        : isLoanReleased
+            ? const Color(0xFF86EFAC)  // green-300
+            : isMyTurn
+                ? const Color(0xFF93C5FD)  // blue-300
+                : Colors.grey.shade200;
+
     final cardContent = Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isSelected
-            ? const Color(0xFFEFF6FF)
-            : Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected
-              ? const Color(0xFF3B82F6)
-              : Colors.grey.shade200,
+          color: cardBorderColor,
           width: isSelected ? 2 : 1,
         ),
         boxShadow: [
