@@ -619,7 +619,10 @@ final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
 
 /// Client mutation service provider
 final clientMutationServiceProvider = Provider<ClientMutationService>((ref) {
-  return ClientMutationService();
+  final role = ref.watch(currentUserRoleProvider);
+  final approvalsApi = ref.watch(approvalsApiServiceProvider);
+  final isOnline = ref.watch(isOnlineProvider);
+  return ClientMutationService(role: role, approvalsApi: approvalsApi, isOnline: isOnline);
 });
 
 // ==================== Sync Providers ====================

@@ -356,6 +356,84 @@ class ApprovalsApiService {
   }
 }
 
+  /// Submit a new client for approval (non-admin users)
+  Future<void> submitClientCreation({
+    required Map<String, dynamic> clientData,
+  }) async {
+    final token = _authService.accessToken;
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await _dio.post(
+      '/approvals',
+      data: {
+        'type': 'client',
+        'reason': 'Client Creation Request',
+        'notes': clientData,
+      },
+      options: Options(headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to submit client creation: ${response.statusCode}');
+    }
+  }
+
+  /// Submit a client edit for approval (non-admin users)
+  Future<void> submitClientEdit({
+    required String clientId,
+    required Map<String, dynamic> updatedData,
+  }) async {
+    final token = _authService.accessToken;
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await _dio.post(
+      '/approvals',
+      data: {
+        'type': 'client',
+        'client_id': clientId,
+        'reason': 'Client Edit Request',
+        'updated_client_information': updatedData,
+      },
+      options: Options(headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to submit client edit: ${response.statusCode}');
+    }
+  }
+
+  /// Submit a client deletion for approval (non-admin users)
+  Future<void> submitClientDelete({
+    required String clientId,
+  }) async {
+    final token = _authService.accessToken;
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await _dio.post(
+      '/approvals',
+      data: {
+        'type': 'client_delete',
+        'client_id': clientId,
+        'reason': 'Client Deletion Request',
+      },
+      options: Options(headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to submit client deletion: ${response.statusCode}');
+    }
+  }
+}
+
 /// Provider for ApprovalsApiService
 final approvalsApiServiceProvider = Provider<ApprovalsApiService>((ref) {
   return ApprovalsApiService();

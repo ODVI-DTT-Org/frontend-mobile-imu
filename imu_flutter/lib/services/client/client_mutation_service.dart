@@ -1,17 +1,37 @@
 import 'package:uuid/uuid.dart';
+import 'package:imu_flutter/core/models/user_role.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
+import 'package:imu_flutter/services/api/approvals_api_service.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/services/local_storage/hive_service.dart';
 import 'package:imu_flutter/core/utils/logger.dart';
 
 enum ClientMutationResult { success, requiresApproval, queued }
 
-/// Mutates clients by writing directly to local SQLite.
-/// PowerSync CRUD queue handles delivery to the backend when online.
+/// Mutates clients.
+/// - Manager roles (admin, area_manager, assistant_area_manager): write directly to local SQLite;
+///   PowerSync CRUD queue delivers to the backend when online.
+/// - Non-manager roles (caravan, tele): submit to the approvals API when online;
+///   fall back to queued when offline.
 class ClientMutationService {
+  final UserRole role;
+  final ApprovalsApiService approvalsApi;
+  final bool isOnline;
   final _uuid = const Uuid();
 
+  ClientMutationService({
+    required this.role,
+    required this.approvalsApi,
+    this.isOnline = true,
+  });
+
   Future<ClientMutationResult> createClient(Client client) async {
+    if (!role.isManager) {
+      if (!isOnline) return ClientMutationResult.queued;
+      await approvalsApi.submitClientCreation(clientData: client.toJson());
+      return ClientMutationResult.requiresApproval;
+    }
+
     final db = await PowerSyncService.database;
     final id = client.id ?? _uuid.v4();
     final now = DateTime.now().toIso8601String();
@@ -74,6 +94,15 @@ class ClientMutationService {
   }
 
   Future<ClientMutationResult> updateClient(Client client) async {
+    if (!role.isManager) {
+      if (!isOnline) return ClientMutationResult.queued;
+      await approvalsApi.submitClientEdit(
+        clientId: client.id!,
+        updatedData: client.toJson(),
+      );
+      return ClientMutationResult.requiresApproval;
+    }
+
     final db = await PowerSyncService.database;
     logDebug('ClientMutationService: Updating client ${client.id} in SQLite');
 
@@ -140,6 +169,12 @@ class ClientMutationService {
   }
 
   Future<ClientMutationResult> deleteClient(String clientId) async {
+    if (!role.isManager) {
+      if (!isOnline) return ClientMutationResult.queued;
+      await approvalsApi.submitClientDelete(clientId: clientId);
+      return ClientMutationResult.requiresApproval;
+    }
+
     final db = await PowerSyncService.database;
     logDebug('ClientMutationService: Deleting client $clientId from SQLite');
 
