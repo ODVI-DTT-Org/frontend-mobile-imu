@@ -116,6 +116,15 @@ class MyDayClient {
     'Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'
   ];
 
+  static String _buildFullName(String? lastName, String? firstName) {
+    final last = (lastName ?? '').trim();
+    final first = (firstName ?? '').trim();
+    if (last.isEmpty && first.isEmpty) return '';
+    if (last.isEmpty) return first;
+    if (first.isEmpty) return last;
+    return '$last, $first';
+  }
+
   /// Alias for [fromPowerSync] — used by MyDayRepository.
   factory MyDayClient.fromRow(Map<String, dynamic> row) => MyDayClient.fromPowerSync(row);
 
@@ -180,7 +189,7 @@ class MyDayClient {
     return MyDayClient(
       id: row['id'] as String,
       clientId: clientId,
-      fullName: '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim(),
+      fullName: _buildFullName(row['last_name'] as String?, row['first_name'] as String?),
       agencyName: null,
       location: null,
       touchpointNumber: currentNum,

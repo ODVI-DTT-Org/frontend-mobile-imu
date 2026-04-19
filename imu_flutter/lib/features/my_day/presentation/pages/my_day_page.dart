@@ -525,11 +525,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
   /// Converts a MyDayClient to a minimal Client for ClientListTile display.
   Client _myDayClientToClient(MyDayClient c) {
-    final nameParts = c.fullName.trim().split(' ');
+    // fullName is "LastName, FirstName" — split on comma
+    final commaIdx = c.fullName.indexOf(',');
+    final lastName = commaIdx >= 0 ? c.fullName.substring(0, commaIdx).trim() : c.fullName.trim();
+    final firstName = commaIdx >= 0 ? c.fullName.substring(commaIdx + 1).trim() : '';
     return Client(
       id: c.clientId,
-      firstName: nameParts.first,
-      lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+      firstName: firstName,
+      lastName: lastName,
       clientType: ClientType.potential,
       productType: ProductType.bfpActive,
       pensionType: PensionType.none,
