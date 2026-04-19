@@ -202,7 +202,13 @@ class ItineraryItem {
       status: row['status'] as String? ?? 'pending',
       priority: row['priority'] as String? ?? 'normal',
       notes: row['notes'] as String?,
-      address: null,
+      address: () {
+        final parts = [
+          if ((row['municipality'] as String?)?.isNotEmpty == true) row['municipality'] as String,
+          if ((row['province'] as String?)?.isNotEmpty == true) row['province'] as String,
+        ];
+        return parts.isEmpty ? null : parts.join(', ');
+      }(),
       latitude: null,
       longitude: null,
       createdAt: row['created_at'] != null

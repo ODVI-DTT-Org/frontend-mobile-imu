@@ -28,6 +28,8 @@ class MyDayClient {
   final DateTime? previousTouchpointDate; // Last completed touchpoint date
 
   // Display fields for ClientListTile
+  final String? firstName;
+  final String? lastName;
   final String? middleName;
   final String? productType;  // raw e.g. 'SSS_PENSIONER'
   final String? pensionType;  // raw e.g. 'GSIS'
@@ -54,6 +56,8 @@ class MyDayClient {
     this.previousTouchpointReason,
     this.previousTouchpointType,
     this.previousTouchpointDate,
+    this.firstName,
+    this.lastName,
     this.middleName,
     this.productType,
     this.pensionType,
@@ -208,6 +212,9 @@ class MyDayClient {
       previousTouchpointReason: lastTouchpoint?['reason'] as String?,
       previousTouchpointType: lastTouchpoint?['type'] as String?,
       previousTouchpointDate: previousDate,
+      firstName: row['first_name'] as String?,
+      lastName: row['last_name'] as String?,
+      middleName: row['middle_name'] as String?,
       productType: row['product_type'] as String?,
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,
@@ -261,6 +268,8 @@ class MyDayClient {
     String? previousTouchpointReason,
     String? previousTouchpointType,
     DateTime? previousTouchpointDate,
+    String? firstName,
+    String? lastName,
     String? middleName,
     String? productType,
     String? pensionType,
@@ -287,6 +296,8 @@ class MyDayClient {
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
       previousTouchpointDate: previousTouchpointDate ?? this.previousTouchpointDate,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       middleName: middleName ?? this.middleName,
       productType: productType ?? this.productType,
       pensionType: pensionType ?? this.pensionType,

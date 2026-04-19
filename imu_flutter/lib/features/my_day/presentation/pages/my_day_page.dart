@@ -525,20 +525,11 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
   /// Converts a MyDayClient to a minimal Client for ClientListTile display.
   Client _myDayClientToClient(MyDayClient c) {
-    // fullName is "LastName, FirstName MiddleName" — split on first comma
-    final commaIdx = c.fullName.indexOf(',');
-    final lastName = commaIdx >= 0 ? c.fullName.substring(0, commaIdx).trim() : c.fullName.trim();
-    // firstName portion already includes middle name from _buildFullName
-    final firstAndMiddle = commaIdx >= 0 ? c.fullName.substring(commaIdx + 1).trim() : '';
-    // Split first and middle for Client fields so Client.fullName renders correctly
-    final spaceIdx = firstAndMiddle.indexOf(' ');
-    final firstName = spaceIdx >= 0 ? firstAndMiddle.substring(0, spaceIdx).trim() : firstAndMiddle;
-    final middleName = spaceIdx >= 0 ? firstAndMiddle.substring(spaceIdx + 1).trim() : null;
     return Client(
       id: c.clientId,
-      firstName: firstName,
-      lastName: lastName,
-      middleName: middleName?.isNotEmpty == true ? middleName : null,
+      firstName: c.firstName ?? '',
+      lastName: c.lastName ?? '',
+      middleName: c.middleName,
       clientType: ClientType.potential,
       productType: ProductType.bfpActive,
       pensionType: PensionType.none,
