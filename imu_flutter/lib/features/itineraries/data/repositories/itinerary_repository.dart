@@ -343,23 +343,18 @@ final itineraryRepositoryProvider = Provider<ItineraryRepository>((ref) {
   return ItineraryRepository();
 });
 
-/// Enriches a PowerSync itinerary row with client name from Hive when the JOIN returns null.
+/// Merges Hive client data into a PowerSync itinerary row.
 Map<String, dynamic> _enrichItineraryRowFromHive(Map<String, dynamic> row) {
-  final firstName = row['first_name'] as String?;
-  final lastName = row['last_name'] as String?;
-  if ((firstName == null || firstName.isEmpty) && (lastName == null || lastName.isEmpty)) {
-    final clientId = row['client_id'] as String?;
-    if (clientId != null) {
-      final cached = HiveService().getClient(clientId);
-      if (cached != null) {
-        final enriched = Map<String, dynamic>.from(row);
-        enriched['first_name'] = cached['first_name'];
-        enriched['last_name'] = cached['last_name'];
-        return enriched;
-      }
-    }
-  }
-  return row;
+  final clientId = row['client_id'] as String?;
+  if (clientId == null) return row;
+  final cached = HiveService().getClient(clientId);
+  if (cached == null) return row;
+  final enriched = Map<String, dynamic>.from(row);
+  enriched['first_name'] = cached['first_name'];
+  enriched['last_name'] = cached['last_name'];
+  enriched['municipality'] = cached['municipality'];
+  enriched['province'] = cached['province'];
+  return enriched;
 }
 
 /// Stream provider for itineraries on a specific date — queries PowerSync local SQLite
@@ -375,9 +370,7 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
   try {
     final db = await PowerSyncService.database;
     await for (final rows in db.watch(
-      '''SELECT i.*, c.first_name, c.last_name
-         FROM itineraries i
-         LEFT JOIN clients c ON c.id = i.client_id
+      '''SELECT * FROM itineraries i
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
          ORDER BY i.scheduled_time ASC''',
       parameters: [userId, dateStr],

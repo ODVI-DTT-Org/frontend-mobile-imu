@@ -3,34 +3,33 @@ import 'package:imu_flutter/features/my_day/data/models/my_day_client.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/services/local_storage/hive_service.dart';
 
-/// Enriches a PowerSync row with client name from Hive when the JOIN returns null.
-/// This happens when the PowerSync clients table is empty (sync rules don't include it).
+/// Merges Hive client data into a PowerSync itinerary row.
+/// Itineraries only stores scheduling fields — all client fields come from Hive.
 Map<String, dynamic> _enrichRowFromHive(Map<String, dynamic> row) {
-  final firstName = row['first_name'] as String?;
-  final lastName = row['last_name'] as String?;
-  if ((firstName == null || firstName.isEmpty) && (lastName == null || lastName.isEmpty)) {
-    final clientId = row['client_id'] as String?;
-    if (clientId != null) {
-      final cached = HiveService().getClient(clientId);
-      if (cached != null) {
-        final enriched = Map<String, dynamic>.from(row);
-        enriched['first_name'] = cached['first_name'];
-        enriched['last_name'] = cached['last_name'];
-        return enriched;
-      }
-    }
-  }
-  return row;
+  final clientId = row['client_id'] as String?;
+  if (clientId == null) return row;
+  final cached = HiveService().getClient(clientId);
+  if (cached == null) return row;
+  final enriched = Map<String, dynamic>.from(row);
+  enriched['first_name'] = cached['first_name'];
+  enriched['last_name'] = cached['last_name'];
+  enriched['municipality'] = cached['municipality'];
+  enriched['province'] = cached['province'];
+  enriched['product_type'] = cached['product_type'];
+  enriched['pension_type'] = cached['pension_type'];
+  enriched['loan_type'] = cached['loan_type'];
+  enriched['touchpoint_number'] = cached['touchpoint_number'];
+  enriched['next_touchpoint'] = cached['next_touchpoint'];
+  enriched['touchpoint_summary'] = cached['touchpoint_summary'];
+  return enriched;
 }
 
 class MyDayRepository {
   static const String _joinSql = '''
     SELECT i.id, i.client_id, i.scheduled_date, i.scheduled_time,
            i.status, i.priority, i.notes, i.time_in, i.time_out,
-           c.first_name, c.last_name, c.agency_name, c.municipality,
-           c.touchpoint_number, c.next_touchpoint, c.touchpoint_summary
+           i.touchpoint_number, i.next_touchpoint, i.touchpoint_summary
     FROM itineraries i
-    LEFT JOIN clients c ON c.id = i.client_id
   ''';
 
   /// Stream of today's My Day clients for this user, ordered by scheduled time.
