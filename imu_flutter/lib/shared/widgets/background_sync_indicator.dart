@@ -7,6 +7,7 @@ import '../../services/connectivity_service.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
 import '../../core/utils/app_notification.dart';
+import '../../shared/providers/app_providers.dart' show refreshAssignedClientsProvider, isOnlineProvider;
 
 /// Compact background sync indicator widget
 ///
@@ -199,10 +200,63 @@ class EnhancedBackgroundSyncSheet extends ConsumerStatefulWidget {
 }
 
 class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackgroundSyncSheet> {
+  bool _isFreshSyncing = false;
+
+  Future<void> _handleFreshSync() async {
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      AppNotification.showNeutral(context, 'No internet connection.');
+      return;
+    }
+    setState(() => _isFreshSyncing = true);
+    try {
+      await ref.read(refreshAssignedClientsProvider)();
+      if (mounted) {
+        AppNotification.showSuccess(context, 'Client list refreshed from server.');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) AppNotification.showError(context, 'Fresh sync failed: $e');
+    } finally {
+      if (mounted) setState(() => _isFreshSyncing = false);
+    }
+  }
+
+  Future<void> _handleCancelPending(BackgroundSyncStatus syncStatus) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Pending Changes?'),
+        content: Text(
+          'This will discard ${syncStatus.pendingCount} unsynced '
+          'item${syncStatus.pendingCount == 1 ? '' : 's'}. '
+          'These changes will be permanently lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await PowerSyncService.clearPendingUploads();
+      if (mounted) {
+        AppNotification.showSuccess(context, 'Pending changes cancelled.');
+        Navigator.pop(context);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final syncStatus = ref.watch(backgroundSyncStatusProvider);
-    final syncService = ref.watch(backgroundSyncServiceProvider);
     final connectivityStatusAsync = ref.watch(connectivityStatusProvider);
     final powerSyncDbAsync = ref.watch(powerSyncDatabaseProvider);
 
@@ -242,7 +296,59 @@ class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackground
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const Divider(height: 12),
+
+              // Action buttons
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: (syncStatus.pendingCount == 0 || syncStatus.isSyncing || _isFreshSyncing)
+                            ? null
+                            : () => _handleCancelPending(syncStatus),
+                        icon: const Icon(Icons.cancel_outlined, size: 16),
+                        label: Text(
+                          syncStatus.pendingCount > 0
+                              ? 'Cancel Pending (${syncStatus.pendingCount})'
+                              : 'Cancel Pending',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: BorderSide(
+                            color: (syncStatus.pendingCount > 0 && !syncStatus.isSyncing && !_isFreshSyncing)
+                                ? Colors.red
+                                : Colors.grey[300]!,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: (syncStatus.isSyncing || _isFreshSyncing) ? null : _handleFreshSync,
+                        icon: _isFreshSyncing
+                            ? const SizedBox(
+                                width: 14, height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.cloud_download_outlined, size: 16),
+                        label: const Text('Fresh Sync', style: TextStyle(fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 12),
+              const SizedBox(height: 12),
 
               // Connection Status Section
               _buildSectionHeader('Connection', Icons.cloud_sync),
@@ -268,97 +374,6 @@ class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackground
               _buildLastSyncCard(context, syncStatus),
               const SizedBox(height: 24),
 
-              // Sync Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: syncStatus.isSyncing
-                      ? null
-                      : () {
-                          syncService.performSync();
-                          Navigator.pop(context);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: syncStatus.isSyncing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.sync, size: 18),
-                  label: Text(
-                    syncStatus.isSyncing ? 'Syncing...' : 'Sync Now',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Remove Pendings Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: (syncStatus.pendingCount == 0 || syncStatus.isSyncing)
-                      ? null
-                      : () async {
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Remove Pending Changes?'),
-                              content: Text(
-                                'This will discard ${syncStatus.pendingCount} unsynced '
-                                'item${syncStatus.pendingCount == 1 ? '' : 's'}. '
-                                'These changes will be permanently lost.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Remove'),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirmed == true && mounted) {
-                            await PowerSyncService.clearPendingUploads();
-                            if (mounted) {
-                              AppNotification.showSuccess(context, 'Pending changes removed');
-                              Navigator.pop(context);
-                            }
-                          }
-                        },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: BorderSide(
-                      color: syncStatus.pendingCount > 0 ? Colors.red : Colors.grey[300]!,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: Text(
-                    syncStatus.pendingCount > 0
-                        ? 'Remove Pendings (${syncStatus.pendingCount})'
-                        : 'Remove Pendings',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
