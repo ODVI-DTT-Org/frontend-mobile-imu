@@ -885,11 +885,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     HapticUtils.lightImpact();
 
     final nextType = _client!.nextTouchpointType;
-    // Use backend-calculated nextTouchpointNumber instead of calculating locally
-    final nextNumber = _client!.nextTouchpointNumber;
+    // Prefer backend-calculated nextTouchpointNumber; fall back to touchpoint_number
+    // (next_touchpoint_number may be absent from Hive-cached API responses)
+    final tp = _client!.touchpointNumber;
+    final nextNumber = _client!.nextTouchpointNumber ?? (tp >= 1 && tp <= 7 ? tp : null);
 
     if (nextNumber == null) {
-      // All touchpoints completed (nextTouchpointNumber is null when touchpointNumber >= 7)
+      // All touchpoints completed
       await _showTouchpointCompletionDialog();
       return;
     }
@@ -1311,6 +1313,15 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     // Check role-based permissions for quick actions
     final canCreateVisit = userRole?.canCreateVisitTouchpoints ?? false;
 
+    // Role must match the next touchpoint type:
+    // caravan → Visit only (1, 4, 7); tele → Call only (2, 3, 5, 6); managers → any
+    final nextType = client.nextTouchpointType;
+    final roleCanRecordTouchpoint = userRole == null ? false
+        : userRole.isManager ? true
+        : userRole == UserRole.caravan ? nextType == TouchpointType.visit
+        : userRole == UserRole.tele ? nextType == TouchpointType.call
+        : false;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -1326,12 +1337,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Touchpoint button — disabled by loan release OR touchpoint business rules
+          // Touchpoint button — disabled by loan release, touchpoint business rules, or role mismatch
           Expanded(
             child: _buildActionButton(
               label: 'TOUCHPOINT',
               color: Colors.green[700]!,
-              enabled: canRecordTouchpoint && !loanReleased,
+              enabled: canRecordTouchpoint && !loanReleased && roleCanRecordTouchpoint,
               loanReleased: loanReleased,
               onPressed: () => _handleRecordTouchpoint(),
             ),
@@ -1686,6 +1697,14 @@ class _QuickActionsSection extends ConsumerWidget {
     // Fallback to true for backward compatibility with cached data
     final canRecordTouchpoint = client?.touchpointStatus?.canCreateTouchpoint ?? true;
 
+    // Role must match next touchpoint type
+    final nextType = client?.nextTouchpointType;
+    final roleCanRecordTouchpoint = userRole == null ? false
+        : userRole.isManager ? true
+        : userRole == UserRole.caravan ? nextType == TouchpointType.visit
+        : userRole == UserRole.tele ? nextType == TouchpointType.call
+        : false;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1718,7 +1737,7 @@ class _QuickActionsSection extends ConsumerWidget {
               _QuickActionButton(
                 icon: LucideIcons.clipboardList,
                 label: 'Record Touchpoint',
-                onTap: (isLoanReleased || !canRecordTouchpoint) ? null : onRecordTouchpoint,
+                onTap: (isLoanReleased || !canRecordTouchpoint || !roleCanRecordTouchpoint) ? null : onRecordTouchpoint,
                 isPrimary: true,
               ),
               _QuickActionButton(

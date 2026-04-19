@@ -344,6 +344,36 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       return;
     }
 
+    // nextTouchpointNumber may be absent from Hive cache; fall back to touchpointNumber
+    final tp = fullClient.touchpointNumber;
+    final nextNumber = fullClient.nextTouchpointNumber ?? (tp >= 1 && tp <= 7 ? tp : null);
+
+    if (nextNumber == null) {
+      if (mounted) _showTouchpointCompletionDialog(visit.clientName);
+      return;
+    }
+
+    // RBAC: role must match the next touchpoint type
+    final authState = ref.read(authNotifierProvider);
+    final userRole = authState.user?.role;
+    final nextType = fullClient.nextTouchpointType;
+
+    if (userRole == null ||
+        !isValidTouchpointNumberForRole(nextNumber, userRole) ||
+        (nextType != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => TouchpointValidationDialog(
+            attemptedNumber: nextNumber,
+            attemptedType: nextType,
+            onConfirm: () => Navigator.of(context).pop(),
+          ),
+        );
+      }
+      return;
+    }
+
     // Show as bottom sheet instead of full screen
     final result = await showModalBottomSheet<bool>(
       context: context,

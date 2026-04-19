@@ -53,9 +53,12 @@ class ClientRepository {
     }
   }
 
-  /// Get client by ID
+  /// Get client by ID — Hive first (has embedded addresses/phones), SQLite fallback
   Future<Client?> getClient(String id) async {
     try {
+      final cached = HiveService().getClient(id);
+      if (cached != null) return Client.fromJson(cached);
+
       final db = await PowerSyncService.database;
       final results = await db.getAll(
         'SELECT * FROM clients WHERE id = ?',
