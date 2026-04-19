@@ -190,8 +190,11 @@ class Client {
 
   // Next touchpoint display
   String get nextTouchpointDisplay {
-    if (nextTouchpoint == null) return '$touchpointNumber/7';
-    return '$touchpointNumber/7 • ${nextTouchpoint!.toLowerCase()}';
+    final nextNum = nextTouchpointNumber ??
+        (touchpointNumber >= 0 && touchpointNumber < 7 ? touchpointNumber + 1 : null);
+    if (nextNum == null) return 'Completed';
+    if (nextTouchpoint == null) return '$nextNum/7';
+    return '$nextNum/7 • ${nextTouchpoint!.toLowerCase()}';
   }
 
   /// Display product type - shows raw value if available, otherwise enum value
