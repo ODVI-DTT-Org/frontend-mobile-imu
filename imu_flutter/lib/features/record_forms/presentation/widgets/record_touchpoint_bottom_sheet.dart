@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart' hide TimeOfDay, TouchpointReason, TouchpointStatus;
+import 'package:imu_flutter/features/clients/data/models/client_model.dart' as _cm show TouchpointReason, TouchpointStatus;
 import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_data.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/location_card.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/schedule_card.dart';
@@ -66,8 +67,8 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           clientId: client.id!,
           touchpointNumber: client.nextTouchpointNumber ?? client.touchpointNumber,
           type: TouchpointType.visit,
-          reason: reason.value!,
-          status: status.value!,
+          reason: _cm.TouchpointReason.values[reason.value!.index],
+          status: _cm.TouchpointStatus.values[status.value!.index],
           date: now,
           createdAt: now,
           userId: '',
