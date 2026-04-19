@@ -49,7 +49,7 @@ class ActivityRepository {
     final pending = await _pendingIds('touchpoints');
     final rows = await PowerSyncService.query(
       """
-      SELECT t.id, t.type, t.reason, t.touchpoint_number, t.created_at,
+      SELECT t.id, t.type, t.notes AS reason, t.touchpoint_number, t.created_at,
              c.first_name || ' ' || c.last_name AS client_name
       FROM touchpoints t
       LEFT JOIN clients c ON c.id = t.client_id
