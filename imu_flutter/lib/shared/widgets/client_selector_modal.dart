@@ -201,7 +201,19 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return clients;
   }
 
-  Future<void> _addClientToItinerary(Client client) async {
+  Future<void> _showDatePicker(Client client) async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: widget.selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
+    );
+    if (selectedDate != null && mounted) {
+      await _addClientToItinerary(client, customDate: selectedDate);
+    }
+  }
+
+  Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
     if (client.id == null) {
       if (mounted) {
         showToast('Invalid client: missing ID');
@@ -223,7 +235,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     });
 
     try {
-      final targetDate = widget.selectedDate;
+      final targetDate = customDate ?? widget.selectedDate;
 
       final repo = ref.read(itineraryRepositoryProvider);
       final userId = ref.read(currentUserIdProvider);
@@ -784,10 +796,17 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final actionButtons = [
           _buildActionButton(
             icon: isAdded ? LucideIcons.checkCircle : LucideIcons.calendar,
-            label: isAdded ? 'Added' : 'Add',
+            label: isAdded ? 'Added' : 'Add Today',
             isPrimary: true,
             isLoading: isAdding,
             onTap: isAdded || isAdding ? null : () => _addClientToItinerary(client),
+          ),
+          _buildActionButton(
+            icon: LucideIcons.calendarClock,
+            label: 'Schedule',
+            isPrimary: false,
+            isLoading: false,
+            onTap: isAdding ? null : () => _showDatePicker(client),
           ),
         ];
 

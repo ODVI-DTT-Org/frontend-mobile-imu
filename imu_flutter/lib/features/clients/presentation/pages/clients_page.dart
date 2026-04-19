@@ -978,13 +978,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     final actionButtons = [
       _buildActionButton(
         icon: LucideIcons.calendar,
-        label: isInMyDay ? 'Scheduled' : 'Schedule Today',
+        label: isInMyDay ? 'Scheduled' : 'Add Today',
         isPrimary: true,
         onTap: isInMyDay ? null : () => _addClientToToday(client),
       ),
       _buildActionButton(
         icon: LucideIcons.calendarClock,
-        label: 'Schedule Itinerary',
+        label: 'Schedule',
         isPrimary: false,
         onTap: () => _showDatePickerForClient(client),
       ),
