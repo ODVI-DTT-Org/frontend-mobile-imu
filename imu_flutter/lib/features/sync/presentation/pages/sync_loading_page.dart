@@ -253,10 +253,25 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         progress: 0.2,
       );
 
-      // Step 2: Listen to sync status
-      _listenToSyncStatus();
+      // Step 2: Re-check for local data now that PowerSync SQLite is open.
+      // On subsequent logins the initial check can return false because
+      // PowerSync hasn't finished opening the DB file yet.
+      final hasDataNow = await _checkForLocalData();
+      if (hasDataNow) {
+        logDebug('[SyncLoadingPage] Local data found after connect — skipping full sync wait.');
+        await _countTableRows();
+        await _preferencesService.saveLastSyncTime();
+        state = state.copyWith(
+          isSyncing: false,
+          syncComplete: true,
+          currentStep: 'Sync complete!',
+          progress: 1.0,
+        );
+        return;
+      }
 
-      // Step 3: Wait for initial sync to complete
+      // Step 3: No local data — wait for full initial sync
+      _listenToSyncStatus();
       await PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 60));
 
       // Step 4: Count rows in each table
