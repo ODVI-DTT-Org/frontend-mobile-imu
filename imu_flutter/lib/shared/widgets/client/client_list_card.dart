@@ -9,6 +9,7 @@ import 'touchpoint_status_badge.dart';
 import 'client_status_badge.dart';
 import '../../../core/utils/haptic_utils.dart';
 import '../../../shared/providers/app_providers.dart' show currentUserRoleProvider;
+import '../../../core/models/user_role.dart';
 import '../../../services/api/itinerary_api_service.dart';
 
 /// Reusable client card widget for My Day and Itinerary pages.
@@ -224,6 +225,18 @@ class ClientListCard extends ConsumerWidget {
     final effectiveTouchpoints = overrideTouchpoints ?? client.touchpointSummary;
     final effectiveLoanReleased = overrideLoanReleased ?? client.loanReleased;
     final effectiveUdi = overrideUdi ?? client.udi;
+
+    // Gray out clients whose next touchpoint is not actionable for the current role:
+    // Caravan → can only do Visits (1, 4, 7); gray out Call clients (2, 3, 5, 6)
+    // Tele    → can only do Calls  (2, 3, 5, 6); gray out Visit clients (1, 4, 7)
+    final role = ref.watch(currentUserRoleProvider);
+    final nextTpNum = client.nextTouchpointNumber;
+    const callNumbers = {2, 3, 5, 6};
+    const visitNumbers = {1, 4, 7};
+    final isNotMyTurn = nextTpNum != null && (
+      (role == UserRole.caravan && callNumbers.contains(nextTpNum)) ||
+      (role == UserRole.tele   && visitNumbers.contains(nextTpNum))
+    );
 
     final latestTouchpoint = effectiveTouchpoints.isNotEmpty
         ? effectiveTouchpoints.last
@@ -586,7 +599,7 @@ class ClientListCard extends ConsumerWidget {
 
     // Wrap with dismissible if enabled
     if (enableSwipeToDismiss && onRemove != null) {
-      return Dismissible(
+      final dismissible = Dismissible(
         key: Key(client.id ?? 'client_${client.hashCode}'),
         direction: DismissDirection.endToStart,
         onDismissed: (_) => onRemove!(),
@@ -616,9 +629,10 @@ class ClientListCard extends ConsumerWidget {
         ),
         child: cardContent,
       );
+      return isNotMyTurn ? Opacity(opacity: 0.4, child: dismissible) : dismissible;
     }
 
-    return cardContent;
+    return isNotMyTurn ? Opacity(opacity: 0.4, child: cardContent) : cardContent;
   }
 
   String _getTouchpointSummary(Touchpoint touchpoint) {
