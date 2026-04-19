@@ -40,11 +40,8 @@ class PSGCSelector extends HookConsumerWidget {
     final barangays = useState<List<PsgcBarangay>>([]);
 
     final isLoadingRegions = useState(true);
-    final isLoadingProvinces = useState(false);
-    final isLoadingMunicipalities = useState(false);
-    final isLoadingBarangays = useState(false);
 
-    // Load regions once
+    // Load regions once (triggers asset parse on first use)
     useEffect(() {
       Future(() async {
         try {
@@ -59,61 +56,50 @@ class PSGCSelector extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // Load provinces when region changes
+    // Cascade steps resolve instantly from in-memory cache — no loading states needed
     useEffect(() {
       if (selectedRegion.value == null) {
         provinces.value = [];
         return null;
       }
-      isLoadingProvinces.value = true;
       Future(() async {
         try {
           final loaded = await repo.getProvincesByRegion(selectedRegion.value!.name);
           provinces.value = loaded;
         } catch (_) {
           provinces.value = [];
-        } finally {
-          isLoadingProvinces.value = false;
         }
       });
       return null;
     }, [selectedRegion.value]);
 
-    // Load municipalities when province changes
     useEffect(() {
       if (selectedProvince.value == null) {
         municipalities.value = [];
         return null;
       }
-      isLoadingMunicipalities.value = true;
       Future(() async {
         try {
           final loaded = await repo.getMunicipalitiesByProvince(selectedProvince.value!.name);
           municipalities.value = loaded;
         } catch (_) {
           municipalities.value = [];
-        } finally {
-          isLoadingMunicipalities.value = false;
         }
       });
       return null;
     }, [selectedProvince.value]);
 
-    // Load barangays when municipality changes
     useEffect(() {
       if (selectedMunicipality.value == null) {
         barangays.value = [];
         return null;
       }
-      isLoadingBarangays.value = true;
       Future(() async {
         try {
           final loaded = await repo.getBarangaysByMunicipality(selectedMunicipality.value!.name);
           barangays.value = loaded;
         } catch (_) {
           barangays.value = [];
-        } finally {
-          isLoadingBarangays.value = false;
         }
       });
       return null;
@@ -174,47 +160,41 @@ class PSGCSelector extends HookConsumerWidget {
         const SizedBox(height: 12),
 
         // Province
-        if (isLoadingProvinces.value)
-          const _LoadingField(label: 'Province')
-        else
-          _buildDropdown<PsgcProvince>(
-            label: 'Province *',
-            value: selectedProvince.value,
-            items: provinces.value,
-            itemLabel: (p) => p.name,
-            hint: selectedRegion.value == null ? 'Select region first' : 'Select Province',
-            icon: LucideIcons.map,
-            enabled: enabled && selectedRegion.value != null && provinces.value.isNotEmpty,
-            onChanged: enabled && selectedRegion.value != null
-                ? (value) {
-                    selectedProvince.value = value;
-                    selectedMunicipality.value = null;
-                    selectedBarangay.value = null;
-                  }
-                : null,
-          ),
+        _buildDropdown<PsgcProvince>(
+          label: 'Province *',
+          value: selectedProvince.value,
+          items: provinces.value,
+          itemLabel: (p) => p.name,
+          hint: selectedRegion.value == null ? 'Select region first' : 'Select Province',
+          icon: LucideIcons.map,
+          enabled: enabled && selectedRegion.value != null && provinces.value.isNotEmpty,
+          onChanged: enabled && selectedRegion.value != null
+              ? (value) {
+                  selectedProvince.value = value;
+                  selectedMunicipality.value = null;
+                  selectedBarangay.value = null;
+                }
+              : null,
+        ),
 
         const SizedBox(height: 12),
 
         // Municipality
-        if (isLoadingMunicipalities.value)
-          const _LoadingField(label: 'City/Municipality')
-        else
-          _buildDropdown<PsgcMunicipality>(
-            label: 'City/Municipality *',
-            value: selectedMunicipality.value,
-            items: municipalities.value,
-            itemLabel: (m) => m.displayName,
-            hint: selectedProvince.value == null ? 'Select province first' : 'Select City/Municipality',
-            icon: LucideIcons.building,
-            enabled: enabled && selectedProvince.value != null && municipalities.value.isNotEmpty,
-            onChanged: enabled && selectedProvince.value != null
-                ? (value) {
-                    selectedMunicipality.value = value;
-                    selectedBarangay.value = null;
-                  }
-                : null,
-          ),
+        _buildDropdown<PsgcMunicipality>(
+          label: 'City/Municipality *',
+          value: selectedMunicipality.value,
+          items: municipalities.value,
+          itemLabel: (m) => m.displayName,
+          hint: selectedProvince.value == null ? 'Select province first' : 'Select City/Municipality',
+          icon: LucideIcons.building,
+          enabled: enabled && selectedProvince.value != null && municipalities.value.isNotEmpty,
+          onChanged: enabled && selectedProvince.value != null
+              ? (value) {
+                  selectedMunicipality.value = value;
+                  selectedBarangay.value = null;
+                }
+              : null,
+        ),
 
         const SizedBox(height: 12),
 
@@ -224,10 +204,7 @@ class PSGCSelector extends HookConsumerWidget {
           children: [
             const Text('Barangay *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
             const SizedBox(height: 4),
-            if (isLoadingBarangays.value)
-              const _LoadingField(label: '')
-            else
-              GestureDetector(
+            GestureDetector(
                 onTap: (enabled && selectedMunicipality.value != null && barangays.value.isNotEmpty)
                     ? showBarangayPicker
                     : null,
