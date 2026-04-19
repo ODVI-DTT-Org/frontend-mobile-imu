@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
@@ -44,6 +45,7 @@ class ActivityRepository {
   // ── Table queries ─────────────────────────────────────────────────────────
 
   Future<List<ActivityItem>> fetchTouchpoints(DateTime from, DateTime to) async {
+    debugPrint('[ACTIVITY][repo] fetchTouchpoints userId=$userId from=$from to=$to');
     final pending = await _pendingIds('touchpoints');
     final rows = await PowerSyncService.query(
       """
@@ -58,6 +60,7 @@ class ActivityRepository {
       [userId, from.toIso8601String(), to.toIso8601String()],
     );
 
+    debugPrint('[ACTIVITY][repo] fetchTouchpoints — ${rows.length} rows');
     return rows.map((r) {
       final id = r['id'] as String;
       final tpNum = r['touchpoint_number'] as int? ?? 0;
@@ -76,6 +79,7 @@ class ActivityRepository {
   }
 
   Future<List<ActivityItem>> fetchVisits(DateTime from, DateTime to) async {
+    debugPrint('[ACTIVITY][repo] fetchVisits userId=$userId from=$from to=$to');
     final pending = await _pendingIds('visits');
     final rows = await PowerSyncService.query(
       """
@@ -90,6 +94,7 @@ class ActivityRepository {
       [userId, from.toIso8601String(), to.toIso8601String()],
     );
 
+    debugPrint('[ACTIVITY][repo] fetchVisits — ${rows.length} rows');
     return rows.map((r) {
       final id = r['id'] as String;
       return ActivityItem(
@@ -105,6 +110,7 @@ class ActivityRepository {
   }
 
   Future<List<ActivityItem>> fetchCalls(DateTime from, DateTime to) async {
+    debugPrint('[ACTIVITY][repo] fetchCalls userId=$userId from=$from to=$to');
     final pending = await _pendingIds('calls');
     final rows = await PowerSyncService.query(
       """
@@ -119,6 +125,7 @@ class ActivityRepository {
       [userId, from.toIso8601String(), to.toIso8601String()],
     );
 
+    debugPrint('[ACTIVITY][repo] fetchCalls — ${rows.length} rows');
     return rows.map((r) {
       final id = r['id'] as String;
       return ActivityItem(
@@ -134,6 +141,7 @@ class ActivityRepository {
   }
 
   Future<List<ActivityItem>> fetchApprovals(DateTime from, DateTime to) async {
+    debugPrint('[ACTIVITY][repo] fetchApprovals userId=$userId from=$from to=$to');
     final rows = await PowerSyncService.query(
       """
       SELECT a.id, a.type, a.status, a.reason, a.created_at,
@@ -147,6 +155,7 @@ class ActivityRepository {
       [userId, from.toIso8601String(), to.toIso8601String()],
     );
 
+    debugPrint('[ACTIVITY][repo] fetchApprovals — ${rows.length} rows');
     return rows.map((r) {
       final type = r['type'] as String? ?? 'client';
       final reason = r['reason'] as String?;
@@ -194,5 +203,6 @@ class ActivityRepository {
 
 final activityRepositoryProvider = Provider<ActivityRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider) ?? '';
+  debugPrint('[ACTIVITY][repo] activityRepositoryProvider — userId="$userId"');
   return ActivityRepository(userId: userId);
 });

@@ -213,6 +213,15 @@ class ActivityPage extends ConsumerWidget {
             'Failed to load activity',
             style: TextStyle(color: Colors.grey.shade600),
           ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              error,
+              style: TextStyle(color: Colors.red.shade300, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ),
           const SizedBox(height: 8),
           TextButton(onPressed: notifier.refresh, child: const Text('Retry')),
         ],

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
@@ -69,6 +70,7 @@ class ActivityFeedNotifier extends StateNotifier<ActivityFeedState> {
   }
 
   Future<void> load() async {
+    debugPrint('[ACTIVITY] load() start — from=${state.dateRange.start} to=${state.dateRange.end} typeFilter=${state.typeFilter}');
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final items = await _repo.fetchAll(
@@ -76,8 +78,11 @@ class ActivityFeedNotifier extends StateNotifier<ActivityFeedState> {
         to: state.dateRange.end,
         typeFilter: state.typeFilter,
       );
+      debugPrint('[ACTIVITY] load() success — ${items.length} items');
       state = state.copyWith(items: items, isLoading: false);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[ACTIVITY] load() error: $e');
+      debugPrint('[ACTIVITY] stacktrace: $st');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
