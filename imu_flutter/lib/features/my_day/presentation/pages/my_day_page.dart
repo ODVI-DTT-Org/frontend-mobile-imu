@@ -31,9 +31,9 @@ import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
-import '../../../clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
-import '../../../clients/presentation/widgets/record_visit_only_bottom_sheet.dart';
-import '../../../clients/presentation/widgets/record_loan_release_bottom_sheet.dart';
+import '../../../record_forms/presentation/widgets/record_touchpoint_bottom_sheet.dart';
+import '../../../record_forms/presentation/widgets/record_visit_bottom_sheet.dart';
+import '../../../record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 
 class MyDayPage extends ConsumerStatefulWidget {
@@ -461,7 +461,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       enableDrag: true,
-      builder: (context) => RecordVisitOnlyBottomSheet(
+      builder: (context) => RecordVisitBottomSheet(
         client: fullClient,
       ),
     );

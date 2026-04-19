@@ -33,9 +33,9 @@ import '../../../clients/data/repositories/address_repository.dart' show Address
 import '../../../clients/data/repositories/phone_number_repository.dart' show PhoneNumberRepository;
 import '../../../clients/presentation/widgets/add_address_modal.dart';
 import '../../../clients/presentation/widgets/add_phone_modal.dart';
-import '../../../clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
-import '../../../clients/presentation/widgets/record_visit_only_bottom_sheet.dart';
-import '../../../clients/presentation/widgets/record_loan_release_bottom_sheet.dart';
+import '../../../record_forms/presentation/widgets/record_touchpoint_bottom_sheet.dart';
+import '../../../record_forms/presentation/widgets/record_visit_bottom_sheet.dart';
+import '../../../record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
 import '../../../clients/presentation/widgets/client_information_expansion_panel.dart';
 import '../../../clients/presentation/widgets/contact_information_expansion_panel.dart';
 import '../../../clients/presentation/widgets/touchpoint_history_expansion_panel.dart';
@@ -1042,7 +1042,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       enableDrag: true,
-      builder: (context) => RecordVisitOnlyBottomSheet(
+      builder: (context) => RecordVisitBottomSheet(
         client: _client!,
       ),
     );

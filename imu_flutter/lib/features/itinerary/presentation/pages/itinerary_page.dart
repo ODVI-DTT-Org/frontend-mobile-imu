@@ -30,9 +30,9 @@ import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../features/clients/data/models/client_model.dart';
-import '../../../../features/clients/presentation/widgets/record_touchpoint_bottom_sheet.dart';
-import '../../../../features/clients/presentation/widgets/record_visit_only_bottom_sheet.dart';
-import '../../../../features/clients/presentation/widgets/record_loan_release_bottom_sheet.dart';
+import '../../../../features/record_forms/presentation/widgets/record_touchpoint_bottom_sheet.dart';
+import '../../../../features/record_forms/presentation/widgets/record_visit_bottom_sheet.dart';
+import '../../../../features/record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
 import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../services/maps/map_service.dart';
@@ -375,7 +375,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       enableDrag: true,
-      builder: (context) => RecordVisitOnlyBottomSheet(
+      builder: (context) => RecordVisitBottomSheet(
         client: fullClient,
       ),
     );

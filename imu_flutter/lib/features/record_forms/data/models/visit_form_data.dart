@@ -25,7 +25,8 @@ class VisitFormData extends FormData {
     this.status,
   });
 
-  /// Factory constructor that auto-sets reason and status
+  /// Convenience constructor that pre-fills reason/status with common defaults.
+  /// Values remain user-editable — no validation enforcement on these defaults.
   factory VisitFormData.withAutoSetValues({
     required Client client,
     DateTime? timeIn,
@@ -37,6 +38,8 @@ class VisitFormData extends FormData {
     double? gpsLatitude,
     double? gpsLongitude,
     String? gpsAddress,
+    TouchpointReason reason = TouchpointReason.clientNotAvailable,
+    TouchpointStatus status = TouchpointStatus.incomplete,
   }) {
     return VisitFormData(
       client: client,
@@ -49,8 +52,8 @@ class VisitFormData extends FormData {
       gpsLatitude: gpsLatitude,
       gpsLongitude: gpsLongitude,
       gpsAddress: gpsAddress,
-      reason: TouchpointReason.clientNotAvailable,
-      status: TouchpointStatus.incomplete,
+      reason: reason,
+      status: status,
     );
   }
 
@@ -58,68 +61,43 @@ class VisitFormData extends FormData {
   Map<String, String?> get validationErrors {
     final errors = <String, String?>{};
 
-    // Time In validation
-    if (timeIn == null) {
-      errors['timeIn'] = 'Time In is required';
-    }
+    if (timeIn == null) errors['timeIn'] = 'Time In is required';
 
-    // Time Out validation
     if (calculatedTimeOut == null) {
       errors['timeOut'] = 'Time Out is required';
     } else if (timeIn != null && calculatedTimeOut!.isBefore(timeIn!)) {
       errors['timeOut'] = 'Must be after Time In';
     }
 
-    // Odometer In validation
     if (odometerIn == null || odometerIn!.isEmpty) {
       errors['odometerIn'] = 'Odometer In is required';
     }
 
-    // Odometer Out validation
     if (odometerOut == null || odometerOut!.isEmpty) {
       errors['odometerOut'] = 'Odometer Out is required';
     } else if (odometerIn != null && odometerOut != null) {
-      final inValue = int.tryParse(odometerIn!);
-      final outValue = int.tryParse(odometerOut!);
-      if (inValue != null && outValue != null && outValue < inValue) {
+      final inVal = int.tryParse(odometerIn!);
+      final outVal = int.tryParse(odometerOut!);
+      if (inVal != null && outVal != null && outVal < inVal) {
         errors['odometerOut'] = 'Must be >= Odometer In';
       }
     }
 
-    // Photo validation
-    if (photoPath == null || photoPath!.isEmpty) {
-      errors['photo'] = 'Photo is required';
-    }
-
-    // Remarks validation
-    if (remarks != null && remarks!.length > 255) {
-      errors['remarks'] = 'Max 255 characters';
-    }
-
-    // Visit-specific validations
-    // Note: reason and status are auto-set, but we validate they're present
-    if (reason == null) {
-      errors['reason'] = 'Reason must be auto-set to Client Not Available';
-    }
-
-    if (status == null) {
-      errors['status'] = 'Status must be auto-set to Incomplete';
-    }
-
-    // Verify auto-set values
-    if (reason != TouchpointReason.clientNotAvailable) {
-      errors['reason'] = 'Reason must be Client Not Available';
-    }
-
-    if (status != TouchpointStatus.incomplete) {
-      errors['status'] = 'Status must be Incomplete';
-    }
+    if (photoPath == null || photoPath!.isEmpty) errors['photo'] = 'Photo is required';
+    if (remarks == null || remarks!.trim().isEmpty) errors['remarks'] = 'Remarks is required';
+    if (reason == null) errors['reason'] = 'Reason is required';
+    if (status == null) errors['status'] = 'Status is required';
 
     return errors;
   }
 
   @override
-  bool get isFilled => super.isFilled && reason != null && status != null;
+  bool get isFilled =>
+      super.isFilled &&
+      reason != null &&
+      status != null &&
+      remarks != null &&
+      remarks!.trim().isNotEmpty;
 
   @override
   VisitFormData copyWith({
