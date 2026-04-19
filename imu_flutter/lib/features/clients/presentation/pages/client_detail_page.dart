@@ -41,6 +41,7 @@ import '../../../clients/presentation/widgets/contact_information_expansion_pane
 import '../../../clients/presentation/widgets/touchpoint_history_expansion_panel.dart';
 import '../../../clients/presentation/widgets/cms_visit_history_expansion_panel.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../../services/local_storage/hive_service.dart';
 
 final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
   final clientRepo = ref.watch(clientRepositoryProvider);
@@ -1000,6 +1001,14 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
+      setState(() {
+        if (_client != null) {
+          _client = _client!.copyWith(
+            touchpointNumber: _client!.touchpointNumber + 1,
+          );
+        }
+      });
+      await HiveService().removeClient(widget.clientId);
       await _loadClient();
       ref.invalidate(clientTouchpointsProvider);
     }

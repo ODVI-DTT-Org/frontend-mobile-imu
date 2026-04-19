@@ -38,7 +38,7 @@ class VisitFormData extends FormData {
     double? gpsLatitude,
     double? gpsLongitude,
     String? gpsAddress,
-    TouchpointReason reason = TouchpointReason.clientNotAvailable,
+    TouchpointReason reason = TouchpointReason.notAround,
     TouchpointStatus status = TouchpointStatus.incomplete,
   }) {
     return VisitFormData(

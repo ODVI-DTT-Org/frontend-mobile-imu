@@ -1414,8 +1414,10 @@ class TouchpointPattern {
   }
 }
 
-/// Reason types for touchpoints with API-compatible values
+/// Reason types for touchpoints — covers both caravan visit reasons and tele call reasons
+/// for proper round-trip deserialization of stored data.
 enum TouchpointReason {
+  // Caravan visit reasons
   abroad('ABROAD'),
   applyMembership('APPLY_MEMBERSHIP'),
   backedOut('BACKED_OUT'),
@@ -1437,11 +1439,39 @@ enum TouchpointReason {
   overage('OVERAGE'),
   poorHealth('POOR_HEALTH'),
   returnedAtm('RETURNED_ATM'),
+  telemarketing('TELEMARKETING'),
   undecided('UNDECIDED'),
   unlocated('UNLOCATED'),
   withOtherLending('WITH_OTHER_LENDING'),
-  interestedButDeclined('INTERESTED_BUT_DECLINED'),
-  telemarketing('TELEMARKETING');
+  interestedFamilyDeclined('INTERESTED_FAMILY_DECLINED'),
+  newReleaseLoan('NEW_RELEASE_LOAN'),
+  // Tele call reasons (L1/L2/L3 system)
+  l1Borrowed('L1_BORROWED'),
+  l1FullyPaid('L1_FULLY_PAID'),
+  l1Interested('L1_INTERESTED'),
+  l1LoanInquiry('L1_LOAN_INQUIRY'),
+  l1Undecided('L1_UNDECIDED'),
+  l1WillCallIfNeeded('L1_WILL_CALL_IF_NEEDED'),
+  l1EndorsedToCaravan('L1_ENDORSED_TO_CARAVAN'),
+  l1NotInList('L1_NOT_IN_LIST'),
+  l2NotAround('L2_NOT_AROUND'),
+  l2Ringing('L2_RINGING'),
+  l2LineBusy('L2_LINE_BUSY'),
+  l2ExistingClient('L2_EXISTING_CLIENT'),
+  l2WithOtherLending('L2_WITH_OTHER_LENDING'),
+  l1NotInterested('L1_NOT_INTERESTED'),
+  l2IncorrectNumber('L2_INCORRECT_NUMBER'),
+  l2WrongNumber('L2_WRONG_NUMBER'),
+  l2Dropcall('L2_DROPCALL'),
+  l2CannotBeReached('L2_CANNOT_BE_REACHED'),
+  l2NotYetInService('L2_NOT_YET_IN_SERVICE'),
+  l2FamilyDeclined('L2_FAMILY_DECLINED'),
+  l2Abroad('L2_ABROAD'),
+  l3NotQualified('L3_NOT_QUALIFIED'),
+  l3Disqualified('L3_DISQUALIFIED'),
+  l3BackedOut('L3_BACKED_OUT'),
+  l3Disapproved('L3_DISAPPROVED'),
+  l3Deceased('L3_DECEASED');
 
   final String _apiValue;
   const TouchpointReason(this._apiValue);
@@ -1545,10 +1575,12 @@ class ClientTouchpointStatus {
 
 /// Touchpoint status enum with API-compatible values
 enum TouchpointStatus {
-  interested('Interested'),
-  undecided('Undecided'),
-  notInterested('Not Interested'),
-  completed('Completed');
+  interested('INTERESTED'),
+  undecided('UNDECIDED'),
+  notInterested('NOT_INTERESTED'),
+  completed('COMPLETED'),
+  followUpNeeded('FOLLOW_UP_NEEDED'),
+  incomplete('INCOMPLETE');
 
   final String _apiValue;
   const TouchpointStatus(this._apiValue);
@@ -1556,8 +1588,9 @@ enum TouchpointStatus {
   String get apiValue => _apiValue;
 
   static TouchpointStatus fromApi(String value) {
+    final normalized = value.toUpperCase().replaceAll(' ', '_');
     return TouchpointStatus.values.firstWhere(
-      (e) => e._apiValue == value,
+      (e) => e._apiValue == normalized,
       orElse: () => TouchpointStatus.interested,
     );
   }

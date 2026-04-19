@@ -3,52 +3,50 @@
 import 'package:imu_flutter/features/record_forms/data/models/form_data.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
+/// Caravan visit reasons — matches backend touchpoint_reasons table (role='caravan', touchpoint_type='Visit').
+/// newReleaseLoan is kept for the loan release form only and excluded from the standard visit dropdown.
 enum TouchpointReason {
-  abroad('ABROAD'),
-  interested('INTERESTED'),
-  loanInquiry('LOAN_INQUIRY'),
-  followUp('FOLLOW_UP'),
-  documentsSubmitted('DOCUMENTS_SUBMITTED'),
-  documentsIncomplete('DOCUMENTS_INCOMPLETE'),
-  notAround('NOT_AROUND'),
-  rescheduled('RESCHEDULED'),
-  declined('DECLINED'),
-  referred('REFERRED'),
-  wrongNumber('WRONG_NUMBER'),
-  disconnected('DISCONNECTED'),
-  busy('BUSY'),
-  callBack('CALL_BACK'),
-  meetingSet('MEETING_SET'),
-  paymentCollection('PAYMENT_COLLECTION'),
-  paymentPromised('PAYMENT_PROMISED'),
-  complaint('COMPLAINT'),
-  query('QUERY'),
-  renewal('RENEWAL'),
-  additional('ADDITIONAL'),
-  preterm('PRETERM'),
-  newApplication('NEW_APPLICATION'),
-  verification('VERIFICATION'),
-  approval('APPROVAL'),
-  disbursement('DISBURSEMENT'),
-  clientNotAvailable('CLIENT_NOT_AVAILABLE'),  // For Visit Only
-  newReleaseLoan('NEW_RELEASE_LOAN');         // For Release Loan
+  abroad('ABROAD', 'Abroad'),
+  applyMembership('APPLY_MEMBERSHIP', 'Apply for PUSU / LIKA Membership'),
+  backedOut('BACKED_OUT', 'Backed Out'),
+  ciBi('CI_BI', 'CI/BI'),
+  deceased('DECEASED', 'Deceased'),
+  disapproved('DISAPPROVED', 'Disapproved'),
+  forAdaCompliance('FOR_ADA_COMPLIANCE', 'For ADA Compliance'),
+  forProcessing('FOR_PROCESSING', 'For Processing / Approval / Request / Buy-Out'),
+  forUpdate('FOR_UPDATE', 'For Update'),
+  forVerification('FOR_VERIFICATION', 'For Verification'),
+  inaccessibleArea('INACCESSIBLE_AREA', 'Inaccessible / Critical Area'),
+  interested('INTERESTED', 'Interested'),
+  loanInquiry('LOAN_INQUIRY', 'Loan Inquiry'),
+  movedOut('MOVED_OUT', 'Moved Out'),
+  notAmenable('NOT_AMENABLE', 'Not Amenable to Our Product Criteria'),
+  notAround('NOT_AROUND', 'Not Around'),
+  notInList('NOT_IN_LIST', 'Not In the List'),
+  notInterested('NOT_INTERESTED', 'Not Interested'),
+  overage('OVERAGE', 'Overage'),
+  poorHealth('POOR_HEALTH', 'Poor Health Condition'),
+  returnedAtm('RETURNED_ATM', 'Returned ATM / Pick-up ATM'),
+  telemarketing('TELEMARKETING', 'Telemarketing'),
+  undecided('UNDECIDED', 'Undecided'),
+  unlocated('UNLOCATED', 'Unlocated'),
+  withOtherLending('WITH_OTHER_LENDING', 'With Other Lending'),
+  interestedFamilyDeclined('INTERESTED_FAMILY_DECLINED', 'Interested, But Declined Due to Family Decision'),
+  newReleaseLoan('NEW_RELEASE_LOAN', 'New Release Loan');
 
   final String apiValue;
-  const TouchpointReason(this.apiValue);
-
-  String get displayName {
-    return apiValue
-        .split('_')
-        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
-        .join(' ');
-  }
+  final String displayName;
+  const TouchpointReason(this.apiValue, this.displayName);
 
   static TouchpointReason fromApi(String value) {
     return TouchpointReason.values.firstWhere(
-      (reason) => reason.apiValue == value,
+      (reason) => reason.apiValue == value.toUpperCase(),
       orElse: () => TouchpointReason.interested,
     );
   }
+
+  static List<TouchpointReason> get visitReasons =>
+      values.where((r) => r != TouchpointReason.newReleaseLoan).toList();
 }
 
 enum TouchpointStatus {

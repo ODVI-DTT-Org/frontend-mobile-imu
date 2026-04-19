@@ -22,6 +22,8 @@ class VisitCreationService {
     double? latitude,
     double? longitude,
     String? address,
+    String? reason,
+    String? status,
   }) async {
     final db = await PowerSyncService.database;
     final id = _uuid.v4();
@@ -34,8 +36,9 @@ class VisitCreationService {
     await db.execute(
       '''INSERT INTO visits
          (id, client_id, user_id, type, time_in, time_out,
-          odometer_arrival, odometer_departure, _local_photo_path, notes, latitude, longitude, address, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          odometer_arrival, odometer_departure, _local_photo_path, notes,
+          latitude, longitude, address, reason, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         clientId,
@@ -50,6 +53,8 @@ class VisitCreationService {
         latitude,
         longitude,
         address,
+        reason,
+        status,
         now,
       ],
     );

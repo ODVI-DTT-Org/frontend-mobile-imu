@@ -73,6 +73,8 @@ class RecordVisitBottomSheet extends HookConsumerWidget {
           latitude: gps.lat,
           longitude: gps.lng,
           address: gps.address,
+          reason: reason.value?.apiValue,
+          status: status.value?.apiValue,
         );
 
         if (context.mounted) {
@@ -132,9 +134,7 @@ class RecordVisitBottomSheet extends HookConsumerWidget {
           locked: false,
           reason: reason.value,
           status: status.value,
-          availableReasons: TouchpointReason.values
-              .where((r) => r != TouchpointReason.newReleaseLoan)
-              .toList(),
+          availableReasons: TouchpointReason.visitReasons,
           availableStatuses: [
             TouchpointStatus.interested,
             TouchpointStatus.undecided,

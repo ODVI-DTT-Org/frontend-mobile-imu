@@ -67,8 +67,8 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           clientId: client.id!,
           touchpointNumber: client.nextTouchpointNumber ?? (client.touchpointNumber + 1),
           type: TouchpointType.visit,
-          reason: _cm.TouchpointReason.values[reason.value!.index],
-          status: _cm.TouchpointStatus.values[status.value!.index],
+          reason: _cm.TouchpointReason.fromApi(reason.value!.apiValue),
+          status: _cm.TouchpointStatus.fromApi(status.value!.apiValue),
           date: now,
           createdAt: now,
           userId: '',
@@ -155,9 +155,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           locked: false,
           reason: reason.value,
           status: status.value,
-          availableReasons: TouchpointReason.values
-              .where((r) => r != TouchpointReason.newReleaseLoan)
-              .toList(),
+          availableReasons: TouchpointReason.visitReasons,
           availableStatuses: [
             TouchpointStatus.interested,
             TouchpointStatus.undecided,
