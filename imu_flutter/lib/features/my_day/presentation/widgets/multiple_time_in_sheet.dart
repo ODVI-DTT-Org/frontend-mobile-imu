@@ -986,6 +986,10 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
         return 'Not Interested';
       case TouchpointStatus.completed:
         return 'Completed';
+      case TouchpointStatus.followUpNeeded:
+        return 'Follow Up Needed';
+      case TouchpointStatus.incomplete:
+        return 'Incomplete';
     }
   }
 
@@ -1000,6 +1004,10 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
         return const Color(0xFFEF4444); // Red
       case TouchpointStatus.completed:
         return const Color(0xFF3B82F6); // Blue
+      case TouchpointStatus.followUpNeeded:
+        return const Color(0xFF8B5CF6); // Purple
+      case TouchpointStatus.incomplete:
+        return const Color(0xFF6B7280); // Grey
     }
   }
 }

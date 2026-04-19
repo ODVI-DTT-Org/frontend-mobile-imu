@@ -57,6 +57,14 @@ class TouchpointStatusBadge extends StatelessWidget {
         badgeColor = Colors.blue;
         badgeIcon = LucideIcons.checkCircle;
         break;
+      case TouchpointStatus.followUpNeeded:
+        badgeColor = Colors.purple;
+        badgeIcon = LucideIcons.refreshCw;
+        break;
+      case TouchpointStatus.incomplete:
+        badgeColor = Colors.grey;
+        badgeIcon = LucideIcons.clock;
+        break;
     }
 
     return Container(
