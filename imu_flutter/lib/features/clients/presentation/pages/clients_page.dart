@@ -22,8 +22,7 @@ import '../../../../shared/providers/app_providers.dart' show
     locationFilterProvider,
     clientAttributeFilterProvider,
     myDayApiServiceProvider,
-    todayItineraryProvider,
-    refreshAssignedClientsProvider;
+    todayItineraryProvider;
 import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
 import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
 import '../../../../shared/widgets/client/client_status_badge.dart';
@@ -128,13 +127,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   Future<void> _handleRefresh() async {
     HapticUtils.lightImpact();
     if (_showAssignedClientsOnly) {
-      // Re-fetch from REST API → save to Hive → rebuild UI with fresh data
-      try {
-        await ref.read(refreshAssignedClientsProvider)();
-      } catch (e) {
-        // Fall back to invalidating from cache if API is unreachable
-        ref.invalidate(assignedClientsProvider);
-      }
+      ref.invalidate(assignedClientsProvider);
     } else {
       ref.invalidate(onlineClientsProvider);
     }
