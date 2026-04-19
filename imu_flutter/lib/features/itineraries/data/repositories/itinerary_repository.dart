@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -398,6 +399,18 @@ Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   enriched['middle_name'] = cached['middleName'] ?? cached['middle_name'];
   enriched['municipality'] = cached['municipality'];
   enriched['province'] = cached['province'];
+  enriched['product_type'] = cached['productType'] ?? cached['product_type'];
+  enriched['pension_type'] = cached['pensionType'] ?? cached['pension_type'];
+  enriched['loan_type'] = cached['loanType'] ?? cached['loan_type'];
+  // touchpoint_summary must be a JSON string for fromPowerSync parsers
+  final summary = cached['touchpoint_summary'];
+  if (summary is List) {
+    enriched['touchpoint_summary'] = jsonEncode(summary);
+  } else if (summary is String) {
+    enriched['touchpoint_summary'] = summary;
+  }
+  enriched['touchpoint_number'] = cached['touchpoint_number'];
+  enriched['next_touchpoint_number'] = cached['next_touchpoint_number'] ?? cached['nextTouchpointNumber'];
   return enriched;
 }
 

@@ -202,6 +202,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     // Show action bottom sheet with options
     if (mounted) {
+      final authState = ref.read(authNotifierProvider);
+      final userRole = authState.user?.role;
+      final nextNum = visit.nextTouchpointNumber;
+      final canRecordTouchpoint = nextNum != null &&
+          nextNum <= 7 &&
+          userRole != null &&
+          isValidTouchpointNumberForRole(nextNum, userRole);
+
       final action = await ActionBottomSheet.show(
         context,
         title: visit.clientName,
@@ -230,6 +238,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             title: 'Record Touchpoint',
             description: 'Create touchpoint + visit',
             value: 'touchpoint',
+            isDisabled: !canRecordTouchpoint,
           ),
           ActionOption(
             icon: LucideIcons.mapPin,

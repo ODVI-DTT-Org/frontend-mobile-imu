@@ -9,6 +9,7 @@ class ActionOption {
   final String? description;
   final String value;
   final bool isDestructive;
+  final bool isDisabled;
   final Color? iconColor;
 
   const ActionOption({
@@ -17,6 +18,7 @@ class ActionOption {
     this.description,
     required this.value,
     this.isDestructive = false,
+    this.isDisabled = false,
     this.iconColor,
   });
 }
@@ -184,8 +186,10 @@ class ActionBottomSheet extends StatelessWidget {
   }
 
   Widget _buildOption(BuildContext context, ActionOption option) {
-    final iconColor = option.iconColor ??
-        (option.isDestructive ? Colors.red.shade600 : const Color(0xFF0F172A));
+    final isDisabled = option.isDisabled;
+    final iconColor = isDisabled
+        ? Colors.grey.shade400
+        : (option.iconColor ?? (option.isDestructive ? Colors.red.shade600 : const Color(0xFF0F172A)));
 
     return Column(
       children: [
@@ -197,7 +201,9 @@ class ActionBottomSheet extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: option.isDestructive ? Colors.red.shade700 : null,
+              color: isDisabled
+                  ? Colors.grey.shade400
+                  : (option.isDestructive ? Colors.red.shade700 : null),
             ),
           ),
           subtitle: option.description != null
@@ -205,11 +211,11 @@ class ActionBottomSheet extends StatelessWidget {
                   option.description!,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey.shade600,
+                    color: isDisabled ? Colors.grey.shade300 : Colors.grey.shade600,
                   ),
                 )
               : null,
-          onTap: () {
+          onTap: isDisabled ? null : () {
             HapticUtils.lightImpact();
             Navigator.of(context).pop(option.value);
           },

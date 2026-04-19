@@ -282,6 +282,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
     // Show action bottom sheet with options
     if (mounted) {
+      final authState = ref.read(authNotifierProvider);
+      final userRole = authState.user?.role;
+      final nextNum = client.nextTouchpointNumber;
+      final canRecordTouchpoint = nextNum != null &&
+          nextNum <= 7 &&
+          userRole != null &&
+          isValidTouchpointNumberForRole(nextNum, userRole);
+
       final action = await ActionBottomSheet.show(
         context,
         title: client.fullName,
@@ -310,6 +318,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             title: 'Record Touchpoint',
             description: 'Create touchpoint + visit',
             value: 'touchpoint',
+            isDisabled: !canRecordTouchpoint,
           ),
           ActionOption(
             icon: LucideIcons.mapPin,

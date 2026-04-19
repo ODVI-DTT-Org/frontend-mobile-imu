@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -33,6 +34,9 @@ class ItineraryItem {
   final String? pensionType;  // raw e.g. 'GSIS'
   final String? loanType;     // raw e.g. 'SALARY'
 
+  final int? nextTouchpointNumber;
+  final String? nextTouchpointType;
+
   // Previous touchpoint info
   final int? previousTouchpointNumber; // Last completed touchpoint number
   final String? previousTouchpointReason; // Last completed touchpoint reason
@@ -60,6 +64,8 @@ class ItineraryItem {
     this.productType,
     this.pensionType,
     this.loanType,
+    this.nextTouchpointNumber,
+    this.nextTouchpointType,
     this.previousTouchpointNumber,
     this.previousTouchpointReason,
     this.previousTouchpointType,
@@ -193,6 +199,28 @@ class ItineraryItem {
       scheduledDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
     }
 
+    // Derive next touchpoint from touchpoint_summary
+    static const _sequence = ['Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'];
+    int? nextNum;
+    String? nextType;
+    final summaryJson = row['touchpoint_summary'] as String?;
+    if (summaryJson != null && summaryJson.isNotEmpty && summaryJson != 'null') {
+      try {
+        final decoded = jsonDecode(summaryJson);
+        if (decoded is List) {
+          final completed = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((t) => (t['touchpoint_number'] as num?)?.toInt() ?? 0)
+              .where((n) => n > 0)
+              .toSet();
+          for (var i = 1; i <= 7; i++) {
+            if (!completed.contains(i)) { nextNum = i; break; }
+          }
+        }
+      } catch (_) {}
+    }
+    if (nextNum != null) nextType = _sequence[nextNum - 1];
+
     return ItineraryItem(
       id: row['id'] as String,
       clientId: row['client_id'] as String? ?? '',
@@ -201,6 +229,8 @@ class ItineraryItem {
       scheduledTime: row['scheduled_time'] as String?,
       status: row['status'] as String? ?? 'pending',
       priority: row['priority'] as String? ?? 'normal',
+      touchpointNumber: nextNum,
+      touchpointType: nextType,
       notes: row['notes'] as String?,
       address: () {
         final parts = [
@@ -217,6 +247,8 @@ class ItineraryItem {
       updatedAt: row['updated_at'] != null
           ? DateTime.parse(row['updated_at'] as String)
           : null,
+      nextTouchpointNumber: nextNum,
+      nextTouchpointType: nextType,
     );
   }
 
