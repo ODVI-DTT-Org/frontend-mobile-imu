@@ -396,9 +396,10 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final hiveService = HiveService();
   var rawClients = hiveService.getAllClients();
 
-  // Startup hydration: if cache is empty and user is authenticated and online,
-  // fetch from API now (handles already-logged-in users after an upgrade).
-  if (rawClients.isEmpty) {
+  // Startup hydration: fetch from API if cache is empty OR if a previous fetch
+  // was never completed (app killed mid-fetch leaves clients in Hive but no timestamp).
+  final lastFetchMs = hiveService.getSetting<int>('clients_last_fetch_ms');
+  if (rawClients.isEmpty || lastFetchMs == null) {
     final isOnline = ref.read(isOnlineProvider);
     final jwtAuth = ref.read(jwtAuthProvider);
     if (isOnline && jwtAuth.isAuthenticated) {
