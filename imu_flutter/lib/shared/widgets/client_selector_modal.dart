@@ -353,9 +353,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     // Get client status and touchpoint info for validation
     final status = _clientStatuses[client.id];
-    // Use Client.touchpointNumber (next touchpoint number 1-7) directly
-    final nextTouchpoint = client.touchpointNumber;
-    // Use Client.nextTouchpointType to get the next touchpoint type
     final nextType = client.nextTouchpointType;
 
     // Check if can add before proceeding
