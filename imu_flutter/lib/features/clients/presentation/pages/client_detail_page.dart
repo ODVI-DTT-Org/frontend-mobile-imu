@@ -1001,6 +1001,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
+      // Immediately update Hive so the clients list reflects the new state
+      _updateHiveAfterTouchpoint(widget.clientId);
+
+      // Optimistic update for the detail page button
       setState(() {
         if (_client != null) {
           _client = _client!.copyWith(
@@ -1008,10 +1012,29 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           );
         }
       });
-      await HiveService().removeClient(widget.clientId);
+
       await _loadClient();
       ref.invalidate(clientTouchpointsProvider);
+      ref.invalidate(assignedClientsProvider);
     }
+  }
+
+  /// Updates the Hive cache entry after a touchpoint is recorded so that
+  /// the clients list immediately shows the button as disabled.
+  Future<void> _updateHiveAfterTouchpoint(String clientId) async {
+    final cached = HiveService().getClient(clientId);
+    if (cached == null) return;
+    final updated = Map<String, dynamic>.from(cached);
+    final prevCount = (updated['touchpoint_number'] as int? ?? 0);
+    updated['touchpoint_number'] = prevCount + 1;
+    final raw = updated['touchpoint_status'];
+    if (raw is Map) {
+      final ts = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+      ts['canCreateTouchpoint'] = false;
+      ts['completedTouchpoints'] = prevCount + 1;
+      updated['touchpoint_status'] = ts;
+    }
+    await HiveService().saveClient(updated);
   }
 
   TouchpointStatus _parseTouchpointStatus(String status) {
@@ -1059,8 +1082,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
+      _updateHiveAfterTouchpoint(widget.clientId);
       await _loadClient();
       ref.invalidate(clientTouchpointsProvider);
+      ref.invalidate(assignedClientsProvider);
     }
   }
 
