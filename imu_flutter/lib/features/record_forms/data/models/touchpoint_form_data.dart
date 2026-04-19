@@ -76,9 +76,11 @@ enum TouchpointStatus {
 }
 
 enum ProductType {
-  pusu('PUSU', 'PUSU'),
-  lika('LIKA', 'LIKA'),
-  sub2k('SUB2K', 'Sub 2K');
+  bfpActive('BFP_ACTIVE', 'BFP Active'),
+  bfpPension('BFP_PENSION', 'BFP Pension'),
+  pnpPension('PNP_PENSION', 'PNP Pension'),
+  napolcom('NAPOLCOM', 'NAPOLCOM'),
+  bfpStp('BFP_STP', 'BFP STP');
 
   final String apiValue;
   final String displayName;
@@ -87,7 +89,7 @@ enum ProductType {
   static ProductType fromApi(String value) {
     return ProductType.values.firstWhere(
       (type) => type.apiValue == value,
-      orElse: () => ProductType.pusu,
+      orElse: () => ProductType.bfpActive,
     );
   }
 }
