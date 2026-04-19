@@ -414,13 +414,42 @@ class ApprovalsApiService {
     final token = _authService.accessToken;
     if (token == null) throw Exception('Not authenticated');
 
+    // Backend reads notes via JSON.parse(approval.notes) and matches snake_case fieldMappings
+    final snakeCaseData = {
+      'first_name': updatedData['firstName'],
+      'last_name': updatedData['lastName'],
+      'middle_name': updatedData['middleName'],
+      'birth_date': updatedData['birthDate'],
+      'email': updatedData['email'],
+      'phone': updatedData['phone'],
+      'agency_name': updatedData['agencyName'],
+      'department': updatedData['department'],
+      'position': updatedData['position'],
+      'employment_status': updatedData['employmentStatus'],
+      'payroll_date': updatedData['payrollDate'],
+      'tenure': updatedData['tenure'],
+      'client_type': updatedData['clientType'],
+      'product_type': updatedData['productType'],
+      'market_type': updatedData['marketType'],
+      'pension_type': updatedData['pensionType'],
+      'pan': updatedData['pan'],
+      'facebook_link': updatedData['facebookLink'],
+      'remarks': updatedData['remarks'],
+      'agency_id': updatedData['agencyId'],
+      'region': updatedData['region'],
+      'province': updatedData['province'],
+      'municipality': updatedData['municipality'],
+      'barangay': updatedData['barangay'],
+      'is_starred': updatedData['isStarred'],
+    };
+
     final response = await _dio.post(
       '/approvals',
       data: {
         'type': 'client',
         'client_id': clientId,
         'reason': 'Client Edit Request',
-        'updated_client_information': updatedData,
+        'notes': jsonEncode(snakeCaseData),
       },
       options: Options(headers: {
         'Authorization': 'Bearer $token',
