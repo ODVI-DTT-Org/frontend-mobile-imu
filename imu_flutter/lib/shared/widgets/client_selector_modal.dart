@@ -250,9 +250,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         // Trigger parent refresh immediately
         widget.onClientAdded();
 
-        // Invalidate todayItineraryProvider to refresh the itinerary
-        ref.invalidate(todayItineraryProvider);
-
         // Invalidate clientTouchpointCountsProvider to refresh touchpoint counts
         ref.invalidate(clientTouchpointCountsProvider);
       }
