@@ -410,6 +410,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       ),
     );
 
+    if (result == true && visit.id.isNotEmpty) {
+      await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
+    }
   }
 
   Future<void> _handleReleaseLoan(ItineraryItem visit) async {
@@ -435,6 +438,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       ),
     );
 
+    if (result == true && visit.id.isNotEmpty) {
+      await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
+    }
   }
 
   Future<void> _releaseLoan(ItineraryItem visit) async {

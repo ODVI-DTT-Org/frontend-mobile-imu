@@ -467,6 +467,9 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     );
 
     if (result == true && mounted) {
+      if (client.id.isNotEmpty) {
+        await ref.read(itineraryRepositoryProvider).updateStatus(client.id, 'completed');
+      }
       await ref.read(myDayStateProvider.notifier).refresh();
     }
   }
@@ -492,6 +495,9 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     );
 
     if (result == true && mounted) {
+      if (client.id.isNotEmpty) {
+        await ref.read(itineraryRepositoryProvider).updateStatus(client.id, 'completed');
+      }
       await ref.read(myDayStateProvider.notifier).refresh();
     }
   }
