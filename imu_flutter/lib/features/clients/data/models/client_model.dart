@@ -184,8 +184,8 @@ class Client {
     if (nextTouchpointNumber != null && nextTouchpointNumber! > 0) {
       return nextTouchpointNumber! - 1;
     }
-    // Fallback: calculate from touchpointNumber, but ensure non-negative
-    return touchpointNumber > 0 ? touchpointNumber - 1 : 0;
+    // Fallback: touchpointNumber IS the completed count (0-7 from DB)
+    return touchpointNumber >= 0 ? touchpointNumber : 0;
   }
 
   // Next touchpoint display
