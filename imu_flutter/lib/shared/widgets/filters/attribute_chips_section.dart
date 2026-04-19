@@ -43,6 +43,9 @@ class AttributeChipsSection extends StatelessWidget {
             final updated = _toggle(draftFilter.clientTypes, v);
             onChanged(draftFilter.copyWith(clientTypes: updated.isEmpty ? null : updated));
           },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(clientTypes: selected.isEmpty ? null : selected.toList()));
+          },
         ),
         const SizedBox(height: 12),
         _FilterGroup(
@@ -53,6 +56,9 @@ class AttributeChipsSection extends StatelessWidget {
           onToggle: (v) {
             final updated = _toggle(draftFilter.marketTypes, v);
             onChanged(draftFilter.copyWith(marketTypes: updated.isEmpty ? null : updated));
+          },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(marketTypes: selected.isEmpty ? null : selected.toList()));
           },
         ),
         const SizedBox(height: 12),
@@ -65,6 +71,9 @@ class AttributeChipsSection extends StatelessWidget {
             final updated = _toggle(draftFilter.pensionTypes, v);
             onChanged(draftFilter.copyWith(pensionTypes: updated.isEmpty ? null : updated));
           },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(pensionTypes: selected.isEmpty ? null : selected.toList()));
+          },
         ),
         const SizedBox(height: 12),
         _FilterGroup(
@@ -75,6 +84,9 @@ class AttributeChipsSection extends StatelessWidget {
           onToggle: (v) {
             final updated = _toggle(draftFilter.productTypes, v);
             onChanged(draftFilter.copyWith(productTypes: updated.isEmpty ? null : updated));
+          },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(productTypes: selected.isEmpty ? null : selected.toList()));
           },
         ),
         const SizedBox(height: 12),
@@ -89,6 +101,9 @@ class AttributeChipsSection extends StatelessWidget {
             final updated = _toggle(draftFilter.loanTypes, v);
             onChanged(draftFilter.copyWith(loanTypes: updated.isEmpty ? null : updated));
           },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(loanTypes: selected.isEmpty ? null : selected.toList()));
+          },
         ),
       ],
     );
@@ -101,6 +116,7 @@ class _FilterGroup extends StatelessWidget {
   final Set<String> selected;
   final String Function(String) labelOf;
   final void Function(String) onToggle;
+  final void Function(Set<String>) onApply;
 
   const _FilterGroup({
     required this.label,
@@ -108,6 +124,7 @@ class _FilterGroup extends StatelessWidget {
     required this.selected,
     required this.labelOf,
     required this.onToggle,
+    required this.onApply,
   });
 
   @override
@@ -137,6 +154,7 @@ class _FilterGroup extends StatelessWidget {
             selected: selected,
             labelOf: labelOf,
             onToggle: onToggle,
+            onApply: onApply,
           ),
       ],
     );
@@ -191,12 +209,14 @@ class _MultiSelectDropdown extends StatelessWidget {
   final Set<String> selected;
   final String Function(String) labelOf;
   final void Function(String) onToggle;
+  final void Function(Set<String>) onApply;
 
   const _MultiSelectDropdown({
     required this.values,
     required this.selected,
     required this.labelOf,
     required this.onToggle,
+    required this.onApply,
   });
 
   String get _buttonLabel {
@@ -214,7 +234,7 @@ class _MultiSelectDropdown extends StatelessWidget {
         values: values,
         selected: selected,
         labelOf: labelOf,
-        onToggle: onToggle,
+        onApply: onApply,
       ),
     );
   }
@@ -266,13 +286,13 @@ class _PickerSheet extends StatefulWidget {
   final List<String> values;
   final Set<String> selected;
   final String Function(String) labelOf;
-  final void Function(String) onToggle;
+  final void Function(Set<String>) onApply;
 
   const _PickerSheet({
     required this.values,
     required this.selected,
     required this.labelOf,
-    required this.onToggle,
+    required this.onApply,
   });
 
   @override
@@ -297,11 +317,7 @@ class _PickerSheetState extends State<_PickerSheet> {
   }
 
   void _apply() {
-    // Compute diff and call onToggle for each changed item
-    final added = _localSelected.difference(widget.selected);
-    final removed = widget.selected.difference(_localSelected);
-    for (final v in added) widget.onToggle(v);
-    for (final v in removed) widget.onToggle(v);
+    widget.onApply(_localSelected);
     Navigator.pop(context);
   }
 
