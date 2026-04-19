@@ -6,6 +6,7 @@ import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/core/utils/logger.dart';
 import 'package:imu_flutter/services/api/itinerary_api_service.dart' show ItineraryItem;
 import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserIdProvider;
+import 'package:imu_flutter/services/local_storage/hive_service.dart';
 
 /// Itinerary model for scheduled visits
 class Itinerary {
@@ -342,6 +343,25 @@ final itineraryRepositoryProvider = Provider<ItineraryRepository>((ref) {
   return ItineraryRepository();
 });
 
+/// Enriches a PowerSync itinerary row with client name from Hive when the JOIN returns null.
+Map<String, dynamic> _enrichItineraryRowFromHive(Map<String, dynamic> row) {
+  final firstName = row['first_name'] as String?;
+  final lastName = row['last_name'] as String?;
+  if ((firstName == null || firstName.isEmpty) && (lastName == null || lastName.isEmpty)) {
+    final clientId = row['client_id'] as String?;
+    if (clientId != null) {
+      final cached = HiveService().getClient(clientId);
+      if (cached != null) {
+        final enriched = Map<String, dynamic>.from(row);
+        enriched['first_name'] = cached['first_name'];
+        enriched['last_name'] = cached['last_name'];
+        return enriched;
+      }
+    }
+  }
+  return row;
+}
+
 /// Stream provider for itineraries on a specific date — queries PowerSync local SQLite
 /// Returns items for the current user, ordered by scheduled_time.
 final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateTime>((ref, date) async* {
@@ -362,7 +382,7 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
          ORDER BY i.scheduled_time ASC''',
       parameters: [userId, dateStr],
     )) {
-      yield rows.map(ItineraryItem.fromPowerSync).toList();
+      yield rows.map((r) => ItineraryItem.fromPowerSync(_enrichItineraryRowFromHive(r))).toList();
     }
   } catch (e) {
     logError('itineraryByDateProvider error', e);
