@@ -76,7 +76,7 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
                 c.first_name, c.last_name, c.client_type,
                 c.touchpoint_summary
          FROM itineraries i
-         JOIN clients c ON c.id = i.client_id
+         LEFT JOIN clients c ON c.id = i.client_id
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
          ORDER BY i.scheduled_time ASC''',
       parameters: [userId, dateStr],

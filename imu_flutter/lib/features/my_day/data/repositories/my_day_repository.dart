@@ -9,7 +9,7 @@ class MyDayRepository {
            c.first_name, c.last_name, c.agency_name, c.municipality,
            c.touchpoint_number, c.next_touchpoint, c.touchpoint_summary
     FROM itineraries i
-    JOIN clients c ON c.id = i.client_id
+    LEFT JOIN clients c ON c.id = i.client_id
   ''';
 
   /// Stream of today's My Day clients for this user, ordered by scheduled time.

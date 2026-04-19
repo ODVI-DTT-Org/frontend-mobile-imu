@@ -471,12 +471,18 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   }
 
   /// Converts an ItineraryItem to a minimal Client for ClientListTile display.
+  /// clientName is stored as "LastName, FirstName" format.
   Client _itineraryItemToClient(ItineraryItem item) {
-    final nameParts = item.clientName.trim().split(' ');
+    final commaIdx = item.clientName.indexOf(',');
+    final lastName = commaIdx >= 0
+        ? item.clientName.substring(0, commaIdx).trim()
+        : item.clientName.trim();
+    final firstName =
+        commaIdx >= 0 ? item.clientName.substring(commaIdx + 1).trim() : '';
     return Client(
       id: item.clientId,
-      firstName: nameParts.first,
-      lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+      firstName: firstName,
+      lastName: lastName,
       clientType: ClientType.potential,
       productType: ProductType.bfpActive,
       pensionType: PensionType.none,
