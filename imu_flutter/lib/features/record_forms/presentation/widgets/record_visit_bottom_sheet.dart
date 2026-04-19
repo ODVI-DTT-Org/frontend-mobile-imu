@@ -59,6 +59,7 @@ class RecordVisitBottomSheet extends HookConsumerWidget {
         final timeOutDt = DateTime(
             now.year, now.month, now.day, timeOut.value!.hour, timeOut.value!.minute);
 
+        final gps = gpsData.value!;
         final service = ref.read(visitCreationServiceProvider);
         await service.createVisit(
           clientId: client.id!,
@@ -69,6 +70,9 @@ class RecordVisitBottomSheet extends HookConsumerWidget {
           photoFile: photoPath.value != null ? File(photoPath.value!) : null,
           notes: remarks.text.trim(),
           type: 'regular_visit',
+          latitude: gps.lat,
+          longitude: gps.lng,
+          address: gps.address,
         );
 
         if (context.mounted) {

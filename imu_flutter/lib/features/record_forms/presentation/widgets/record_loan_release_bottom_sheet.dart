@@ -64,6 +64,7 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
 
         final udiNum = int.tryParse(udiController.text.trim());
 
+        final gps = gpsData.value!;
         final service = ref.read(releaseCreationServiceProvider);
         await service.createCompleteLoanRelease(
           clientId: client.id!,
@@ -76,6 +77,8 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           udiNumber: udiNum,
           remarks: remarks.text.trim(),
           photoPath: photoPath.value,
+          latitude: gps.lat,
+          longitude: gps.lng,
         );
 
         if (context.mounted) {

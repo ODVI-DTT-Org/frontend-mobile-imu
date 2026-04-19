@@ -92,6 +92,9 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           client.id!,
           touchpoint,
           photo: photoPath.value != null ? File(photoPath.value!) : null,
+          latitude: gps.lat,
+          longitude: gps.lng,
+          address: gps.address,
         );
 
         if (context.mounted) {
