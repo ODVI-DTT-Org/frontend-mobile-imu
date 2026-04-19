@@ -66,8 +66,8 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
         final service = ref.read(releaseCreationServiceProvider);
         await service.createCompleteLoanRelease(
           clientId: client.id!,
-          timeIn: timeInDt.toIso8601String(),
-          timeOut: timeOutDt.toIso8601String(),
+          timeIn: timeInDt.toUtc().toIso8601String(),
+          timeOut: timeOutDt.toUtc().toIso8601String(),
           odometerArrival: odometerArrival.value!,
           odometerDeparture: odometerDeparture.value!,
           productType: productType.value!.apiValue,

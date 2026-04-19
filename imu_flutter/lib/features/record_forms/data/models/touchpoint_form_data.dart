@@ -76,26 +76,18 @@ enum TouchpointStatus {
 }
 
 enum ProductType {
-  bfpActive('BFP_ACTIVE'),
-  bfpPension('BFP_PENSION'),
-  pnpPension('PNP_PENSION'),
-  napolcom('NAPOLCOM'),
-  bfpStp('BFP_STP');
+  pusu('PUSU', 'PUSU'),
+  lika('LIKA', 'LIKA'),
+  sub2k('SUB2K', 'Sub 2K');
 
   final String apiValue;
-  const ProductType(this.apiValue);
-
-  String get displayName {
-    return apiValue
-        .split('_')
-        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
-        .join(' ');
-  }
+  final String displayName;
+  const ProductType(this.apiValue, this.displayName);
 
   static ProductType fromApi(String value) {
     return ProductType.values.firstWhere(
       (type) => type.apiValue == value,
-      orElse: () => ProductType.bfpActive,
+      orElse: () => ProductType.pusu,
     );
   }
 }
