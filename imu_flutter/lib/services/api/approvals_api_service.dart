@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -362,12 +363,37 @@ class ApprovalsApiService {
     final token = _authService.accessToken;
     if (token == null) throw Exception('Not authenticated');
 
+    // Backend schema requires notes to be a JSON string, and reads snake_case keys
+    final snakeCaseData = {
+      'first_name': clientData['firstName'],
+      'last_name': clientData['lastName'],
+      'middle_name': clientData['middleName'],
+      'birth_date': clientData['birthDate'],
+      'email': clientData['email'],
+      'phone': clientData['phone'],
+      'agency_name': clientData['agencyName'],
+      'department': clientData['department'],
+      'position': clientData['position'],
+      'employment_status': clientData['employmentStatus'],
+      'payroll_date': clientData['payrollDate'],
+      'tenure': clientData['tenure'],
+      'client_type': clientData['clientType'],
+      'product_type': clientData['productType'],
+      'market_type': clientData['marketType'],
+      'pension_type': clientData['pensionType'],
+      'pan': clientData['pan'],
+      'facebook_link': clientData['facebookLink'],
+      'remarks': clientData['remarks'],
+      'agency_id': clientData['agencyId'],
+      'is_starred': clientData['isStarred'],
+    };
+
     final response = await _dio.post(
       '/approvals',
       data: {
         'type': 'client',
         'reason': 'Client Creation Request',
-        'notes': clientData,
+        'notes': jsonEncode(snakeCaseData),
       },
       options: Options(headers: {
         'Authorization': 'Bearer $token',
