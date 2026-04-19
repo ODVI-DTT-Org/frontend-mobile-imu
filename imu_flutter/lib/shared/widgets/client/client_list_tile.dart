@@ -143,44 +143,69 @@ class ClientListTile extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
 
-              // Row 3: Touchpoint progress badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: canRecordNext
-                      ? progressColor.withOpacity(0.1)
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: canRecordNext
-                        ? progressColor.withOpacity(0.3)
-                        : Colors.grey.shade300,
+              // Row 3: Loan Released badge OR touchpoint progress badge
+              if (client.loanReleased)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isCompleted
-                          ? LucideIcons.checkCircle
-                          : isCall
-                              ? LucideIcons.phone
-                              : LucideIcons.mapPin,
-                      size: 11,
-                      color: canRecordNext ? progressColor : Colors.grey.shade500,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.checkCircle, size: 11, color: Color(0xFF16A34A)),
+                      SizedBox(width: 4),
+                      Text(
+                        'LOAN RELEASED',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: canRecordNext
+                        ? progressColor.withOpacity(0.1)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: canRecordNext
+                          ? progressColor.withOpacity(0.3)
+                          : Colors.grey.shade300,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      touchpointInfo,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isCompleted
+                            ? LucideIcons.checkCircle
+                            : isCall
+                                ? LucideIcons.phone
+                                : LucideIcons.mapPin,
+                        size: 11,
                         color: canRecordNext ? progressColor : Colors.grey.shade500,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        touchpointInfo,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: canRecordNext ? progressColor : Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 6),
 
               // Row 4: Address
