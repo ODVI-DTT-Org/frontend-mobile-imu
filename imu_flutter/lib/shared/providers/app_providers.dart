@@ -614,7 +614,10 @@ final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
   final connectivity = ref.watch(connectivityServiceProvider);
   final releaseApi = ref.watch(releaseApiServiceProvider);
   final visitApi = ref.watch(visitApiServiceProvider);
-  return ReleaseCreationService(connectivity, releaseApi, visitApi);
+  final approvalsApi = ref.watch(approvalsApiServiceProvider);
+  final uploadApi = ref.watch(uploadApiServiceProvider);
+  final role = ref.watch(currentUserRoleProvider);
+  return ReleaseCreationService(connectivity, releaseApi, visitApi, approvalsApi, uploadApi, role);
 });
 
 /// Client mutation service provider

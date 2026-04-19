@@ -62,8 +62,6 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
         final timeOutDt = DateTime(
             now.year, now.month, now.day, timeOut.value!.hour, timeOut.value!.minute);
 
-        final udiNum = int.tryParse(udiController.text.trim());
-
         final gps = gpsData.value!;
         final service = ref.read(releaseCreationServiceProvider);
         await service.createCompleteLoanRelease(
@@ -74,11 +72,12 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
           odometerDeparture: odometerDeparture.value!,
           productType: productType.value!.apiValue,
           loanType: loanType.value!.apiValue,
-          udiNumber: udiNum,
+          udiNumber: udiController.text.trim(),
           remarks: remarks.text.trim(),
           photoPath: photoPath.value,
           latitude: gps.lat,
           longitude: gps.lng,
+          address: gps.address,
         );
 
         if (context.mounted) {
