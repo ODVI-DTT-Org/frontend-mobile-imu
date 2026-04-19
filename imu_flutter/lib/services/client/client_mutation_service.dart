@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
+import 'package:imu_flutter/services/local_storage/hive_service.dart';
 import 'package:imu_flutter/core/utils/logger.dart';
 
 enum ClientMutationResult { success, requiresApproval, queued }
@@ -61,6 +62,14 @@ class ClientMutationService {
       ],
     );
 
+    // Mirror to Hive cache so client list shows the new entry immediately
+    try {
+      final created = client.copyWith(id: id, createdAt: DateTime.parse(now));
+      await HiveService().saveClient(created.toJson());
+    } catch (e) {
+      logError('ClientMutationService: Failed to mirror created client to Hive', e);
+    }
+
     return ClientMutationResult.success;
   }
 
@@ -113,6 +122,20 @@ class ClientMutationService {
       ],
     );
 
+    // Mirror updated fields to Hive cache
+    try {
+      final hive = HiveService();
+      final existingJson = hive.getClient(client.id ?? '');
+      if (existingJson != null) {
+        // Merge updated scalar fields into existing Hive entry (preserves addresses/phones)
+        final merged = Map<String, dynamic>.from(existingJson)
+          ..addAll(client.toJson());
+        await hive.saveClient(merged);
+      }
+    } catch (e) {
+      logError('ClientMutationService: Failed to mirror updated client to Hive', e);
+    }
+
     return ClientMutationResult.success;
   }
 
@@ -121,6 +144,13 @@ class ClientMutationService {
     logDebug('ClientMutationService: Deleting client $clientId from SQLite');
 
     await db.execute('DELETE FROM clients WHERE id = ?', [clientId]);
+
+    // Remove from Hive cache
+    try {
+      await HiveService().removeClient(clientId);
+    } catch (e) {
+      logError('ClientMutationService: Failed to remove client from Hive cache', e);
+    }
 
     return ClientMutationResult.success;
   }

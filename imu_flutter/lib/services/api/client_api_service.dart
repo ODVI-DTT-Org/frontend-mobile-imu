@@ -193,6 +193,26 @@ class ClientApiService {
     }
   }
 
+  /// Fetch ALL assigned clients across all pages — for initial Hive cache population.
+  /// Uses MAX_PER_PAGE=100 to minimize round-trips.
+  Future<List<Client>> fetchAllAssignedClients() async {
+    const perPage = 100;
+    final allClients = <Client>[];
+    int page = 1;
+    int totalPages = 1;
+
+    do {
+      final response = await fetchAssignedClients(page: page, perPage: perPage);
+      allClients.addAll(response.items);
+      totalPages = response.totalPages;
+      debugPrint('[CLIENT-API] fetchAllAssignedClients: page $page/$totalPages, fetched ${response.items.length}');
+      page++;
+    } while (page <= totalPages);
+
+    debugPrint('[CLIENT-API] fetchAllAssignedClients: total ${allClients.length} clients fetched');
+    return allClients;
+  }
+
   /// Search unassigned clients (clients without caravan_id)
   Future<List<Client>> searchUnassignedClients({
     int page = 1,

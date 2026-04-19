@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 // import 'package:package_info_plus/package_info_plus.dart'; // Temporarily disabled for build
-import 'package:uuid/uuid.dart';
 import '../models/error_report_model.dart';
 import 'error_reporter_service.dart';
-import 'sync/powersync_service.dart';
 import 'auth/jwt_auth_service.dart';
 
 /// Centralized error logging helper
@@ -41,7 +38,7 @@ class ErrorLoggingHelper {
     }
   }
 
-  /// Log non-critical error (user can continue) - PowerSync batch
+  /// Log non-critical error (user can continue) - direct REST API
   static Future<void> logNonCriticalError({
     required String operation,
     required Object error,
@@ -61,13 +58,12 @@ class ErrorLoggingHelper {
         details: {'operation': operation, ...?context},
       );
 
-      // Queue to PowerSync
-      await _queueForPowerSync(report);
+      await ErrorReporterService().reportError(report);
 
-      debugPrint('[ErrorLogging] Non-critical error queued: $operation');
+      debugPrint('[ErrorLogging] Non-critical error logged: $operation');
     } catch (e) {
       // Silently fail
-      debugPrint('[ErrorLogging] Failed to queue non-critical error: $e');
+      debugPrint('[ErrorLogging] Failed to log non-critical error: $e');
     }
   }
 
@@ -138,30 +134,4 @@ class ErrorLoggingHelper {
     };
   }
 
-  /// Queue non-critical error to PowerSync
-  static Future<void> _queueForPowerSync(ErrorReport report) async {
-    try {
-      await PowerSyncService.execute(
-        'INSERT INTO error_logs (code, message, platform, stack_trace, user_id, '
-        'request_id, fingerprint, app_version, os_version, device_info, details, '
-        'is_synced, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
-        [
-          report.code,
-          report.message,
-          report.platform.value,
-          report.stackTrace ?? '',
-          report.userId ?? '',
-          report.requestId ?? '',
-          report.fingerprint ?? '',
-          report.appVersion ?? '',
-          report.osVersion ?? '',
-          jsonEncode(report.deviceInfo ?? {}),
-          jsonEncode(report.details ?? {}),
-          report.createdAt.toIso8601String(),
-        ],
-      );
-    } catch (e) {
-      debugPrint('[ErrorLogging] Failed to queue error for PowerSync: $e');
-    }
-  }
 }

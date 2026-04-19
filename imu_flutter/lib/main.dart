@@ -16,6 +16,7 @@ import 'services/sync/powersync_service.dart';
 import 'services/sync/powersync_connector.dart';
 import 'services/auth/jwt_auth_service.dart';
 import 'services/error_reporter_service.dart';
+import 'services/local_storage/hive_service.dart';
 import 'shared/widgets/splash_screen.dart';
 
 void main() async {
@@ -49,7 +50,7 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
       });
 
       // Initialize Hive first (before any service that uses it)
-      await Hive.initFlutter();
+      await HiveService().init();
       await Future.delayed(const Duration(milliseconds: 500)); // Smooth transition
 
       setState(() {

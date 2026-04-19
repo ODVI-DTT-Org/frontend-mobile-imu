@@ -544,6 +544,8 @@ class Client {
       }).toList(),
       'touchpoint_number': touchpointNumber,
       'next_touchpoint': nextTouchpoint,
+      'addresses': addresses.map((a) => a.toJson()).toList(),
+      'phone_numbers': phoneNumbers.map((p) => p.toJson()).toList(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'isStarred': isStarred,
@@ -719,6 +721,10 @@ class Client {
       municipality: json['municipality'] ?? json['municipality_id'],
       barangay: json['barangay'] ?? json['psgc_barangay'],
       udi: json['udi'],
+      addresses: ((json['expand']?['addresses'] ?? json['addresses']) as List?)
+          ?.map((a) => addr.Address.fromJson(a as Map<String, dynamic>)).toList() ?? [],
+      phoneNumbers: ((json['expand']?['phone_numbers'] ?? json['phone_numbers']) as List?)
+          ?.map((p) => ph.PhoneNumber.fromJson(p as Map<String, dynamic>)).toList() ?? [],
       touchpoints: (json['touchpoints'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       touchpointSummary: (json['touchpoint_summary'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       touchpointNumber: json['touchpoint_number'] as int? ?? 1,

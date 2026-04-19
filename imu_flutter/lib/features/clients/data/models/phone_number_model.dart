@@ -48,6 +48,27 @@ class PhoneNumber {
     );
   }
 
+  // Factory from API response JSON
+  factory PhoneNumber.fromJson(Map<String, dynamic> json) {
+    final isPrimaryRaw = json['is_primary'];
+    final isPrimary = isPrimaryRaw is bool
+        ? isPrimaryRaw
+        : (isPrimaryRaw is int ? isPrimaryRaw == 1 : false);
+    return PhoneNumber(
+      id: json['id'] as String? ?? '',
+      clientId: json['client_id'] as String? ?? '',
+      label: PhoneLabel.fromString(json['label'] as String? ?? 'mobile'),
+      number: json['number'] as String? ?? '',
+      isPrimary: isPrimary,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
+    );
+  }
+
   // Factory from legacy client field
   factory PhoneNumber.fromLegacyField(Client client) {
     return PhoneNumber(
@@ -61,12 +82,15 @@ class PhoneNumber {
     );
   }
 
-  // Convert to JSON for API requests
+  // Convert to JSON (includes id/client_id for local cache; safe to use for API too)
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
+      'client_id': clientId,
       'label': label.name,
       'number': number,
       'is_primary': isPrimary,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 

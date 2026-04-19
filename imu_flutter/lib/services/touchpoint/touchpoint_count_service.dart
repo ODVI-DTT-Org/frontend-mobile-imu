@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../sync/powersync_service.dart';
+import '../local_storage/hive_service.dart';
 import '../../shared/providers/app_providers.dart' show isOnlineProvider, clientApiServiceProvider;
 import '../../features/clients/data/models/client_model.dart';
 
@@ -11,22 +12,28 @@ class TouchpointCountService {
 
   TouchpointCountService(this._ref);
 
-  /// Fetch touchpoint counts from PowerSync using Client.touchpointNumber
+  /// Fetch touchpoint counts from Hive cache using Client.touchpointNumber
   Future<Map<String, int>> fetchFromPowerSync(List<String> clientIds) async {
     if (clientIds.isEmpty) return {};
 
     final counts = <String, int>{};
+    final hive = HiveService();
 
     for (final clientId in clientIds) {
-      // Query client from PowerSync
+      // Try Hive cache first (primary source after clients_by_territory removal)
+      final cachedJson = hive.getClient(clientId);
+      if (cachedJson != null) {
+        final client = Client.fromJson(cachedJson);
+        counts[clientId] = client.completedTouchpoints;
+        continue;
+      }
+      // Fallback: PowerSync SQLite (locally-created clients)
       final results = await PowerSyncService.query(
         'SELECT * FROM clients WHERE id = ?',
         [clientId],
       );
-
       if (results.isNotEmpty) {
         final client = Client.fromRow(results.first);
-        // touchpointNumber is next number, so completed = touchpointNumber - 1
         counts[clientId] = client.completedTouchpoints;
       } else {
         counts[clientId] = 0;

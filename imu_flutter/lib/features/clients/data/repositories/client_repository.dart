@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/services/search/fuzzy_search_service.dart';
+import 'package:imu_flutter/services/local_storage/hive_service.dart';
 import '../../../../core/utils/logger.dart';
 
 /// Repository for client CRUD operations using PowerSync
@@ -90,10 +91,14 @@ class ClientRepository {
   /// Uses FuzzySearchService for typo-tolerant local search
   Future<List<Client>> searchAssignedClients(String searchQuery) async {
     try {
-      // Get all assigned clients from local storage
-      final db = await PowerSyncService.database;
-      final results = await db.getAll('SELECT * FROM clients');
-      final allClients = results.map(Client.fromRow).toList();
+      // Prefer Hive cache (has embedded addresses/phones + is the primary read source)
+      final hive = HiveService();
+      final rawClients = hive.getAllClients();
+      final allClients = rawClients.isNotEmpty
+          ? rawClients.map((json) => Client.fromJson(json)).toList()
+          : (await (await PowerSyncService.database).getAll('SELECT * FROM clients'))
+              .map(Client.fromRow)
+              .toList();
 
       // Use fuzzy search for offline matching
       final fuzzyService = FuzzySearchService(allClients);
@@ -189,7 +194,14 @@ class ClientRepository {
       );
 
       logDebug('Created client: $id');
-      return client.copyWith(id: id, createdAt: DateTime.parse(now));
+      final created = client.copyWith(id: id, createdAt: DateTime.parse(now));
+      // Mirror to Hive cache so the client list shows the new entry immediately
+      try {
+        await HiveService().saveClient(created.toJson());
+      } catch (e) {
+        logError('Failed to mirror created client to Hive cache', e);
+      }
+      return created;
     } catch (e) {
       logError('Error creating client', e);
       rethrow;
@@ -249,6 +261,12 @@ class ClientRepository {
       );
 
       logDebug('Updated client: ${client.id}');
+      // Mirror to Hive cache
+      try {
+        await HiveService().saveClient(client.toJson());
+      } catch (e) {
+        logError('Failed to mirror updated client to Hive cache', e);
+      }
     } catch (e) {
       logError('Error updating client', e);
       rethrow;
@@ -261,6 +279,12 @@ class ClientRepository {
       final db = await PowerSyncService.database;
       await db.execute('DELETE FROM clients WHERE id = ?', [id]);
       logDebug('Deleted client: $id');
+      // Remove from Hive cache
+      try {
+        await HiveService().removeClient(id);
+      } catch (e) {
+        logError('Failed to remove deleted client from Hive cache', e);
+      }
     } catch (e) {
       logError('Error deleting client', e);
       rethrow;

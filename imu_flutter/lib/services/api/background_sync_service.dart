@@ -39,8 +39,8 @@ class BackgroundSyncService extends ChangeNotifier {
   bool _isInitialized = false;
 
   // Configuration
-  Duration _syncInterval = const Duration(minutes: 5); // Default 5 minutes
-  Duration _pendingCheckInterval = const Duration(seconds: 30); // Check pending count every 30s
+  Duration _syncInterval = const Duration(minutes: 15); // Default 15 minutes
+  Duration _pendingCheckInterval = const Duration(minutes: 2); // Check pending count every 2min
   static const int _maxSyncRetries = 10;
   int _currentSyncRetry = 0;
 
@@ -315,11 +315,14 @@ class BackgroundSyncService extends ChangeNotifier {
     }
   }
 
-  /// Wait for pending uploads to complete (with timeout)
-  Future<void> _waitForPendingUploads() async {
+  /// Wait for pending uploads to complete (with timeout).
+  /// Returns true if all uploads cleared, false if timed out with items remaining.
+  Future<bool> _waitForPendingUploads() async {
     const maxWaitTime = Duration(seconds: 60);
     const pollInterval = Duration(milliseconds: 500);
+    const logInterval = Duration(seconds: 10);
     final startTime = DateTime.now();
+    DateTime lastLogTime = startTime;
 
     while (DateTime.now().difference(startTime) < maxWaitTime) {
       final pending = await PowerSyncService.pendingUploadCount;
@@ -327,26 +330,25 @@ class BackgroundSyncService extends ChangeNotifier {
 
       if (pending == 0) {
         logDebug('BackgroundSyncService: All pending uploads completed');
-        break;
+        return true;
       }
 
-      logDebug('BackgroundSyncService: Waiting for $pending uploads to complete...');
+      // Only log every 10 seconds instead of every poll
+      if (DateTime.now().difference(lastLogTime) >= logInterval) {
+        logDebug('BackgroundSyncService: Waiting for $pending uploads to complete...');
+        lastLogTime = DateTime.now();
+      }
+
       await Future.delayed(pollInterval);
     }
 
-    if (DateTime.now().difference(startTime) >= maxWaitTime) {
-      logWarning('BackgroundSyncService: Timeout waiting for uploads to complete');
-      // Log non-critical error - timeout doesn't block workflow but indicates performance issue
-      await ErrorLoggingHelper.logNonCriticalError(
-        operation: 'sync timeout',
-        error: Exception('Sync timeout after ${maxWaitTime.inSeconds}s with $_pendingCount pending uploads'),
-        stackTrace: StackTrace.current,
-        context: {
-          'pendingCount': _pendingCount.toString(),
-          'maxWaitTime': '${maxWaitTime.inSeconds}s',
-        },
-      );
-    }
+    // Timed out with items still pending — log to console only (NOT to
+    // PowerSync error_logs: that would create new CRUD entries, stacking the queue).
+    logWarning('BackgroundSyncService: Timeout waiting for uploads ($_pendingCount remaining)');
+    _lastSyncError = '$_pendingCount item${_pendingCount == 1 ? '' : 's'} could not be synced. '
+        'Open Sync Status to retry or remove pending items.';
+    notifyListeners();
+    return false;
   }
 
   /// Update pending count from PowerSync CRUD queue
@@ -357,13 +359,10 @@ class BackgroundSyncService extends ChangeNotifier {
         logDebug('BackgroundSyncService: $_pendingCount pending uploads in PowerSync queue');
       }
       notifyListeners();
-    } catch (e, stackTrace) {
+    } catch (e) {
+      // Log to console only — writing to error_logs via PowerSync would create
+      // new CRUD entries and stack the pending queue.
       logError('BackgroundSyncService: Failed to update pending count', e);
-      await ErrorLoggingHelper.logNonCriticalError(
-        operation: 'pending count update',
-        error: e,
-        stackTrace: stackTrace,
-      );
     }
   }
 

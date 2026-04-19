@@ -85,6 +85,34 @@ class Address {
     );
   }
 
+  // Factory from API response JSON (same field names as fromSyncMap)
+  factory Address.fromJson(Map<String, dynamic> json) {
+    final isPrimaryRaw = json['is_primary'];
+    final isPrimary = isPrimaryRaw is bool
+        ? isPrimaryRaw
+        : (isPrimaryRaw is int ? isPrimaryRaw == 1 : false);
+    return Address(
+      id: json['id'] as String? ?? '',
+      clientId: json['client_id'] as String? ?? '',
+      psgcId: 0,
+      label: AddressLabel.fromString(json['type'] as String? ?? 'other'),
+      streetAddress: json['street'] as String? ?? '',
+      postalCode: json['postal_code'] as String?,
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+      isPrimary: isPrimary,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
+      province: json['province'] as String?,
+      municipality: json['city'] as String?,
+      barangay: json['barangay'] as String?,
+    );
+  }
+
   // Factory from legacy client fields
   factory Address.fromLegacyFields(Client client) {
     return Address(
@@ -106,9 +134,11 @@ class Address {
     );
   }
 
-  // Convert to JSON for API requests (PostgreSQL column names)
+  // Convert to JSON (includes id/client_id for local cache; safe to use for API too)
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
+      'client_id': clientId,
       'type': label.name,
       'street': streetAddress,
       if (barangay != null) 'barangay': barangay,
@@ -118,6 +148,7 @@ class Address {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       'is_primary': isPrimary,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 

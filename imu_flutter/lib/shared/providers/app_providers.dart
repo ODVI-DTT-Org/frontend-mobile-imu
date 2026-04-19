@@ -64,7 +64,8 @@ export './app_providers.dart' show
   visitsByClientProvider,
   currentMonthTargetProvider,
   myDayClientsProvider,
-  powersyncGroupsProvider;
+  powersyncGroupsProvider,
+  refreshAssignedClientsProvider;
 // Re-export client attribute filter providers
 export 'client_attribute_filter_provider.dart' show
   clientAttributeFilterProvider,
@@ -123,6 +124,7 @@ import '../../features/groups/data/repositories/group_repository.dart';
 import '../../features/targets/data/repositories/target_repository.dart';
 import '../../features/my_day/data/models/my_day_client.dart';
 import '../../features/my_day/data/repositories/my_day_repository.dart';
+import '../../services/local_storage/hive_service.dart';
 
 // ==================== Service Providers ====================
 
@@ -152,17 +154,25 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
 
   debugPrint('[AUTH-PROVIDER] Creating authNotifierProvider...');
 
-  // Create initial sync callback that triggers assigned clients sync
+  // Fetch all assigned clients from REST API → cache in Hive on login.
   Future<void> onLoginSuccess() async {
     try {
-      debugPrint('[INITIAL SYNC] Login successful - triggering initial client sync...');
+      debugPrint('[INITIAL SYNC] Login successful - fetching assigned clients into Hive cache...');
 
-      // Invalidate assigned clients provider to trigger fresh load from PowerSync
+      final clientApiService = ref.read(clientApiServiceProvider);
+      final hiveService = HiveService();
+
+      final clients = await clientApiService.fetchAllAssignedClients();
+      final clientJsons = clients.map((c) => c.toJson()).toList();
+      await hiveService.saveAllClients(clientJsons);
+
       ref.invalidate(assignedClientsProvider);
 
-      debugPrint('[INITIAL SYNC] Initial client sync triggered');
+      debugPrint('[INITIAL SYNC] Cached ${clients.length} clients into Hive');
     } catch (e) {
-      debugPrint('[INITIAL SYNC] Failed to trigger initial sync: $e');
+      debugPrint('[INITIAL SYNC] Failed to populate Hive cache: $e');
+      // Still invalidate so assignedClientsProvider shows whatever is in cache
+      ref.invalidate(assignedClientsProvider);
     }
   }
 
@@ -171,6 +181,11 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
     // Without this, login → logout → login reuses a closed database and hangs on sync page.
     ref.invalidate(powerSyncDatabaseProvider);
     debugPrint('[AUTH] powerSyncDatabaseProvider invalidated on logout');
+    // Clear Hive client cache so the next login starts fresh
+    HiveService().clearClients().catchError((e) {
+      debugPrint('[AUTH] Failed to clear Hive client cache on logout: $e');
+      return Future<void>.value();
+    });
   }
 
   final notifier = AuthNotifier(authService, onLoginSuccess: onLoginSuccess, onLogout: onLogout);
@@ -244,6 +259,13 @@ final offlineAuthProvider = Provider<OfflineAuthService>((ref) {
 /// Client by ID provider - fetches a single client from PowerSync SQLite
 /// Used by router for deep linking to client detail pages and forms
 final clientByIdProvider = FutureProvider.family<Client, String>((ref, clientId) async {
+  // Try Hive cache first (has embedded addresses + phoneNumbers)
+  final hiveService = HiveService();
+  final cachedJson = hiveService.getClient(clientId);
+  if (cachedJson != null) {
+    return Client.fromJson(cachedJson);
+  }
+  // Fallback: PowerSync SQLite (no addresses/phones, but better than nothing offline)
   final clientRepo = ref.watch(clientRepositoryProvider);
   final client = await clientRepo.getClient(clientId);
   if (client == null) throw Exception('Client not found: $clientId');
@@ -358,8 +380,8 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   }
 });
 
-/// Assigned clients — reads from PowerSync SQLite, applies filters/search/pagination locally.
-/// PowerSync automatically keeps the clients table in sync with the server.
+/// Assigned clients — reads from Hive cache, applies filters/search/pagination locally.
+/// Cache is populated on login via REST API (fetchAllAssignedClients).
 final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
   final page = ref.watch(assignedClientPageProvider);
@@ -370,11 +392,34 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   debugPrint('=== ASSIGNED CLIENTS FETCH ===');
   debugPrint('Search query: "$searchQuery", Page: $page');
 
-  // Load from PowerSync SQLite (PowerSync sync rules already filter to assigned territory)
-  final clientRepo = ref.watch(clientRepositoryProvider);
-  var cachedClients = await clientRepo.getClients();
+  // Load from Hive cache (populated on login from REST API)
+  final hiveService = HiveService();
+  var rawClients = hiveService.getAllClients();
 
-  debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from PowerSync SQLite');
+  // Startup hydration: if cache is empty and user is authenticated and online,
+  // fetch from API now (handles already-logged-in users after an upgrade).
+  if (rawClients.isEmpty) {
+    final isOnline = ref.read(isOnlineProvider);
+    final jwtAuth = ref.read(jwtAuthProvider);
+    if (isOnline && jwtAuth.isAuthenticated) {
+      try {
+        debugPrint('assignedClientsProvider: Cache empty - hydrating from API...');
+        final clientApi = ref.read(clientApiServiceProvider);
+        final clients = await clientApi.fetchAllAssignedClients();
+        final clientJsons = clients.map((c) => c.toJson()).toList();
+        await hiveService.saveAllClients(clientJsons);
+        await hiveService.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
+        rawClients = hiveService.getAllClients();
+        debugPrint('assignedClientsProvider: Hydrated ${rawClients.length} clients from API');
+      } catch (e) {
+        debugPrint('assignedClientsProvider: Startup hydration failed: $e');
+      }
+    }
+  }
+
+  var cachedClients = rawClients.map((json) => Client.fromJson(json)).toList();
+
+  debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from Hive cache');
 
   // Apply location filter locally if needed
   if (locationFilter.hasFilter) {
@@ -440,6 +485,22 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 });
 
 
+/// Callable that re-fetches all assigned clients from the REST API, saves to Hive,
+/// and invalidates [assignedClientsProvider] so the UI rebuilds with fresh data.
+/// Wire to pull-to-refresh and app-resume events.
+final refreshAssignedClientsProvider = Provider<Future<void> Function()>((ref) {
+  return () async {
+    final clientApi = ref.read(clientApiServiceProvider);
+    final hive = HiveService();
+    final clients = await clientApi.fetchAllAssignedClients();
+    final clientJsons = clients.map((c) => c.toJson()).toList();
+    await hive.saveAllClients(clientJsons);
+    await hive.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
+    ref.invalidate(assignedClientsProvider);
+    debugPrint('refreshAssignedClientsProvider: Refreshed ${clients.length} clients');
+  };
+});
+
 /// Provider for user's assigned municipality IDs
 /// Fetches and caches the user's assigned municipalities from the backend
 final assignedMunicipalitiesProvider = FutureProvider<List<String>>((ref) async {
@@ -486,10 +547,16 @@ final selectedClientProvider = Provider<Client?>((ref) {
 
 // ==================== Touchpoint Providers ====================
 
-/// Touchpoints for selected client from PowerSync (used by touchpoint form)
+/// Touchpoints for selected client from Hive cache (used by touchpoint form)
 final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
   final clientId = ref.watch(selectedClientIdProvider);
   if (clientId == null) return [];
+  // Hive cache has touchpoint_summary embedded in client JSON
+  final cachedJson = HiveService().getClient(clientId);
+  if (cachedJson != null) {
+    return Client.fromJson(cachedJson).touchpointSummary;
+  }
+  // Fallback: PowerSync SQLite
   final client = await ref.watch(clientRepositoryProvider).getClient(clientId);
   return client?.touchpointSummary ?? [];
 });
