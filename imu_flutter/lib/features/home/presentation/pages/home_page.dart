@@ -140,6 +140,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _MenuItem(icon: LucideIcons.calculator, label: 'Loan Calculator', id: 'calculator'),
       _MenuItem(icon: LucideIcons.clipboardList, label: 'Attendance', id: 'attendance'),
       _MenuItem(icon: LucideIcons.userCog, label: 'My Profile', id: 'profile'),
+      _MenuItem(icon: LucideIcons.activity, label: 'My Activity', id: 'activity'),
     ];
   }
 
@@ -179,6 +180,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         break;
       case 'profile':
         context.push('/profile');
+        break;
+      case 'activity':
+        context.push('/activity');
         break;
       case 'settings':
         context.push('/settings');

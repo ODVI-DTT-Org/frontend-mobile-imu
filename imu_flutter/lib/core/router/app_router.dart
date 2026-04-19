@@ -26,6 +26,7 @@ import '../../features/visits/presentation/pages/missed_visits_page.dart';
 import '../../features/calculator/presentation/pages/loan_calculator_page.dart';
 import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/activity/presentation/pages/activity_page.dart';
 import '../../features/record_forms/presentation/widgets/record_touchpoint_form.dart';
 import '../../features/record_forms/presentation/widgets/record_visit_only_form.dart';
 import '../../features/record_forms/presentation/widgets/release_loan_form.dart';
@@ -326,6 +327,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           final clientId = state.pathParameters['clientId']!;
           return ReleaseLoanFormLoader(clientId: clientId);
         },
+      ),
+
+      // Activity / History route
+      GoRoute(
+        path: '/activity',
+        builder: (context, state) => const ActivityPage(),
       ),
 
       // Debug route (development only)
