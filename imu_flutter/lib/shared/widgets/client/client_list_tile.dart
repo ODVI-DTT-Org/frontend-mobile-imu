@@ -52,12 +52,10 @@ class ClientListTile extends ConsumerWidget {
       addressText = client.fullAddress;
     }
 
-    // Touchpoint progress
-    // nextTouchpointNumber is the next step to record (e.g. 3 if 2 are done).
-    // touchpointNumber is the completed count — add +1 for the fallback so it
-    // matches the semantics of nextTouchpointNumber (completed + 1 = next step).
-    final nextNumber = client.nextTouchpointNumber ??
-        (client.touchpointNumber >= 0 && client.touchpointNumber < 7 ? client.touchpointNumber + 1 : null);
+    // Touchpoint progress — use touchpointNumber directly as returned by the backend.
+    final nextNumber = client.touchpointNumber >= 0 && client.touchpointNumber <= 7
+        ? client.touchpointNumber
+        : null;
     final nextType = client.nextTouchpointType;
     final isCompleted = client.completedTouchpoints >= 7;
     String touchpointInfo;
