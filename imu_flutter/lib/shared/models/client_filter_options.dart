@@ -1,11 +1,8 @@
-// lib/shared/models/client_filter_options.dart
-import '../../features/clients/data/models/client_model.dart';
-
 class ClientFilterOptions {
-  final List<ClientType> clientTypes;
-  final List<MarketType> marketTypes;
-  final List<PensionType> pensionTypes;
-  final List<ProductType> productTypes;
+  final List<String> clientTypes;
+  final List<String> marketTypes;
+  final List<String> pensionTypes;
+  final List<String> productTypes;
 
   const ClientFilterOptions({
     this.clientTypes = const [],
@@ -24,50 +21,10 @@ class ClientFilterOptions {
   factory ClientFilterOptions.fromAPIResponse(Map<String, dynamic> data) {
     final results = data['results'] as List? ?? [];
 
-    ClientType? parseClientType(String value) {
-      try {
-        return ClientType.values.firstWhere(
-          (e) => e.name.toLowerCase() == value.toLowerCase(),
-        );
-      } catch (_) {
-        return null;
-      }
-    }
-
-    MarketType? parseMarketType(String value) {
-      try {
-        return MarketType.values.firstWhere(
-          (e) => e.name.toLowerCase() == value.toLowerCase(),
-        );
-      } catch (_) {
-        return null;
-      }
-    }
-
-    PensionType? parsePensionType(String value) {
-      try {
-        return PensionType.values.firstWhere(
-          (e) => e.name.toLowerCase() == value.toLowerCase(),
-        );
-      } catch (_) {
-        return null;
-      }
-    }
-
-    ProductType? parseProductType(String value) {
-      try {
-        return ProductType.values.firstWhere(
-          (e) => e.name.toLowerCase() == value.toLowerCase(),
-        );
-      } catch (_) {
-        return null;
-      }
-    }
-
-    List<ClientType> clientTypes = [];
-    List<MarketType> marketTypes = [];
-    List<PensionType> pensionTypes = [];
-    List<ProductType> productTypes = [];
+    final clientTypes = <String>[];
+    final marketTypes = <String>[];
+    final pensionTypes = <String>[];
+    final productTypes = <String>[];
 
     for (final result in results) {
       if (result is! Map) continue;
@@ -82,32 +39,21 @@ class ClientFilterOptions {
         if (item is! Map) continue;
 
         final value = item['value'] as String?;
-        if (value == null || value == 'all' || value == 'Unspecified') continue;
+        if (value == null || value.isEmpty || value == 'all' || value == 'Unspecified') continue;
 
+        final normalized = value.toUpperCase().trim();
         switch (column) {
           case 'client_type':
-            final parsed = parseClientType(value);
-            if (parsed != null && !clientTypes.contains(parsed)) {
-              clientTypes.add(parsed);
-            }
+            if (!clientTypes.contains(normalized)) clientTypes.add(normalized);
             break;
           case 'market_type':
-            final parsed = parseMarketType(value);
-            if (parsed != null && !marketTypes.contains(parsed)) {
-              marketTypes.add(parsed);
-            }
+            if (!marketTypes.contains(normalized)) marketTypes.add(normalized);
             break;
           case 'pension_type':
-            final parsed = parsePensionType(value);
-            if (parsed != null && !pensionTypes.contains(parsed)) {
-              pensionTypes.add(parsed);
-            }
+            if (!pensionTypes.contains(normalized)) pensionTypes.add(normalized);
             break;
           case 'product_type':
-            final parsed = parseProductType(value);
-            if (parsed != null && !productTypes.contains(parsed)) {
-              productTypes.add(parsed);
-            }
+            if (!productTypes.contains(normalized)) productTypes.add(normalized);
             break;
         }
       }

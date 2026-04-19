@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../features/clients/data/models/client_model.dart';
 import '../../../shared/providers/client_attribute_filter_provider.dart';
 import '../../../shared/providers/location_filter_providers.dart';
-import '../filters/client_attribute_filter_helpers.dart';
+import '../filters/client_attribute_filter_helpers.dart' show formatLoanType;
 
 class ActiveFilterChipsRow extends ConsumerWidget {
   const ActiveFilterChipsRow({super.key});
@@ -17,7 +16,6 @@ class ActiveFilterChipsRow extends ConsumerWidget {
 
     final chips = <Widget>[];
 
-    // Location chip
     if (location.province != null) {
       final label = location.municipalities == null || location.municipalities!.isEmpty
           ? location.province!
@@ -31,30 +29,17 @@ class ActiveFilterChipsRow extends ConsumerWidget {
       ));
     }
 
-    // Attribute chips
-    for (final t in attrs.clientTypes ?? []) {
-      chips.add(_ActiveChip(
-        label: formatClientType(t),
-        onRemove: () => attrNotifier.toggleClientType(t),
-      ));
+    for (final v in attrs.clientTypes ?? []) {
+      chips.add(_ActiveChip(label: _label(v), onRemove: () => attrNotifier.toggleClientType(v)));
     }
-    for (final t in attrs.marketTypes ?? []) {
-      chips.add(_ActiveChip(
-        label: formatMarketType(t),
-        onRemove: () => attrNotifier.toggleMarketType(t),
-      ));
+    for (final v in attrs.marketTypes ?? []) {
+      chips.add(_ActiveChip(label: _label(v), onRemove: () => attrNotifier.toggleMarketType(v)));
     }
-    for (final t in attrs.pensionTypes ?? []) {
-      chips.add(_ActiveChip(
-        label: formatPensionType(t),
-        onRemove: () => attrNotifier.togglePensionType(t),
-      ));
+    for (final v in attrs.pensionTypes ?? []) {
+      chips.add(_ActiveChip(label: _label(v), onRemove: () => attrNotifier.togglePensionType(v)));
     }
-    for (final t in attrs.productTypes ?? []) {
-      chips.add(_ActiveChip(
-        label: formatProductType(t),
-        onRemove: () => attrNotifier.toggleProductType(t),
-      ));
+    for (final v in attrs.productTypes ?? []) {
+      chips.add(_ActiveChip(label: _label(v), onRemove: () => attrNotifier.toggleProductType(v)));
     }
     for (final t in attrs.loanTypes ?? []) {
       chips.add(_ActiveChip(
@@ -91,6 +76,14 @@ class ActiveFilterChipsRow extends ConsumerWidget {
             .toList(),
       ),
     );
+  }
+
+  /// Title-case a DB uppercase string for display (e.g. "BFP ACTIVE" → "BFP Active")
+  String _label(String raw) {
+    return raw
+        .split(' ')
+        .map((w) => w.isEmpty ? w : w[0] + w.substring(1).toLowerCase())
+        .join(' ');
   }
 }
 

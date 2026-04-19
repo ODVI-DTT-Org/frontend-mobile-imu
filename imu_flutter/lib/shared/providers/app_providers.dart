@@ -74,7 +74,7 @@ export 'client_filter_options_provider.dart' show
   clientFilterOptionsServiceProvider;
 // Re-export client filter types
 export '../models/client_attribute_filter.dart' show ClientAttributeFilter;
-export '../../services/filter/client_filter_options_service.dart' show ClientFilterOptions;
+export '../models/client_filter_options.dart' show ClientFilterOptions;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';

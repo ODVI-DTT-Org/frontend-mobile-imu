@@ -1,22 +1,40 @@
 import 'package:flutter/material.dart';
-import '../../../features/clients/data/models/client_model.dart';
+import '../../../features/clients/data/models/client_model.dart' show LoanType;
 import '../../../shared/models/client_attribute_filter.dart';
-import '../filters/client_attribute_filter_helpers.dart';
+import '../../../shared/models/client_filter_options.dart';
+import '../filters/client_attribute_filter_helpers.dart' show formatLoanType;
+
+const int _dropdownThreshold = 4;
 
 class AttributeChipsSection extends StatelessWidget {
   final ClientAttributeFilter draftFilter;
+  final ClientFilterOptions options;
   final void Function(ClientAttributeFilter) onChanged;
 
   const AttributeChipsSection({
     super.key,
     required this.draftFilter,
+    required this.options,
     required this.onChanged,
   });
 
-  List<T> _toggle<T>(List<T>? current, T value) {
+  List<String> _toggle(List<String>? current, String value) {
+    final list = List<String>.from(current ?? []);
+    list.contains(value) ? list.remove(value) : list.add(value);
+    return list;
+  }
+
+  List<T> _toggleEnum<T>(List<T>? current, T value) {
     final list = List<T>.from(current ?? []);
     list.contains(value) ? list.remove(value) : list.add(value);
     return list;
+  }
+
+  String _label(String raw) {
+    return raw
+        .split(' ')
+        .map((w) => w.isEmpty ? w : w[0] + w.substring(1).toLowerCase())
+        .join(' ');
   }
 
   @override
@@ -24,57 +42,57 @@ class AttributeChipsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ChipGroup<ClientType>(
+        _FilterGroup(
           label: 'Client Type',
-          values: ClientType.values,
+          values: options.clientTypes,
           selected: draftFilter.clientTypes?.toSet() ?? {},
-          labelOf: formatClientType,
-          onToggle: (t) {
-            final updated = _toggle(draftFilter.clientTypes, t);
+          labelOf: _label,
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.clientTypes, v);
             onChanged(draftFilter.copyWith(clientTypes: updated.isEmpty ? null : updated));
           },
         ),
         const SizedBox(height: 12),
-        _ChipGroup<MarketType>(
+        _FilterGroup(
           label: 'Market Type',
-          values: MarketType.values,
+          values: options.marketTypes,
           selected: draftFilter.marketTypes?.toSet() ?? {},
-          labelOf: formatMarketType,
-          onToggle: (t) {
-            final updated = _toggle(draftFilter.marketTypes, t);
+          labelOf: _label,
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.marketTypes, v);
             onChanged(draftFilter.copyWith(marketTypes: updated.isEmpty ? null : updated));
           },
         ),
         const SizedBox(height: 12),
-        _ChipGroup<PensionType>(
+        _FilterGroup(
           label: 'Pension Type',
-          values: PensionType.values,
+          values: options.pensionTypes,
           selected: draftFilter.pensionTypes?.toSet() ?? {},
-          labelOf: formatPensionType,
-          onToggle: (t) {
-            final updated = _toggle(draftFilter.pensionTypes, t);
+          labelOf: _label,
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.pensionTypes, v);
             onChanged(draftFilter.copyWith(pensionTypes: updated.isEmpty ? null : updated));
           },
         ),
         const SizedBox(height: 12),
-        _ChipGroup<ProductType>(
+        _FilterGroup(
           label: 'Product Type',
-          values: ProductType.values,
+          values: options.productTypes,
           selected: draftFilter.productTypes?.toSet() ?? {},
-          labelOf: formatProductType,
-          onToggle: (t) {
-            final updated = _toggle(draftFilter.productTypes, t);
+          labelOf: _label,
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.productTypes, v);
             onChanged(draftFilter.copyWith(productTypes: updated.isEmpty ? null : updated));
           },
         ),
         const SizedBox(height: 12),
-        _ChipGroup<LoanType>(
+        _EnumChipsRow<LoanType>(
           label: 'Loan Type',
           values: LoanType.values,
           selected: draftFilter.loanTypes?.toSet() ?? {},
           labelOf: formatLoanType,
           onToggle: (t) {
-            final updated = _toggle(draftFilter.loanTypes, t);
+            final updated = _toggleEnum(draftFilter.loanTypes, t);
             onChanged(draftFilter.copyWith(loanTypes: updated.isEmpty ? null : updated));
           },
         ),
@@ -83,14 +101,299 @@ class AttributeChipsSection extends StatelessWidget {
   }
 }
 
-class _ChipGroup<T> extends StatelessWidget {
+class _FilterGroup extends StatelessWidget {
+  final String label;
+  final List<String> values;
+  final Set<String> selected;
+  final String Function(String) labelOf;
+  final void Function(String) onToggle;
+
+  const _FilterGroup({
+    required this.label,
+    required this.values,
+    required this.selected,
+    required this.labelOf,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (values.length <= _dropdownThreshold)
+          _ChipsRow(
+            values: values,
+            selected: selected,
+            labelOf: labelOf,
+            onToggle: onToggle,
+          )
+        else
+          _MultiSelectDropdown(
+            values: values,
+            selected: selected,
+            labelOf: labelOf,
+            onToggle: onToggle,
+          ),
+      ],
+    );
+  }
+}
+
+class _ChipsRow extends StatelessWidget {
+  final List<String> values;
+  final Set<String> selected;
+  final String Function(String) labelOf;
+  final void Function(String) onToggle;
+
+  const _ChipsRow({
+    required this.values,
+    required this.selected,
+    required this.labelOf,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: values.map((value) {
+        final isSelected = selected.contains(value);
+        return FilterChip(
+          label: Text(labelOf(value)),
+          selected: isSelected,
+          onSelected: (_) => onToggle(value),
+          visualDensity: VisualDensity.compact,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            color: isSelected ? Colors.white : null,
+          ),
+          selectedColor: theme.colorScheme.primary,
+          checkmarkColor: Colors.white,
+          showCheckmark: false,
+          side: BorderSide(
+            color: isSelected ? theme.colorScheme.primary : Colors.grey[350]!,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _MultiSelectDropdown extends StatelessWidget {
+  final List<String> values;
+  final Set<String> selected;
+  final String Function(String) labelOf;
+  final void Function(String) onToggle;
+
+  const _MultiSelectDropdown({
+    required this.values,
+    required this.selected,
+    required this.labelOf,
+    required this.onToggle,
+  });
+
+  String get _buttonLabel {
+    if (selected.isEmpty) return 'All';
+    if (selected.length == 1) return labelOf(selected.first);
+    return '${selected.length} selected';
+  }
+
+  void _showPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PickerSheet(
+        values: values,
+        selected: selected,
+        labelOf: labelOf,
+        onToggle: onToggle,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasSelection = selected.isNotEmpty;
+    return GestureDetector(
+      onTap: () => _showPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: hasSelection ? theme.colorScheme.primary : Colors.grey[350]!,
+            width: hasSelection ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: hasSelection ? theme.colorScheme.primary.withOpacity(0.06) : Colors.white,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(
+              child: Text(
+                _buttonLabel,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasSelection ? theme.colorScheme.primary : Colors.black87,
+                  fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: hasSelection ? theme.colorScheme.primary : Colors.grey[600],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerSheet extends StatefulWidget {
+  final List<String> values;
+  final Set<String> selected;
+  final String Function(String) labelOf;
+  final void Function(String) onToggle;
+
+  const _PickerSheet({
+    required this.values,
+    required this.selected,
+    required this.labelOf,
+    required this.onToggle,
+  });
+
+  @override
+  State<_PickerSheet> createState() => _PickerSheetState();
+}
+
+class _PickerSheetState extends State<_PickerSheet> {
+  late Set<String> _localSelected;
+
+  @override
+  void initState() {
+    super.initState();
+    _localSelected = Set.from(widget.selected);
+  }
+
+  void _toggle(String value) {
+    setState(() {
+      _localSelected.contains(value)
+          ? _localSelected.remove(value)
+          : _localSelected.add(value);
+    });
+  }
+
+  void _apply() {
+    // Compute diff and call onToggle for each changed item
+    final added = _localSelected.difference(widget.selected);
+    final removed = widget.selected.difference(_localSelected);
+    for (final v in added) widget.onToggle(v);
+    for (final v in removed) widget.onToggle(v);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: widget.values.length,
+              itemBuilder: (_, i) {
+                final value = widget.values[i];
+                final isSelected = _localSelected.contains(value);
+                return CheckboxListTile(
+                  value: isSelected,
+                  title: Text(widget.labelOf(value), style: const TextStyle(fontSize: 14)),
+                  onChanged: (_) => _toggle(value),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  dense: true,
+                  activeColor: theme.colorScheme.primary,
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() => _localSelected.clear());
+                      },
+                      child: const Text('Clear'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _apply,
+                      child: const Text('Apply'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Enum-based chip group (for LoanType and similar fixed-option filters)
+class _EnumChipsRow<T> extends StatelessWidget {
   final String label;
   final List<T> values;
   final Set<T> selected;
   final String Function(T) labelOf;
   final void Function(T) onToggle;
 
-  const _ChipGroup({
+  const _EnumChipsRow({
     required this.label,
     required this.values,
     required this.selected,

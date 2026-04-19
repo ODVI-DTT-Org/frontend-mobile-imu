@@ -1,8 +1,6 @@
-// lib/services/filter/client_filter_options_service.dart
 import 'package:powersync/powersync.dart';
 import '../api/client_filter_api_service.dart';
 import '../../shared/models/client_filter_options.dart';
-import '../../features/clients/data/models/client_model.dart';
 import 'package:flutter/foundation.dart';
 import 'client_filter_exceptions.dart';
 
@@ -12,10 +10,7 @@ class ClientFilterOptionsService {
 
   ClientFilterOptionsService(this._apiService, this._powerSync);
 
-  /// Fetch filter options using PowerSync (offline-first)
-  /// Falls back to API only if PowerSync fails or returns empty results
   Future<ClientFilterOptions> fetchOptions() async {
-    // If PowerSync is not available, fall back to API immediately
     if (_powerSync == null) {
       debugPrint('[ClientFilterOptionsService] PowerSync not available, using API');
       return await _apiService.fetchFilterOptions();
@@ -25,12 +20,7 @@ class ClientFilterOptionsService {
       debugPrint('[ClientFilterOptionsService] Fetching from PowerSync...');
       final options = await _fetchFromPowerSync();
 
-      final hasData = options.clientTypes.isNotEmpty ||
-                     options.marketTypes.isNotEmpty ||
-                     options.pensionTypes.isNotEmpty ||
-                     options.productTypes.isNotEmpty;
-
-      if (hasData) {
+      if (options.isNotEmpty) {
         debugPrint('[ClientFilterOptionsService] PowerSync success: '
             '${options.clientTypes.length} client types, '
             '${options.marketTypes.length} market types, '
@@ -41,14 +31,12 @@ class ClientFilterOptionsService {
         debugPrint('[ClientFilterOptionsService] PowerSync returned empty, falling back to API');
       }
     } on PowerSyncUnavailableException catch (e) {
-      // Re-throw PowerSync-specific exceptions
       debugPrint('[ClientFilterOptionsService] PowerSync unavailable: $e');
       rethrow;
     } catch (e) {
       debugPrint('[ClientFilterOptionsService] PowerSync failed: $e, falling back to API');
     }
 
-    // Fallback to API
     try {
       return await _apiService.fetchFilterOptions();
     } catch (e) {
@@ -59,153 +47,55 @@ class ClientFilterOptionsService {
     }
   }
 
-  /// Fetch distinct values from PowerSync using separate optimized queries
   Future<ClientFilterOptions> _fetchFromPowerSync() async {
     if (_powerSync == null) {
       throw PowerSyncUnavailableException('PowerSync database is not available');
     }
 
-    // Fetch all filter types concurrently
     final queryResults = await Future.wait([
       _powerSync!.getAll('''
-        SELECT DISTINCT client_type
+        SELECT DISTINCT UPPER(TRIM(client_type)) as val
         FROM clients
-        WHERE client_type IS NOT NULL
-        ORDER BY client_type
+        WHERE client_type IS NOT NULL AND TRIM(client_type) != ''
+        ORDER BY val
       '''),
       _powerSync!.getAll('''
-        SELECT DISTINCT market_type
+        SELECT DISTINCT UPPER(TRIM(market_type)) as val
         FROM clients
-        WHERE market_type IS NOT NULL
-        ORDER BY market_type
+        WHERE market_type IS NOT NULL AND TRIM(market_type) != ''
+        ORDER BY val
       '''),
       _powerSync!.getAll('''
-        SELECT DISTINCT pension_type
+        SELECT DISTINCT UPPER(TRIM(pension_type)) as val
         FROM clients
-        WHERE pension_type IS NOT NULL
-        ORDER BY pension_type
+        WHERE pension_type IS NOT NULL AND TRIM(pension_type) != ''
+        ORDER BY val
       '''),
       _powerSync!.getAll('''
-        SELECT DISTINCT product_type
+        SELECT DISTINCT UPPER(TRIM(product_type)) as val
         FROM clients
-        WHERE product_type IS NOT NULL
-        ORDER BY product_type
+        WHERE product_type IS NOT NULL AND TRIM(product_type) != ''
+        ORDER BY val
       '''),
     ]);
 
-    final clientTypesResult = queryResults[0];
-    final marketTypesResult = queryResults[1];
-    final pensionTypesResult = queryResults[2];
-    final productTypesResult = queryResults[3];
-
-    final clientTypes = <ClientType>{};
-    final marketTypes = <MarketType>{};
-    final pensionTypes = <PensionType>{};
-    final productTypes = <ProductType>{};
-
-    // Parse client types
-    for (final row in clientTypesResult) {
-      final value = row['client_type'] as String?;
-      if (value != null) {
-        final parsed = _parseClientType(value);
-        if (parsed != null) clientTypes.add(parsed);
+    List<String> toStrings(List<Map<String, dynamic>> rows) {
+      final seen = <String>{};
+      final result = <String>[];
+      for (final row in rows) {
+        final val = row['val'] as String?;
+        if (val != null && val.isNotEmpty && seen.add(val)) {
+          result.add(val);
+        }
       }
-    }
-
-    // Parse market types
-    for (final row in marketTypesResult) {
-      final value = row['market_type'] as String?;
-      if (value != null) {
-        final parsed = _parseMarketType(value);
-        if (parsed != null) marketTypes.add(parsed);
-      }
-    }
-
-    // Parse pension types
-    for (final row in pensionTypesResult) {
-      final value = row['pension_type'] as String?;
-      if (value != null) {
-        final parsed = _parsePensionType(value);
-        if (parsed != null) pensionTypes.add(parsed);
-      }
-    }
-
-    // Parse product types
-    for (final row in productTypesResult) {
-      final value = row['product_type'] as String?;
-      if (value != null) {
-        final parsed = _parseProductType(value);
-        if (parsed != null) productTypes.add(parsed);
-      }
+      return result;
     }
 
     return ClientFilterOptions(
-      clientTypes: clientTypes.toList()..sort(),
-      marketTypes: marketTypes.toList()..sort(),
-      pensionTypes: pensionTypes.toList()..sort(),
-      productTypes: productTypes.toList()..sort(),
+      clientTypes: toStrings(queryResults[0]),
+      marketTypes: toStrings(queryResults[1]),
+      pensionTypes: toStrings(queryResults[2]),
+      productTypes: toStrings(queryResults[3]),
     );
-  }
-
-  /// Parse client type from database value (e.g., "POTENTIAL" -> ClientType.potential)
-  ClientType? _parseClientType(String value) {
-    try {
-      return ClientType.values.firstWhere(
-        (e) => e.name.toUpperCase() == value.toUpperCase(),
-      );
-    } catch (_) {
-      debugPrint('[ClientFilterOptionsService] Failed to parse ClientType: $value');
-      return null;
-    }
-  }
-
-  /// Parse market type from database value (e.g., "RESIDENTIAL" -> MarketType.residential)
-  MarketType? _parseMarketType(String value) {
-    try {
-      return MarketType.values.firstWhere(
-        (e) => e.name.toUpperCase() == value.toUpperCase(),
-      );
-    } catch (_) {
-      debugPrint('[ClientFilterOptionsService] Failed to parse MarketType: $value');
-      return null;
-    }
-  }
-
-  /// Parse pension type from database value (e.g., "SSS" -> PensionType.sss)
-  PensionType? _parsePensionType(String value) {
-    try {
-      return PensionType.values.firstWhere(
-        (e) => e.name.toUpperCase() == value.toUpperCase(),
-      );
-    } catch (_) {
-      debugPrint('[ClientFilterOptionsService] Failed to parse PensionType: $value');
-      return null;
-    }
-  }
-
-  /// Parse product type from database value (e.g., "BFP ACTIVE" -> ProductType.bfpActive)
-  ProductType? _parseProductType(String value) {
-    try {
-      switch (value.toUpperCase()) {
-        case 'BFP ACTIVE':
-          return ProductType.bfpActive;
-        case 'BFP PENSION':
-          return ProductType.bfpPension;
-        case 'PNP PENSION':
-          return ProductType.pnpPension;
-        case 'NAPOLCOM':
-          return ProductType.napolcom;
-        case 'BFP STP':
-          return ProductType.bfpStp;
-        default:
-          // Try normal parsing as fallback
-          return ProductType.values.firstWhere(
-            (e) => e.name.toUpperCase() == value.toUpperCase(),
-          );
-      }
-    } catch (_) {
-      debugPrint('[ClientFilterOptionsService] Failed to parse ProductType: $value');
-      return null;
-    }
   }
 }

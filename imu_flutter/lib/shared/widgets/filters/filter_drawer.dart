@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/client_attribute_filter.dart';
+import '../../../shared/models/client_filter_options.dart';
 import '../../../shared/models/location_filter.dart';
 import '../../../shared/providers/client_attribute_filter_provider.dart';
+import '../../../shared/providers/client_filter_options_provider.dart';
 import '../../../shared/providers/location_filter_providers.dart';
 import 'location_dropdown_section.dart';
 import 'attribute_chips_section.dart';
@@ -42,6 +44,8 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
 
   @override
   Widget build(BuildContext context) {
+    final optionsAsync = ref.watch(clientFilterOptionsProvider);
+
     return Align(
       alignment: Alignment.centerRight,
       child: Material(
@@ -51,7 +55,6 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
           height: double.infinity,
           child: Column(
             children: [
-              // Header
               SafeArea(
                 bottom: false,
                 child: Padding(
@@ -72,7 +75,6 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                 ),
               ),
               const Divider(height: 1),
-              // Scrollable content
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
@@ -87,15 +89,26 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                       const SizedBox(height: 20),
                       const Divider(),
                       const SizedBox(height: 12),
-                      AttributeChipsSection(
-                        draftFilter: _draftAttrs,
-                        onChanged: (f) => setState(() => _draftAttrs = f),
+                      optionsAsync.when(
+                        data: (options) => AttributeChipsSection(
+                          draftFilter: _draftAttrs,
+                          options: options,
+                          onChanged: (f) => setState(() => _draftAttrs = f),
+                        ),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (_, __) => AttributeChipsSection(
+                          draftFilter: _draftAttrs,
+                          options: const ClientFilterOptions(),
+                          onChanged: (f) => setState(() => _draftAttrs = f),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              // Sticky footer
               const Divider(height: 1),
               SafeArea(
                 top: false,
@@ -128,7 +141,6 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
   }
 }
 
-/// Opens the filter drawer as a right-slide overlay.
 void showFilterDrawer(BuildContext context, {required bool showAllPsgc}) {
   showGeneralDialog(
     context: context,

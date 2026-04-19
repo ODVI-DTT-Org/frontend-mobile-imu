@@ -1,4 +1,3 @@
-// lib/services/api/client_filter_api_service.dart
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
@@ -13,8 +12,6 @@ class ClientFilterApiService {
       : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
         _authService = authService ?? JwtAuthService();
 
-  /// Fetch filter options from backend API
-  /// Uses /api/filters/batch endpoint
   Future<ClientFilterOptions> fetchFilterOptions() async {
     final filters = [
       {'table': 'clients', 'column': 'client_type'},
@@ -37,7 +34,7 @@ class ClientFilterApiService {
       ),
       queryParameters: {
         'filters': jsonEncode(filters),
-        'withCounts': 'true',
+        'withCounts': 'false',
         'includeNull': 'false',
         'includeAll': 'false',
       },

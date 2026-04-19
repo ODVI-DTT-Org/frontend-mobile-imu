@@ -2,10 +2,10 @@ import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
 
 class ClientAttributeFilter {
-  final List<ClientType>? clientTypes;
-  final List<MarketType>? marketTypes;
-  final List<PensionType>? pensionTypes;
-  final List<ProductType>? productTypes;
+  final List<String>? clientTypes;
+  final List<String>? marketTypes;
+  final List<String>? pensionTypes;
+  final List<String>? productTypes;
   final List<LoanType>? loanTypes;
 
   const ClientAttributeFilter({
@@ -36,16 +36,20 @@ class ClientAttributeFilter {
   /// OR within category, AND across categories
   bool matches(Client client) {
     if (clientTypes != null && clientTypes!.isNotEmpty) {
-      if (!clientTypes!.contains(client.clientType)) return false;
+      final raw = (client.clientTypeRaw ?? '').toUpperCase().trim();
+      if (!clientTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (marketTypes != null && marketTypes!.isNotEmpty) {
-      if (!marketTypes!.contains(client.marketType)) return false;
+      final raw = (client.marketTypeRaw ?? '').toUpperCase().trim();
+      if (!marketTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (pensionTypes != null && pensionTypes!.isNotEmpty) {
-      if (!pensionTypes!.contains(client.pensionType)) return false;
+      final raw = (client.pensionTypeRaw ?? '').toUpperCase().trim();
+      if (!pensionTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (productTypes != null && productTypes!.isNotEmpty) {
-      if (!productTypes!.contains(client.productType)) return false;
+      final raw = (client.productTypeRaw ?? '').toUpperCase().trim();
+      if (!productTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (loanTypes != null && loanTypes!.isNotEmpty) {
       if (!loanTypes!.contains(client.loanType)) return false;
@@ -56,16 +60,16 @@ class ClientAttributeFilter {
   Map<String, String> toQueryParams() {
     final params = <String, String>{};
     if (clientTypes != null && clientTypes!.isNotEmpty) {
-      params['client_type'] = clientTypes!.map((t) => t.name.toUpperCase()).join(',');
+      params['client_type'] = clientTypes!.join(',');
     }
     if (marketTypes != null && marketTypes!.isNotEmpty) {
-      params['market_type'] = marketTypes!.map((t) => t.name.toUpperCase()).join(',');
+      params['market_type'] = marketTypes!.join(',');
     }
     if (pensionTypes != null && pensionTypes!.isNotEmpty) {
-      params['pension_type'] = pensionTypes!.map((t) => t.name.toUpperCase()).join(',');
+      params['pension_type'] = pensionTypes!.join(',');
     }
     if (productTypes != null && productTypes!.isNotEmpty) {
-      params['product_type'] = productTypes!.map((t) => _productTypeApiValue(t)).join(',');
+      params['product_type'] = productTypes!.join(',');
     }
     if (loanTypes != null && loanTypes!.isNotEmpty) {
       params['loan_type'] = loanTypes!.map((t) => _loanTypeApiValue(t)).join(',');
@@ -86,21 +90,6 @@ class ClientAttributeFilter {
     }
   }
 
-  String _productTypeApiValue(ProductType type) {
-    switch (type) {
-      case ProductType.bfpActive:
-        return 'BFP ACTIVE';
-      case ProductType.bfpPension:
-        return 'BFP PENSION';
-      case ProductType.pnpPension:
-        return 'PNP PENSION';
-      case ProductType.napolcom:
-        return 'NAPOLCOM';
-      case ProductType.bfpStp:
-        return 'BFP STP';
-    }
-  }
-
   static const _absent = Object();
 
   ClientAttributeFilter copyWith({
@@ -111,10 +100,10 @@ class ClientAttributeFilter {
     Object? loanTypes = _absent,
   }) {
     return ClientAttributeFilter(
-      clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<ClientType>?,
-      marketTypes: identical(marketTypes, _absent) ? this.marketTypes : marketTypes as List<MarketType>?,
-      pensionTypes: identical(pensionTypes, _absent) ? this.pensionTypes : pensionTypes as List<PensionType>?,
-      productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<ProductType>?,
+      clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<String>?,
+      marketTypes: identical(marketTypes, _absent) ? this.marketTypes : marketTypes as List<String>?,
+      pensionTypes: identical(pensionTypes, _absent) ? this.pensionTypes : pensionTypes as List<String>?,
+      productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<String>?,
       loanTypes: identical(loanTypes, _absent) ? this.loanTypes : loanTypes as List<LoanType>?,
     );
   }
