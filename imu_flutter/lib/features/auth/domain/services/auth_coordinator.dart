@@ -487,7 +487,7 @@ class AuthCoordinator extends ChangeNotifier {
   void _startSessionMonitoring() {
     _stopSessionMonitoring();
 
-    _sessionMonitorTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _sessionMonitorTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
