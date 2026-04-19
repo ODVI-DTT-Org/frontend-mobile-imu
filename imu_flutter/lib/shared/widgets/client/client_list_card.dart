@@ -419,22 +419,8 @@ class ClientListCard extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // Touchpoint progress and status badges
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.start,
-                      children: [
-                        TouchpointProgressBadge(
-                          client: client,
-                          touchpointCount: touchpointCount,
-                        ),
-                        TouchpointStatusBadge(client: client),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Loan Released badge (if applicable)
-                    if (effectiveLoanReleased && effectiveUdi != null)
+                    // Loan Released replaces touchpoint progress
+                    if (effectiveLoanReleased)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -445,23 +431,35 @@ class ClientListCard extends ConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              LucideIcons.dollarSign,
-                              size: 11,
-                              color: const Color(0xFF16A34A),
-                            ),
+                            const Icon(LucideIcons.checkCircle, size: 11, color: Color(0xFF16A34A)),
                             const SizedBox(width: 4),
-                            Text(
-                              'Loan Released: $effectiveUdi',
-                              style: const TextStyle(
+                            const Text(
+                              'LOAN RELEASED',
+                              style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w700,
                                 color: Color(0xFF16A34A),
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
                         ),
+                      )
+                    else ...[
+                      // Touchpoint progress and status badges
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.start,
+                        children: [
+                          TouchpointProgressBadge(
+                            client: client,
+                            touchpointCount: touchpointCount,
+                          ),
+                          TouchpointStatusBadge(client: client),
+                        ],
                       ),
+                    ],
                     const SizedBox(height: 8),
                     // Address row
                     Row(
