@@ -109,6 +109,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/data/psgc.json
     - .env.dev
     - .env.qa
     - .env.prod
