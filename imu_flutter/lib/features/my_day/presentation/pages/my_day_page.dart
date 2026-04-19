@@ -29,6 +29,7 @@ import '../providers/my_day_provider.dart';
 import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider;
 import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
+import '../../../../shared/widgets/client/client_list_tile.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
 import '../../../record_forms/presentation/widgets/record_touchpoint_bottom_sheet.dart';
@@ -522,6 +523,26 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     context.push('/clients/${client.clientId}/edit');
   }
 
+  /// Converts a MyDayClient to a minimal Client for ClientListTile display.
+  Client _myDayClientToClient(MyDayClient c) {
+    final nameParts = c.fullName.trim().split(' ');
+    return Client(
+      id: c.clientId,
+      firstName: nameParts.first,
+      lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+      clientType: ClientType.potential,
+      productType: ProductType.bfpActive,
+      pensionType: PensionType.none,
+      productTypeRaw: c.productType,
+      pensionTypeRaw: c.pensionType,
+      loanType: c.loanType != null ? LoanType.firstLoan : null,
+      loanTypeRaw: c.loanType,
+      nextTouchpointNumber: c.nextTouchpointNumber,
+      municipality: c.address,
+      createdAt: DateTime.now(),
+    );
+  }
+
   Future<void> _viewHistory(MyDayClient client) async {
     HapticUtils.lightImpact();
     if (mounted) {
@@ -957,26 +978,41 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             ...clients.map(
               (client) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 4),
-                child: ClientListCard.fromMyDayClient(
-                  myDayClient: client,
-                  clientId: client.clientId,
-                  fullName: client.fullName,
-                  location: client.location,
-                  touchpointNumber: client.touchpointNumber,
-                  touchpointType: client.touchpointType,
-                  previousTouchpointNumber: client.previousTouchpointNumber,
-                  previousTouchpointReason: client.previousTouchpointReason,
-                  previousTouchpointType: client.previousTouchpointType,
-                  previousTouchpointDate: client.previousTouchpointDate,
-                  priority: client.priority,
-                  assignedByName: client.assignedByName,
-                  onTap: () => _onClientTap(client),
-                  onRemove: () => _confirmRemoveClient(client),
-                  onLongPress: () => _onClientLongPress(client),
-                  isSelected: _isClientSelected(client.id),
-                  isMultiSelectMode: _isMultiSelectMode,
-                  enableSwipeToDismiss: true,
-                  showInMyDayBadge: true,
+                child: Dismissible(
+                  key: Key(client.id),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => _confirmRemoveClient(client),
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.trash2, color: Colors.red.shade600),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Remove',
+                          style: TextStyle(
+                            color: Colors.red.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  child: GestureDetector(
+                    onLongPress: () => _onClientLongPress(client),
+                    child: ClientListTile(
+                      client: _myDayClientToClient(client),
+                      onTap: () => _onClientTap(client),
+                    ),
+                  ),
                 ),
               ),
             ),
