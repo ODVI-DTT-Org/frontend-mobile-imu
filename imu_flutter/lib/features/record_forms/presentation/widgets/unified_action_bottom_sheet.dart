@@ -126,9 +126,9 @@ class UnifiedActionBottomSheet extends StatelessWidget {
               // Submit button
               Container(
                 width: double.infinity,
-                color: Colors.white,
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
                 decoration: const BoxDecoration(
+                  color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
                 ),
                 child: SizedBox(
