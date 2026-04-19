@@ -97,8 +97,8 @@ enum ProductType {
 enum LoanType {
   newLoan('NEW'),
   additional('ADDITIONAL'),
-  renewal('RENEWAL'),
-  preterm('PRETERM');
+  preterm('PRETERM'),
+  renewal('RENEWAL');
 
   final String apiValue;
   const LoanType(this.apiValue);
