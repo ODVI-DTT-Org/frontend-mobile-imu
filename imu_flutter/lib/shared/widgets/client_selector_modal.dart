@@ -7,14 +7,10 @@ import '../../app.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
-import '../../features/clients/data/models/client_model.dart' show Client, ClientType, TouchpointType;
-import '../../features/clients/data/models/address_model.dart' show Address;
-import '../../models/client_status.dart';
-import '../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
+import '../../features/clients/data/models/client_model.dart' show Client;
 import '../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
-import '../../services/sync/powersync_service.dart';
 import '../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     onlineClientsProvider,
@@ -22,7 +18,6 @@ import '../../shared/providers/app_providers.dart' show
     assignedClientPageProvider,
     onlineClientSearchQueryProvider,
     onlineClientPageProvider,
-    isOnlineProvider,
     currentUserRoleProvider,
     currentUserIdProvider,
     assignedMunicipalitiesProvider,
@@ -86,16 +81,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   String _searchQuery = '';
   String _clientFilter = 'assigned'; // 'assigned' or 'all'
   Set<String> _addingClientIds = {};
-  Set<String> _addedClientIds = {}; // Track clients that have been added
+  Set<String> _addedClientIds = {};
 
   // Pagination state
   final int _itemsPerPage = 10;
   int _currentPage = 1;
-
-  // Status tracking state
-  Map<String, ClientStatus> _clientStatuses = {};
-  bool _isLoadingStatuses = true;
-  bool _hasStatusError = false;
 
   @override
   void initState() {
@@ -211,137 +201,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return clients;
   }
 
-  Future<void> _loadClientStatuses() async {
-    setState(() {
-      _isLoadingStatuses = true;
-      _hasStatusError = false;
-    });
-
-    try {
-      final isOnline = ref.read(isOnlineProvider);
-      // Use selected date instead of today for status checking
-      final selectedDate = DateTime(widget.selectedDate.year, widget.selectedDate.month, widget.selectedDate.day);
-
-      // Debug logging
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      debugPrint('ClientSelectorModal: Date debug');
-      debugPrint('  widget.selectedDate: $widget.selectedDate');
-      debugPrint('  selectedDate (normalized): $selectedDate');
-      debugPrint('  today (for comparison): $today');
-      debugPrint('  dates match: ${selectedDate == today}');
-      debugPrint('  isOnline: $isOnline');
-
-      if (isOnline) {
-        // Use API when online
-        await _loadStatusesFromAPI(selectedDate);
-      } else {
-        // Use PowerSync when offline
-        await _loadStatusesFromPowerSync(selectedDate);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _hasStatusError = true;
-          _isLoadingStatuses = false;
-        });
-        debugPrint('Error loading client statuses: $e');
-      }
-    }
-  }
-
-  Future<void> _loadStatusesFromAPI(DateTime today) async {
-    try {
-      final itineraryRepo = ref.read(itineraryRepositoryProvider);
-      final userId = ref.read(currentUserIdProvider) ?? '';
-      final todayClientIds = await itineraryRepo.getClientIdsByDate(userId, today);
-
-      final clientsAsync = _clientFilter == 'assigned'
-          ? ref.read(assignedClientsProvider)
-          : ref.read(onlineClientsProvider);
-
-      final statuses = <String, ClientStatus>{};
-      clientsAsync.when(
-        data: (data) {
-          final clients = data.items;
-          for (final client in clients) {
-            final inItinerary = todayClientIds.contains(client.id);
-            // Only track inItinerary status, loanReleased is already available from client.loanReleased
-            statuses[client.id!] = ClientStatus(
-              inItinerary: inItinerary,
-              loanReleased: client.loanReleased, // Keep for backward compatibility, but client.loanReleased is used
-            );
-          }
-        },
-        loading: () {},
-        error: (_, __) {},
-      );
-
-      if (mounted) {
-        setState(() {
-          _clientStatuses = statuses;
-          _isLoadingStatuses = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('API status load failed, falling back to PowerSync: $e');
-      await _loadStatusesFromPowerSync(today);
-    }
-  }
-
-  Future<void> _loadStatusesFromPowerSync(DateTime today) async {
-    try {
-      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
-      final todayClients = await PowerSyncService.query('''
-        SELECT client_id FROM itineraries
-        WHERE scheduled_date = ?
-      ''', [todayStr]);
-
-      final inItineraryIds = todayClients.map((row) => row['client_id'] as String).toSet();
-
-      final clientsAsync = _clientFilter == 'assigned'
-          ? ref.read(assignedClientsProvider)
-          : ref.read(onlineClientsProvider);
-
-      final statuses = <String, ClientStatus>{};
-      clientsAsync.when(
-        data: (data) {
-          final clients = data.items;
-          for (final client in clients) {
-            // Only track inItinerary status, loanReleased is already available from client.loanReleased
-            statuses[client.id!] = ClientStatus(
-              inItinerary: inItineraryIds.contains(client.id),
-              loanReleased: client.loanReleased, // Keep for backward compatibility, but client.loanReleased is used
-            );
-          }
-        },
-        loading: () {},
-        error: (_, __) {},
-      );
-
-      if (mounted) {
-        setState(() {
-          _clientStatuses = statuses;
-          _isLoadingStatuses = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('PowerSync status load failed: $e');
-      if (mounted) {
-        setState(() {
-          _hasStatusError = true;
-          _isLoadingStatuses = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _retryLoadStatuses() async {
-    await _loadClientStatuses();
-  }
-
-  Future<void> _addClientToItinerary(Client client, {DateTime? customDate}) async {
+  Future<void> _addClientToItinerary(Client client) async {
     if (client.id == null) {
       if (mounted) {
         showToast('Invalid client: missing ID');
@@ -358,27 +218,12 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       return;
     }
 
-    // Get client status and touchpoint info for validation
-    final status = _clientStatuses[client.id];
-    final nextType = client.nextTouchpointType;
-
-    // Check if can add before proceeding
-    if (!_canAddToItinerary(client, status, nextType)) {
-      if (mounted) {
-        final reason = _getDisableReason(client, status, nextType);
-        HapticUtils.error();
-        showToast(reason);
-      }
-      return;
-    }
-
     setState(() {
       _addingClientIds.add(client.id!);
     });
 
     try {
-      // Default to today if no date is provided
-      final targetDate = customDate ?? widget.selectedDate ?? DateTime.now();
+      final targetDate = widget.selectedDate;
 
       final repo = ref.read(itineraryRepositoryProvider);
       final userId = ref.read(currentUserIdProvider);
@@ -393,9 +238,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
       if (mounted) {
         HapticUtils.success();
-        showToast(customDate == null
-            ? '${client.fullName} added to Today'
-            : '${client.fullName} added to ${_formatDateShort(customDate)}');
+        showToast('${client.fullName} added to ${_formatDateShort(targetDate)}');
 
         // Mark client as added (disable button, show "Added" status)
         setState(() {
@@ -440,131 +283,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     return '${months[date.month - 1]} ${date.day}';
   }
 
-  String _formatAddress(Address address) {
-    final parts = <String>[];
-
-    if (address.streetAddress != null && address.streetAddress!.isNotEmpty) {
-      parts.add(address.streetAddress!);
-    }
-    if (address.barangay != null && address.barangay!.isNotEmpty) {
-      parts.add(address.barangay!);
-    }
-    if (address.municipality != null && address.municipality!.isNotEmpty) {
-      parts.add(address.municipality!);
-    }
-    if (address.province != null && address.province!.isNotEmpty) {
-      parts.add(address.province!);
-    }
-
-    return parts.isNotEmpty ? parts.join(', ') : 'No address';
-  }
-
-  String _getTouchpointOrdinal(int number) {
-    if (number >= 11 && number <= 13) return 'th';
-    switch (number % 10) {
-      case 1:
-        return '1st';
-      case 2:
-        return '2nd';
-      case 3:
-        return '3rd';
-      case 4:
-        return '4th';
-      case 5:
-        return '5th';
-      case 6:
-        return '6th';
-      case 7:
-        return '7th';
-      default:
-        return '${number}th';
-    }
-  }
-
-  bool _canAddToItinerary(Client client, ClientStatus? status, TouchpointType? nextType) {
-    // Check if client was visited today
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    bool visitedToday = false;
-    if (client.touchpointSummary.isNotEmpty) {
-      final lastTouchpoint = client.touchpointSummary.last;
-      final lastTouchpointDate = DateTime(
-        lastTouchpoint.date.year,
-        lastTouchpoint.date.month,
-        lastTouchpoint.date.day,
-      );
-      visitedToday = lastTouchpointDate.isAtSameMomentAs(today);
-    }
-    if (visitedToday) return false;
-
-    // Check already in today's itinerary (from _clientStatuses)
-    if (status?.inItinerary == true) return false;
-
-    // Check next touchpoint type (Caravan can only do Visit: 1, 4, 7)
-    final userRole = ref.read(currentUserRoleProvider);
-    if (userRole == UserRole.caravan && nextType == TouchpointType.call) {
-      return false;
-    }
-
-    // Loan released - can still add for follow-up, so return true
-    return true;
-  }
-
-  String _getDisableReason(Client client, ClientStatus? status, TouchpointType? nextType) {
-    // Check if client was visited today
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    bool visitedToday = false;
-    if (client.touchpointSummary.isNotEmpty) {
-      final lastTouchpoint = client.touchpointSummary.last;
-      final lastTouchpointDate = DateTime(
-        lastTouchpoint.date.year,
-        lastTouchpoint.date.month,
-        lastTouchpoint.date.day,
-      );
-      visitedToday = lastTouchpointDate.isAtSameMomentAs(today);
-    }
-    if (visitedToday) return 'Visited today - cannot add';
-
-    if (status?.inItinerary == true) return 'Already added today';
-
-    final userRole = ref.read(currentUserRoleProvider);
-    if (userRole == UserRole.caravan && nextType == TouchpointType.call) {
-      return 'Next is Call - use Call feature';
-    }
-
-    return '';
-  }
-
-  String _getActionButtonLabel(Client client, ClientStatus? status, bool isPrimary) {
-    // If already added to this session
-    if (client.id != null && _addedClientIds.contains(client.id)) {
-      return 'Added';
-    }
-
-    // Check if client can be added
-    if (!_canAddToItinerary(client, status, client.nextTouchpointType)) {
-      // Return the disable reason as label
-      return _getDisableReason(client, status, client.nextTouchpointType);
-    }
-
-    // Default label
-    return isPrimary ? 'Schedule Today' : 'Schedule Itinerary';
-  }
-
-  Future<void> _showDatePicker(Client client) async {
-    final selectedDate = await showDatePicker(
-      context: context,
-      initialDate: widget.selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-    );
-
-    if (selectedDate != null && mounted) {
-      await _addClientToItinerary(client, customDate: selectedDate);
-    }
-  }
-
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _clientFilter == value;
     return GestureDetector(
@@ -598,24 +316,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch today's itinerary to filter out already-added clients
-    final itineraryAsync = ref.watch(todayItineraryProvider);
-    final today = DateTime.now();
-
-    // Get existing client IDs from today's itinerary
-    final existingClientIds = itineraryAsync.when(
-      data: (items) {
-        return items
-            .where((item) => item.scheduledDate.year == today.year &&
-                           item.scheduledDate.month == today.month &&
-                           item.scheduledDate.day == today.day)
-            .map((item) => item.clientId)
-            .toSet();
-      },
-      loading: () => <String>{},
-      error: (_, __) => <String>{},
-    );
-
     // Watch touchpoint counts for badges
     final touchpointCountsAsync = ref.watch(clientTouchpointCountsProvider);
 
@@ -632,18 +332,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final totalPages = _totalPages(meta);
         final totalItems = _totalItems(meta);
 
-        // Don't filter out clients - show all with status badges
-        // Only hide loan released clients from the list
         final displayableClients = _getDisplayableClients(clients);
-
-        // Load client statuses after clients are loaded
-        if (_clientStatuses.isEmpty || _clientStatuses.length != clients.length) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _isLoadingStatuses) {
-              _loadClientStatuses();
-            }
-          });
-        }
 
         return DraggableScrollableSheet(
           initialChildSize: 0.7,
@@ -1032,42 +721,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     AsyncValue<Map<String, int>> touchpointCountsAsync,
     ScrollController scrollController,
   ) {
-    // Show skeleton loading while fetching client statuses
-    if (_isLoadingStatuses && !_hasStatusError) {
-      return ListView.builder(
-        controller: scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: 5, // Show 5 skeleton cards
-        itemBuilder: (context, index) => _buildClientSkeleton(),
-      );
-    }
-
-    if (_hasStatusError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.alertCircle, size: 48, color: Colors.orange.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load client status',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap to retry',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _retryLoadStatuses,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
     if (displayableClients.isEmpty) {
       // Check if user has no assigned municipalities
       final UserRole userRole = ref.read(currentUserRoleProvider);
@@ -1129,45 +782,22 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       itemBuilder: (context, index) {
         final client = displayableClients[index];
         final isAdding = _addingClientIds.contains(client.id);
-        final status = _clientStatuses[client.id];
+        final isAdded = client.id != null && _addedClientIds.contains(client.id);
 
-        // Build action buttons for the modal
         final actionButtons = [
           _buildActionButton(
-            icon: LucideIcons.calendar,
-            label: _getActionButtonLabel(client, status, true),
+            icon: isAdded ? LucideIcons.checkCircle : LucideIcons.calendar,
+            label: isAdded ? 'Added' : 'Add',
             isPrimary: true,
             isLoading: isAdding,
-            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
-                ? () => _addClientToItinerary(client)
-                : null,
-          ),
-          _buildActionButton(
-            icon: LucideIcons.calendarClock,
-            label: _getActionButtonLabel(client, status, false),
-            isPrimary: false,
-            isLoading: isAdding,
-            onTap: _canAddToItinerary(client, status, client.nextTouchpointType) && !isAdding
-                ? () => _showDatePicker(client)
-                : null,
+            onTap: isAdded || isAdding ? null : () => _addClientToItinerary(client),
           ),
         ];
 
-        // Build trailing widget for status
-        Widget? trailingWidget;
-        if (status != null && status.inItinerary) {
-          trailingWidget = Icon(
-            LucideIcons.checkCircle,
-            size: 20,
-            color: const Color(0xFF22C55E),
-          );
-        }
-
         return ClientListTile(
           client: client,
-          useCardStyle: true, // Use Card style for modal
+          useCardStyle: true,
           actions: actionButtons,
-          trailing: trailingWidget,
         );
       },
     );
