@@ -28,6 +28,11 @@ class ItineraryItem {
   final String? createdBy;
   final String? assignedByName;
 
+  // Display fields for ClientListTile
+  final String? productType;  // raw e.g. 'SSS_PENSIONER'
+  final String? pensionType;  // raw e.g. 'GSIS'
+  final String? loanType;     // raw e.g. 'SALARY'
+
   // Previous touchpoint info
   final int? previousTouchpointNumber; // Last completed touchpoint number
   final String? previousTouchpointReason; // Last completed touchpoint reason
@@ -52,6 +57,9 @@ class ItineraryItem {
     this.updatedAt,
     this.createdBy,
     this.assignedByName,
+    this.productType,
+    this.pensionType,
+    this.loanType,
     this.previousTouchpointNumber,
     this.previousTouchpointReason,
     this.previousTouchpointType,
@@ -76,15 +84,24 @@ class ItineraryItem {
       clientName = json['client_name'];
     }
 
-    // Get address from expand or flat field
+    // Get address, product/pension/loan from expand or flat fields
     String? address;
+    String? productType;
+    String? pensionType;
+    String? loanType;
     if (json['expand'] != null && json['expand']['client_id'] != null) {
       final client = json['expand']['client_id'] as Map<String, dynamic>;
-      address = client['address'];
+      address = client['address'] as String?;
+      productType = client['product_type'] as String?;
+      pensionType = client['pension_type'] as String?;
+      loanType = client['loan_type'] as String?;
     }
     if (address == null) {
-      address = json['address'];
+      address = json['address'] as String?;
     }
+    productType ??= (json['client'] as Map<String, dynamic>?)?['product_type'] as String?;
+    pensionType ??= (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?;
+    loanType ??= (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?;
 
     // Parse scheduled date - convert UTC timestamps to local time
     // Backend can send either:
@@ -144,6 +161,9 @@ class ItineraryItem {
       assignedByName: (json['expand'] != null && json['expand']['created_by'] != null)
           ? json['expand']['created_by']['name'] as String?
           : null,
+      productType: productType,
+      pensionType: pensionType,
+      loanType: loanType,
       previousTouchpointNumber: validatedPreviousNumber,
       previousTouchpointReason: json['previous_touchpoint_reason'],
       previousTouchpointType: json['previous_touchpoint_type'],
@@ -223,6 +243,9 @@ class ItineraryItem {
     DateTime? updatedAt,
     String? createdBy,
     String? assignedByName,
+    String? productType,
+    String? pensionType,
+    String? loanType,
     int? previousTouchpointNumber,
     String? previousTouchpointReason,
     String? previousTouchpointType,
@@ -246,6 +269,9 @@ class ItineraryItem {
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
       assignedByName: assignedByName ?? this.assignedByName,
+      productType: productType ?? this.productType,
+      pensionType: pensionType ?? this.pensionType,
+      loanType: loanType ?? this.loanType,
       previousTouchpointNumber: previousTouchpointNumber ?? this.previousTouchpointNumber,
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
