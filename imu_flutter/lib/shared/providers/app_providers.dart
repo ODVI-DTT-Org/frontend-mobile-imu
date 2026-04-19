@@ -156,28 +156,12 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
 
   debugPrint('[AUTH-PROVIDER] Creating authNotifierProvider...');
 
-  // Fetch all assigned clients from REST API → cache in Hive on login.
+  // Show cached clients immediately, then sync in background.
   Future<void> onLoginSuccess() async {
-    try {
-      debugPrint('[INITIAL SYNC] Login successful - fetching assigned clients into Hive cache...');
-
-      final clientApiService = ref.read(clientApiServiceProvider);
-      final hiveService = HiveService();
-
-      final clients = await clientApiService.fetchAllAssignedClients();
-      final clientJsons = clients.map((c) => c.toJson()).toList();
-      await hiveService.saveAllClients(clientJsons);
-      await hiveService.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
-      await hiveService.saveSetting('clients_cache_version', 3);
-
-      ref.invalidate(assignedClientsProvider);
-
-      debugPrint('[INITIAL SYNC] Cached ${clients.length} clients into Hive');
-    } catch (e) {
-      debugPrint('[INITIAL SYNC] Failed to populate Hive cache: $e');
-      // Still invalidate so assignedClientsProvider shows whatever is in cache
-      ref.invalidate(assignedClientsProvider);
-    }
+    // Invalidate immediately so UI shows stale cache (or empty) right away.
+    ref.invalidate(assignedClientsProvider);
+    // Fire background sync — does NOT block login.
+    _syncClientsInBackground(ref);
   }
 
   void onLogout() {
@@ -209,6 +193,27 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   final authState = ref.watch(authNotifierProvider);
   return authState.isAuthenticated;
 });
+
+/// Fetches all assigned clients in parallel batches and saves to Hive.
+/// Runs fire-and-forget — does not block the caller.
+void _syncClientsInBackground(Ref ref) {
+  Future(() async {
+    try {
+      debugPrint('[BG-SYNC] Starting background client sync...');
+      final clientApi = ref.read(clientApiServiceProvider);
+      final hive = HiveService();
+      final clients = await clientApi.fetchAllAssignedClients();
+      final clientJsons = clients.map((c) => c.toJson()).toList();
+      await hive.saveAllClients(clientJsons);
+      await hive.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
+      await hive.saveSetting('clients_cache_version', 3);
+      ref.invalidate(assignedClientsProvider);
+      debugPrint('[BG-SYNC] Done — ${clients.length} clients cached');
+    } catch (e) {
+      debugPrint('[BG-SYNC] Failed: $e');
+    }
+  });
+}
 
 /// Current user record
 final currentUserRecordProvider = Provider<Map<String, dynamic>?>((ref) {
@@ -396,35 +401,6 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   // Load from Hive cache (populated on login from REST API)
   final hiveService = HiveService();
   var rawClients = hiveService.getAllClients();
-
-  // Bump this when the API response shape changes so stale caches are cleared.
-  const kCacheVersion = 3;
-
-  // Startup hydration: fetch from API if:
-  //  - cache is empty
-  //  - previous fetch was killed mid-way (no timestamp written)
-  //  - cache schema version is outdated (stale data from a prior API shape)
-  final lastFetchMs = hiveService.getSetting<int>('clients_last_fetch_ms');
-  final cacheVersion = hiveService.getSetting<int>('clients_cache_version');
-  if (rawClients.isEmpty || lastFetchMs == null || cacheVersion != kCacheVersion) {
-    final isOnline = ref.read(isOnlineProvider);
-    final jwtAuth = ref.read(jwtAuthProvider);
-    if (isOnline && jwtAuth.isAuthenticated) {
-      try {
-        debugPrint('assignedClientsProvider: Cache empty - hydrating from API...');
-        final clientApi = ref.read(clientApiServiceProvider);
-        final clients = await clientApi.fetchAllAssignedClients();
-        final clientJsons = clients.map((c) => c.toJson()).toList();
-        await hiveService.saveAllClients(clientJsons);
-        await hiveService.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
-        await hiveService.saveSetting('clients_cache_version', kCacheVersion);
-        rawClients = hiveService.getAllClients();
-        debugPrint('assignedClientsProvider: Hydrated ${rawClients.length} clients from API');
-      } catch (e) {
-        debugPrint('assignedClientsProvider: Startup hydration failed: $e');
-      }
-    }
-  }
 
   var cachedClients = rawClients.map((json) => Client.fromJson(json)).toList();
 

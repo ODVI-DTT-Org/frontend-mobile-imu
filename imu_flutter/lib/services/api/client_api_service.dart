@@ -198,23 +198,36 @@ class ClientApiService {
     }
   }
 
-  /// Fetch ALL assigned clients across all pages — for initial Hive cache population.
-  /// Uses MAX_PER_PAGE=100 to minimize round-trips.
+  /// Fetch ALL assigned clients using parallel page requests.
+  /// Fetches page 1 first to discover totalPages, then remaining pages in
+  /// concurrent batches of [_concurrency] to minimise wall-clock time.
+  static const int _concurrency = 10;
+
   Future<List<Client>> fetchAllAssignedClients() async {
     const perPage = 100;
-    final allClients = <Client>[];
-    int page = 1;
-    int totalPages = 1;
 
-    do {
-      final response = await fetchAssignedClients(page: page, perPage: perPage);
-      allClients.addAll(response.items);
-      totalPages = response.totalPages;
-      debugPrint('[CLIENT-API] fetchAllAssignedClients: page $page/$totalPages, fetched ${response.items.length}');
-      page++;
-    } while (page <= totalPages);
+    // Page 1 tells us totalPages.
+    final first = await fetchAssignedClients(page: 1, perPage: perPage);
+    final totalPages = first.totalPages;
+    debugPrint('[CLIENT-API] fetchAllAssignedClients: $totalPages pages total, fetching with concurrency=$_concurrency');
 
-    debugPrint('[CLIENT-API] fetchAllAssignedClients: total ${allClients.length} clients fetched');
+    final allClients = <Client>[...first.items];
+    if (totalPages <= 1) return allClients;
+
+    // Remaining pages in batches.
+    for (int batchStart = 2; batchStart <= totalPages; batchStart += _concurrency) {
+      final batchEnd = (batchStart + _concurrency - 1).clamp(batchStart, totalPages);
+      final responses = await Future.wait(
+        List.generate(batchEnd - batchStart + 1, (i) => batchStart + i)
+            .map((p) => fetchAssignedClients(page: p, perPage: perPage)),
+      );
+      for (final r in responses) {
+        allClients.addAll(r.items);
+      }
+      debugPrint('[CLIENT-API] fetchAllAssignedClients: pages $batchStart–$batchEnd/$totalPages done');
+    }
+
+    debugPrint('[CLIENT-API] fetchAllAssignedClients: ${allClients.length} clients total');
     return allClients;
   }
 
