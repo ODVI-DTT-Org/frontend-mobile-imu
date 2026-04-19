@@ -219,6 +219,12 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             value: 'edit',
           ),
           ActionOption(
+            icon: LucideIcons.navigation,
+            title: 'Navigate',
+            description: 'Open navigation to client address',
+            value: 'navigate',
+          ),
+          ActionOption(
             icon: LucideIcons.listChecks,
             title: 'Record Touchpoint',
             description: 'Create touchpoint + visit',
@@ -262,6 +268,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           break;
         case 'details':
           await _viewDetails(visit);
+          break;
+        case 'navigate':
+          await _navigateToVisit(visit);
           break;
       }
     }
