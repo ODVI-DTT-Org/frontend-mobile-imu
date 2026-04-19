@@ -88,7 +88,7 @@ class RecordVisitBottomSheet extends HookConsumerWidget {
       }
     }
 
-    final touchpointNum = client.nextTouchpointNumber ?? 1;
+    final touchpointNum = client.nextTouchpointNumber ?? (client.touchpointNumber + 1);
 
     return UnifiedActionBottomSheet(
       icon: Icons.home_outlined,

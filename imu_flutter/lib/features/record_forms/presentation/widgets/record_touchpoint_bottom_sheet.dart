@@ -65,7 +65,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
         final touchpoint = Touchpoint(
           id: '',
           clientId: client.id!,
-          touchpointNumber: client.nextTouchpointNumber ?? client.touchpointNumber,
+          touchpointNumber: client.nextTouchpointNumber ?? (client.touchpointNumber + 1),
           type: TouchpointType.visit,
           reason: _cm.TouchpointReason.values[reason.value!.index],
           status: _cm.TouchpointStatus.values[status.value!.index],
@@ -111,7 +111,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
       }
     }
 
-    final touchpointNum = client.nextTouchpointNumber ?? client.touchpointNumber;
+    final touchpointNum = client.nextTouchpointNumber ?? (client.touchpointNumber + 1);
 
     return UnifiedActionBottomSheet(
       icon: Icons.assignment_outlined,
