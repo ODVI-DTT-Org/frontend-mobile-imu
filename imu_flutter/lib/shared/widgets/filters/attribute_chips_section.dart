@@ -67,6 +67,17 @@ class AttributeChipsSection extends StatelessWidget {
             onChanged(draftFilter.copyWith(productTypes: updated.isEmpty ? null : updated));
           },
         ),
+        const SizedBox(height: 12),
+        _ChipGroup<LoanType>(
+          label: 'Loan Type',
+          values: LoanType.values,
+          selected: draftFilter.loanTypes?.toSet() ?? {},
+          labelOf: formatLoanType,
+          onToggle: (t) {
+            final updated = _toggle(draftFilter.loanTypes, t);
+            onChanged(draftFilter.copyWith(loanTypes: updated.isEmpty ? null : updated));
+          },
+        ),
       ],
     );
   }

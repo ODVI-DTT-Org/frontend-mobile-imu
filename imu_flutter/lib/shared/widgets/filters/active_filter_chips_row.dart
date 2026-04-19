@@ -56,6 +56,12 @@ class ActiveFilterChipsRow extends ConsumerWidget {
         onRemove: () => attrNotifier.toggleProductType(t),
       ));
     }
+    for (final t in attrs.loanTypes ?? []) {
+      chips.add(_ActiveChip(
+        label: formatLoanType(t),
+        onRemove: () => attrNotifier.toggleLoanType(t),
+      ));
+    }
 
     if (chips.isEmpty) return const SizedBox.shrink();
 

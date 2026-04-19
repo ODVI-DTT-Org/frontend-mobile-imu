@@ -116,3 +116,33 @@ IconData? getProductTypeIcon(ProductType? type) {
       return LucideIcons.fileCheck;
   }
 }
+
+/// Format LoanType enum for display
+String formatLoanType(LoanType? type) {
+  if (type == null) return 'All';
+  switch (type) {
+    case LoanType.firstLoan:
+      return 'New';
+    case LoanType.additional:
+      return 'Additional';
+    case LoanType.renewal:
+      return 'Renewal';
+    case LoanType.preterm:
+      return 'Preterm';
+  }
+}
+
+/// Get icon for LoanType
+IconData? getLoanTypeIcon(LoanType? type) {
+  if (type == null) return null;
+  switch (type) {
+    case LoanType.firstLoan:
+      return LucideIcons.plusCircle;
+    case LoanType.additional:
+      return LucideIcons.layers;
+    case LoanType.renewal:
+      return LucideIcons.refreshCw;
+    case LoanType.preterm:
+      return LucideIcons.clock;
+  }
+}

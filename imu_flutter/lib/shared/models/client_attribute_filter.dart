@@ -6,25 +6,29 @@ class ClientAttributeFilter {
   final List<MarketType>? marketTypes;
   final List<PensionType>? pensionTypes;
   final List<ProductType>? productTypes;
+  final List<LoanType>? loanTypes;
 
   const ClientAttributeFilter({
     this.clientTypes,
     this.marketTypes,
     this.pensionTypes,
     this.productTypes,
+    this.loanTypes,
   });
 
   bool get hasFilter =>
       (clientTypes?.isNotEmpty ?? false) ||
       (marketTypes?.isNotEmpty ?? false) ||
       (pensionTypes?.isNotEmpty ?? false) ||
-      (productTypes?.isNotEmpty ?? false);
+      (productTypes?.isNotEmpty ?? false) ||
+      (loanTypes?.isNotEmpty ?? false);
 
   int get activeFilterCount {
     return (clientTypes?.length ?? 0) +
         (marketTypes?.length ?? 0) +
         (pensionTypes?.length ?? 0) +
-        (productTypes?.length ?? 0);
+        (productTypes?.length ?? 0) +
+        (loanTypes?.length ?? 0);
   }
 
   static ClientAttributeFilter none() => const ClientAttributeFilter();
@@ -43,6 +47,9 @@ class ClientAttributeFilter {
     if (productTypes != null && productTypes!.isNotEmpty) {
       if (!productTypes!.contains(client.productType)) return false;
     }
+    if (loanTypes != null && loanTypes!.isNotEmpty) {
+      if (!loanTypes!.contains(client.loanType)) return false;
+    }
     return true;
   }
 
@@ -60,7 +67,23 @@ class ClientAttributeFilter {
     if (productTypes != null && productTypes!.isNotEmpty) {
       params['product_type'] = productTypes!.map((t) => _productTypeApiValue(t)).join(',');
     }
+    if (loanTypes != null && loanTypes!.isNotEmpty) {
+      params['loan_type'] = loanTypes!.map((t) => _loanTypeApiValue(t)).join(',');
+    }
     return params;
+  }
+
+  String _loanTypeApiValue(LoanType type) {
+    switch (type) {
+      case LoanType.firstLoan:
+        return 'NEW';
+      case LoanType.additional:
+        return 'ADDITIONAL';
+      case LoanType.renewal:
+        return 'RENEWAL';
+      case LoanType.preterm:
+        return 'PRETERM';
+    }
   }
 
   String _productTypeApiValue(ProductType type) {
@@ -85,12 +108,14 @@ class ClientAttributeFilter {
     Object? marketTypes = _absent,
     Object? pensionTypes = _absent,
     Object? productTypes = _absent,
+    Object? loanTypes = _absent,
   }) {
     return ClientAttributeFilter(
       clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<ClientType>?,
       marketTypes: identical(marketTypes, _absent) ? this.marketTypes : marketTypes as List<MarketType>?,
       pensionTypes: identical(pensionTypes, _absent) ? this.pensionTypes : pensionTypes as List<PensionType>?,
       productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<ProductType>?,
+      loanTypes: identical(loanTypes, _absent) ? this.loanTypes : loanTypes as List<LoanType>?,
     );
   }
 
@@ -102,7 +127,8 @@ class ClientAttributeFilter {
         listEq.equals(other.clientTypes, clientTypes) &&
         listEq.equals(other.marketTypes, marketTypes) &&
         listEq.equals(other.pensionTypes, pensionTypes) &&
-        listEq.equals(other.productTypes, productTypes);
+        listEq.equals(other.productTypes, productTypes) &&
+        listEq.equals(other.loanTypes, loanTypes);
   }
 
   @override
@@ -111,10 +137,11 @@ class ClientAttributeFilter {
         Object.hashAll(marketTypes ?? []),
         Object.hashAll(pensionTypes ?? []),
         Object.hashAll(productTypes ?? []),
+        Object.hashAll(loanTypes ?? []),
       );
 
   @override
   String toString() =>
       'ClientAttributeFilter(clientTypes: $clientTypes, marketTypes: $marketTypes, '
-      'pensionTypes: $pensionTypes, productTypes: $productTypes)';
+      'pensionTypes: $pensionTypes, productTypes: $productTypes, loanTypes: $loanTypes)';
 }

@@ -22,6 +22,7 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     final marketTypeStrs = await _prefs.getMarketTypes();
     final pensionTypeStrs = await _prefs.getPensionTypes();
     final productTypeStrs = await _prefs.getProductTypes();
+    final loanTypeStrs = await _prefs.getLoanTypes();
 
     List<T> parseEnums<T extends Enum>(List<String> strs, List<T> values) =>
         strs
@@ -39,14 +40,16 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     final marketTypes = parseEnums(marketTypeStrs, MarketType.values);
     final pensionTypes = parseEnums(pensionTypeStrs, PensionType.values);
     final productTypes = parseEnums(productTypeStrs, ProductType.values);
+    final loanTypes = parseEnums(loanTypeStrs, LoanType.values);
 
     if (clientTypes.isNotEmpty || marketTypes.isNotEmpty ||
-        pensionTypes.isNotEmpty || productTypes.isNotEmpty) {
+        pensionTypes.isNotEmpty || productTypes.isNotEmpty || loanTypes.isNotEmpty) {
       state = ClientAttributeFilter(
         clientTypes: clientTypes.isEmpty ? null : clientTypes,
         marketTypes: marketTypes.isEmpty ? null : marketTypes,
         pensionTypes: pensionTypes.isEmpty ? null : pensionTypes,
         productTypes: productTypes.isEmpty ? null : productTypes,
+        loanTypes: loanTypes.isEmpty ? null : loanTypes,
       );
     }
   }
@@ -80,6 +83,12 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     updateFilter(state.copyWith(productTypes: current.isEmpty ? null : current));
   }
 
+  void toggleLoanType(LoanType type) {
+    final current = List<LoanType>.from(state.loanTypes ?? []);
+    current.contains(type) ? current.remove(type) : current.add(type);
+    updateFilter(state.copyWith(loanTypes: current.isEmpty ? null : current));
+  }
+
   void clear() {
     state = ClientAttributeFilter.none();
     _prefs.clearAttributeFilters();
@@ -90,6 +99,7 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     _prefs.setMarketTypes(filter.marketTypes?.map((t) => t.name).toList() ?? []);
     _prefs.setPensionTypes(filter.pensionTypes?.map((t) => t.name).toList() ?? []);
     _prefs.setProductTypes(filter.productTypes?.map((t) => t.name).toList() ?? []);
+    _prefs.setLoanTypes(filter.loanTypes?.map((t) => t.name).toList() ?? []);
   }
 }
 

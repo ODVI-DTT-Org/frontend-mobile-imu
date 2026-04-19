@@ -14,6 +14,7 @@ class FilterPreferencesService {
   static const String _keyMarketType = 'filter_market_type';
   static const String _keyPensionType = 'filter_pension_type';
   static const String _keyProductType = 'filter_product_type';
+  static const String _keyLoanType = 'filter_loan_type';
 
   // Touchpoint filter key
   static const String _keyTouchpointNumbers = 'filter_touchpoint_numbers';
@@ -170,6 +171,27 @@ class FilterPreferencesService {
     }
   }
 
+  /// Loan Types Filter (multi-select)
+  Future<List<String>> getLoanTypes() async {
+    await init();
+    final jsonStr = _prefs?.getString(_keyLoanType);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      return (json.decode(jsonStr) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> setLoanTypes(List<String> values) async {
+    await init();
+    if (values.isEmpty) {
+      await _prefs?.remove(_keyLoanType);
+    } else {
+      await _prefs?.setString(_keyLoanType, json.encode(values));
+    }
+  }
+
   // ============================================
   // BULK OPERATIONS
   // ============================================
@@ -186,6 +208,7 @@ class FilterPreferencesService {
     await _prefs?.remove(_keyMarketType);
     await _prefs?.remove(_keyPensionType);
     await _prefs?.remove(_keyProductType);
+    await _prefs?.remove(_keyLoanType);
     // Touchpoint filter
     await _prefs?.remove(_keyTouchpointNumbers);
   }
@@ -205,6 +228,7 @@ class FilterPreferencesService {
     await _prefs?.remove(_keyMarketType);
     await _prefs?.remove(_keyPensionType);
     await _prefs?.remove(_keyProductType);
+    await _prefs?.remove(_keyLoanType);
   }
 
   // ============================================

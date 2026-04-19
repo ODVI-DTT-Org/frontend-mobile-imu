@@ -26,6 +26,7 @@ class ClientApiService {
     String? marketType,
     String? pensionType,
     String? productType,
+    String? loanType,
     List<String>? municipalityIds,
   }) async {
     try {
@@ -62,6 +63,7 @@ class ClientApiService {
           if (marketType != null && marketType.isNotEmpty) 'market_type': marketType,
           if (pensionType != null && pensionType.isNotEmpty) 'pension_type': pensionType,
           if (productType != null && productType.isNotEmpty) 'product_type': productType,
+          if (loanType != null && loanType.isNotEmpty) 'loan_type': loanType,
           if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality_ids': municipalityIds.join(','),
         },
       );
