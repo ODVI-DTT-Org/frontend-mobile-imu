@@ -5,7 +5,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../../../../services/touchpoint/touchpoint_validation_service.dart' hide UserRole;
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
@@ -19,7 +18,9 @@ import '../../../../shared/providers/app_providers.dart' show
     phoneNumberRepositoryProvider,
     clientMutationServiceProvider,
     jwtAuthProvider,
-    powerSyncDatabaseProvider;
+    powerSyncDatabaseProvider,
+    clientByIdProvider,
+    clientTouchpointsProvider;
 import '../../../../core/models/user_role.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../../../shared/utils/loading_helper.dart';
@@ -43,17 +44,6 @@ import '../../../clients/presentation/widgets/cms_visit_history_expansion_panel.
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../data/providers/client_favorites_provider.dart';
-
-final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
-  final clientRepo = ref.watch(clientRepositoryProvider);
-  return clientRepo.getClient(clientId);
-});
-
-final clientTouchpointsProvider = FutureProvider.family<List<Touchpoint>, String>((ref, clientId) async {
-  final clientRepo = ref.watch(clientRepositoryProvider);
-  final client = await clientRepo.getClient(clientId);
-  return client?.touchpointSummary ?? [];
-});
 
 class ClientDetailPage extends ConsumerStatefulWidget {
   final String clientId;
@@ -82,41 +72,52 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Future<void> _loadClient() async {
     try {
-      final clientRepo = ref.read(clientRepositoryProvider);
-      Client? client = await clientRepo.getClient(widget.clientId);
+      // Use clientByIdProvider which has online fallback: Hive → PowerSync → API
+      final clientAsync = ref.read(clientByIdProvider(widget.clientId));
 
-      // Load addresses and phone numbers from PowerSync
-      if (client != null) {
-        try {
-          final addressRepo = ref.read(addressRepositoryProvider);
-          final phoneRepo = ref.read(phoneNumberRepositoryProvider);
+      clientAsync.when(
+        data: (client) async {
+          if (!mounted) return;
 
-          final addressesFuture = addressRepo.getAddresses(widget.clientId);
-          final phoneNumbersFuture = phoneRepo.getPhoneNumbers(widget.clientId);
-          final addresses = await addressesFuture;
-          final phoneNumbers = await phoneNumbersFuture;
+          // Load addresses and phone numbers from PowerSync (if client has them locally)
+          Client? updatedClient = client;
+          try {
+            final addressRepo = ref.read(addressRepositoryProvider);
+            final phoneRepo = ref.read(phoneNumberRepositoryProvider);
 
-          // Update client with addresses and phone numbers
-          client = client.copyWith(
-            addresses: addresses,
-            phoneNumbers: phoneNumbers,
-          );
-        } catch (e, stack) {
-          debugPrint('Error loading addresses/phones from PowerSync: $e\n$stack');
-          // Continue without addresses/phones
-        }
-      }
+            final addressesFuture = addressRepo.getAddresses(widget.clientId);
+            final phoneNumbersFuture = phoneRepo.getPhoneNumbers(widget.clientId);
+            final addresses = await addressesFuture;
+            final phoneNumbers = await phoneNumbersFuture;
 
-      if (mounted) {
-        setState(() {
-          _client = client;
-          _isLoading = false;
-        });
+            // Update client with addresses and phone numbers from PowerSync
+            updatedClient = client.copyWith(
+              addresses: addresses,
+              phoneNumbers: phoneNumbers,
+            );
+          } catch (e, stack) {
+            debugPrint('Error loading addresses/phones from PowerSync: $e\n$stack');
+            // Continue with client data from API (which already includes addresses/phones)
+          }
 
-        if (client == null) {
-          _showNotFoundError();
-        }
-      }
+          setState(() {
+            _client = updatedClient;
+            _isLoading = false;
+          });
+        },
+        loading: () {
+          if (mounted) {
+            setState(() => _isLoading = true);
+          }
+        },
+        error: (error, stack) {
+          debugPrint('Error in _loadClient: $error\n$stack');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showErrorDialog('Failed to load client', error);
+          }
+        },
+      );
     } catch (e, stack) {
       debugPrint('Error in _loadClient: $e\n$stack');
       if (mounted) {
