@@ -265,20 +265,45 @@ final offlineAuthProvider = Provider<OfflineAuthService>((ref) {
 
 // ==================== Client Providers ====================
 
-/// Client by ID provider - fetches a single client from PowerSync SQLite
+/// Client by ID provider - fetches a single client with smart fallback
+/// Priority: Hive cache → PowerSync SQLite → Online API
 /// Used by router for deep linking to client detail pages and forms
 final clientByIdProvider = FutureProvider.family<Client, String>((ref, clientId) async {
   // Try Hive cache first (has embedded addresses + phoneNumbers)
   final hiveService = HiveService();
   final cachedJson = hiveService.getClient(clientId);
   if (cachedJson != null) {
+    debugPrint('[clientByIdProvider] Found in Hive cache: $clientId');
     return Client.fromJson(cachedJson);
   }
+
   // Fallback: PowerSync SQLite (no addresses/phones, but better than nothing offline)
   final clientRepo = ref.watch(clientRepositoryProvider);
-  final client = await clientRepo.getClient(clientId);
-  if (client == null) throw Exception('Client not found: $clientId');
-  return client;
+  final localClient = await clientRepo.getClient(clientId);
+  if (localClient != null) {
+    debugPrint('[clientByIdProvider] Found in PowerSync: $clientId');
+    return localClient;
+  }
+
+  // Final fallback: Online API (when online and client not found locally)
+  final isOnline = ref.watch(isOnlineProvider);
+  if (isOnline) {
+    debugPrint('[clientByIdProvider] Not found locally, fetching from API: $clientId');
+    try {
+      final clientApi = ref.watch(clientApiServiceProvider);
+      final onlineClient = await clientApi.fetchClient(clientId);
+      if (onlineClient != null) {
+        // Cache the fetched client locally for future use
+        await hiveService.saveClient(onlineClient.toJson());
+        debugPrint('[clientByIdProvider] Fetched from API and cached: $clientId');
+        return onlineClient;
+      }
+    } catch (e) {
+      debugPrint('[clientByIdProvider] API fetch failed: $e');
+    }
+  }
+
+  throw Exception('Client not found: $clientId');
 });
 
 // ==================== Online-Only Client Providers ====================
