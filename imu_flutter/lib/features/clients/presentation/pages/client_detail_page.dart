@@ -42,6 +42,7 @@ import '../../../clients/presentation/widgets/touchpoint_history_expansion_panel
 import '../../../clients/presentation/widgets/cms_visit_history_expansion_panel.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 import '../../../../services/local_storage/hive_service.dart';
+import '../../data/providers/client_favorites_provider.dart';
 
 final clientDetailProvider = FutureProvider.family<Client?, String>((ref, clientId) async {
   final clientRepo = ref.watch(clientRepositoryProvider);
@@ -1575,6 +1576,43 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         ),
         title: const Text('Client Details'),
         actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final isStarred = ref.watch(clientFavoritesProvider)
+                  .maybeWhen(data: (ids) => ids.contains(widget.clientId), orElse: () => false);
+              final favoritesService = ref.watch(clientFavoritesServiceProvider);
+              return IconButton(
+                icon: Icon(
+                  isStarred ? Icons.star : Icons.star_border,
+                  color: isStarred ? Colors.amber : null,
+                ),
+                tooltip: isStarred ? 'Remove from favorites' : 'Add to favorites',
+                onPressed: () async {
+                  try {
+                    if (isStarred) {
+                      await favoritesService.unstarClient(widget.clientId);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Removed from favorites')),
+                        );
+                      }
+                    } else {
+                      await favoritesService.starClient(widget.clientId);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Added to favorites')),
+                        );
+                      }
+                    }
+                  } catch (_) {
+                    if (context.mounted) {
+                      AppNotification.showError(context, 'Failed to update favorites');
+                    }
+                  }
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(LucideIcons.pencil),
             tooltip: 'Edit Client',

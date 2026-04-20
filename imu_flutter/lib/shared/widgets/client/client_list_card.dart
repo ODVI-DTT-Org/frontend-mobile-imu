@@ -11,6 +11,8 @@ import '../../../core/utils/haptic_utils.dart';
 import '../../../shared/providers/app_providers.dart' show currentUserRoleProvider;
 import '../../../core/models/user_role.dart';
 import '../../../services/api/itinerary_api_service.dart';
+import '../../../features/clients/data/providers/client_favorites_provider.dart';
+import '../../../core/utils/app_notification.dart';
 
 /// Reusable client card widget for My Day and Itinerary pages.
 ///
@@ -619,6 +621,51 @@ class ClientListCard extends ConsumerWidget {
       ),
     );
 
+    // Star icon overlay (top-right corner)
+    final isStarred = ref.watch(clientFavoritesProvider)
+        .maybeWhen(data: (ids) => ids.contains(client.id), orElse: () => false);
+    final favoritesService = ref.watch(clientFavoritesServiceProvider);
+
+    final stackedCard = Stack(
+      children: [
+        cardContent,
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: () async {
+              try {
+                if (isStarred) {
+                  await favoritesService.unstarClient(client.id!);
+                } else {
+                  await favoritesService.starClient(client.id!);
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  AppNotification.showError(
+                    context,
+                    isStarred ? 'Failed to remove from favorites' : 'Failed to add to favorites',
+                  );
+                }
+              }
+            },
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Icon(
+                  isStarred ? Icons.star : Icons.star_border,
+                  color: isStarred ? Colors.amber : Colors.grey.shade400,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
     // Wrap with dismissible if enabled
     if (enableSwipeToDismiss && onRemove != null) {
       final dismissible = Dismissible(
@@ -649,12 +696,12 @@ class ClientListCard extends ConsumerWidget {
             ],
           ),
         ),
-        child: cardContent,
+        child: stackedCard,
       );
       return dismissible;
     }
 
-    return cardContent;
+    return stackedCard;
   }
 
   String _getTouchpointSummary(Touchpoint touchpoint) {

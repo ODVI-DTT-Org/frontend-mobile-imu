@@ -38,7 +38,6 @@ const Schema _powerSyncSchema = Schema([
     Column.text('municipality'),
     Column.text('region'),
     Column.text('barangay'),
-    Column.integer('is_starred'),
     Column.integer('loan_released'),
     Column.text('loan_released_at'),
     Column.text('udi'),
@@ -222,6 +221,11 @@ const Schema _powerSyncSchema = Schema([
     Column.text('rejection_reason'),
     Column.text('created_at'),
     Column.text('updated_at'),
+  ]),
+  Table('client_favorites', [
+    Column.text('user_id'),
+    Column.text('client_id'),
+    Column.text('created_at'),
   ]),
 ]);
 

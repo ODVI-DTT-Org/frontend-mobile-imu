@@ -26,6 +26,7 @@ import '../../shared/providers/app_providers.dart' show
     clientAttributeFilterProvider,
     touchpointFilterProvider;
 import '../providers/client_attribute_filter_provider.dart' show activeFilterCountProvider;
+import '../../features/clients/data/providers/client_favorites_provider.dart';
 import 'filters/touchpoint_filter_chips.dart';
 import 'filters/filter_drawer.dart';
 import 'filters/active_filter_chips_row.dart';
@@ -114,7 +115,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         if (!mounted) return;
 
         // Update the appropriate search query provider based on mode
-        if (_clientFilter == 'assigned') {
+        if (_clientFilter == 'starred') {
+          // Starred uses local SQLite — no server call needed
+        } else if (_clientFilter == 'assigned') {
           ref.read(assignedClientSearchQueryProvider.notifier).state = _searchQuery;
           ref.read(assignedClientPageProvider.notifier).state = _currentPage;
           ref.invalidate(assignedClientsProvider);
@@ -145,7 +148,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       ref.read(locationFilterProvider.notifier).clear();
       ref.read(clientAttributeFilterProvider.notifier).clear();
 
-      if (_clientFilter == 'assigned') {
+      if (_clientFilter == 'starred') {
+        // Starred uses local SQLite — no server call needed
+      } else if (_clientFilter == 'assigned') {
         ref.read(assignedClientPageProvider.notifier).state = _currentPage;
         ref.read(assignedClientSearchQueryProvider.notifier).state = '';
         // Force fresh re-read from Hive to avoid stale/contaminated state
@@ -170,7 +175,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       if (!mounted) return;
 
       // Update the appropriate provider's page state and invalidate to trigger refetch
-      if (_clientFilter == 'assigned') {
+      if (_clientFilter == 'starred') {
+        // no-op: starred uses local SQLite stream
+      } else if (_clientFilter == 'assigned') {
         ref.read(assignedClientPageProvider.notifier).state = page;
         ref.invalidate(assignedClientsProvider);
       } else {
@@ -328,6 +335,100 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     // Watch touchpoint counts for badges
     final touchpointCountsAsync = ref.watch(clientTouchpointCountsProvider);
 
+    // Starred filter uses local PowerSync SQLite — no server pagination
+    if (_clientFilter == 'starred') {
+      final starredAsync = ref.watch(starredClientListProvider);
+      return starredAsync.when(
+        data: (clients) {
+          final displayableClients = _getDisplayableClients(clients);
+          return DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                                    style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                              ],
+                            ),
+                          ),
+                          IconButton(icon: const Icon(LucideIcons.x), onPressed: () => Navigator.pop(context)),
+                        ],
+                      ),
+                    ),
+                    if (widget.showAssignedFilter)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            _buildFilterChip('★ Starred', 'starred'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Assigned', 'assigned'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('All Clients', 'all'),
+                          ],
+                        ),
+                      ),
+                    if (displayableClients.isEmpty)
+                      const Expanded(
+                        child: Center(child: Text('No starred clients', style: TextStyle(color: Colors.grey))),
+                      )
+                    else
+                      Expanded(
+                        child: _buildClientList(displayableClients, displayableClients.length, touchpointCountsAsync, scrollController),
+                      ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+        loading: () => DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, __) => const Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, _) => DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, __) => Center(child: Text('Error: $e')),
+        ),
+      );
+    }
+
     // Choose provider based on mode (Assigned Clients vs All Clients)
     final clientsAsync = _clientFilter == 'assigned'
         ? ref.watch(assignedClientsProvider)
@@ -473,6 +574,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
+                          _buildFilterChip('★ Starred', 'starred'),
+                          const SizedBox(width: 8),
                           _buildFilterChip('Assigned', 'assigned'),
                           const SizedBox(width: 8),
                           _buildFilterChip('All Clients', 'all'),
@@ -661,6 +764,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
+                          _buildFilterChip('★ Starred', 'starred'),
+                          const SizedBox(width: 8),
                           _buildFilterChip('Assigned', 'assigned'),
                           const SizedBox(width: 8),
                           _buildFilterChip('All Clients', 'all'),
@@ -708,7 +813,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       onPressed: () {
                         if (_clientFilter == 'assigned') {
                           ref.invalidate(assignedClientsProvider);
-                        } else {
+                        } else if (_clientFilter != 'starred') {
                           ref.invalidate(onlineClientsProvider);
                         }
                       },
