@@ -206,7 +206,7 @@ class ClientApiService {
   static const int _concurrency = 10;
 
   Future<List<Client>> fetchAllAssignedClients() async {
-    const perPage = 1000;
+    const perPage = 500;
 
     // Page 1 tells us totalPages.
     final first = await fetchAssignedClients(page: 1, perPage: perPage);
