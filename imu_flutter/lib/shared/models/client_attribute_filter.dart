@@ -7,6 +7,7 @@ class ClientAttributeFilter {
   final List<String>? pensionTypes;
   final List<String>? productTypes;
   final List<String>? loanTypes;
+  final List<String>? touchpointStatuses;
 
   const ClientAttributeFilter({
     this.clientTypes,
@@ -14,6 +15,7 @@ class ClientAttributeFilter {
     this.pensionTypes,
     this.productTypes,
     this.loanTypes,
+    this.touchpointStatuses,
   });
 
   bool get hasFilter =>
@@ -21,14 +23,16 @@ class ClientAttributeFilter {
       (marketTypes?.isNotEmpty ?? false) ||
       (pensionTypes?.isNotEmpty ?? false) ||
       (productTypes?.isNotEmpty ?? false) ||
-      (loanTypes?.isNotEmpty ?? false);
+      (loanTypes?.isNotEmpty ?? false) ||
+      (touchpointStatuses?.isNotEmpty ?? false);
 
   int get activeFilterCount {
     return (clientTypes?.length ?? 0) +
         (marketTypes?.length ?? 0) +
         (pensionTypes?.length ?? 0) +
         (productTypes?.length ?? 0) +
-        (loanTypes?.length ?? 0);
+        (loanTypes?.length ?? 0) +
+        (touchpointStatuses?.length ?? 0);
   }
 
   static ClientAttributeFilter none() => const ClientAttributeFilter();
@@ -55,6 +59,11 @@ class ClientAttributeFilter {
       final raw = (client.loanTypeRaw ?? '').toUpperCase().trim();
       if (!loanTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
+    if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
+      final hasMatch = client.touchpoints.any((tp) =>
+          touchpointStatuses!.any((s) => s.toUpperCase() == tp.status.apiValue.toUpperCase()));
+      if (!hasMatch) return false;
+    }
     return true;
   }
 
@@ -75,6 +84,9 @@ class ClientAttributeFilter {
     if (loanTypes != null && loanTypes!.isNotEmpty) {
       params['loan_type'] = loanTypes!.join(',');
     }
+    if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
+      params['touchpoint_status'] = touchpointStatuses!.join(',');
+    }
     return params;
   }
 
@@ -86,6 +98,7 @@ class ClientAttributeFilter {
     Object? pensionTypes = _absent,
     Object? productTypes = _absent,
     Object? loanTypes = _absent,
+    Object? touchpointStatuses = _absent,
   }) {
     return ClientAttributeFilter(
       clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<String>?,
@@ -93,6 +106,7 @@ class ClientAttributeFilter {
       pensionTypes: identical(pensionTypes, _absent) ? this.pensionTypes : pensionTypes as List<String>?,
       productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<String>?,
       loanTypes: identical(loanTypes, _absent) ? this.loanTypes : loanTypes as List<String>?,
+      touchpointStatuses: identical(touchpointStatuses, _absent) ? this.touchpointStatuses : touchpointStatuses as List<String>?,
     );
   }
 
@@ -105,7 +119,8 @@ class ClientAttributeFilter {
         listEq.equals(other.marketTypes, marketTypes) &&
         listEq.equals(other.pensionTypes, pensionTypes) &&
         listEq.equals(other.productTypes, productTypes) &&
-        listEq.equals(other.loanTypes, loanTypes);
+        listEq.equals(other.loanTypes, loanTypes) &&
+        listEq.equals(other.touchpointStatuses, touchpointStatuses);
   }
 
   @override
@@ -115,10 +130,12 @@ class ClientAttributeFilter {
         Object.hashAll(pensionTypes ?? []),
         Object.hashAll(productTypes ?? []),
         Object.hashAll(loanTypes ?? []),
+        Object.hashAll(touchpointStatuses ?? []),
       );
 
   @override
   String toString() =>
       'ClientAttributeFilter(clientTypes: $clientTypes, marketTypes: $marketTypes, '
-      'pensionTypes: $pensionTypes, productTypes: $productTypes, loanTypes: $loanTypes)';
+      'pensionTypes: $pensionTypes, productTypes: $productTypes, loanTypes: $loanTypes, '
+      'touchpointStatuses: $touchpointStatuses)';
 }

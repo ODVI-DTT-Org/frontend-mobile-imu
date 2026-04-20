@@ -27,6 +27,7 @@ class ClientApiService {
     String? pensionType,
     String? productType,
     String? loanType,
+    String? touchpointStatus,
     List<String>? municipalityIds,
     List<String>? nextTouchpointNumbers,
   }) async {
@@ -65,6 +66,7 @@ class ClientApiService {
           if (pensionType != null && pensionType.isNotEmpty) 'pension_type': pensionType,
           if (productType != null && productType.isNotEmpty) 'product_type': productType,
           if (loanType != null && loanType.isNotEmpty) 'loan_type': loanType,
+          if (touchpointStatus != null && touchpointStatus.isNotEmpty) 'touchpoint_status': touchpointStatus,
           if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality_ids': municipalityIds.join(','),
           if (nextTouchpointNumbers != null && nextTouchpointNumbers.isNotEmpty)
             'next_touchpoint_number': nextTouchpointNumbers,

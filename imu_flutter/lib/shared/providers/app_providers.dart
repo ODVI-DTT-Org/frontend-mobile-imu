@@ -374,6 +374,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       pensionType: queryParams['pension_type'],
       productType: queryParams['product_type'],
       loanType: queryParams['loan_type'],
+      touchpointStatus: queryParams['touchpoint_status'],
       municipalityIds: municipalityIds,
       nextTouchpointNumbers: nextTouchpointNumbers,
     );

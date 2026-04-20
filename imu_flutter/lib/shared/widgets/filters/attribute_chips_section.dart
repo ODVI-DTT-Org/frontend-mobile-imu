@@ -105,6 +105,20 @@ class AttributeChipsSection extends StatelessWidget {
             onChanged(draftFilter.copyWith(loanTypes: selected.isEmpty ? null : selected.toList()));
           },
         ),
+        const SizedBox(height: 12),
+        _FilterGroup(
+          label: 'Visit Status',
+          values: const ['INTERESTED', 'UNDECIDED', 'NOT_INTERESTED'],
+          selected: draftFilter.touchpointStatuses?.toSet() ?? {},
+          labelOf: (v) => v == 'NOT_INTERESTED' ? 'Not Interested' : _label(v.replaceAll('_', ' ')),
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.touchpointStatuses, v);
+            onChanged(draftFilter.copyWith(touchpointStatuses: updated.isEmpty ? null : updated));
+          },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(touchpointStatuses: selected.isEmpty ? null : selected.toList()));
+          },
+        ),
       ],
     );
   }

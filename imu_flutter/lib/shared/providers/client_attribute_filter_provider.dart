@@ -70,6 +70,12 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     updateFilter(state.copyWith(loanTypes: current.isEmpty ? null : current));
   }
 
+  void toggleTouchpointStatus(String value) {
+    final current = List<String>.from(state.touchpointStatuses ?? []);
+    current.contains(value) ? current.remove(value) : current.add(value);
+    updateFilter(state.copyWith(touchpointStatuses: current.isEmpty ? null : current));
+  }
+
   void clear() {
     state = ClientAttributeFilter.none();
     _prefs.clearAttributeFilters();
