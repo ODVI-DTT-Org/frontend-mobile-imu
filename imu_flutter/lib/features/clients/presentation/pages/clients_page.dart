@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../app.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/debounce_utils.dart';
+import '../../../../core/utils/app_notification.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../../../shared/providers/app_providers.dart' show
@@ -127,10 +128,32 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
   Future<void> _handleRefresh() async {
     HapticUtils.lightImpact();
+
+    // Show orange notification that refresh is in progress
+    if (mounted) {
+      AppNotification.showWarning(
+        context,
+        _showAssignedClientsOnly
+          ? 'Refreshing assigned clients...'
+          : 'Refreshing all clients...',
+        duration: const Duration(seconds: 10), // Longer duration for refresh
+      );
+    }
+
     if (_showAssignedClientsOnly) {
-      ref.invalidate(assignedClientsProvider);
+      await ref.invalidate(assignedClientsProvider);
     } else {
-      ref.invalidate(onlineClientsProvider);
+      await ref.invalidate(onlineClientsProvider);
+    }
+
+    // Show success notification when refresh completes
+    if (mounted) {
+      AppNotification.showSuccess(
+        context,
+        _showAssignedClientsOnly
+          ? 'Assigned clients refreshed'
+          : 'All clients refreshed',
+      );
     }
   }
 
