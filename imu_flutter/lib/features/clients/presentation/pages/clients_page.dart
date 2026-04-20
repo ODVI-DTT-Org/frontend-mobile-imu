@@ -66,37 +66,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-
-    // Listen for assigned clients fetch status changes
-    ref.listen<AssignedClientsFetchState>(
-      assignedClientsFetchProvider,
-      (previous, next) {
-        if (!mounted) return;
-
-        // Show notification when fetch starts
-        if (next.isFetching && (previous == null || !previous.isFetching)) {
-          AppNotification.showWarning(
-            context,
-            'Loading assigned clients...',
-            duration: const Duration(seconds: 30), // Longer duration for large fetches
-          );
-        }
-
-        // Show success notification when fetch completes
-        if (!next.isFetching && next.fetchCount > 0 && (previous == null || previous.isFetching)) {
-          AppNotification.showSuccess(
-            context,
-            '${next.fetchCount} assigned clients loaded',
-            duration: const Duration(seconds: 3),
-          );
-        }
-
-        // Dismiss any in-progress notification if fetch failed
-        if (!next.isFetching && next.fetchCount == 0 && (previous == null || previous.isFetching)) {
-          AppNotification.dismiss();
-        }
-      },
-    );
+    // ref.listen() moved to build() method
   }
 
   void _onSearchChanged() {
@@ -228,6 +198,37 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for assigned clients fetch status changes (only in build method)
+    ref.listen<AssignedClientsFetchState>(
+      assignedClientsFetchProvider,
+      (previous, next) {
+        if (!mounted) return;
+
+        // Show notification when fetch starts
+        if (next.isFetching && (previous == null || !previous.isFetching)) {
+          AppNotification.showWarning(
+            context,
+            'Loading assigned clients...',
+            duration: const Duration(seconds: 30), // Longer duration for large fetches
+          );
+        }
+
+        // Show success notification when fetch completes
+        if (!next.isFetching && next.fetchCount > 0 && (previous == null || previous.isFetching)) {
+          AppNotification.showSuccess(
+            context,
+            '${next.fetchCount} assigned clients loaded',
+            duration: const Duration(seconds: 3),
+          );
+        }
+
+        // Dismiss any in-progress notification if fetch failed
+        if (!next.isFetching && next.fetchCount == 0 && (previous == null || previous.isFetching)) {
+          AppNotification.dismiss();
+        }
+      },
+    );
+
     final assignedMunicipalitiesAsync = ref.watch(assignedMunicipalitiesProvider);
     final isOnline = ref.watch(isOnlineProvider);
     final screenWidth = MediaQuery.of(context).size.width;
