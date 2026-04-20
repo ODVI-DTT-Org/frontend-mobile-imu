@@ -16,7 +16,10 @@ export '../../services/api/background_sync_service.dart' show backgroundSyncServ
 // Re-export auth providers
 export '../../services/auth/auth_service.dart' show jwtAuthProvider;
 export '../../services/auth/offline_auth_service.dart' show offlineAuthProvider;
-export './app_providers.dart' show authNotifierProvider;
+export './app_providers.dart' show
+  authNotifierProvider,
+  assignedClientsFetchProvider,
+  assignedClientsProvider;
 // Re-export permission providers
 export 'permission_providers.dart' show
   permissionServiceProvider,
@@ -200,6 +203,10 @@ void _syncClientsInBackground(Ref ref) {
   Future(() async {
     try {
       debugPrint('[BG-SYNC] Starting background client sync...');
+
+      // Notify that fetch is starting
+      ref.read(assignedClientsFetchProvider.notifier).startFetch();
+
       final clientApi = ref.read(clientApiServiceProvider);
       final hive = HiveService();
       final clients = await clientApi.fetchAllAssignedClients();
@@ -208,9 +215,15 @@ void _syncClientsInBackground(Ref ref) {
       await hive.saveSetting('clients_last_fetch_ms', DateTime.now().millisecondsSinceEpoch);
       await hive.saveSetting('clients_cache_version', 3);
       ref.invalidate(assignedClientsProvider);
+
+      // Notify that fetch is complete
+      ref.read(assignedClientsFetchProvider.notifier).completeFetch(clients.length);
+
       debugPrint('[BG-SYNC] Done — ${clients.length} clients cached');
     } catch (e) {
       debugPrint('[BG-SYNC] Failed: $e');
+      // Reset fetch state on error
+      ref.read(assignedClientsFetchProvider.notifier).reset();
     }
   });
 }
@@ -1100,3 +1113,54 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
     state = null;
   }
 }
+
+/// State for tracking assigned clients initial fetch status
+class AssignedClientsFetchNotifier extends StateNotifier<AssignedClientsFetchState> {
+  AssignedClientsFetchNotifier() : super(AssignedClientsFetchState.initial());
+
+  void startFetch() {
+    state = AssignedClientsFetchState(
+      isFetching: true,
+      fetchCount: 0,
+      lastFetchTime: null,
+    );
+  }
+
+  void completeFetch(int count) {
+    state = AssignedClientsFetchState(
+      isFetching: false,
+      fetchCount: count,
+      lastFetchTime: DateTime.now(),
+    );
+  }
+
+  void reset() {
+    state = AssignedClientsFetchState.initial();
+  }
+}
+
+/// State class for assigned clients fetch
+class AssignedClientsFetchState {
+  final bool isFetching;
+  final int fetchCount;
+  final DateTime? lastFetchTime;
+
+  AssignedClientsFetchState({
+    required this.isFetching,
+    required this.fetchCount,
+    this.lastFetchTime,
+  });
+
+  factory AssignedClientsFetchState.initial() {
+    return AssignedClientsFetchState(
+      isFetching: false,
+      fetchCount: 0,
+      lastFetchTime: null,
+    );
+  }
+}
+
+/// Provider for tracking assigned clients initial fetch status
+final assignedClientsFetchProvider = StateNotifierProvider<AssignedClientsFetchNotifier, AssignedClientsFetchState>((ref) {
+  return AssignedClientsFetchNotifier();
+});

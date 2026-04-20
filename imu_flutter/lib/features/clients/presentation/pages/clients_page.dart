@@ -10,6 +10,7 @@ import '../../../../core/utils/debounce_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
+import '../../../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
 import '../../../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     assignedClientSearchQueryProvider,
@@ -24,7 +25,9 @@ import '../../../../shared/providers/app_providers.dart' show
     clientAttributeFilterProvider,
     touchpointFilterProvider,
     myDayApiServiceProvider,
-    todayItineraryProvider;
+    assignedClientsFetchProvider,
+    AssignedClientsFetchState;
+import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/widgets/client/touchpoint_progress_badge.dart';
 import '../../../../shared/widgets/client/touchpoint_status_badge.dart';
 import '../../../../shared/widgets/client/client_status_badge.dart';
@@ -63,6 +66,37 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+
+    // Listen for assigned clients fetch status changes
+    ref.listen<AssignedClientsFetchState>(
+      assignedClientsFetchProvider,
+      (previous, next) {
+        if (!mounted) return;
+
+        // Show notification when fetch starts
+        if (next.isFetching && (previous == null || !previous.isFetching)) {
+          AppNotification.showWarning(
+            context,
+            'Loading assigned clients...',
+            duration: const Duration(seconds: 30), // Longer duration for large fetches
+          );
+        }
+
+        // Show success notification when fetch completes
+        if (!next.isFetching && next.fetchCount > 0 && (previous == null || previous.isFetching)) {
+          AppNotification.showSuccess(
+            context,
+            '${next.fetchCount} assigned clients loaded',
+            duration: const Duration(seconds: 3),
+          );
+        }
+
+        // Dismiss any in-progress notification if fetch failed
+        if (!next.isFetching && next.fetchCount == 0 && (previous == null || previous.isFetching)) {
+          AppNotification.dismiss();
+        }
+      },
+    );
   }
 
   void _onSearchChanged() {
