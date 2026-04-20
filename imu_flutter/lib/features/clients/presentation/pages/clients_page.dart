@@ -175,9 +175,9 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     }
 
     if (_showAssignedClientsOnly) {
-      await ref.invalidate(assignedClientsProvider);
+      ref.invalidate(assignedClientsProvider);
     } else {
-      await ref.invalidate(onlineClientsProvider);
+      ref.invalidate(onlineClientsProvider);
     }
 
     // Show success notification when refresh completes
