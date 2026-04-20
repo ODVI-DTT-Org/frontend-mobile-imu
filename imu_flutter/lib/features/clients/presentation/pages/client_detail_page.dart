@@ -64,67 +64,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   @override
   void initState() {
     super.initState();
-    // Defer loading until after the first frame to avoid modifying providers during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadClient();
-    });
+    // Removed _loadClient() call - using ref.watch() in build() instead
   }
 
+  /// Refresh client data by invalidating the provider
   Future<void> _loadClient() async {
-    try {
-      // Use clientByIdProvider which has online fallback: Hive → PowerSync → API
-      final clientAsync = ref.read(clientByIdProvider(widget.clientId));
-
-      clientAsync.when(
-        data: (client) async {
-          if (!mounted) return;
-
-          // Load addresses and phone numbers from PowerSync (if client has them locally)
-          Client? updatedClient = client;
-          try {
-            final addressRepo = ref.read(addressRepositoryProvider);
-            final phoneRepo = ref.read(phoneNumberRepositoryProvider);
-
-            final addressesFuture = addressRepo.getAddresses(widget.clientId);
-            final phoneNumbersFuture = phoneRepo.getPhoneNumbers(widget.clientId);
-            final addresses = await addressesFuture;
-            final phoneNumbers = await phoneNumbersFuture;
-
-            // Update client with addresses and phone numbers from PowerSync
-            updatedClient = client.copyWith(
-              addresses: addresses,
-              phoneNumbers: phoneNumbers,
-            );
-          } catch (e, stack) {
-            debugPrint('Error loading addresses/phones from PowerSync: $e\n$stack');
-            // Continue with client data from API (which already includes addresses/phones)
-          }
-
-          setState(() {
-            _client = updatedClient;
-            _isLoading = false;
-          });
-        },
-        loading: () {
-          if (mounted) {
-            setState(() => _isLoading = true);
-          }
-        },
-        error: (error, stack) {
-          debugPrint('Error in _loadClient: $error\n$stack');
-          if (mounted) {
-            setState(() => _isLoading = false);
-            _showErrorDialog('Failed to load client', error);
-          }
-        },
-      );
-    } catch (e, stack) {
-      debugPrint('Error in _loadClient: $e\n$stack');
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showErrorDialog('Failed to load client', e);
-      }
-    }
+    ref.invalidate(clientByIdProvider(widget.clientId));
   }
 
   Widget _buildSkeletonLoading() {
@@ -1541,34 +1486,39 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show skeleton loading while data is being fetched
-    // Check this FIRST before checking if client is null to avoid "Client not found" flash
-    if (_isLoading) {
-      return _buildSkeletonLoading();
-    }
+    // Watch the client provider - automatically rebuilds when state changes
+    final clientAsync = ref.watch(clientByIdProvider(widget.clientId));
 
-    if (_client == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Client Not Found')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(LucideIcons.userX, size: 64, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Client not found'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => context.pop(),
-                child: const Text('Go Back'),
-              ),
-            ],
+    return clientAsync.when(
+      loading: () => _buildSkeletonLoading(),
+      error: (error, stack) {
+        debugPrint('Error loading client: $error');
+        return Scaffold(
+          appBar: AppBar(title: const Text('Error')),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(LucideIcons.alertCircle, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text('Failed to load client'),
+                const SizedBox(height: 8),
+                Text(error.toString(), style: const TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Go Back'),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    }
+        );
+      },
+      data: (client) {
+        // Update local state for methods that need it
+        _client = client;
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(
@@ -1731,6 +1681,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 
