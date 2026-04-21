@@ -1360,13 +1360,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Touchpoint button — disabled by loan release, touchpoint business rules, or role mismatch
+          // Touchpoint button — always enabled
           Expanded(
             child: _buildActionButton(
               label: 'TOUCHPOINT',
               color: Colors.green[700]!,
-              enabled: canRecordTouchpoint && !loanReleased && roleCanRecordTouchpoint,
-              loanReleased: loanReleased,
+              enabled: true,
+              loanReleased: false,
               onPressed: () => _handleRecordTouchpoint(),
             ),
           ),
@@ -1804,7 +1804,7 @@ class _QuickActionsSection extends ConsumerWidget {
               _QuickActionButton(
                 icon: LucideIcons.clipboardList,
                 label: 'Record Touchpoint',
-                onTap: (isLoanReleased || !canRecordTouchpoint || !roleCanRecordTouchpoint) ? null : onRecordTouchpoint,
+                onTap: onRecordTouchpoint,
                 isPrimary: true,
               ),
               // REMOVED: Duplicate "Record Visit" button - functionality already covered by "Record Touchpoint"
