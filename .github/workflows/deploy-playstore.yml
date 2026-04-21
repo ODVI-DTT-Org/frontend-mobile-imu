@@ -1,8 +1,6 @@
 name: Deploy to Google Play Store
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       track:
@@ -18,7 +16,7 @@ on:
       rollout:
         description: 'Rollout percentage (for beta/production)'
         required: false
-        default: '0.1'
+        default: '1'
         type: string
 
 jobs:
@@ -76,37 +74,14 @@ jobs:
           path: imu_flutter/build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
 
-      - name: Upload to Play Store - Internal Testing
-        if: github.event_name == 'push'
-        uses: rubygems/upload-play-store@v1
-        with:
-          package_name: com.odvi.imu
-          service_account_json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          track: internal
-          status: completed
-          release_name: v${{ github.run_number }}-${{ github.sha }}
-          release_notes: |
-            🚀 Automated Build #${{ github.run_number }}
-
-            📅 Date: ${{ github.event.head_commit.timestamp }}
-            🌿 Branch: ${{ github.ref_name }}
-            👤 Author: ${{ github.actor }}
-
-            📝 Changes:
-            ${{ github.event.head_commit.message }}
-
-            🔗 Commit: ${{ github.sha }}
-            📦 View on GitHub: https://github.com/ODVI-DTT-Org/frontend-mobile-imu/commit/${{ github.sha }}
-
-      - name: Upload to Play Store - Custom Track
-        if: github.event_name == 'workflow_dispatch'
+      - name: Upload to Play Store
         uses: rubygems/upload-play-store@v1
         with:
           package_name: com.odvi.imu
           service_account_json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           track: ${{ inputs.track }}
           status: completed
-          rollout: ${{ inputs.rollout }}
+          rollout: ${{ inputs.track == 'production' || inputs.track == 'beta' && inputs.rollout || null }}
           release_name: v${{ github.run_number }}-${{ github.sha }}
           release_notes: |
             🚀 Manual Deployment - Build #${{ github.run_number }}
@@ -114,6 +89,8 @@ jobs:
             📅 Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
             🌿 Branch: ${{ github.ref_name }}
             👤 Triggered by: ${{ github.actor }}
+            📦 Track: ${{ inputs.track }}
+            📊 Rollout: ${{ inputs.rollout || '100%' }}
 
             🔗 Commit: ${{ github.sha }}
 

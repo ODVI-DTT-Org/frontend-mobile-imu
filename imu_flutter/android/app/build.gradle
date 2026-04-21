@@ -1,17 +1,9 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins
+    id "dev.flutter.flutter-gradle-plugin"
 }
-
-def flutterSdkPath = {
-    def properties = new Properties()
-    file("../local.properties").withInputStream { properties.load(it) }
-    def path = properties.getProperty("flutter.sdk")
-    assert path != null, "flutter.sdk not set in local.properties"
-    return path
-}()
-
-apply from: "$flutterSdkPath/packages/flutter_tools/gradle/flutter.gradle"
 
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
