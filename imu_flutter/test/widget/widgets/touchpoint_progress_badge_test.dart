@@ -6,6 +6,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 Client createTestClient({int touchpointCount = 0}) {
   final now = DateTime.now();
+  // Calculate next touchpoint number: if 3 completed, next is 4th
+  final nextTouchpointNumber = touchpointCount > 0 ? touchpointCount + 1 : 1;
   return Client(
     id: 'test-client-1',
     firstName: 'Test',
@@ -14,6 +16,7 @@ Client createTestClient({int touchpointCount = 0}) {
     productType: ProductType.pnpPension,
     pensionType: PensionType.sss,
     createdAt: now,
+    touchpointNumber: nextTouchpointNumber, // Set next touchpoint number correctly
     touchpoints: List.generate(
       touchpointCount,
       (index) => Touchpoint(
