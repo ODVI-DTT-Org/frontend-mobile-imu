@@ -337,7 +337,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     // Starred filter uses local PowerSync SQLite — no server pagination
     if (_clientFilter == 'starred') {
-      final starredAsync = ref.watch(starredClientListProvider);
+      final starredAsync = ref.watch(favoritedClientListProvider);
       return starredAsync.when(
         data: (clients) {
           final displayableClients = _getDisplayableClients(clients);

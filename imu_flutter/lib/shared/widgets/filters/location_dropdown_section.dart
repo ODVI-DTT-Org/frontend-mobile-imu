@@ -78,22 +78,50 @@ class LocationDropdownSection extends ConsumerWidget {
           onTap: draftFilter.province == null
               ? null
               : () async {
-                  final munsAsync =
-                      ref.read(municipalitiesByProvinceProvider(draftFilter.province!));
-                  final muns = munsAsync.value?.map((m) => m.name).toList() ?? [];
-                  final result = await SearchablePickerSheet.show(
-                    context: context,
-                    title: 'Municipality',
-                    items: muns,
-                    selectedItems: draftFilter.municipalities?.toSet() ?? {},
-                    multiSelect: true,
-                    showAllOption: true,
-                  );
-                  if (result != null) {
-                    onChanged(LocationFilter(
-                      province: draftFilter.province,
-                      municipalities: result.isEmpty ? null : result.toList(),
-                    ));
+                  try {
+                    // Properly await the provider to get municipalities
+                    final munsAsync = await ref.read(
+                      municipalitiesByProvinceProvider(draftFilter.province!).future,
+                    );
+                    final muns = munsAsync.map((m) => m.name).toList();
+
+                    // Handle case where no municipalities are found
+                    if (muns.isEmpty) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No municipalities found for this province'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    final result = await SearchablePickerSheet.show(
+                      context: context,
+                      title: 'Municipality',
+                      items: muns,
+                      selectedItems: draftFilter.municipalities?.toSet() ?? {},
+                      multiSelect: true,
+                      showAllOption: true,
+                    );
+                    if (result != null) {
+                      onChanged(LocationFilter(
+                        province: draftFilter.province,
+                        municipalities: result.isEmpty ? null : result.toList(),
+                      ));
+                    }
+                  } catch (e) {
+                    // Handle errors (e.g., province not found in PSGC data, network errors)
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to load municipalities: ${e.toString()}'),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
                   }
                 },
         ),

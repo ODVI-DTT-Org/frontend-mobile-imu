@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../features/clients/data/models/client_model.dart';
+import '../../../features/clients/data/providers/client_favorites_provider.dart';
 import '../../../core/models/user_role.dart';
 import '../../../shared/providers/app_providers.dart' show currentUserRoleProvider;
+import '../../../core/utils/app_notification.dart';
 
 /// Unified client list tile used across Clients Page and Client Selector Modal.
 ///
 /// Layout:
-///   [Product Type]  [Pension Type]  [Loan Type?]
+///   [Product Type]  [Pension Type]  [Loan Type?]  [STAR]
 ///   Name
 ///   [X/7 • Call/Visit]
 ///   📍 Full address
@@ -34,6 +36,11 @@ class ClientListTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userRole = ref.watch(currentUserRoleProvider);
+
+    // Check if client is favorited
+    final isStarred = ref.watch(clientFavoritesProvider)
+        .maybeWhen(data: (ids) => ids.contains(client.id), orElse: () => false);
+    final favoritesService = ref.watch(clientFavoritesServiceProvider);
 
     // Address — prefer primary from addresses list, fall back to client fields
     String addressText = '';
@@ -116,7 +123,7 @@ class ClientListTile extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: type badges + optional trailing checkmark
+              // Row 1: type badges + star button + optional trailing checkmark
               Row(
                 children: [
                   Expanded(
@@ -131,8 +138,35 @@ class ClientListTile extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  // Star button (top-right corner)
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        if (isStarred) {
+                          await favoritesService.unstarClient(client.id!);
+                        } else {
+                          await favoritesService.starClient(client.id!);
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          AppNotification.showError(
+                            context,
+                            isStarred ? 'Failed to remove from favorites' : 'Failed to add to favorites',
+                          );
+                        }
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        isStarred ? LucideIcons.star : LucideIcons.star,
+                        size: 18,
+                        color: isStarred ? Colors.amber : Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
                   if (trailing != null) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     trailing!,
                   ],
                 ],

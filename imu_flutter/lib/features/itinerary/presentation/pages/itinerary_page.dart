@@ -293,50 +293,61 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     // Get touchpoint number from visit
     final touchpointNumber = visit.touchpointNumber ?? 1;
 
-    // Calculate expected touchpoint type based on touchpoint number (1=Visit, 2=Call, 3=Call, 4=Visit, 5=Call, 6=Call, 7=Visit)
-    final touchpointType = TouchpointValidationService.getExpectedTouchpointType(touchpointNumber);
-    final touchpointTypeStr = touchpointType == TouchpointType.visit ? 'Visit' : 'Call';
+    // COMMENTED OUT for Unli Touchpoint - no pattern validation
+    // // Calculate expected touchpoint type based on touchpoint number (1=Visit, 2=Call, 3=Call, 4=Visit, 5=Call, 6=Call, 7=Visit)
+    // final touchpointType = TouchpointValidationService.getExpectedTouchpointType(touchpointNumber);
+    // final touchpointTypeStr = touchpointType == TouchpointType.visit ? 'Visit' : 'Call';
+    //
+    // // Check if touchpoint number is valid (1-7)
+    // if (touchpointNumber > 7) {
+    //   if (mounted) {
+    //     _showTouchpointCompletionDialog(visit.clientName);
+    //   }
+    //   return;
+    // }
+    //
+    // // Validate the sequence
+    // final validation = TouchpointValidationService.validateTouchpointSequence(
+    //   touchpointNumber: touchpointNumber,
+    //   touchpointType: touchpointType,
+    // );
+    //
+    // if (!validation.isValid) {
+    //   if (mounted) {
+    //     _showValidationError(validation, visit.clientName);
+    //   }
+    //   return;
+    // }
 
-    // Check if touchpoint number is valid (1-7)
-    if (touchpointNumber > 7) {
-      if (mounted) {
-        _showTouchpointCompletionDialog(visit.clientName);
-      }
-      return;
-    }
-
-    // Validate the sequence
-    final validation = TouchpointValidationService.validateTouchpointSequence(
-      touchpointNumber: touchpointNumber,
-      touchpointType: touchpointType,
-    );
-
-    if (!validation.isValid) {
-      if (mounted) {
-        _showValidationError(validation, visit.clientName);
-      }
-      return;
-    }
+    // NEW: No pattern - default to 'Visit' (API will enforce correct type based on role)
+    final touchpointTypeStr = 'Visit';
 
     // RBAC: Check if user can create this touchpoint number based on their role
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
 
-    // BUG FIX: Check BOTH touchpoint number AND type
-    if (userRole == null ||
-        !isValidTouchpointNumberForRole(touchpointNumber, userRole) ||
-        (touchpointType != null && !isValidTouchpointTypeForRole(touchpointType, userRole))) {
-      // User's role doesn't allow this touchpoint number or type
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => TouchpointValidationDialog(
-            attemptedNumber: touchpointNumber,
-            attemptedType: touchpointType,
-            onConfirm: () => Navigator.of(context).pop(),
-          ),
-        );
-      }
+    // COMMENTED OUT for Unli Touchpoint - no number restrictions
+    // // BUG FIX: Check BOTH touchpoint number AND type
+    // if (userRole == null ||
+    //     !isValidTouchpointNumberForRole(touchpointNumber, userRole) ||
+    //     (touchpointType != null && !isValidTouchpointTypeForRole(touchpointType, userRole))) {
+    //   // User's role doesn't allow this touchpoint number or type
+    //   if (mounted) {
+    //     showDialog(
+    //       context: context,
+    //       builder: (context) => TouchpointValidationDialog(
+    //         attemptedNumber: touchpointNumber,
+    //         attemptedType: touchpointType,
+    //         onConfirm: () => Navigator.of(context).pop(),
+    //       ),
+    //     );
+    //   }
+    //   return;
+    // }
+
+    // NEW: Only check if user is authenticated (type restrictions handled by API)
+    if (userRole == null) {
+      if (mounted) showToast('Authentication required');
       return;
     }
 
@@ -543,22 +554,23 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...TouchpointValidationService.getSequenceDisplay().map((item) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.check,
-                      size: 14,
-                      color: Colors.green[600],
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item)),
-                  ],
-                ),
-              );
-            }),
+            // COMMENTED OUT for Unli Touchpoint - no sequence pattern
+            // ...TouchpointValidationService.getSequenceDisplay().map((item) {
+            //   return Padding(
+            //     padding: const EdgeInsets.only(left: 8, bottom: 4),
+            //     child: Row(
+            //       children: [
+            //         Icon(
+            //           LucideIcons.check,
+            //           size: 14,
+            //           color: Colors.green[600],
+            //         ),
+            //         const SizedBox(width: 8),
+            //         Expanded(child: Text(item)),
+            //       ],
+            //     ),
+            //   );
+            // }),
           ],
         ),
         actions: [
@@ -1386,6 +1398,8 @@ class _VisitCard extends StatelessWidget {
   Widget _buildNextTouchpointBadge(int touchpointNumber, String touchpointType) {
     final isVisit = touchpointType.toLowerCase() == 'visit';
     final badgeColor = isVisit ? const Color(0xFF3B82F6) : const Color(0xFF22C55E);
+    // touchpointNumber is the NEXT touchpoint (1-7), so completed = touchpointNumber - 1
+    final completedCount = touchpointNumber - 1;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1404,7 +1418,7 @@ class _VisitCard extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            '$touchpointNumber/7 • ${isVisit ? 'Visit' : 'Call'}',
+            '$completedCount/7 • ${isVisit ? 'Visit' : 'Call'}',
             style: TextStyle(
               fontSize: 11,
               color: badgeColor,

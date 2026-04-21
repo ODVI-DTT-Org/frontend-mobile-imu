@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:intl/intl.dart';
 import '../../features/clients/data/models/client_model.dart';
 
 class ClientAttributeFilter {
@@ -8,6 +9,9 @@ class ClientAttributeFilter {
   final List<String>? productTypes;
   final List<String>? loanTypes;
   final List<String>? touchpointStatuses;
+  final List<String>? touchpointReasons;
+  final DateTime? touchpointDateFrom;
+  final DateTime? touchpointDateTo;
 
   const ClientAttributeFilter({
     this.clientTypes,
@@ -16,6 +20,9 @@ class ClientAttributeFilter {
     this.productTypes,
     this.loanTypes,
     this.touchpointStatuses,
+    this.touchpointReasons,
+    this.touchpointDateFrom,
+    this.touchpointDateTo,
   });
 
   bool get hasFilter =>
@@ -24,7 +31,10 @@ class ClientAttributeFilter {
       (pensionTypes?.isNotEmpty ?? false) ||
       (productTypes?.isNotEmpty ?? false) ||
       (loanTypes?.isNotEmpty ?? false) ||
-      (touchpointStatuses?.isNotEmpty ?? false);
+      (touchpointStatuses?.isNotEmpty ?? false) ||
+      (touchpointReasons?.isNotEmpty ?? false) ||
+      (touchpointDateFrom != null) ||
+      (touchpointDateTo != null);
 
   int get activeFilterCount {
     return (clientTypes?.length ?? 0) +
@@ -32,10 +42,16 @@ class ClientAttributeFilter {
         (pensionTypes?.length ?? 0) +
         (productTypes?.length ?? 0) +
         (loanTypes?.length ?? 0) +
-        (touchpointStatuses?.length ?? 0);
+        (touchpointStatuses?.length ?? 0) +
+        (touchpointReasons?.length ?? 0) +
+        ((touchpointDateFrom != null || touchpointDateTo != null) ? 1 : 0);
   }
 
-  static ClientAttributeFilter none() => const ClientAttributeFilter();
+  static ClientAttributeFilter none() => const ClientAttributeFilter(
+    touchpointReasons: null,
+    touchpointDateFrom: null,
+    touchpointDateTo: null,
+  );
 
   /// OR within category, AND across categories
   bool matches(Client client) {
@@ -61,7 +77,7 @@ class ClientAttributeFilter {
     }
     if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
       final hasMatch = client.touchpoints.any((tp) =>
-          touchpointStatuses!.any((s) => s.toUpperCase() == tp.status.apiValue.toUpperCase()));
+          touchpointStatuses!.any((s) => s.toUpperCase() == tp.status.apiValue.toUpperCase()),);
       if (!hasMatch) return false;
     }
     return true;
@@ -87,6 +103,15 @@ class ClientAttributeFilter {
     if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
       params['touchpoint_status'] = touchpointStatuses!.join(',');
     }
+    if (touchpointReasons != null && touchpointReasons!.isNotEmpty) {
+      params['touchpoint_reason_codes'] = touchpointReasons!.join(',');
+    }
+    if (touchpointDateFrom != null) {
+      params['touchpoint_date_from'] = DateFormat('yyyy-MM-dd').format(touchpointDateFrom!);
+    }
+    if (touchpointDateTo != null) {
+      params['touchpoint_date_to'] = DateFormat('yyyy-MM-dd').format(touchpointDateTo!);
+    }
     return params;
   }
 
@@ -99,6 +124,9 @@ class ClientAttributeFilter {
     Object? productTypes = _absent,
     Object? loanTypes = _absent,
     Object? touchpointStatuses = _absent,
+    Object? touchpointReasons = _absent,
+    Object? touchpointDateFrom = _absent,
+    Object? touchpointDateTo = _absent,
   }) {
     return ClientAttributeFilter(
       clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<String>?,
@@ -107,6 +135,9 @@ class ClientAttributeFilter {
       productTypes: identical(productTypes, _absent) ? this.productTypes : productTypes as List<String>?,
       loanTypes: identical(loanTypes, _absent) ? this.loanTypes : loanTypes as List<String>?,
       touchpointStatuses: identical(touchpointStatuses, _absent) ? this.touchpointStatuses : touchpointStatuses as List<String>?,
+      touchpointReasons: identical(touchpointReasons, _absent) ? this.touchpointReasons : touchpointReasons as List<String>?,
+      touchpointDateFrom: identical(touchpointDateFrom, _absent) ? this.touchpointDateFrom : touchpointDateFrom as DateTime?,
+      touchpointDateTo: identical(touchpointDateTo, _absent) ? this.touchpointDateTo : touchpointDateTo as DateTime?,
     );
   }
 
@@ -120,7 +151,10 @@ class ClientAttributeFilter {
         listEq.equals(other.pensionTypes, pensionTypes) &&
         listEq.equals(other.productTypes, productTypes) &&
         listEq.equals(other.loanTypes, loanTypes) &&
-        listEq.equals(other.touchpointStatuses, touchpointStatuses);
+        listEq.equals(other.touchpointStatuses, touchpointStatuses) &&
+        listEq.equals(other.touchpointReasons, touchpointReasons) &&
+        other.touchpointDateFrom == touchpointDateFrom &&
+        other.touchpointDateTo == touchpointDateTo;
   }
 
   @override
@@ -131,11 +165,15 @@ class ClientAttributeFilter {
         Object.hashAll(productTypes ?? []),
         Object.hashAll(loanTypes ?? []),
         Object.hashAll(touchpointStatuses ?? []),
+        Object.hashAll(touchpointReasons ?? []),
+        touchpointDateFrom,
+        touchpointDateTo,
       );
 
   @override
   String toString() =>
       'ClientAttributeFilter(clientTypes: $clientTypes, marketTypes: $marketTypes, '
       'pensionTypes: $pensionTypes, productTypes: $productTypes, loanTypes: $loanTypes, '
-      'touchpointStatuses: $touchpointStatuses)';
+      'touchpointStatuses: $touchpointStatuses, touchpointReasons: $touchpointReasons, '
+      'touchpointDateFrom: $touchpointDateFrom, touchpointDateTo: $touchpointDateTo)';
 }

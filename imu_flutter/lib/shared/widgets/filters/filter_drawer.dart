@@ -8,6 +8,7 @@ import '../../../shared/providers/client_filter_options_provider.dart';
 import '../../../shared/providers/location_filter_providers.dart';
 import 'location_dropdown_section.dart';
 import 'attribute_chips_section.dart';
+import 'date_range_section.dart';
 
 class FilterDrawer extends ConsumerStatefulWidget {
   final bool showAllPsgc;
@@ -87,8 +88,6 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                         onChanged: (f) => setState(() => _draftLocation = f),
                       ),
                       const SizedBox(height: 20),
-                      const Divider(),
-                      const SizedBox(height: 12),
                       optionsAsync.when(
                         data: (options) => AttributeChipsSection(
                           draftFilter: _draftAttrs,
@@ -104,6 +103,11 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                           options: const ClientFilterOptions(),
                           onChanged: (f) => setState(() => _draftAttrs = f),
                         ),
+                      ),
+                      const SizedBox(height: 20),
+                      DateRangeSection(
+                        draftFilter: _draftAttrs,
+                        onChanged: (f) => setState(() => _draftAttrs = f),
                       ),
                     ],
                   ),

@@ -6,6 +6,7 @@ import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
 import 'package:imu_flutter/features/activity/providers/activity_feed_provider.dart';
 import 'package:imu_flutter/features/activity/presentation/widgets/activity_card.dart';
 import 'package:imu_flutter/features/activity/presentation/widgets/activity_filter_sheet.dart';
+import 'package:imu_flutter/features/activity/presentation/widgets/activity_detail_dialog.dart';
 
 class ActivityPage extends ConsumerWidget {
   const ActivityPage({super.key});
@@ -119,12 +120,13 @@ class ActivityPage extends ConsumerWidget {
         padding: const EdgeInsets.only(top: 12, bottom: 24),
         itemCount: totalCount,
         itemBuilder: (context, index) =>
-            _buildListItem(index, grouped, sections, state, notifier),
+            _buildListItem(context, index, grouped, sections, state, notifier),
       ),
     );
   }
 
   Widget _buildListItem(
+    BuildContext context,
     int index,
     Map<String, List<ActivityItem>> grouped,
     List<String> sections,
@@ -137,7 +139,10 @@ class ActivityPage extends ConsumerWidget {
       cursor++;
       final items = grouped[section]!;
       if (index < cursor + items.length) {
-        return ActivityCard(item: items[index - cursor]);
+        return ActivityCard(
+          item: items[index - cursor],
+          onTap: () => ActivityDetailDialog.show(context, item: items[index - cursor]),
+        );
       }
       cursor += items.length;
     }

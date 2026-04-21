@@ -328,6 +328,26 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
           );
         }
 
+      case 'client_favorites':
+        final clientId = data['client_id'] as String?;
+        if (clientId == null) {
+          logError('client_favorites op missing client_id — skipping');
+          return;
+        }
+        if (op.op == UpdateType.put) {
+          // Star client - POST to favorite endpoint
+          await _httpClient.post(
+            '$_apiUrl/clients/$clientId/favorite',
+            options: Options(headers: headers),
+          );
+        } else if (op.op == UpdateType.delete) {
+          // Unstar client - DELETE from favorite endpoint
+          await _httpClient.delete(
+            '$_apiUrl/clients/$clientId/favorite',
+            options: Options(headers: headers),
+          );
+        }
+
       default:
         logWarning('uploadData: unhandled table "${op.table}" — skipping');
     }

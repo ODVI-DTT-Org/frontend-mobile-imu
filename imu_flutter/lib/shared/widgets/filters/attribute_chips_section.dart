@@ -34,6 +34,38 @@ class AttributeChipsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // VISIT SECTION (moved to top)
+        _FilterGroup(
+          label: 'Visit Status',
+          values: const ['INTERESTED', 'UNDECIDED', 'NOT_INTERESTED'],
+          selected: draftFilter.touchpointStatuses?.toSet() ?? {},
+          labelOf: (v) => v == 'NOT_INTERESTED' ? 'Not Interested' : _label(v.replaceAll('_', ' ')),
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.touchpointStatuses, v);
+            onChanged(draftFilter.copyWith(touchpointStatuses: updated.isEmpty ? null : updated));
+          },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(touchpointStatuses: selected.isEmpty ? null : selected.toList()));
+          },
+        ),
+        const SizedBox(height: 12),
+        _FilterGroup(
+          label: 'Visit Reason',
+          values: options.touchpointReasons,
+          selected: draftFilter.touchpointReasons?.toSet() ?? {},
+          labelOf: (v) => v.split('_').map((w) => w.isEmpty ? w : w[0] + w.substring(1).toLowerCase()).join(' '),
+          onToggle: (v) {
+            final updated = _toggle(draftFilter.touchpointReasons, v);
+            onChanged(draftFilter.copyWith(touchpointReasons: updated.isEmpty ? null : updated));
+          },
+          onApply: (selected) {
+            onChanged(draftFilter.copyWith(touchpointReasons: selected.isEmpty ? null : selected.toList()));
+          },
+        ),
+
+        const SizedBox(height: 20),
+
+        // OTHERS SECTION (moved to bottom)
         _FilterGroup(
           label: 'Client Type',
           values: options.clientTypes,
@@ -103,20 +135,6 @@ class AttributeChipsSection extends StatelessWidget {
           },
           onApply: (selected) {
             onChanged(draftFilter.copyWith(loanTypes: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-        const SizedBox(height: 12),
-        _FilterGroup(
-          label: 'Visit Status',
-          values: const ['INTERESTED', 'UNDECIDED', 'NOT_INTERESTED'],
-          selected: draftFilter.touchpointStatuses?.toSet() ?? {},
-          labelOf: (v) => v == 'NOT_INTERESTED' ? 'Not Interested' : _label(v.replaceAll('_', ' ')),
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.touchpointStatuses, v);
-            onChanged(draftFilter.copyWith(touchpointStatuses: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(touchpointStatuses: selected.isEmpty ? null : selected.toList()));
           },
         ),
       ],

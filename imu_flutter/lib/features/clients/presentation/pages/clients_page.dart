@@ -1,4 +1,4 @@
-// Simplified Clients page with Assigned Clients / All Clients filters and pagination
+// Simplified Clients page with Assigned Clients / All Clients / Favorites filters and pagination
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -40,7 +40,15 @@ import '../../../../models/client_status.dart';
 import '../../../my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
+import '../../data/providers/client_favorites_provider.dart';
 import '../../../../services/api/itinerary_api_service.dart';
+
+/// Client view mode enum
+enum ClientViewMode {
+  assigned,
+  all,
+  favorites,
+}
 
 class ClientsPage extends ConsumerStatefulWidget {
   const ClientsPage({super.key});
@@ -53,7 +61,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   final _searchController = TextEditingController();
   final _searchDebounce = Debounce(milliseconds: 300);
   String _searchQuery = '';
-  bool _showAssignedClientsOnly = true; // true = Assigned Clients (API with municipality filter, cached), false = All Clients (API, no filter)
+  ClientViewMode _viewMode = ClientViewMode.assigned;
 
   // Optimistic set of client IDs scheduled today — prevents button re-enabling during provider reload
   final Set<String> _scheduledTodayIds = {};
@@ -83,14 +91,53 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
         if (!mounted) return;
 
         // Update the appropriate search query provider based on mode
-        if (_showAssignedClientsOnly) {
+        if (_viewMode == ClientViewMode.assigned) {
           // Assigned Clients: update assigned search query provider
           ref.read(assignedClientSearchQueryProvider.notifier).state = _searchQuery;
-        } else {
+        } else if (_viewMode == ClientViewMode.all) {
           // All Clients: update online search query provider
           ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
         }
+        // Favorites: no provider update needed (filtered locally)
       });
+    });
+  }
+
+  void _setViewMode(ClientViewMode mode) {
+    HapticUtils.lightImpact();
+
+    // Check online requirement for All Clients
+    if (mode == ClientViewMode.all) {
+      final isOnlineNow = ref.read(isOnlineProvider);
+      if (!isOnlineNow) {
+        showToast('Cannot search all clients while offline');
+        return;
+      }
+    }
+
+    setState(() {
+      _viewMode = mode;
+      _currentPage = 1;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+
+    Future.microtask(() {
+      if (!mounted) return;
+
+      // Reset filters when switching modes
+      ref.read(assignedClientSearchQueryProvider.notifier).state = '';
+      ref.read(onlineClientSearchQueryProvider.notifier).state = '';
+      ref.read(assignedClientPageProvider.notifier).state = 1;
+      ref.read(onlineClientPageProvider.notifier).state = 1;
+      ref.read(touchpointFilterProvider.notifier).clear();
+      ref.read(locationFilterProvider.notifier).clear();
+      ref.read(clientAttributeFilterProvider.notifier).clear();
+
+      // Invalidate providers
+      ref.invalidate(onlineClientsProvider);
+      ref.invalidate(assignedClientsProvider);
+      ref.invalidate(favoritedClientListProvider);
     });
   }
 
@@ -120,13 +167,14 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
       if (!mounted) return;
 
       // Update the appropriate provider's page state and invalidate to trigger refetch
-      if (_showAssignedClientsOnly) {
+      if (_viewMode == ClientViewMode.assigned) {
         ref.read(assignedClientPageProvider.notifier).state = page;
         ref.invalidate(assignedClientsProvider);
-      } else {
+      } else if (_viewMode == ClientViewMode.all) {
         ref.read(onlineClientPageProvider.notifier).state = page;
         ref.invalidate(onlineClientsProvider);
       }
+      // Favorites mode: no pagination
     });
   }
 
@@ -137,26 +185,32 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     if (mounted) {
       AppNotification.showWarning(
         context,
-        _showAssignedClientsOnly
+        _viewMode == ClientViewMode.assigned
           ? 'Refreshing assigned clients...'
-          : 'Refreshing all clients...',
+          : _viewMode == ClientViewMode.all
+            ? 'Refreshing all clients...'
+            : 'Refreshing favorites...',
         duration: const Duration(seconds: 10), // Longer duration for refresh
       );
     }
 
-    if (_showAssignedClientsOnly) {
+    if (_viewMode == ClientViewMode.assigned) {
       ref.invalidate(assignedClientsProvider);
-    } else {
+    } else if (_viewMode == ClientViewMode.all) {
       ref.invalidate(onlineClientsProvider);
+    } else {
+      ref.invalidate(favoritedClientListProvider);
     }
 
     // Show success notification when refresh completes
     if (mounted) {
       AppNotification.showSuccess(
         context,
-        _showAssignedClientsOnly
+        _viewMode == ClientViewMode.assigned
           ? 'Assigned clients refreshed'
-          : 'All clients refreshed',
+          : _viewMode == ClientViewMode.all
+            ? 'All clients refreshed'
+            : 'Favorites refreshed',
       );
     }
   }
@@ -193,7 +247,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   }
 
   void _showFilterDrawer(BuildContext context) {
-    showFilterDrawer(context, showAllPsgc: !_showAssignedClientsOnly);
+    showFilterDrawer(context, showAllPsgc: _viewMode != ClientViewMode.assigned);
   }
 
   @override
@@ -237,20 +291,35 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     // Choose provider based on mode
     // Assigned Clients = API with municipality filter (cached for offline)
     // All Clients = Online API (search all clients in database)
-    final clientsAsync = _showAssignedClientsOnly
+    // Favorites = Local PowerSync query (client_favorites table)
+    final clientsAsync = _viewMode == ClientViewMode.assigned
         ? ref.watch(assignedClientsProvider)
-        : ref.watch(onlineClientsProvider);
+        : _viewMode == ClientViewMode.all
+            ? ref.watch(onlineClientsProvider)
+            : ref.watch(favoritedClientListProvider);
 
     return clientsAsync.when(
       data: (data) {
-        // Both providers now return ClientsResponse
-        final clients = data.items;
-        final meta = data;
+        // Handle different data structures
+        final clients = data is ClientsResponse ? data.items : data as List<Client>;
+        final meta = data is ClientsResponse ? data : null;
 
-        // Server handles filtering and pagination, just display the results
-        final paginatedClients = clients;
-        final totalPages = _totalPages(meta);
-        final totalItems = _totalItems(meta);
+        // Filter locally for favorites mode with search
+        var paginatedClients = clients;
+        if (_viewMode == ClientViewMode.favorites && _searchQuery.isNotEmpty) {
+          paginatedClients = clients.where((client) =>
+            client.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            (client.municipality?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
+          ).toList();
+        }
+
+        // Calculate pagination info
+        final totalPages = _viewMode == ClientViewMode.favorites
+            ? 1 // Favorites are not paginated (all shown)
+            : _totalPages(meta!);
+        final totalItems = _viewMode == ClientViewMode.favorites
+            ? paginatedClients.length
+            : _totalItems(meta!);
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -294,7 +363,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                           const Spacer(),
                           // Title
                           Text(
-                            _showAssignedClientsOnly ? 'Assigned Clients' : 'All Clients',
+                            _viewMode == ClientViewMode.assigned ? 'Assigned Clients' :
+                            _viewMode == ClientViewMode.all ? 'All Clients' : 'Favorites',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -322,57 +392,18 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      // Toggle between Assigned Clients and All Clients
+                      // Toggle between Assigned Clients, All Clients, and Favorites
                       Row(
                         children: [
-                          _buildFilterToggle('Assigned Clients', _showAssignedClientsOnly, () {
-                            HapticUtils.lightImpact();
-                            setState(() {
-                              _showAssignedClientsOnly = true;
-                              _currentPage = 1;
-                              _searchQuery = '';
-                              _searchController.clear();
-                            });
-                            Future.microtask(() {
-                              if (!mounted) return;
-                              // Reset all state to prevent contamination from All Clients mode
-                              ref.read(assignedClientSearchQueryProvider.notifier).state = '';
-                              ref.read(assignedClientPageProvider.notifier).state = 1;
-                              ref.read(touchpointFilterProvider.notifier).clear();
-                              ref.read(locationFilterProvider.notifier).clear();
-                              ref.read(clientAttributeFilterProvider.notifier).clear();
-                              ref.invalidate(onlineClientsProvider);
-                              ref.invalidate(assignedClientsProvider);
-                            });
-                          }),
+                          _buildFilterToggle('Assigned', _viewMode == ClientViewMode.assigned, () => _setViewMode(ClientViewMode.assigned)),
                           const SizedBox(width: 8),
-                          _buildFilterToggle('All Clients', !_showAssignedClientsOnly, () {
-                            HapticUtils.lightImpact();
-                            final isOnlineNow = ref.read(isOnlineProvider);
-                            if (!isOnlineNow) {
-                              showToast('Cannot search all clients while offline');
-                              return;
-                            }
-                            setState(() {
-                              _showAssignedClientsOnly = false;
-                              _currentPage = 1;
-                              _searchQuery = '';
-                              _searchController.clear();
-                            });
-                            Future.microtask(() {
-                              if (!mounted) return;
-                              ref.read(onlineClientSearchQueryProvider.notifier).state = '';
-                              ref.read(onlineClientPageProvider.notifier).state = 1;
-                              ref.read(touchpointFilterProvider.notifier).clear();
-                              ref.read(locationFilterProvider.notifier).clear();
-                              ref.read(clientAttributeFilterProvider.notifier).clear();
-                              ref.invalidate(onlineClientsProvider);
-                            });
-                          }),
+                          _buildFilterToggle('All', _viewMode == ClientViewMode.all, () => _setViewMode(ClientViewMode.all)),
+                          const SizedBox(width: 8),
+                          _buildFilterToggle('Favorites', _viewMode == ClientViewMode.favorites, () => _setViewMode(ClientViewMode.favorites)),
                         ],
                       ),
                       // Show online indicator when in All Clients mode
-                      if (!_showAssignedClientsOnly)
+                      if (_viewMode == ClientViewMode.all)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Row(
@@ -558,7 +589,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                         const Spacer(),
                         // Title
                         Text(
-                          _showAssignedClientsOnly ? 'Assigned Clients' : 'All Clients',
+                          _viewMode == ClientViewMode.assigned ? 'Assigned Clients' :
+                          _viewMode == ClientViewMode.all ? 'All Clients' : 'Favorites',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -570,56 +602,18 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Toggle between Assigned Clients and All Clients
+                    // Toggle between Assigned Clients, All Clients, and Favorites
                     Row(
                       children: [
-                        _buildFilterToggle('Assigned Clients', _showAssignedClientsOnly, () {
-                          HapticUtils.lightImpact();
-                          setState(() {
-                            _showAssignedClientsOnly = true;
-                            _currentPage = 1;
-                            _searchQuery = '';
-                            _searchController.clear();
-                          });
-                          Future.microtask(() {
-                            if (!mounted) return;
-                            ref.read(assignedClientSearchQueryProvider.notifier).state = '';
-                            ref.read(assignedClientPageProvider.notifier).state = 1;
-                            ref.read(touchpointFilterProvider.notifier).clear();
-                            ref.read(locationFilterProvider.notifier).clear();
-                            ref.read(clientAttributeFilterProvider.notifier).clear();
-                            ref.invalidate(onlineClientsProvider);
-                            ref.invalidate(assignedClientsProvider);
-                          });
-                        }),
+                        _buildFilterToggle('Assigned', _viewMode == ClientViewMode.assigned, () => _setViewMode(ClientViewMode.assigned)),
                         const SizedBox(width: 8),
-                        _buildFilterToggle('All Clients', !_showAssignedClientsOnly, () {
-                          HapticUtils.lightImpact();
-                          final isOnlineNow = ref.read(isOnlineProvider);
-                          if (!isOnlineNow) {
-                            showToast('Cannot search all clients while offline');
-                            return;
-                          }
-                          setState(() {
-                            _showAssignedClientsOnly = false;
-                            _currentPage = 1;
-                            _searchQuery = '';
-                            _searchController.clear();
-                          });
-                          Future.microtask(() {
-                            if (!mounted) return;
-                            ref.read(onlineClientSearchQueryProvider.notifier).state = '';
-                            ref.read(onlineClientPageProvider.notifier).state = 1;
-                            ref.read(touchpointFilterProvider.notifier).clear();
-                            ref.read(locationFilterProvider.notifier).clear();
-                            ref.read(clientAttributeFilterProvider.notifier).clear();
-                            ref.invalidate(onlineClientsProvider);
-                          });
-                        }),
+                        _buildFilterToggle('All', _viewMode == ClientViewMode.all, () => _setViewMode(ClientViewMode.all)),
+                        const SizedBox(width: 8),
+                        _buildFilterToggle('Favorites', _viewMode == ClientViewMode.favorites, () => _setViewMode(ClientViewMode.favorites)),
                       ],
                     ),
                     // Show online indicator when in All Clients mode
-                    if (!_showAssignedClientsOnly)
+                    if (_viewMode == ClientViewMode.all)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Row(
@@ -737,30 +731,38 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: _showAssignedClientsOnly
+                  color: _viewMode == ClientViewMode.assigned
                       ? Colors.red.shade50
-                      : Colors.orange.shade50,
+                      : _viewMode == ClientViewMode.all
+                          ? Colors.orange.shade50
+                          : Colors.amber.shade50,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _showAssignedClientsOnly
+                  _viewMode == ClientViewMode.assigned
                       ? LucideIcons.alertCircle
-                      : LucideIcons.wifiOff,
+                      : _viewMode == ClientViewMode.all
+                          ? LucideIcons.wifiOff
+                          : LucideIcons.star,
                   size: 40,
-                  color: _showAssignedClientsOnly
+                  color: _viewMode == ClientViewMode.assigned
                       ? Colors.red.shade400
-                      : Colors.orange.shade400,
+                      : _viewMode == ClientViewMode.all
+                          ? Colors.orange.shade400
+                          : Colors.amber.shade400,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                _showAssignedClientsOnly
+                _viewMode == ClientViewMode.assigned
                     ? 'Failed to load clients'
-                    : 'Cannot search all clients',
-                style: TextStyle(
+                    : _viewMode == ClientViewMode.all
+                        ? 'Cannot search all clients'
+                        : 'Failed to load favorites',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
+                  color: Color(0xFF64748B),
                 ),
               ),
               const SizedBox(height: 8),
@@ -772,23 +774,20 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
-                  if (_showAssignedClientsOnly) {
+                  if (_viewMode == ClientViewMode.assigned) {
                     ref.invalidate(assignedClientsProvider);
-                  } else {
+                  } else if (_viewMode == ClientViewMode.all) {
                     ref.invalidate(onlineClientsProvider);
+                  } else {
+                    ref.invalidate(favoritedClientListProvider);
                   }
                 },
-                child: Text(_showAssignedClientsOnly ? 'Retry' : 'Check Connection'),
+                child: const Text('Retry'),
               ),
-              if (!_showAssignedClientsOnly) ...[
+              if (_viewMode == ClientViewMode.all) ...[
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _showAssignedClientsOnly = true;
-                      _currentPage = 1;
-                    });
-                  },
+                  onPressed: () => _setViewMode(ClientViewMode.assigned),
                   child: const Text('Switch to Assigned Clients (Offline)'),
                 ),
               ],
@@ -829,12 +828,29 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   }
 
   Widget _buildTopPagination(int totalItems, int totalPages) {
+    // Favorites mode: simple count, no pagination
+    if (_viewMode == ClientViewMode.favorites) {
+      return Row(
+        children: [
+          Text(
+            '$totalItems ${totalItems == 1 ? 'client' : 'clients'}',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+        ],
+      );
+    }
+
     // For online mode, show actual counts from server
     // For offline mode, calculate local pagination
-    final startIndex = _showAssignedClientsOnly
+    final startIndex = _viewMode == ClientViewMode.assigned
         ? (_currentPage - 1) * _itemsPerPage + 1
         : (_currentPage - 1) * 10 + 1; // Server uses perPage=10
-    final endIndex = _showAssignedClientsOnly
+    final endIndex = _viewMode == ClientViewMode.assigned
         ? (_currentPage * _itemsPerPage).clamp(1, totalItems)
         : (_currentPage * 10).clamp(1, totalItems);
 
@@ -979,8 +995,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              // Use consistent icon for both tabs - search icon indicates "no results"
-              _searchQuery.isEmpty ? LucideIcons.users : LucideIcons.search,
+              _searchQuery.isEmpty
+                  ? (_viewMode == ClientViewMode.favorites
+                      ? LucideIcons.star
+                      : LucideIcons.users)
+                  : LucideIcons.search,
               size: 40,
               color: Colors.grey.shade400,
             ),
@@ -988,20 +1007,24 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty
-                ? 'No clients found'
+                ? (_viewMode == ClientViewMode.favorites
+                    ? 'No favorites yet'
+                    : 'No clients found')
                 : 'No clients found',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             _searchQuery.isEmpty
-                ? (_showAssignedClientsOnly
+                ? (_viewMode == ClientViewMode.assigned
                     ? 'No clients assigned to your territory yet'
-                    : 'No clients in the database')
+                    : _viewMode == ClientViewMode.all
+                        ? 'No clients in the database'
+                        : 'Tap the star on any client card to add them to your favorites')
                 : 'Try a different search term',
             style: TextStyle(color: Colors.grey.shade500),
           ),

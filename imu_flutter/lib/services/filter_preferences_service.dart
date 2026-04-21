@@ -25,6 +25,7 @@ class FilterPreferencesService {
   static const String _keyOptionsPensionTypes = 'filter_options_pension_types';
   static const String _keyOptionsProductTypes = 'filter_options_product_types';
   static const String _keyOptionsLoanTypes = 'filter_options_loan_types';
+  static const String _keyOptionsTouchpointReasons = 'filter_options_touchpoint_reasons';
 
   /// Get singleton instance
   static final FilterPreferencesService _instance = FilterPreferencesService._internal();
@@ -228,6 +229,7 @@ class FilterPreferencesService {
   Future<List<String>> getCachedPensionTypeOptions() => _getOptionsList(_keyOptionsPensionTypes);
   Future<List<String>> getCachedProductTypeOptions() => _getOptionsList(_keyOptionsProductTypes);
   Future<List<String>> getCachedLoanTypeOptions() => _getOptionsList(_keyOptionsLoanTypes);
+  Future<List<String>> getCachedTouchpointReasonsOptions() => _getOptionsList(_keyOptionsTouchpointReasons);
 
   Future<void> cacheFilterOptions({
     required List<String> clientTypes,
@@ -235,6 +237,7 @@ class FilterPreferencesService {
     required List<String> pensionTypes,
     required List<String> productTypes,
     required List<String> loanTypes,
+    required List<String> touchpointReasons,
   }) async {
     await Future.wait([
       _setOptionsList(_keyOptionsClientTypes, clientTypes),
@@ -242,6 +245,7 @@ class FilterPreferencesService {
       _setOptionsList(_keyOptionsPensionTypes, pensionTypes),
       _setOptionsList(_keyOptionsProductTypes, productTypes),
       _setOptionsList(_keyOptionsLoanTypes, loanTypes),
+      _setOptionsList(_keyOptionsTouchpointReasons, touchpointReasons),
     ]);
   }
 
@@ -258,6 +262,7 @@ class FilterPreferencesService {
       _prefs!.remove(_keyOptionsPensionTypes),
       _prefs!.remove(_keyOptionsProductTypes),
       _prefs!.remove(_keyOptionsLoanTypes),
+      _prefs!.remove(_keyOptionsTouchpointReasons),
     ]);
   }
 

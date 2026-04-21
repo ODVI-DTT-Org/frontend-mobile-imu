@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../../../shared/providers/client_attribute_filter_provider.dart';
 import '../../../shared/providers/location_filter_providers.dart';
 
@@ -25,7 +27,7 @@ class ActiveFilterChipsRow extends ConsumerWidget {
         label: label,
         icon: Icons.location_on,
         onRemove: () => locationNotifier.clear(),
-      ));
+      ),);
     }
 
     for (final v in attrs.clientTypes ?? []) {
@@ -48,7 +50,29 @@ class ActiveFilterChipsRow extends ConsumerWidget {
         label: _label(v.replaceAll('_', ' ')),
         icon: Icons.star_outline,
         onRemove: () => attrNotifier.toggleTouchpointStatus(v),
-      ));
+      ),);
+    }
+
+    // Touchpoint reason chips (show up to 3)
+    for (final reason in (attrs.touchpointReasons ?? []).take(3)) {
+      chips.add(_ActiveChip(
+        label: _formatReason(reason),
+        icon: LucideIcons.messageSquare,
+        onRemove: () {
+          ref.read(clientAttributeFilterProvider.notifier).toggleTouchpointReason(reason);
+        },
+      ),);
+    }
+
+    // Date range chip
+    if (attrs.touchpointDateFrom != null || attrs.touchpointDateTo != null) {
+      chips.add(_ActiveChip(
+        label: _formatDateRange(attrs.touchpointDateFrom, attrs.touchpointDateTo),
+        icon: LucideIcons.calendar,
+        onRemove: () {
+          ref.read(clientAttributeFilterProvider.notifier).clearDateRange();
+        },
+      ),);
     }
 
     if (chips.isEmpty) return const SizedBox.shrink();
@@ -87,6 +111,45 @@ class ActiveFilterChipsRow extends ConsumerWidget {
         .split(' ')
         .map((w) => w.isEmpty ? w : w[0] + w.substring(1).toLowerCase())
         .join(' ');
+  }
+
+  String _formatReason(String reason) {
+    return reason.split('_').map((w) =>
+      w.isEmpty ? w : w[0] + w.substring(1).toLowerCase(),
+    ).join(' ');
+  }
+
+  String _formatDateRange(DateTime? from, DateTime? to) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (from != null && to != null) {
+      final fromDate = DateTime(from.year, from.month, from.day);
+      final toDate = DateTime(to.year, to.month, to.day);
+
+      final daysDiff = toDate.difference(fromDate).inDays + 1;
+
+      if (daysDiff == 7 && fromDate == today.subtract(const Duration(days: 6))) {
+        return 'Last 7 days';
+      }
+      if (daysDiff == 30 && fromDate == today.subtract(const Duration(days: 29))) {
+        return 'Last 30 days';
+      }
+      if (daysDiff == 90 && fromDate == today.subtract(const Duration(days: 89))) {
+        return 'Last 90 days';
+      }
+
+      return '${DateFormat('MMM dd').format(from)} - ${DateFormat('MMM dd').format(to)}';
+    }
+
+    if (from != null) {
+      return 'From ${DateFormat('MMM dd').format(from)}';
+    }
+    if (to != null) {
+      return 'Until ${DateFormat('MMM dd').format(to)}';
+    }
+
+    return 'Any Time';
   }
 }
 

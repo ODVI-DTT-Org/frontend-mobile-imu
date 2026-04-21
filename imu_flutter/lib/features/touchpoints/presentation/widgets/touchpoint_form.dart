@@ -95,22 +95,24 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
     super.initState();
     // Initialize the provider with the touchpoint type
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Validate the touchpoint sequence
-      final validation = TouchpointValidationService.validateTouchpointSequence(
-        touchpointNumber: widget.touchpointNumber,
-        touchpointType: widget.touchpointType == 'Visit'
-            ? TouchpointType.visit
-            : TouchpointType.call,
-      );
+      // COMMENTED OUT for Unli Touchpoint - no sequence validation
+      // // Validate the touchpoint sequence
+      // final validation = TouchpointValidationService.validateTouchpointSequence(
+      //   touchpointNumber: widget.touchpointNumber,
+      //   touchpointType: widget.touchpointType == 'Visit'
+      //       ? TouchpointType.visit
+      //       : TouchpointType.call,
+      // );
+      //
+      // if (!validation.isValid) {
+      //   // Show validation error
+      //   WidgetsBinding.instance.addPostFrameCallback((_) {
+      //     _showSequenceValidationError(validation);
+      //   });
+      //   return;
+      // }
 
-      if (!validation.isValid) {
-        // Show validation error
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showSequenceValidationError(validation);
-        });
-        return;
-      }
-
+      // NEW: No validation - just set the touchpoint type
       ref.read(touchpointFormProvider.notifier).setTouchpointType(widget.touchpointType);
     });
   }

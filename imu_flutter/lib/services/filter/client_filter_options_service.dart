@@ -19,6 +19,7 @@ class ClientFilterOptionsService {
         pensionTypes: await _prefs.getCachedPensionTypeOptions(),
         productTypes: await _prefs.getCachedProductTypeOptions(),
         loanTypes: await _prefs.getCachedLoanTypeOptions(),
+        touchpointReasons: await _prefs.getCachedTouchpointReasonsOptions(),
       );
     }
 
@@ -32,6 +33,7 @@ class ClientFilterOptionsService {
         pensionTypes: options.pensionTypes,
         productTypes: options.productTypes,
         loanTypes: options.loanTypes,
+        touchpointReasons: options.touchpointReasons,
       );
       debugPrint('[ClientFilterOptionsService] Cached filter options from API');
       return options;

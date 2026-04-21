@@ -4,6 +4,7 @@ class ClientFilterOptions {
   final List<String> pensionTypes;
   final List<String> productTypes;
   final List<String> loanTypes;
+  final List<String> touchpointReasons;
 
   const ClientFilterOptions({
     this.clientTypes = const [],
@@ -11,14 +12,34 @@ class ClientFilterOptions {
     this.pensionTypes = const [],
     this.productTypes = const [],
     this.loanTypes = const [],
+    this.touchpointReasons = const [],
   });
+
+  ClientFilterOptions copyWith({
+    List<String>? clientTypes,
+    List<String>? marketTypes,
+    List<String>? pensionTypes,
+    List<String>? productTypes,
+    List<String>? loanTypes,
+    List<String>? touchpointReasons,
+  }) {
+    return ClientFilterOptions(
+      clientTypes: clientTypes ?? this.clientTypes,
+      marketTypes: marketTypes ?? this.marketTypes,
+      pensionTypes: pensionTypes ?? this.pensionTypes,
+      productTypes: productTypes ?? this.productTypes,
+      loanTypes: loanTypes ?? this.loanTypes,
+      touchpointReasons: touchpointReasons ?? this.touchpointReasons,
+    );
+  }
 
   bool get isNotEmpty =>
       clientTypes.isNotEmpty ||
       marketTypes.isNotEmpty ||
       pensionTypes.isNotEmpty ||
       productTypes.isNotEmpty ||
-      loanTypes.isNotEmpty;
+      loanTypes.isNotEmpty ||
+      touchpointReasons.isNotEmpty;
 
   /// Parse from API response (/api/filters/batch)
   factory ClientFilterOptions.fromAPIResponse(Map<String, dynamic> data) {

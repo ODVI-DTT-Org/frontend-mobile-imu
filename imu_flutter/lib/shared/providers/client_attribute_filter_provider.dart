@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_attribute_filter.dart';
-import '../models/location_filter.dart';
 import '../../services/filter_preferences_service.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 
@@ -76,8 +75,41 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     updateFilter(state.copyWith(touchpointStatuses: current.isEmpty ? null : current));
   }
 
+  void toggleTouchpointReason(String value) {
+    final current = List<String>.from(state.touchpointReasons ?? []);
+    current.contains(value) ? current.remove(value) : current.add(value);
+    updateFilter(state.copyWith(touchpointReasons: current.isEmpty ? null : current));
+  }
+
+  void setDateRange(DateTime? from, DateTime? to) {
+    updateFilter(state.copyWith(
+      touchpointDateFrom: from,
+      touchpointDateTo: to,
+    ),);
+  }
+
+  void setQuickDateRange(int days) {
+    final to = DateTime.now();
+    final from = to.subtract(Duration(days: days));
+    updateFilter(state.copyWith(
+      touchpointDateFrom: from,
+      touchpointDateTo: to,
+    ),);
+  }
+
+  void clearDateRange() {
+    updateFilter(state.copyWith(
+      touchpointDateFrom: null,
+      touchpointDateTo: null,
+    ),);
+  }
+
   void clear() {
-    state = ClientAttributeFilter.none();
+    state = const ClientAttributeFilter(
+      touchpointReasons: null,
+      touchpointDateFrom: null,
+      touchpointDateTo: null,
+    );
     _prefs.clearAttributeFilters();
   }
 
@@ -87,6 +119,8 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     _prefs.setPensionTypes(filter.pensionTypes ?? []);
     _prefs.setProductTypes(filter.productTypes ?? []);
     _prefs.setLoanTypes(filter.loanTypes ?? []);
+    // Note: touchpointReasons and date range not persisted to preferences
+    // as they are session-specific filters
   }
 }
 

@@ -20,10 +20,13 @@ class TouchpointProgressBadge extends StatelessWidget {
   int get _displayedCount => touchpointCount ?? client.completedTouchpoints;
 
   /// Calculate next touchpoint type based on displayed count
+  /// Uses completedCount directly as the index (0 = 1st touchpoint, 1 = 2nd, etc.)
   TouchpointType? get _nextTouchpointType {
-    final next = _displayedCount;
-    if (next >= 7) return null;
-    return TouchpointPattern.types[next];
+    final completedCount = _displayedCount;
+    // Bounds checking: ensure completedCount is within valid range
+    if (completedCount >= 7 || completedCount < 0) return null;
+    if (completedCount >= TouchpointPattern.types.length) return null;
+    return TouchpointPattern.types[completedCount];
   }
 
   @override
@@ -46,7 +49,7 @@ class TouchpointProgressBadge extends StatelessWidget {
     final nextType = _nextTouchpointType;
 
     return _buildBadge(
-      label: '${completedCount + 1}/$totalCount • ${nextType?.name ?? 'Touchpoint'}',
+      label: '$completedCount/$totalCount • ${nextType?.name ?? 'Touchpoint'}',
       color: nextType == TouchpointType.call
           ? Colors.orange
           : Colors.blue,

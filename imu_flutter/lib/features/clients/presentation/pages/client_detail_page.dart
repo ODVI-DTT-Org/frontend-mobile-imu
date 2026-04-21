@@ -852,36 +852,44 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       return;
     }
 
-    // Validate the sequence before opening the form
-    final validation = TouchpointValidationService.validateTouchpointSequence(
-      touchpointNumber: nextNumber,
-      touchpointType: nextType,
-    );
-
-    if (!validation.isValid) {
-      _showValidationError(validation);
-      return;
-    }
+    // COMMENTED OUT for Unli Touchpoint - no sequence validation
+    // // Validate the sequence before opening the form
+    // final validation = TouchpointValidationService.validateTouchpointSequence(
+    //   touchpointNumber: nextNumber,
+    //   touchpointType: nextType,
+    // );
+    //
+    // if (!validation.isValid) {
+    //   _showValidationError(validation);
+    //   return;
+    // }
 
     // RBAC: Check if user can create this touchpoint number based on their role
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
 
-    // BUG FIX: Check BOTH touchpoint number AND type
-    if (userRole == null ||
-        !isValidTouchpointNumberForRole(nextNumber, userRole) ||
-        (nextType != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
-      // User's role doesn't allow this touchpoint number or type
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => TouchpointValidationDialog(
-            attemptedNumber: nextNumber,
-            attemptedType: nextType,
-            onConfirm: () => Navigator.of(context).pop(),
-          ),
-        );
-      }
+    // COMMENTED OUT for Unli Touchpoint - no number restrictions
+    // // BUG FIX: Check BOTH touchpoint number AND type
+    // if (userRole == null ||
+    //     !isValidTouchpointNumberForRole(nextNumber, userRole) ||
+    //     (nextType != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
+    //   // User's role doesn't allow this touchpoint number or type
+    //   if (mounted) {
+    //     showDialog(
+    //       context: context,
+    //       builder: (context) => TouchpointValidationDialog(
+    //         attemptedNumber: nextNumber,
+    //         attemptedType: nextType,
+    //         onConfirm: () => Navigator.of(context).pop(),
+    //       ),
+    //     );
+    //   }
+    //   return;
+    // }
+
+    // NEW: Only check if user is authenticated (type restrictions handled by API)
+    if (userRole == null) {
+      if (mounted) showToast('Authentication required');
       return;
     }
 
@@ -1085,22 +1093,23 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...TouchpointValidationService.getSequenceDisplay().map((item) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.check,
-                      size: 14,
-                      color: Colors.green[600],
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item)),
-                  ],
-                ),
-              );
-            }),
+            // COMMENTED OUT for Unli Touchpoint - no sequence pattern
+            // ...TouchpointValidationService.getSequenceDisplay().map((item) {
+            //   return Padding(
+            //     padding: const EdgeInsets.only(left: 8, bottom: 4),
+            //     child: Row(
+            //       children: [
+            //         Icon(
+            //           LucideIcons.check,
+            //           size: 14,
+            //           color: Colors.green[600],
+            //         ),
+            //         const SizedBox(width: 8),
+            //         Expanded(child: Text(item)),
+            //       ],
+            //     ),
+            //   );
+            // }),
           ],
         ),
         actions: [
@@ -1135,12 +1144,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...TouchpointValidationService.getSequenceDisplay().map((item) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Text('• $item'),
-              );
-            }),
+            // COMMENTED OUT for Unli Touchpoint - no sequence pattern
+            // ...TouchpointValidationService.getSequenceDisplay().map((item) {
+            //   return Padding(
+            //     padding: const EdgeInsets.only(left: 8, bottom: 4),
+            //     child: Text('• $item'),
+            //   );
+            // }),
           ],
         ),
         actions: [
