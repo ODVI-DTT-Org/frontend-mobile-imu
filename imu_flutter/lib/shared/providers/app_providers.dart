@@ -807,10 +807,11 @@ final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
 
       for (final client in response.items) {
         // Get the next expected touchpoint
-        final nextTouchpointNum = client.completedTouchpoints + 1;
-        if (nextTouchpointNum > 7) continue; // All touchpoints completed
+        // touchpointNumber is now the completed count, so next = completed + 1
+        final nextTouchpointNum = client.touchpointNumber + 1;
 
-        final nextType = client.nextTouchpointType;
+        // Use client.nextTouchpoint directly (String from API, no strict pattern)
+        final nextType = client.nextTouchpoint?.toLowerCase();
         if (nextType == null) continue;
 
         // Determine scheduled date based on last touchpoint or client creation
@@ -830,12 +831,14 @@ final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
           final primaryAddress = client.fullAddress;
 
           if (client.id == null) continue; // Skip clients without ID
+          // Convert String to TouchpointType for MissedVisit model
+          final touchpointTypeEnum = nextType == 'call' ? TouchpointType.call : TouchpointType.visit;
           missedVisits.add(MissedVisit(
             id: '${client.id}_$nextTouchpointNum',
             clientId: client.id!,
             clientName: client.fullName,
             touchpointNumber: nextTouchpointNum,
-            touchpointType: nextType,
+            touchpointType: touchpointTypeEnum,
             scheduledDate: scheduledDate,
             createdAt: DateTime.now(),
             primaryPhone: primaryPhone,

@@ -30,7 +30,7 @@ class ClientMapMarkerWidget extends StatelessWidget {
       position: position,
       infoWindow: InfoWindow(
         title: clientName,
-        snippet: '$completedTouchpoints/7 Touchpoints',
+        snippet: '$completedTouchpoints Touchpoints',
         onTap: onTap,
       ),
       icon: BitmapDescriptor.defaultMarkerWithHue(
@@ -83,7 +83,7 @@ class ClientMapMarkerWidget extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              '$completedTouchpoints/7',
+              '$completedTouchpoints',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10,

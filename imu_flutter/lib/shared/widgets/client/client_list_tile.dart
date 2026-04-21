@@ -59,20 +59,19 @@ class ClientListTile extends ConsumerWidget {
       addressText = client.fullAddress;
     }
 
-    // Touchpoint progress — show completed count (no /7 limit)
-    final nextNumber = client.touchpointNumber >= 0 && client.touchpointNumber <= 7
-        ? client.touchpointNumber
-        : null;
-    final nextType = client.nextTouchpointType;
+    // Touchpoint progress — show completed count (no limit on touchpoints)
+    final nextNumber = client.touchpointNumber >= 0 ? client.touchpointNumber : null;
+    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    final nextType = client.nextTouchpoint;
     final completedCount = client.completedTouchpoints;
     String touchpointInfo;
     if (nextType != null) {
-      touchpointInfo = '$completedCount • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
+      touchpointInfo = '$completedCount • ${nextType.toLowerCase()}';
     } else {
       touchpointInfo = '$completedCount';
     }
 
-    final isCall = nextType == TouchpointType.call;
+    final isCall = nextType?.toLowerCase() == 'call';
 
     // Check if client has completed all touchpoints (no next type)
     final isCompleted = nextType == null;
@@ -89,7 +88,9 @@ class ClientListTile extends ConsumerWidget {
     if (!isCompleted && nextNumber != null && userRole != null) {
       final validNumbers = _validNumbers(userRole);
       final validTypes = _validTypes(userRole);
-      canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextType);
+      // Convert nextType String to TouchpointType for validation
+      final nextTypeEnum = nextType?.toLowerCase() == 'call' ? TouchpointType.call : TouchpointType.visit;
+      canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextTypeEnum);
     }
 
     final Color cardBg = client.loanReleased

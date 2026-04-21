@@ -703,8 +703,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     }
 
     // nextTouchpointNumber may be absent from Hive cache; fall back to touchpointNumber
+    // touchpointNumber is now the completed count, so next = completed + 1
     final tp = fullClient.touchpointNumber;
-    final nextNumber = fullClient.nextTouchpointNumber ?? (tp >= 1 && tp <= 7 ? tp : null);
+    final nextNumber = fullClient.nextTouchpointNumber ?? (tp >= 0 ? tp + 1 : null);
 
     if (nextNumber == null) {
       if (mounted) _showTouchpointCompletionDialog(visit.clientName);
@@ -714,17 +715,19 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     // RBAC: role must match the next touchpoint type
     final authState = ref.read(authNotifierProvider);
     final userRole = authState.user?.role;
-    final nextType = fullClient.nextTouchpointType;
+    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    final nextTypeString = fullClient.nextTouchpoint?.toLowerCase();
+    final nextType = nextTypeString == 'call' ? TouchpointType.call : TouchpointType.visit;
 
     if (userRole == null ||
         !isValidTouchpointNumberForRole(nextNumber, userRole) ||
-        (nextType != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
+        (nextTypeString != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => TouchpointValidationDialog(
             attemptedNumber: nextNumber,
-            attemptedType: nextType ?? TouchpointType.visit,
+            attemptedType: nextType,
             onConfirm: () => Navigator.of(context).pop(),
           ),
         );

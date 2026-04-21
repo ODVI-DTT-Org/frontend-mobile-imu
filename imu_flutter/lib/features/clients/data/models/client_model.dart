@@ -180,21 +180,17 @@ class Client {
   }
 
   int get completedTouchpoints {
-    // Use backend-calculated nextTouchpointNumber if available
-    if (nextTouchpointNumber != null && nextTouchpointNumber! > 0) {
-      return nextTouchpointNumber! - 1;
-    }
-    // Fallback: touchpointNumber is the NEXT touchpoint number (1-7), so completed = touchpointNumber - 1
-    return touchpointNumber >= 1 ? touchpointNumber - 1 : 0;
+    // Backend now sends touchpointNumber as the COMPLETED count directly (0, 1, 2, ...)
+    // No need to subtract 1 - this was changed in backend API
+    return touchpointNumber >= 0 ? touchpointNumber : 0;
   }
 
   // Next touchpoint display
   String get nextTouchpointDisplay {
-    final nextNum = nextTouchpointNumber ??
-        (touchpointNumber >= 0 && touchpointNumber < 7 ? touchpointNumber + 1 : null);
+    final nextNum = nextTouchpointNumber ?? (touchpointNumber >= 0 ? touchpointNumber + 1 : null);
     if (nextNum == null) return 'Completed';
-    if (nextTouchpoint == null) return '$nextNum/7';
-    return '$nextNum/7 • ${nextTouchpoint!.toLowerCase()}';
+    if (nextTouchpoint == null) return '$nextNum';
+    return '$nextNum • ${nextTouchpoint!.toLowerCase()}';
   }
 
   /// Display product type - shows raw value if available, otherwise enum value

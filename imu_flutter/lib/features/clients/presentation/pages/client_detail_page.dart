@@ -868,7 +868,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     HapticUtils.lightImpact();
 
-    final nextType = _client!.nextTouchpointType;
+    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    final nextTypeString = _client!.nextTouchpoint?.toLowerCase();
     // Prefer backend-calculated nextTouchpointNumber; fall back to touchpointNumber+1
     // (touchpointNumber is the completed count, so +1 gives the next step number)
     final tp = _client!.touchpointNumber;
@@ -880,7 +881,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       return;
     }
 
-    if (nextType == null) {
+    if (nextTypeString == null) {
       // Show completion dialog
       await _showTouchpointCompletionDialog();
       return;
@@ -1339,11 +1340,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     // Role must match the next touchpoint type:
     // caravan → Visit only (1, 4, 7); tele → Call only (2, 3, 5, 6); managers → any
-    final nextType = client.nextTouchpointType;
+    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    final nextTypeString = client.nextTouchpoint?.toLowerCase();
+    final nextType = nextTypeString == 'call' ? TouchpointType.call : TouchpointType.visit;
     final roleCanRecordTouchpoint = userRole == null ? false
         : userRole.isManager ? true
-        : userRole == UserRole.caravan ? nextType == TouchpointType.visit
-        : userRole == UserRole.tele ? nextType == TouchpointType.call
+        : userRole == UserRole.caravan ? nextTypeString == 'visit'
+        : userRole == UserRole.tele ? nextTypeString == 'call'
         : false;
 
     return Container(
@@ -1483,19 +1486,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Widget _buildTouchpointProgressBadge() {
     final client = _client!;
-    final isCompleted = client.completedTouchpoints >= 7;
-    final nextNumber = client.touchpointNumber >= 0 && client.touchpointNumber <= 7
-        ? client.touchpointNumber
-        : null;
-    final nextType = client.nextTouchpointType;
+    final completedCount = client.completedTouchpoints;
+    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    final nextType = client.nextTouchpoint?.toLowerCase();
 
-    final badgeText = isCompleted
-        ? 'Completed'
-        : nextNumber != null && nextType != null
-            ? '$nextNumber/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}'
-            : nextNumber != null
-                ? '$nextNumber/7'
-                : '0/7';
+    final badgeText = nextType != null
+        ? '$completedCount • $nextType'
+        : '$completedCount';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1764,11 +1761,12 @@ class _QuickActionsSection extends ConsumerWidget {
     final canRecordTouchpoint = client?.touchpointStatus?.canCreateTouchpoint ?? true;
 
     // Role must match next touchpoint type
-    final nextType = client?.nextTouchpointType;
+    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    final nextTypeString = client?.nextTouchpoint?.toLowerCase();
     final roleCanRecordTouchpoint = userRole == null ? false
         : userRole.isManager ? true
-        : userRole == UserRole.caravan ? nextType == TouchpointType.visit
-        : userRole == UserRole.tele ? nextType == TouchpointType.call
+        : userRole == UserRole.caravan ? nextTypeString == 'visit'
+        : userRole == UserRole.tele ? nextTypeString == 'call'
         : false;
 
     return Container(

@@ -121,7 +121,7 @@ class _ClientMapViewState extends ConsumerState<ClientMapView> {
         infoWindow: InfoWindow(
           title: markerData.clientName,
           snippet:
-              '${markerData.completedTouchpoints}/7 Touchpoints\n${markerData.address ?? ""}',
+              '${markerData.completedTouchpoints} Touchpoints\n${markerData.address ?? ""}',
           onTap: () {
             HapticUtils.lightImpact();
             widget.onClientTap?.call(markerData.clientId);
