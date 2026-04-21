@@ -1,8 +1,18 @@
 name: Release APK to Google Drive
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      upload_to_drive:
+        description: 'Upload APK to Google Drive'
+        required: false
+        default: true
+        type: boolean
+      send_email:
+        description: 'Send email notification'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   build-and-upload:
@@ -48,10 +58,19 @@ jobs:
           echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
           echo "BUILD_DATE=${DATE}" >> $GITHUB_ENV
 
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: imu-release-apk
+          path: ${{ env.APK_NAME }}
+          retention-days: 30
+
       - name: Install rclone
+        if: inputs.upload_to_drive == true
         run: curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure rclone
+        if: inputs.upload_to_drive == true
         run: |
           echo '${{ secrets.GDRIVE_SERVICE_ACCOUNT_KEY }}' > /tmp/sa.json
           mkdir -p ~/.config/rclone
@@ -63,6 +82,7 @@ jobs:
           RCLONE_EOF
 
       - name: Upload APK to Google Drive
+        if: inputs.upload_to_drive == true
         run: |
           rclone copy "${{ env.APK_NAME }}" "gdrive:/" \
             --drive-root-folder-id "${{ secrets.GDRIVE_FOLDER_ID }}" \
@@ -71,6 +91,7 @@ jobs:
           echo "Uploaded: ${{ env.APK_NAME }}"
 
       - name: Send email notification
+        if: inputs.send_email == true
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -86,7 +107,8 @@ jobs:
             Build: #${{ github.run_number }}
             Date: ${{ env.BUILD_DATE }}
             File: ${{ env.APK_NAME }}
-            Drive folder: https://drive.google.com/drive/folders/${{ secrets.GDRIVE_FOLDER_ID }}
+            ${{ inputs.upload_to_drive == true && 'Drive folder: https://drive.google.com/drive/folders/${{ secrets.GDRIVE_FOLDER_ID }}' || 'APK available in Actions artifacts' }}
 
-            Triggered by: push to main
+            Triggered by: ${{ github.actor }}
+            Workflow run: #${{ github.run_number }}
             Commit: ${{ github.sha }}
