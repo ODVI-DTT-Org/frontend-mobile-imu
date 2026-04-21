@@ -59,25 +59,25 @@ class ClientListTile extends ConsumerWidget {
       addressText = client.fullAddress;
     }
 
-    // Touchpoint progress — show completed count over 7
+    // Touchpoint progress — show completed count (no /7 limit)
     final nextNumber = client.touchpointNumber >= 0 && client.touchpointNumber <= 7
         ? client.touchpointNumber
         : null;
     final nextType = client.nextTouchpointType;
-    final isCompleted = client.completedTouchpoints >= 7;
+    final completedCount = client.completedTouchpoints;
     String touchpointInfo;
-    if (isCompleted) {
-      touchpointInfo = 'Completed';
-    } else if (nextNumber != null && nextType != null) {
-      final completedCount = client.completedTouchpoints;
-      touchpointInfo = '$completedCount/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
+    if (nextType != null) {
+      touchpointInfo = '$completedCount • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
     } else {
-      touchpointInfo = '0/7 • Visit';
+      touchpointInfo = '$completedCount';
     }
 
     final isCall = nextType == TouchpointType.call;
 
-    Color progressColor = isCompleted
+    // Check if client has completed all touchpoints (no next type)
+    final isCompleted = nextType == null;
+
+    final Color progressColor = isCompleted
         ? Colors.green
         : isCall
             ? Colors.orange
@@ -85,7 +85,8 @@ class ClientListTile extends ConsumerWidget {
 
     // Role-based: can the user record the next touchpoint?
     bool canRecordNext = true;
-    if (!isCompleted && nextNumber != null && nextType != null && userRole != null) {
+    // ignore: unnecessary_null_comparison
+    if (!isCompleted && nextNumber != null && userRole != null) {
       final validNumbers = _validNumbers(userRole);
       final validTypes = _validTypes(userRole);
       canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextType);

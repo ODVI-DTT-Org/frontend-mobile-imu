@@ -1819,7 +1819,7 @@ class _VisitCard extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            '$completedCount/7 • ${isVisit ? 'Visit' : 'Call'}',
+            '$completedCount • ${isVisit ? 'Visit' : 'Call'}',
             style: TextStyle(
               fontSize: 11,
               color: badgeColor,

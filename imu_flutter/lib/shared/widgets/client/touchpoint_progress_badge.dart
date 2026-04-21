@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../features/clients/data/models/client_model.dart';
 
-/// Badge showing touchpoint progress in format "X/7 • Type"
-/// Examples: "2/7 • Call", "3/7 • Visit", "7/7 • Completed"
+/// Badge showing touchpoint progress in format "X • Type"
+/// Examples: "2 • Call", "3 • Visit", "10 • Visit"
+/// No limit on number of touchpoints - shows actual count
 class TouchpointProgressBadge extends StatelessWidget {
   final Client client;
   final bool showCompletedLabel;
@@ -19,43 +20,32 @@ class TouchpointProgressBadge extends StatelessWidget {
   /// Internal getter that uses provided count or falls back to client.completedTouchpoints
   int get _displayedCount => touchpointCount ?? client.completedTouchpoints;
 
-  /// Calculate next touchpoint type based on displayed count
-  /// Uses completedCount directly as the index (0 = 1st touchpoint, 1 = 2nd, etc.)
-  TouchpointType? get _nextTouchpointType {
-    final completedCount = _displayedCount;
-    // Bounds checking: ensure completedCount is within valid range
-    if (completedCount >= 7 || completedCount < 0) return null;
-    if (completedCount >= TouchpointPattern.types.length) return null;
-    return TouchpointPattern.types[completedCount];
-  }
-
   @override
   Widget build(BuildContext context) {
     final completedCount = _displayedCount;
-    final totalCount = 7;
 
-    // All touchpoints completed
-    if (completedCount >= totalCount) {
-      if (!showCompletedLabel) return const SizedBox.shrink();
+    // Use client's nextTouchpoint field directly (no pattern enforcement)
+    final nextTouchpoint = client.nextTouchpoint;
+
+    if (nextTouchpoint != null) {
+      final isCall = nextTouchpoint.toLowerCase() == 'call';
       return _buildBadge(
-        label: 'Completed',
-        color: Colors.green,
-        icon: LucideIcons.checkCircle,
+        label: '$completedCount • ${nextTouchpoint.toLowerCase()}',
+        color: isCall
+            ? Colors.orange
+            : Colors.blue,
+        icon: isCall
+            ? LucideIcons.phone
+            : LucideIcons.mapPin,
         context: context,
       );
     }
 
-    // Get next touchpoint type
-    final nextType = _nextTouchpointType;
-
+    // Fallback: just show count without type
     return _buildBadge(
-      label: '$completedCount/$totalCount • ${nextType?.name.toLowerCase() ?? 'touchpoint'}',
-      color: nextType == TouchpointType.call
-          ? Colors.orange
-          : Colors.blue,
-      icon: nextType == TouchpointType.call
-          ? LucideIcons.phone
-          : LucideIcons.mapPin,
+      label: '$completedCount',
+      color: Colors.blue,
+      icon: LucideIcons.mapPin,
       context: context,
     );
   }

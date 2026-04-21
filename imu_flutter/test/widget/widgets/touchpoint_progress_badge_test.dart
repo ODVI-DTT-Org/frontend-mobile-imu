@@ -4,7 +4,7 @@ import 'package:imu_flutter/shared/widgets/client/touchpoint_progress_badge.dart
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-Client createTestClient({int touchpointCount = 0}) {
+Client createTestClient({int touchpointCount = 0, String? nextTouchpoint}) {
   final now = DateTime.now();
   // Calculate next touchpoint number: if 3 completed, next is 4th
   final nextTouchpointNumber = touchpointCount > 0 ? touchpointCount + 1 : 1;
@@ -17,6 +17,7 @@ Client createTestClient({int touchpointCount = 0}) {
     pensionType: PensionType.sss,
     createdAt: now,
     touchpointNumber: nextTouchpointNumber, // Set next touchpoint number correctly
+    nextTouchpoint: nextTouchpoint, // Set the next touchpoint type directly
     touchpoints: List.generate(
       touchpointCount,
       (index) => Touchpoint(
@@ -36,7 +37,7 @@ void main() {
   group('TouchpointProgressBadge', () {
     testWidgets('uses client.touchpoints.length when touchpointCount not provided', (tester) async {
       // Arrange
-      final client = createTestClient(touchpointCount: 3);
+      final client = createTestClient(touchpointCount: 3, nextTouchpoint: 'Visit');
 
       // Act
       await tester.pumpWidget(
@@ -53,12 +54,12 @@ void main() {
       print('Client nextTouchpointNumber: ${client.nextTouchpointNumber}');
 
       // Assert - 3 completed, next is 4th (Visit)
-      expect(find.text('3/7 • visit'), findsOneWidget);
+      expect(find.text('3 • visit'), findsOneWidget);
     });
 
     testWidgets('uses provided touchpointCount when available', (tester) async {
       // Arrange
-      final client = createTestClient(touchpointCount: 0); // Empty in client model
+      final client = createTestClient(touchpointCount: 0, nextTouchpoint: 'Call'); // Empty in client model
 
       // Act
       await tester.pumpWidget(
@@ -73,12 +74,12 @@ void main() {
       );
 
       // Assert - 5 completed, next is 6th (Call)
-      expect(find.text('5/7 • call'), findsOneWidget);
+      expect(find.text('5 • call'), findsOneWidget);
     });
 
     testWidgets('shows 0/7 when touchpointCount is 0', (tester) async {
       // Arrange
-      final client = createTestClient(touchpointCount: 0);
+      final client = createTestClient(touchpointCount: 0, nextTouchpoint: 'Visit');
 
       // Act
       await tester.pumpWidget(
@@ -93,12 +94,12 @@ void main() {
       );
 
       // Assert - 0 completed, next is 1st (Visit)
-      expect(find.text('0/7 • visit'), findsOneWidget);
+      expect(find.text('0 • visit'), findsOneWidget);
     });
 
-    testWidgets('shows Completed when touchpointCount is 7', (tester) async {
+    testWidgets('shows count when touchpointCount is 7', (tester) async {
       // Arrange
-      final client = createTestClient(touchpointCount: 0);
+      final client = createTestClient(touchpointCount: 0, nextTouchpoint: 'Visit');
 
       // Act
       await tester.pumpWidget(
@@ -112,14 +113,13 @@ void main() {
         ),
       );
 
-      // Assert
-      expect(find.text('Completed'), findsOneWidget);
-      expect(find.text('7/7'), findsNothing);
+      // Assert - 7 completed, next is 8th (Visit per pattern)
+      expect(find.text('7 • visit'), findsOneWidget);
     });
 
     testWidgets('shows correct next touchpoint type (Visit/Call)', (tester) async {
       // Arrange
-      final client = createTestClient(touchpointCount: 0);
+      final client = createTestClient(touchpointCount: 0, nextTouchpoint: 'Visit');
 
       // Act - Test 0 completed -> Next is 1st touchpoint (Visit)
       await tester.pumpWidget(
@@ -139,7 +139,7 @@ void main() {
 
     testWidgets('shows Call icon for 2nd touchpoint', (tester) async {
       // Arrange
-      final client = createTestClient(touchpointCount: 0);
+      final client = createTestClient(touchpointCount: 0, nextTouchpoint: 'Call');
 
       // Act - Test 1 completed -> Next is 2nd touchpoint (Call)
       await tester.pumpWidget(
