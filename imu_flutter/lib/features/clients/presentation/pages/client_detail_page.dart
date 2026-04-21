@@ -929,7 +929,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       context: context,
       clientId: widget.clientId,
       touchpointNumber: nextNumber,
-      touchpointType: nextType == TouchpointType.visit ? 'Visit' : 'Call',
+      touchpointType: nextTypeString == 'visit' ? 'Visit' : 'Call',
       clientName: _client!.fullName,
       address: _client!.addresses.isNotEmpty ? _client!.addresses.first.fullAddress : null,
     );
