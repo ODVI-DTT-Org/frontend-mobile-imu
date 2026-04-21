@@ -59,7 +59,8 @@ class ClientListTile extends ConsumerWidget {
       addressText = client.fullAddress;
     }
 
-    // Touchpoint progress — use touchpointNumber directly as returned by the backend.
+    // Touchpoint progress — show completed count over 7
+    // nextNumber is the NEXT touchpoint (1-7), so completed = nextNumber - 1
     final nextNumber = client.touchpointNumber >= 0 && client.touchpointNumber <= 7
         ? client.touchpointNumber
         : null;
@@ -69,7 +70,8 @@ class ClientListTile extends ConsumerWidget {
     if (isCompleted) {
       touchpointInfo = 'Completed';
     } else if (nextNumber != null && nextType != null) {
-      touchpointInfo = '$nextNumber/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
+      final completedCount = nextNumber - 1;
+      touchpointInfo = '$completedCount/7 • ${nextType == TouchpointType.visit ? 'Visit' : 'Call'}';
     } else {
       touchpointInfo = '0/7 • Visit';
     }
