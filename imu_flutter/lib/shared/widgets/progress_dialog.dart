@@ -16,7 +16,7 @@ class ProgressDialog {
     double? progress,
     bool dismissible = false,
   }) {
-    _dismiss(); // Dismiss any existing dialog
+    dismiss(); // Dismiss any existing dialog
 
     _currentMessage = message;
     _currentProgress = progress;
@@ -26,7 +26,7 @@ class ProgressDialog {
         message: _currentMessage,
         progress: _currentProgress,
         dismissible: dismissible,
-        onDismiss: _dismiss,
+        onDismiss: dismiss,
       ),
     );
 

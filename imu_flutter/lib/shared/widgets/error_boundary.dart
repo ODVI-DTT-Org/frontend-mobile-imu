@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/utils/logger.dart';
+import '../../core/utils/logger.dart';
 
 /// Error boundary widget that catches errors in child widgets.
 ///
@@ -79,10 +79,10 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
           widget.onError!(error, stackTrace);
         } else {
           // Default error logging
-          Logger.error(
+          logError(
             '[ErrorBoundary] Unhandled widget error',
-            error: error,
-            stackTrace: stackTrace,
+            error,
+            stackTrace,
           );
         }
       },
