@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import '../../core/utils/logger.dart';
 
-/// Error boundary widget that catches errors in child widgets.
+/// Error boundary widget that provides structured error UI for Flutter apps.
 ///
-/// Wraps any widget tree and displays a user-friendly error message
-/// when an error occurs during build or runtime.
+/// **IMPORTANT LIMITATION:** Flutter doesn't support try-catch for widget errors.
+/// This widget provides a structured UI for displaying errors, but doesn't
+/// automatically catch build errors. To catch errors globally, use:
 ///
-/// Usage:
+/// ```dart
+/// // In main.dart:
+/// ErrorWidget.builder = (details) {
+///   return CustomErrorWidget(details);
+/// };
+/// ```
+///
+/// Alternatively, use packages like `catcher` or `flutter_error_handler`.
+///
+/// **Usage:**
 /// ```dart
 /// ErrorBoundary(
 ///   child: MyWidget(),
 ///   onError: (error, stackTrace) {
-///     Logger.error('Widget error', error: error, stackTrace: stackTrace);
+///     logError('Widget error', error, stackTrace);
 ///   },
 /// )
 /// ```
@@ -91,7 +101,12 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   }
 }
 
-/// Internal widget that catches Flutter errors using ErrorWidget.builder
+/// Internal wrapper widget for future error catching implementation.
+///
+/// Note: This is currently a placeholder wrapper. Flutter doesn't provide
+/// a direct way to catch errors in widget subtrees without using ErrorWidget.builder
+/// globally. This wrapper exists for future implementation when Flutter adds
+/// fine-grained error boundary support.
 class ErrorWidgetBuilder extends StatelessWidget {
   final Widget child;
   final void Function(Object error, StackTrace stackTrace) onError;
@@ -104,8 +119,8 @@ class ErrorWidgetBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Note: Flutter doesn't have a direct way to catch widget errors
-    // This is a placeholder for future implementation with ErrorWidget.builder
+    // Placeholder: returns child directly without error catching
+    // Error catching would require ErrorWidget.builder at app level
     return child;
   }
 }

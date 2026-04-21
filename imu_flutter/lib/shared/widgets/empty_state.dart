@@ -146,70 +146,70 @@ class EmptyStateAction extends StatelessWidget {
 /// Pre-configured empty states for common scenarios.
 class EmptyStates {
   /// Empty state for no items/records.
-  static const noItems = EmptyState(
+  static final noItems = const EmptyState(
     icon: LucideIcons.inbox,
     title: 'No Items Found',
     message: 'There are no items to display at the moment.',
   );
 
   /// Empty state for search with no results.
-  static const noSearchResults = EmptyState(
+  static final noSearchResults = const EmptyState(
     icon: LucideIcons.search,
     title: 'No Results Found',
     message: 'Try adjusting your search or filters to find what you\'re looking for.',
   );
 
   /// Empty state for network error.
-  static const networkError = EmptyState(
+  static final networkError = const EmptyState(
     icon: LucideIcons.wifiOff,
     title: 'Connection Error',
     message: 'Unable to load content. Please check your internet connection.',
   );
 
   /// Empty state for generic error.
-  static const error = EmptyState(
+  static final error = const EmptyState(
     icon: LucideIcons.alertCircle,
     title: 'Something Went Wrong',
     message: 'An error occurred while loading the content. Please try again.',
   );
 
   /// Empty state for no favorites.
-  static const noFavorites = EmptyState(
+  static final noFavorites = const EmptyState(
     icon: LucideIcons.star,
     title: 'No Favorites',
     message: 'You haven\'t added any items to your favorites yet.',
   );
 
   /// Empty state for no activity.
-  static const noActivity = EmptyState(
+  static final noActivity = const EmptyState(
     icon: LucideIcons.activity,
     title: 'No Activity',
     message: 'There are no activities to display for this period.',
   );
 
   /// Empty state for no clients.
-  static const noClients = EmptyState(
+  static final noClients = const EmptyState(
     icon: LucideIcons.users,
     title: 'No Clients',
     message: 'No clients found. Try adjusting your filters or add a new client.',
   );
 
   /// Empty state for no itinerary.
-  static const noItinerary = EmptyState(
+  static final noItinerary = const EmptyState(
     icon: LucideIcons.calendar,
     title: 'No Scheduled Visits',
     message: 'You don\'t have any visits scheduled for this day.',
   );
 
   /// Empty state for no notifications.
-  static const noNotifications = EmptyState(
+  static final noNotifications = const EmptyState(
     icon: LucideIcons.bell,
     title: 'No Notifications',
     message: 'You\'re all caught up! No new notifications to show.',
   );
 
   /// Empty state for no touchpoints.
-  static const noTouchpoints = EmptyState(
+  static final noTouchpoints = const EmptyState(
     icon: LucideIcons.mapPin,
     title: 'No Touchpoints',
     message: 'No touchpoints recorded yet. Start by adding your first touchpoint.',
