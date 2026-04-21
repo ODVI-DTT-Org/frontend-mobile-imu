@@ -17,15 +17,15 @@ class HeaderButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Multiple Time In button
-        Expanded(
-          child: _PillButton(
-            icon: _buildHandIcons(),
-            label: 'Multiple Time In',
-            onTap: onMultipleTimeIn,
-          ),
-        ),
-        const SizedBox(width: 12),
+        // Multiple Time In button (DISABLED)
+        // Expanded(
+        //   child: _PillButton(
+        //     icon: _buildHandIcons(),
+        //     label: 'Multiple Time In',
+        //     onTap: onMultipleTimeIn,
+        //   ),
+        // ),
+        // const SizedBox(width: 12),
         // Add client button
         Expanded(
           child: _PillButton(
