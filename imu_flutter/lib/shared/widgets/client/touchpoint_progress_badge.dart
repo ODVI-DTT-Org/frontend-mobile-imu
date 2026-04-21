@@ -49,7 +49,7 @@ class TouchpointProgressBadge extends StatelessWidget {
     final nextType = _nextTouchpointType;
 
     return _buildBadge(
-      label: '$completedCount/$totalCount • ${nextType?.name ?? 'Touchpoint'}',
+      label: '$completedCount/$totalCount • ${nextType?.name.toLowerCase() ?? 'touchpoint'}',
       color: nextType == TouchpointType.call
           ? Colors.orange
           : Colors.blue,

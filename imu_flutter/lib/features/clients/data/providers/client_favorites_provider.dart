@@ -29,9 +29,10 @@ class ClientFavoritesService {
     final db = await PowerSyncService.database;
 
     // Optimistic local insert - PowerSync will upload this automatically
+    // Don't insert with explicit id - let PowerSync handle it
     await db.execute(
-      'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
-      [const Uuid().v4(), userId, clientId, DateTime.now().toIso8601String()],
+      'INSERT OR IGNORE INTO client_favorites (user_id, client_id, created_at) VALUES (?, ?, ?)',
+      [userId, clientId, DateTime.now().toIso8601String()],
     );
 
     // PowerSync will automatically upload this change to the server

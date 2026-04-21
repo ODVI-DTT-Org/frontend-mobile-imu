@@ -44,6 +44,11 @@ void main() {
         ),
       );
 
+      // Debug: print all text widgets
+      print('Client completedTouchpoints: ${client.completedTouchpoints}');
+      print('Client touchpointNumber: ${client.touchpointNumber}');
+      print('Client nextTouchpointNumber: ${client.nextTouchpointNumber}');
+
       // Assert - 3 completed, next is 4th (Visit)
       expect(find.text('3/7 • visit'), findsOneWidget);
     });

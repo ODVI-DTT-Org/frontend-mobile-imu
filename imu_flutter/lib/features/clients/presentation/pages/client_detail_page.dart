@@ -333,30 +333,63 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Future<void> _navigateToClient() async {
     if (_client == null) return;
     final client = _client!;
-    Address? primaryAddress;
-    if (client.addresses.isNotEmpty) {
-      try {
-        primaryAddress = client.addresses.firstWhere((a) => a.isPrimary);
-      } catch (_) {
-        primaryAddress = client.addresses.first;
+
+    // Case 1: No addresses found
+    if (client.addresses.isEmpty) {
+      if (mounted) {
+        AppNotification.showError(context, 'No address found for this client');
       }
+      return;
     }
 
-    if (primaryAddress?.latitude != null && primaryAddress?.longitude != null) {
-      await _openNavigationPicker(
-        latitude: primaryAddress!.latitude!,
-        longitude: primaryAddress.longitude!,
-        label: client.fullName,
-      );
-    } else if (client.municipality != null && client.province != null) {
-      final query = Uri.encodeComponent('${client.municipality}, ${client.province}');
-      final url = 'https://www.google.com/maps/search/?api=1&query=$query';
-      if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
-        if (mounted) AppNotification.showError(context, 'Could not open maps');
-      }
-    } else {
-      if (mounted) AppNotification.showError(context, 'No location information available');
+    // Case 2: Only one address - navigate directly
+    if (client.addresses.length == 1) {
+      await _navigateToAddress(client.addresses.first);
+      return;
     }
+
+    // Case 3: Multiple addresses - show picker
+    await _showAddressPicker(client.addresses);
+  }
+
+  Future<void> _showAddressPicker(List<Address> addresses) async {
+    if (!mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Select Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            const Divider(height: 1),
+            ...addresses.map((address) => ListTile(
+              leading: Icon(
+                address.isPrimary ? Icons.star : Icons.location_on,
+                color: address.isPrimary ? Colors.amber : Colors.grey,
+              ),
+              title: Text(
+                address.streetAddress?.isNotEmpty == true
+                    ? address.streetAddress!
+                    : address.fullAddress,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(address.fullAddress, maxLines: 1, overflow: TextOverflow.ellipsis),
+              trailing: const Icon(LucideIcons.chevronRight, size: 18),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _navigateToAddress(address);
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _navigateToAddress(Address address) async {
