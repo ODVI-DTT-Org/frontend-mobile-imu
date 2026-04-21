@@ -26,12 +26,13 @@ import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../providers/my_day_provider.dart';
-import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider;
+import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider, Itinerary;
 import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
 import '../../../../shared/widgets/client/client_list_tile.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
+import '../../../../services/api/itinerary_api_service.dart' show ItineraryItem;
 import '../../../record_forms/presentation/widgets/record_touchpoint_bottom_sheet.dart';
 import '../../../record_forms/presentation/widgets/record_visit_bottom_sheet.dart';
 import '../../../record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
@@ -48,6 +49,13 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   // Multi-select state
   final Set<String> _selectedClientIds = {};
   bool _isMultiSelectMode = false;
+
+  // Undo functionality
+  List<MyDayClient> _recentlyDeletedClients = [];
+  DismissDirection? _recentlyDeletedDirection;
+
+  // Bulk operation loading state
+  bool _isBulkOperationInProgress = false;
 
   @override
   void initState() {
@@ -297,12 +305,97 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
     if (confirmed != true) return;
 
-    final repo = ref.read(itineraryRepositoryProvider);
-    for (final client in selectedClients) {
-      await repo.deleteItinerary(client.id);
+    // Store for undo before deleting
+    _recentlyDeletedClients = selectedClients;
+    _recentlyDeletedDirection = DismissDirection.endToStart;
+
+    // Set loading state
+    setState(() {
+      _isBulkOperationInProgress = true;
+    });
+
+    try {
+      // Delete clients
+      final repo = ref.read(itineraryRepositoryProvider);
+      for (final client in selectedClients) {
+        await repo.deleteItinerary(client.id);
+      }
+
+      final removedCount = _selectedClientIds.length;
+      _exitMultiSelectMode();
+
+      if (mounted) {
+        // Show snackbar with undo option
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$removedCount client${removedCount == 1 ? '' : 's'} removed from My Day'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'UNDO',
+              textColor: Colors.white,
+              onPressed: () async {
+                HapticUtils.lightImpact();
+                await _undoBulkRemove();
+              },
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBulkOperationInProgress = false;
+        });
+      }
     }
-    _exitMultiSelectMode();
-    if (mounted) showToast('Clients removed from My Day');
+  }
+
+  Future<void> _undoBulkRemove() async {
+    if (_recentlyDeletedClients.isEmpty) return;
+
+    HapticUtils.lightImpact();
+
+    try {
+      // Restore deleted clients
+      final repo = ref.read(itineraryRepositoryProvider);
+      for (final client in _recentlyDeletedClients) {
+        // Convert MyDayClient back to Itinerary for restoration
+        final visit = Itinerary(
+          id: client.id,
+          caravanId: null,
+          clientId: client.clientId,
+          scheduledDate: DateTime.now(),
+          scheduledTime: client.scheduledTime,
+          status: client.status ?? 'pending',
+          priority: client.priority,
+          notes: client.notes,
+          createdAt: null,
+          updatedAt: null,
+        );
+        await repo.createItinerary(visit);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Clients restored to My Day'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to restore clients: $e'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      _recentlyDeletedClients = [];
+      _recentlyDeletedDirection = null;
+    }
   }
 
   void _onMultipleTimeIn() {
@@ -854,30 +947,66 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: GestureDetector(
-          // Handle tap outside to exit multi-select mode
-          onTap: () {
-            if (_isMultiSelectMode) {
-              _exitMultiSelectMode();
-            }
-          },
-          behavior: HitTestBehavior.opaque,
-          child: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: PullToRefresh(
-                    onRefresh: _handleRefresh,
-                    child: state.isLoading
-                        ? const MyDaySkeleton()
-                        : state.error != null
-                            ? _buildErrorState(state.error!)
-                            : _buildContent(state.clients),
+        body: Stack(
+          children: [
+            // Main content
+            GestureDetector(
+              // Handle tap outside to exit multi-select mode
+              onTap: () {
+                if (_isMultiSelectMode) {
+                  _exitMultiSelectMode();
+                }
+              },
+              behavior: HitTestBehavior.opaque,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: PullToRefresh(
+                        onRefresh: _handleRefresh,
+                        child: state.isLoading
+                            ? const MyDaySkeleton()
+                            : state.error != null
+                                ? _buildErrorState(state.error!)
+                                : _buildContent(state.clients),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Loading overlay for bulk operations
+            if (_isBulkOperationInProgress)
+              Container(
+                color: Colors.black.withOpacity(0.5),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Removing clients...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+          ],
         ),
         floatingActionButton: !_isMultiSelectMode
             ? FloatingActionButton(

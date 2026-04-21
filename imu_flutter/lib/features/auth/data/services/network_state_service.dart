@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 /// Network status enumeration.
 enum NetworkStatus {
   online,
@@ -5,88 +8,92 @@ enum NetworkStatus {
   unknown,
 }
 
-/// Stub implementation for network state monitoring.
+/// Real implementation for network state monitoring using connectivity_plus.
 ///
-/// NOTE: This is a placeholder implementation. The actual network
-/// state monitoring functionality has not been implemented yet.
-///
-/// TODO: Implement network state monitoring with connectivity_plus.
+/// Monitors network connectivity changes and provides real-time status updates.
 class NetworkStateService {
-  NetworkStateService();
-
-  NetworkStatus _currentStatus = NetworkStatus.online;
+  final Connectivity _connectivity = Connectivity();
+  final StreamController<NetworkStatus> _statusController = StreamController.broadcast();
+  NetworkStatus _currentStatus = NetworkStatus.unknown;
   bool _isOffline = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  /// Initialize the service (stub).
-  Future<void> initialize({bool startPolling = false}) async {
-    // Stub implementation
-  }
-
-  /// Stream of network status changes (stub).
-  Stream<NetworkStatus> get onNetworkStatusChange {
-    // Stub implementation - always return online
-    return Stream.value(NetworkStatus.online);
-  }
+  /// Stream of network status changes.
+  Stream<NetworkStatus> get onNetworkStatusChange => _statusController.stream;
 
   /// Stream of network status (alias for onNetworkStatusChange).
-  Stream<NetworkStatus> get statusStream {
-    // Stub implementation - always return online
-    return Stream.value(NetworkStatus.online);
-  }
-
-  /// Get current network status (stub).
-  Future<NetworkStatus> getNetworkStatus() async {
-    // Stub implementation - always return online
-    return NetworkStatus.online;
-  }
+  Stream<NetworkStatus> get statusStream => _statusController.stream;
 
   /// Get current network status (synchronous).
   NetworkStatus get currentStatus => _currentStatus;
 
-  /// Check if currently online (stub).
-  Future<bool> isOnline() async {
-    // Stub implementation - always return true
-    return true;
-  }
-
-  /// Check if currently offline (stub).
+  /// Check if currently offline.
   bool get isOffline => _isOffline;
 
-  /// Start monitoring network status (stub).
-  void startMonitoring() {
-    // Stub implementation
+  /// Check if currently online.
+  bool get isOnline => !_isOffline;
+
+  /// Initialize the service and start monitoring network changes.
+  Future<void> initialize({bool startPolling = false}) async {
+    final result = await _connectivity.checkConnectivity();
+    _currentStatus = _mapToStatus(result);
+    _isOffline = _currentStatus == NetworkStatus.offline;
+    _statusController.add(_currentStatus);
+
+    // Listen to connectivity changes
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((result) {
+      final newStatus = _mapToStatus(result);
+      if (newStatus != _currentStatus) {
+        _currentStatus = newStatus;
+        _isOffline = newStatus == NetworkStatus.offline;
+        _statusController.add(newStatus);
+      }
+    });
+
+    if (startPolling) {
+      startStatusPolling();
+    }
   }
 
-  /// Start status polling (stub).
-  void startStatusPolling() {
-    // Stub implementation
-  }
-
-  /// Stop monitoring network status (stub).
-  void stopMonitoring() {
-    // Stub implementation
-  }
-
-  /// Check connectivity (stub).
-  Future<bool> checkConnectivity() async {
-    // Stub implementation - always return true
-    return true;
-  }
-
-  /// Check connectivity with detailed status (stub).
-  Future<NetworkStatus> checkConnectivityDetailed() async {
-    // Stub implementation - always return online
+  /// Map ConnectivityResult to NetworkStatus.
+  NetworkStatus _mapToStatus(List<ConnectivityResult> result) {
+    if (result.contains(ConnectivityResult.none)) {
+      return NetworkStatus.offline;
+    }
     return NetworkStatus.online;
   }
 
-  /// Set network status (for testing).
-  void setNetworkStatus(NetworkStatus status) {
-    _currentStatus = status;
-    _isOffline = status == NetworkStatus.offline;
+  /// Get current network status.
+  Future<NetworkStatus> getNetworkStatus() async {
+    final result = await _connectivity.checkConnectivity();
+    return _mapToStatus(result);
   }
 
-  /// Dispose resources (stub).
+  /// Check if device is online.
+  Future<bool> checkConnectivity() async {
+    final status = await getNetworkStatus();
+    return status == NetworkStatus.online;
+  }
+
+  /// Start monitoring (already started in initialize).
+  void startMonitoring() {
+    // Already listening in initialize
+  }
+
+  /// Start periodic status polling (optional - not needed with connectivity_plus).
+  void startStatusPolling() {
+    // ConnectivityPlus already provides real-time updates
+    // This is kept for compatibility with the interface
+  }
+
+  /// Stop monitoring network status.
+  void stopMonitoring() {
+    _connectivitySubscription?.cancel();
+  }
+
+  /// Dispose resources.
   void dispose() {
-    // Stub implementation
+    _connectivitySubscription?.cancel();
+    _statusController.close();
   }
 }

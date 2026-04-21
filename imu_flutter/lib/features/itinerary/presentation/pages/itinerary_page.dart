@@ -19,7 +19,7 @@ import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/itinerary_api_service.dart' show ItineraryItem;
 import '../../../../services/api/approvals_api_service.dart';
-import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryByDateProvider, itineraryRepositoryProvider;
+import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryByDateProvider, itineraryRepositoryProvider, Itinerary;
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show
     authNotifierProvider,
@@ -53,8 +53,49 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
   int? _recentlyDeletedIndex;
 
   // Multi-select state
-  final Set<String> _selectedVisitIds = {};
+  Set<String> _selectedVisitIds = {};
   bool _isMultiSelectMode = false;
+
+  // Undo functionality
+  List<ItineraryItem> _recentlyDeletedVisits = [];
+  DismissDirection? _recentlyDeletedDirection;
+
+  // Selection state per tab
+  final Map<String, Set<String>> _selectionStateByTab = {};
+
+  // Bulk operation loading state
+  bool _isBulkOperationInProgress = false;
+
+  // Get current tab key for storing selection state
+  String _getTabKey() {
+    if (_selectedCalendarDate != null) {
+      return _selectedCalendarDate!.toIso8601String().split('T')[0];
+    }
+    return _selectedTab;
+  }
+
+  // Save current selection state before switching tabs
+  void _saveSelectionState() {
+    if (_selectedVisitIds.isNotEmpty) {
+      _selectionStateByTab[_getTabKey()] = Set<String>.from(_selectedVisitIds);
+    }
+  }
+
+  // Restore selection state for current tab
+  void _restoreSelectionState() {
+    final savedState = _selectionStateByTab[_getTabKey()];
+    if (savedState != null && savedState.isNotEmpty) {
+      setState(() {
+        _selectedVisitIds = savedState;
+        _isMultiSelectMode = true;
+      });
+    } else {
+      setState(() {
+        _selectedVisitIds.clear();
+        _isMultiSelectMode = false;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -359,6 +400,11 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     HapticUtils.lightImpact();
 
+    // Store visits for potential undo
+    final targetDate = _selectedDate;
+    final visitsToDelete = await ref.read(itineraryByDateProvider(targetDate).future);
+    final visitsToDeleteFiltered = visitsToDelete.where((v) => _selectedVisitIds.contains(v.id)).toList();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -380,12 +426,97 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
     if (confirmed != true) return;
 
-    final repo = ref.read(itineraryRepositoryProvider);
-    for (final id in _selectedVisitIds.toList()) {
-      await repo.deleteItinerary(id);
+    // Store for undo before deleting
+    _recentlyDeletedVisits = visitsToDeleteFiltered;
+    _recentlyDeletedDirection = DismissDirection.endToStart;
+
+    // Set loading state
+    setState(() {
+      _isBulkOperationInProgress = true;
+    });
+
+    try {
+      // Delete visits
+      final repo = ref.read(itineraryRepositoryProvider);
+      for (final id in _selectedVisitIds.toList()) {
+        await repo.deleteItinerary(id);
+      }
+
+      final removedCount = _selectedVisitIds.length;
+      _exitMultiSelectMode();
+
+      if (mounted) {
+        // Show snackbar with undo option
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$removedCount visit${removedCount == 1 ? '' : 's'} removed'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'UNDO',
+              textColor: Colors.white,
+              onPressed: () async {
+                HapticUtils.lightImpact();
+                await _undoBulkRemove();
+              },
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBulkOperationInProgress = false;
+        });
+      }
     }
-    _exitMultiSelectMode();
-    if (mounted) showToast('Visits removed');
+  }
+
+  Future<void> _undoBulkRemove() async {
+    if (_recentlyDeletedVisits.isEmpty) return;
+
+    HapticUtils.lightImpact();
+
+    try {
+      // Restore deleted visits
+      final repo = ref.read(itineraryRepositoryProvider);
+      for (final visit in _recentlyDeletedVisits) {
+        // Convert ItineraryItem to Itinerary for restoration
+        final itinerary = Itinerary(
+          id: visit.id,
+          caravanId: null,
+          clientId: visit.clientId,
+          scheduledDate: visit.scheduledDate,
+          scheduledTime: null,
+          status: visit.status,
+          priority: visit.priority,
+          notes: visit.notes,
+          createdAt: null,
+          updatedAt: null,
+        );
+        await repo.createItinerary(itinerary);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Visits restored'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to restore visits: $e'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      _recentlyDeletedVisits = [];
+      _recentlyDeletedDirection = null;
+    }
   }
 
   Future<void> _onVisitTap(ItineraryItem visit) async {
@@ -979,26 +1110,29 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                 child: const Icon(LucideIcons.plus),
               )
             : null,
-        body: GestureDetector(
-          // Handle tap outside to exit multi-select mode
-          onTap: () {
-            if (_isMultiSelectMode) {
-              _exitMultiSelectMode();
-            }
-          },
-          behavior: HitTestBehavior.opaque,
-          child: SafeArea(
-            child: Column(
+        body: Stack(
           children: [
-            // Header - app bar with title or selection toolbar
-            if (_isMultiSelectMode)
-              _buildSelectionToolbar()
-            else
-              _buildNormalHeader(),
+            // Main content
+            GestureDetector(
+              // Handle tap outside to exit multi-select mode
+              onTap: () {
+                if (_isMultiSelectMode) {
+                  _exitMultiSelectMode();
+                }
+              },
+              behavior: HitTestBehavior.opaque,
+              child: SafeArea(
+                child: Column(
+              children: [
+                // Header - app bar with title or selection toolbar
+                if (_isMultiSelectMode)
+                  _buildSelectionToolbar()
+                else
+                  _buildNormalHeader(),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Tab filter (Tomorrow / Today / Yesterday) with calendar button (per Figma)
+                // Tab filter (Tomorrow / Today / Yesterday) with calendar button (per Figma)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1264,7 +1398,40 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             ),
           ],
         ),
-      ),
+        ),
+        ),
+        // Loading overlay for bulk operations
+        if (_isBulkOperationInProgress)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Removing Itineraries...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
         ),
       ),
     );
@@ -1275,9 +1442,21 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     return GestureDetector(
       onTap: () {
         HapticUtils.lightImpact();
+
+        // Save current selection state before switching
+        _saveSelectionState();
+
         setState(() {
           _selectedTab = tabValue;
           _selectedCalendarDate = null;
+          // Clear current selection (will be restored if saved state exists)
+          _selectedVisitIds.clear();
+          _isMultiSelectMode = false;
+        });
+
+        // Restore selection state for the new tab after rebuild
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _restoreSelectionState();
         });
       },
       child: Container(

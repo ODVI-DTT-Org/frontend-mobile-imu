@@ -12,10 +12,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 // CI/CD environment variables override key.properties
-def keystorePath = System.getenv("KEYSTORE_PATH") ?: keystoreProperties['storeFile']
-def keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties['storePassword']
-def keyAlias = System.getenv("KEY_ALIAS") ?: keystoreProperties['keyAlias']
-def keyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProperties['keyPassword']
+def keystorePath = System.getenv("KEYSTORE_PATH") ?: keystoreProperties['storeFile']?.toString()
+def keystorePasswordValue = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties['storePassword']?.toString()
+def keyAliasValue = System.getenv("KEY_ALIAS") ?: keystoreProperties['keyAlias']?.toString()
+def keyPasswordValue = System.getenv("KEY_PASSWORD") ?: keystoreProperties['keyPassword']?.toString()
 
 android {
     namespace "com.odvi.imu"
@@ -33,10 +33,10 @@ android {
 
     signingConfigs {
         release {
-            keyAlias keyAlias
-            keyPassword keyPassword
+            keyAlias keyAliasValue
+            keyPassword keyPasswordValue
             storeFile keystorePath ? file(keystorePath) : null
-            storePassword keystorePassword
+            storePassword keystorePasswordValue
         }
     }
 

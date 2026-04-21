@@ -60,10 +60,10 @@ class TouchpointStatusBadge extends StatelessWidget {
       );
     } catch (e, stackTrace) {
       // Error handling: Log and return empty widget
-      Logger.error(
+      logError(
         '[TouchpointStatusBadge] Error rendering badge for client ${client.id}',
-        error: e,
-        stackTrace: stackTrace,
+        e,
+        stackTrace,
       );
       return const SizedBox.shrink();
     }

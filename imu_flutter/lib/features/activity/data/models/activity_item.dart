@@ -66,7 +66,7 @@ class ActivityItem {
   final ActivityStatus status;
   final DateTime createdAt;
 
-  const ActivityItem({
+  ActivityItem({
     required this.id,
     required this.type,
     required this.subtype,
