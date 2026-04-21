@@ -6,23 +6,23 @@ import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 void main() {
   group('PermissionService', () {
     group('canCreateTouchpoint', () {
-      test('admin can create any touchpoint', () {
-        final result = PermissionService.canCreateTouchpoint(
+      test('admin can create any touchpoint type', () {
+        final resultVisit = PermissionService.canCreateTouchpoint(
           role: UserRole.admin,
           touchpointNumber: 1,
           type: TouchpointType.visit,
         );
-        expect(result, true);
+        expect(resultVisit, true);
 
-        final result2 = PermissionService.canCreateTouchpoint(
+        final resultCall = PermissionService.canCreateTouchpoint(
           role: UserRole.admin,
           touchpointNumber: 2,
           type: TouchpointType.call,
         );
-        expect(result2, true);
+        expect(resultCall, true);
       });
 
-      test('area manager can create any touchpoint', () {
+      test('area manager can create any touchpoint type', () {
         final result = PermissionService.canCreateTouchpoint(
           role: UserRole.areaManager,
           touchpointNumber: 5,
@@ -31,7 +31,7 @@ void main() {
         expect(result, true);
       });
 
-      test('assistant area manager can create any touchpoint', () {
+      test('assistant area manager can create any touchpoint type', () {
         final result = PermissionService.canCreateTouchpoint(
           role: UserRole.assistantAreaManager,
           touchpointNumber: 6,
@@ -40,7 +40,8 @@ void main() {
         expect(result, true);
       });
 
-      test('caravan can create visit touchpoints (1, 4, 7)', () {
+      // UPDATED for Unli Touchpoint - no number restrictions
+      test('caravan can create visit touchpoints at any number', () {
         final tp1 = PermissionService.canCreateTouchpoint(
           role: UserRole.caravan,
           touchpointNumber: 1,
@@ -48,54 +49,29 @@ void main() {
         );
         expect(tp1, true);
 
-        final tp4 = PermissionService.canCreateTouchpoint(
-          role: UserRole.caravan,
-          touchpointNumber: 4,
-          type: TouchpointType.visit,
-        );
-        expect(tp4, true);
-
-        final tp7 = PermissionService.canCreateTouchpoint(
-          role: UserRole.caravan,
-          touchpointNumber: 7,
-          type: TouchpointType.visit,
-        );
-        expect(tp7, true);
-      });
-
-      test('caravan cannot create call touchpoints', () {
-        final tp2 = PermissionService.canCreateTouchpoint(
-          role: UserRole.caravan,
-          touchpointNumber: 2,
-          type: TouchpointType.call,
-        );
-        expect(tp2, false);
-
-        final tp3 = PermissionService.canCreateTouchpoint(
-          role: UserRole.caravan,
-          touchpointNumber: 3,
-          type: TouchpointType.call,
-        );
-        expect(tp3, false);
-      });
-
-      test('caravan cannot create visit for call touchpoints (2, 3, 5, 6)', () {
         final tp2 = PermissionService.canCreateTouchpoint(
           role: UserRole.caravan,
           touchpointNumber: 2,
           type: TouchpointType.visit,
         );
-        expect(tp2, false);
+        expect(tp2, true);
 
-        final tp5 = PermissionService.canCreateTouchpoint(
+        final tp8 = PermissionService.canCreateTouchpoint(
           role: UserRole.caravan,
-          touchpointNumber: 5,
+          touchpointNumber: 8,
           type: TouchpointType.visit,
         );
-        expect(tp5, false);
+        expect(tp8, true);
+
+        final tp50 = PermissionService.canCreateTouchpoint(
+          role: UserRole.caravan,
+          touchpointNumber: 50,
+          type: TouchpointType.visit,
+        );
+        expect(tp50, true);
       });
 
-      test('caravan cannot create call for visit touchpoints (1, 4, 7)', () {
+      test('caravan cannot create call touchpoints at any number', () {
         final tp1 = PermissionService.canCreateTouchpoint(
           role: UserRole.caravan,
           touchpointNumber: 1,
@@ -103,15 +79,30 @@ void main() {
         );
         expect(tp1, false);
 
-        final tp4 = PermissionService.canCreateTouchpoint(
+        final tp2 = PermissionService.canCreateTouchpoint(
           role: UserRole.caravan,
-          touchpointNumber: 4,
+          touchpointNumber: 2,
           type: TouchpointType.call,
         );
-        expect(tp4, false);
+        expect(tp2, false);
+
+        final tp8 = PermissionService.canCreateTouchpoint(
+          role: UserRole.caravan,
+          touchpointNumber: 8,
+          type: TouchpointType.call,
+        );
+        expect(tp8, false);
       });
 
-      test('tele can create call touchpoints (2, 3, 5, 6)', () {
+      // UPDATED for Unli Touchpoint - no number restrictions
+      test('tele can create call touchpoints at any number', () {
+        final tp1 = PermissionService.canCreateTouchpoint(
+          role: UserRole.tele,
+          touchpointNumber: 1,
+          type: TouchpointType.call,
+        );
+        expect(tp1, true);
+
         final tp2 = PermissionService.canCreateTouchpoint(
           role: UserRole.tele,
           touchpointNumber: 2,
@@ -119,29 +110,22 @@ void main() {
         );
         expect(tp2, true);
 
-        final tp3 = PermissionService.canCreateTouchpoint(
+        final tp8 = PermissionService.canCreateTouchpoint(
           role: UserRole.tele,
-          touchpointNumber: 3,
+          touchpointNumber: 8,
           type: TouchpointType.call,
         );
-        expect(tp3, true);
+        expect(tp8, true);
 
-        final tp5 = PermissionService.canCreateTouchpoint(
+        final tp50 = PermissionService.canCreateTouchpoint(
           role: UserRole.tele,
-          touchpointNumber: 5,
+          touchpointNumber: 50,
           type: TouchpointType.call,
         );
-        expect(tp5, true);
-
-        final tp6 = PermissionService.canCreateTouchpoint(
-          role: UserRole.tele,
-          touchpointNumber: 6,
-          type: TouchpointType.call,
-        );
-        expect(tp6, true);
+        expect(tp50, true);
       });
 
-      test('tele cannot create visit touchpoints', () {
+      test('tele cannot create visit touchpoints at any number', () {
         final tp1 = PermissionService.canCreateTouchpoint(
           role: UserRole.tele,
           touchpointNumber: 1,
@@ -149,38 +133,6 @@ void main() {
         );
         expect(tp1, false);
 
-        final tp4 = PermissionService.canCreateTouchpoint(
-          role: UserRole.tele,
-          touchpointNumber: 4,
-          type: TouchpointType.visit,
-        );
-        expect(tp4, false);
-
-        final tp7 = PermissionService.canCreateTouchpoint(
-          role: UserRole.tele,
-          touchpointNumber: 7,
-          type: TouchpointType.visit,
-        );
-        expect(tp7, false);
-      });
-
-      test('tele cannot create call for visit touchpoints (1, 4, 7)', () {
-        final tp1 = PermissionService.canCreateTouchpoint(
-          role: UserRole.tele,
-          touchpointNumber: 1,
-          type: TouchpointType.call,
-        );
-        expect(tp1, false);
-
-        final tp4 = PermissionService.canCreateTouchpoint(
-          role: UserRole.tele,
-          touchpointNumber: 4,
-          type: TouchpointType.call,
-        );
-        expect(tp4, false);
-      });
-
-      test('tele cannot create visit for call touchpoints (2, 3, 5, 6)', () {
         final tp2 = PermissionService.canCreateTouchpoint(
           role: UserRole.tele,
           touchpointNumber: 2,
@@ -188,12 +140,12 @@ void main() {
         );
         expect(tp2, false);
 
-        final tp5 = PermissionService.canCreateTouchpoint(
+        final tp8 = PermissionService.canCreateTouchpoint(
           role: UserRole.tele,
-          touchpointNumber: 5,
+          touchpointNumber: 8,
           type: TouchpointType.visit,
         );
-        expect(tp5, false);
+        expect(tp8, false);
       });
     });
 
