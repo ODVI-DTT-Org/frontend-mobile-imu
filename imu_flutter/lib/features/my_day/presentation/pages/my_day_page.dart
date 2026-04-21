@@ -1123,9 +1123,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                     ],
                   )
                 else
-                  _buildSelectionToolbar(clients.length)
-                    onCancel: _exitMultiSelectMode,
-                  ),
+                  _buildSelectionToolbar(clients.length),
               ],
             ),
           ),
