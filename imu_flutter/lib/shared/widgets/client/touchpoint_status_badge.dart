@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../features/clients/data/models/client_model.dart';
+import '../../../core/utils/logger.dart';
 
 /// Badge showing last touchpoint status with reason
 /// Format: "Reason - Status" or just "Status" if no reason
@@ -24,76 +25,101 @@ class TouchpointStatusBadge extends StatelessWidget {
       final reason = lastTouchpoint.reason;
       final status = lastTouchpoint.status;
 
-    // Build label based on reason and status
-    String label;
-    if (reason != null && status != null) {
-      label = '${reason.apiValue} - ${status.apiValue}';
-    } else if (reason != null) {
-      label = reason.apiValue;
-    } else if (status != null) {
-      label = status.apiValue;
-    } else {
+      // Build label based on reason and status
+      final label = _getLabel(reason, status);
+      if (label.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      // Get color based on status
+      final badgeColor = _getColor(status);
+      final badgeIcon = _getIcon(status);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: badgeColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: badgeColor.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(badgeIcon, size: 12, color: badgeColor),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: badgeColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e, stackTrace) {
+      // Error handling: Log and return empty widget
+      Logger.error(
+        '[TouchpointStatusBadge] Error rendering badge for client ${client.id}',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return const SizedBox.shrink();
     }
+  }
 
-    // Get color based on status
-    Color badgeColor;
-    IconData badgeIcon;
+  /// Get display label based on reason and status.
+  String _getLabel(TouchpointReason? reason, TouchpointStatus? status) {
+    if (reason != null && status != null) {
+      return '${reason.apiValue} - ${status.apiValue}';
+    }
+    if (reason != null) {
+      return reason.apiValue;
+    }
+    if (status != null) {
+      return status.apiValue;
+    }
+    return '';
+  }
 
+  /// Get badge color based on status.
+  Color _getColor(TouchpointStatus? status) {
     switch (status) {
       case TouchpointStatus.interested:
-        badgeColor = Colors.green;
-        badgeIcon = LucideIcons.thumbsUp;
-        break;
+        return Colors.green;
       case TouchpointStatus.undecided:
-        badgeColor = Colors.orange;
-        badgeIcon = LucideIcons.helpCircle;
-        break;
+        return Colors.orange;
       case TouchpointStatus.notInterested:
-        badgeColor = Colors.red;
-        badgeIcon = LucideIcons.thumbsDown;
-        break;
+        return Colors.red;
       case TouchpointStatus.completed:
-        badgeColor = Colors.blue;
-        badgeIcon = LucideIcons.checkCircle;
-        break;
+        return Colors.blue;
       case TouchpointStatus.followUpNeeded:
-        badgeColor = Colors.purple;
-        badgeIcon = LucideIcons.refreshCw;
-        break;
+        return Colors.purple;
       case TouchpointStatus.incomplete:
-        badgeColor = Colors.grey;
-        badgeIcon = LucideIcons.clock;
-        break;
+        return Colors.grey;
+      case null:
+        return Colors.grey;
     }
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: badgeColor.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(badgeIcon, size: 12, color: badgeColor),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: badgeColor,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-    } catch (e) {
-      // BUG FIX: Catch any errors parsing touchpoint data and return empty widget
-      debugPrint('[TouchpointStatusBadge] Error rendering badge for client ${client.id}: $e');
-      return const SizedBox.shrink();
+  /// Get badge icon based on status.
+  IconData _getIcon(TouchpointStatus? status) {
+    switch (status) {
+      case TouchpointStatus.interested:
+        return LucideIcons.thumbsUp;
+      case TouchpointStatus.undecided:
+        return LucideIcons.helpCircle;
+      case TouchpointStatus.notInterested:
+        return LucideIcons.thumbsDown;
+      case TouchpointStatus.completed:
+        return LucideIcons.checkCircle;
+      case TouchpointStatus.followUpNeeded:
+        return LucideIcons.refreshCw;
+      case TouchpointStatus.incomplete:
+        return LucideIcons.clock;
+      case null:
+        return LucideIcons.helpCircle;
     }
   }
 }
