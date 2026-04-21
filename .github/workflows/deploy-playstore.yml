@@ -1,0 +1,182 @@
+name: Deploy to Google Play Store
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play Store track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      rollout:
+        description: 'Rollout percentage (for beta/production)'
+        required: false
+        default: '0.1'
+        type: string
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('imu_flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        working-directory: imu_flutter
+        run: flutter pub get
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > imu_flutter/android/app/keystore.jks
+
+      - name: Build release AAB
+        working-directory: imu_flutter
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build appbundle --release
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: imu_flutter/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload to Play Store - Internal Testing
+        if: github.event_name == 'push'
+        uses: rubygems/upload-play-store@v1
+        with:
+          package_name: com.odvi.imu
+          service_account_json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          track: internal
+          status: completed
+          release_name: v${{ github.run_number }}-${{ github.sha }}
+          release_notes: |
+            🚀 Automated Build #${{ github.run_number }}
+
+            📅 Date: ${{ github.event.head_commit.timestamp }}
+            🌿 Branch: ${{ github.ref_name }}
+            👤 Author: ${{ github.actor }}
+
+            📝 Changes:
+            ${{ github.event.head_commit.message }}
+
+            🔗 Commit: ${{ github.sha }}
+            📦 View on GitHub: https://github.com/ODVI-DTT-Org/frontend-mobile-imu/commit/${{ github.sha }}
+
+      - name: Upload to Play Store - Custom Track
+        if: github.event_name == 'workflow_dispatch'
+        uses: rubygems/upload-play-store@v1
+        with:
+          package_name: com.odvi.imu
+          service_account_json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          track: ${{ inputs.track }}
+          status: completed
+          rollout: ${{ inputs.rollout }}
+          release_name: v${{ github.run_number }}-${{ github.sha }}
+          release_notes: |
+            🚀 Manual Deployment - Build #${{ github.run_number }}
+
+            📅 Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            🌿 Branch: ${{ github.ref_name }}
+            👤 Triggered by: ${{ github.actor }}
+
+            🔗 Commit: ${{ github.sha }}
+
+      - name: Send notification on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Play Store Deployment Failed - Build #${{ github.run_number }}"
+          to: egonzaga@oakdriveventures.com
+          from: ${{ secrets.MAIL_USERNAME }}
+          body: |
+            The Play Store deployment has failed.
+
+            Build: #${{ github.run_number }}
+            Branch: ${{ github.ref_name }}
+            Triggered by: ${{ github.actor }}
+            Workflow: ${{ github.workflow }}
+
+            Please check the Actions tab for details:
+            https://github.com/ODVI-DTT-Org/frontend-mobile-imu/actions
+
+      - name: Send notification on success
+        if: success() && github.event_name == 'workflow_dispatch'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ Play Store Deployment Complete - Build #${{ github.run_number }}"
+          to: egonzaga@oakdriveventures.com
+          from: ${{ secrets.MAIL_USERNAME }}
+          body: |
+            The app has been deployed to Google Play Store!
+
+            Build: #${{ github.run_number }}
+            Track: ${{ inputs.track || 'internal' }}
+            Rollout: ${{ inputs.rollout || '100%' }}
+            Triggered by: ${{ github.actor }}
+
+            Check the Play Store Console for status:
+            https://play.google.com/console
+
+      - name: Comment on PR (if applicable)
+        if: success() && github.event_name == 'push' && github.ref_type == 'branch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+
+            if (prs.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prs[0].number,
+                body: `🚀 **Play Store Deployment Complete**\n\nBuild #${{ github.run_number }} has been deployed to Internal Testing.\n\n📦 AAB Artifact: Available in Actions run\n🔗 [View Actions Run](${context.payload.repository.html_url}/actions/runs/${context.runId})`
+              });
+            }
