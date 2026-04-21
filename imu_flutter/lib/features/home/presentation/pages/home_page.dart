@@ -135,7 +135,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     return [
       _MenuItem(icon: LucideIcons.sun, label: 'My Day', id: 'my-day'),
       _MenuItem(icon: LucideIcons.users, label: 'My Clients', id: 'clients'),
-      _MenuItem(icon: LucideIcons.star, label: 'Starred', id: 'favorites'),
       _MenuItem(icon: LucideIcons.target, label: 'My Targets', id: 'targets'),
       _MenuItem(icon: LucideIcons.mapPin, label: 'Missed Visits', id: 'visits'),
       _MenuItem(icon: LucideIcons.calculator, label: 'Loan Calculator', id: 'calculator'),
@@ -165,9 +164,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         context.push('/my-day');
         break;
       case 'clients':
-        context.push('/clients');
-        break;
-      case 'favorites':
         context.push('/clients');
         break;
       case 'visits':

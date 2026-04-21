@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
+import '../../../../core/utils/logger.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart' hide UserRole;
 import '../../../../services/maps/map_service.dart';
 import '../../../../services/error_service.dart';
@@ -1580,6 +1581,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                 tooltip: isStarred ? 'Remove from favorites' : 'Add to favorites',
                 onPressed: () async {
                   try {
+                    logDebug('[ClientDetailPage] ${isStarred ? "Unstarring" : "Starring"} client: ${widget.clientId}');
+
                     if (isStarred) {
                       await favoritesService.unstarClient(widget.clientId);
                       if (context.mounted) {
@@ -1595,9 +1598,16 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                         );
                       }
                     }
-                  } catch (_) {
+
+                    logDebug('[ClientDetailPage] Successfully updated favorite status for client: ${widget.clientId}');
+                  } catch (e, stackTrace) {
+                    logError(
+                      '[ClientDetailPage] Failed to update favorites for client: ${widget.clientId}',
+                      e,
+                      stackTrace,
+                    );
                     if (context.mounted) {
-                      AppNotification.showError(context, 'Failed to update favorites');
+                      AppNotification.showError(context, 'Failed to update favorites: ${e.toString()}');
                     }
                   }
                 },
