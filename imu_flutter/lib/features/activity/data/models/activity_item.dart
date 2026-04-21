@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 enum ActivityType { approval, touchpoint, visit, call }
@@ -133,5 +134,20 @@ class ActivityItem {
       case ActivityStatus.rejected:  return 'REJECTED';
       case ActivityStatus.failed:    return 'FAILED';
     }
+  }
+
+  /// Cached formatted time string for display.
+  /// Computed once per instance and reused.
+  late final String formattedTime = _computeFormattedTime();
+
+  String _computeFormattedTime() {
+    final now = DateTime.now();
+    final diff = now.difference(createdAt);
+
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday ${DateFormat('h:mm a').format(createdAt)}';
+    return DateFormat('MMM d, h:mm a').format(createdAt);
   }
 }

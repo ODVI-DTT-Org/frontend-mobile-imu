@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
 
 class ActivityCard extends StatelessWidget {
@@ -66,7 +65,7 @@ class ActivityCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        _relativeTime(item.createdAt),
+                        item.formattedTime,
                         style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                       ),
                     ],
@@ -121,15 +120,5 @@ class ActivityCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _relativeTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday ${DateFormat('h:mm a').format(dt)}';
-    return DateFormat('MMM d, h:mm a').format(dt);
   }
 }
