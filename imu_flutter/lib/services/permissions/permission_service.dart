@@ -10,16 +10,47 @@ class PermissionService {
 
   /// Check if a role can create a specific touchpoint.
   ///
-  /// Touchpoint sequence: 1(Visit), 2(Call), 3(Call), 4(Visit), 5(Call), 6(Call), 7(Visit)
+  /// UPDATED for Unli Touchpoint - no number restrictions
   ///
   /// Managers can create any touchpoint type.
-  /// Caravan can only create Visit touchpoints (1, 4, 7).
-  /// Tele can only create Call touchpoints (2, 3, 5, 6).
+  /// Caravan can only create Visit touchpoints (any number).
+  /// Tele can only create Call touchpoints (any number).
   ///
   /// Returns true if the role can create this touchpoint, false otherwise.
+  ///
+  /// OLD: COMMENTED OUT for Unli Touchpoint - had number restrictions
+  /// Touchpoint sequence: 1(Visit), 2(Call), 3(Call), 4(Visit), 5(Call), 6(Call), 7(Visit)
+  /// Caravan can only create Visit touchpoints (1, 4, 7).
+  /// Tele can only create Call touchpoints (2, 3, 5, 6).
+  // static bool canCreateTouchpoint({
+  //   required UserRole role,
+  //   required int touchpointNumber,
+  //   required TouchpointType type,
+  // }) {
+  //   // Managers can create any type
+  //   if (role.isManager) {
+  //     return true;
+  //   }
+  //
+  //   // Caravan can only create visits for specific touchpoint numbers
+  //   if (role == UserRole.caravan) {
+  //     const visitNumbers = [1, 4, 7];
+  //     return visitNumbers.contains(touchpointNumber) && type == TouchpointType.visit;
+  //   }
+  //
+  //   // Tele can only create calls for specific touchpoint numbers
+  //   if (role == UserRole.tele) {
+  //     const callNumbers = [2, 3, 5, 6];
+  //     return callNumbers.contains(touchpointNumber) && type == TouchpointType.call;
+  //   }
+  //
+  //   return false;
+  // }
+
+  /// NEW: Simplified implementation - type check only, no number restrictions
   static bool canCreateTouchpoint({
     required UserRole role,
-    required int touchpointNumber,
+    required int touchpointNumber, // Kept for backward compatibility
     required TouchpointType type,
   }) {
     // Managers can create any type
@@ -27,16 +58,14 @@ class PermissionService {
       return true;
     }
 
-    // Caravan can only create visits for specific touchpoint numbers
+    // Caravan can only create Visit touchpoints (any number)
     if (role == UserRole.caravan) {
-      const visitNumbers = [1, 4, 7];
-      return visitNumbers.contains(touchpointNumber) && type == TouchpointType.visit;
+      return type == TouchpointType.visit;
     }
 
-    // Tele can only create calls for specific touchpoint numbers
+    // Tele can only create Call touchpoints (any number)
     if (role == UserRole.tele) {
-      const callNumbers = [2, 3, 5, 6];
-      return callNumbers.contains(touchpointNumber) && type == TouchpointType.call;
+      return type == TouchpointType.call;
     }
 
     return false;
