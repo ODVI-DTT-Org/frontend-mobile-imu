@@ -39,11 +39,15 @@ class ClientFavoritesService {
       final db = await PowerSyncService.database;
       logDebug('[ClientFavoritesService] Database obtained, executing INSERT');
 
+      // PowerSync requires an id column for all tables
+      // Generate a UUID for the local record
+      final id = const Uuid().v4();
+      logDebug('[ClientFavoritesService] Generated id: $id');
+
       // Optimistic local insert - PowerSync will upload this automatically
-      // Don't insert with explicit id - let PowerSync handle it
       await db.execute(
-        'INSERT OR IGNORE INTO client_favorites (user_id, client_id, created_at) VALUES (?, ?, ?)',
-        [userId, clientId, DateTime.now().toIso8601String()],
+        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
+        [id, userId, clientId, DateTime.now().toIso8601String()],
       );
 
       logDebug('[ClientFavoritesService] INSERT executed successfully for clientId: $clientId');
