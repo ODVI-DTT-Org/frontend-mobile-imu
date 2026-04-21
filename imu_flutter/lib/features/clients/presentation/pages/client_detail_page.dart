@@ -887,11 +887,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     //   return;
     // }
 
-    // NEW: Only check if user is authenticated (type restrictions handled by API)
-    if (userRole == null) {
-      if (mounted) showToast('Authentication required');
-      return;
-    }
+    // NEW: No validation - proceed to form
+    // (Authentication and type restrictions handled by API)
 
     final result = await showTouchpointForm(
       context: context,
