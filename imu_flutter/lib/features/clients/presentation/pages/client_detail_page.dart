@@ -1350,17 +1350,6 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Visit Only button — always enabled for caravan role
-          Expanded(
-            child: _buildActionButton(
-              label: 'VISIT ONLY',
-              color: Colors.blue[700]!,
-              enabled: canCreateVisit,
-              loanReleased: false,
-              onPressed: () => _handleRecordVisitOnly(),
-            ),
-          ),
-          const SizedBox(width: 12),
           // Touchpoint button — always enabled
           Expanded(
             child: _buildActionButton(
