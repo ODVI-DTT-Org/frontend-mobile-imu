@@ -320,12 +320,13 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             value: 'touchpoint',
             isDisabled: !canRecordTouchpoint,
           ),
-          ActionOption(
-            icon: LucideIcons.mapPin,
-            title: 'Record Visit Only',
-            description: 'Create visit without touchpoint',
-            value: 'visit_only',
-          ),
+          // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
+          // ActionOption(
+          //   icon: LucideIcons.mapPin,
+          //   title: 'Record Visit Only',
+          //   description: 'Create visit without touchpoint',
+          //   value: 'visit_only',
+          // ),
           ActionOption(
             icon: LucideIcons.dollarSign,
             title: 'Release Loan',
@@ -347,9 +348,10 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
         case 'touchpoint':
           await _handleRecordTouchpoint(client);
           break;
-        case 'visit_only':
-          await _handleRecordVisitOnly(client);
-          break;
+        // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
+        // case 'visit_only':
+        //   await _handleRecordVisitOnly(client);
+        //   break;
         case 'release_loan':
           await _handleReleaseLoan(client);
           break;
@@ -372,58 +374,68 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     // Use backend-calculated nextTouchpointNumber if available
     final touchpointNumber = client.nextTouchpointNumber ?? (client.touchpointNumber > 0 ? client.touchpointNumber : 1);
 
-    // Calculate expected touchpoint type based on touchpoint number (enforce sequence)
-    final touchpointType = TouchpointValidationService.getExpectedTouchpointType(touchpointNumber);
+    // COMMENTED OUT for Unli Touchpoint - no pattern restrictions
+    // // Calculate expected touchpoint type based on touchpoint number (enforce sequence)
+    // final touchpointType = TouchpointValidationService.getExpectedTouchpointType(touchpointNumber);
+    //
+    // // Check if touchpoint number is valid (1-7)
+    // if (touchpointNumber > 7) {
+    //   if (mounted) {
+    //     _showTouchpointCompletionDialog(client.fullName);
+    //   }
+    //   return;
+    // }
+    //
+    // // Validate the sequence
+    // final validation = TouchpointValidationService.validateTouchpointSequence(
+    //   touchpointNumber: touchpointNumber,
+    //   touchpointType: touchpointType,
+    // );
+    //
+    // if (!validation.isValid) {
+    //   if (mounted) {
+    //     _showValidationError(validation, client.fullName);
+    //   }
+    //   return;
+    // }
 
-    // Check if touchpoint number is valid (1-7)
-    if (touchpointNumber > 7) {
-      if (mounted) {
-        _showTouchpointCompletionDialog(client.fullName);
-      }
-      return;
-    }
-
-    // Validate the sequence
-    final validation = TouchpointValidationService.validateTouchpointSequence(
-      touchpointNumber: touchpointNumber,
-      touchpointType: touchpointType,
-    );
-
-    if (!validation.isValid) {
-      if (mounted) {
-        _showValidationError(validation, client.fullName);
-      }
-      return;
-    }
-
-    // RBAC: Check if user can create this touchpoint number based on their role
+    // NEW: Unli Touchpoint - no type calculation (user will select type in form)
+    // RBAC: Check if user can create touchpoints based on their role
     final authState = ref.watch(authNotifierProvider);
     final userRole = authState.user?.role;
 
-    // BUG FIX: Check BOTH touchpoint number AND type
-    if (userRole == null ||
-        !isValidTouchpointNumberForRole(touchpointNumber, userRole) ||
-        (touchpointType != null && !isValidTouchpointTypeForRole(touchpointType, userRole))) {
-      // User's role doesn't allow this touchpoint number or type
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => TouchpointValidationDialog(
-            attemptedNumber: touchpointNumber,
-            attemptedType: touchpointType,
-            onConfirm: () => Navigator.of(context).pop(),
-          ),
-        );
-      }
+    // COMMENTED OUT for Unli Touchpoint - no number restrictions
+    // // BUG FIX: Check BOTH touchpoint number AND type
+    // if (userRole == null ||
+    //     !isValidTouchpointNumberForRole(touchpointNumber, userRole) ||
+    //     (touchpointType != null && !isValidTouchpointTypeForRole(touchpointType, userRole))) {
+    //   // User's role doesn't allow this touchpoint number or type
+    //   if (mounted) {
+    //     showDialog(
+    //       context: context,
+    //       builder: (context) => TouchpointValidationDialog(
+    //         attemptedNumber: touchpointNumber,
+    //         attemptedType: touchpointType,
+    //         onConfirm: () => Navigator.of(context).pop(),
+    //       ),
+    //     );
+    //   }
+    //   return;
+    // }
+
+    // NEW: Only check if user is authenticated (type restrictions handled by API)
+    if (userRole == null) {
+      if (mounted) showToast('Authentication required');
       return;
     }
 
     // Open the TouchpointForm which handles submission internally
+    // Note: Default to 'Visit' - API will enforce correct type based on user role
     await showTouchpointForm(
       context: context,
       clientId: client.clientId,
       touchpointNumber: touchpointNumber,
-      touchpointType: touchpointType == TouchpointType.visit ? 'Visit' : 'Call',
+      touchpointType: 'Visit', // Default - API will validate based on role
       clientName: client.fullName,
       address: client.location,
     );
@@ -456,33 +468,34 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     }
   }
 
-  Future<void> _handleRecordVisitOnly(MyDayClient client) async {
-    HapticUtils.lightImpact();
-
-    final clientRepo = ref.read(clientRepositoryProvider);
-    final fullClient = await clientRepo.getClient(client.clientId);
-    if (fullClient == null) {
-      if (mounted) showToast('Client not found');
-      return;
-    }
-
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-      builder: (context) => RecordVisitBottomSheet(
-        client: fullClient,
-      ),
-    );
-
-    if (result == true && mounted) {
-      if (client.id.isNotEmpty) {
-        await ref.read(itineraryRepositoryProvider).updateStatus(client.id, 'completed');
-      }
-      await ref.read(myDayStateProvider.notifier).refresh();
-    }
-  }
+  /// COMMENTED OUT for Unli Touchpoint - visit only functionality removed
+  /// Future<void> _handleRecordVisitOnly(MyDayClient client) async {
+  ///   HapticUtils.lightImpact();
+  ///
+  ///   final clientRepo = ref.read(clientRepositoryProvider);
+  ///   final fullClient = await clientRepo.getClient(client.clientId);
+  ///   if (fullClient == null) {
+  ///     if (mounted) showToast('Client not found');
+  ///     return;
+  ///   }
+  ///
+  ///   final result = await showModalBottomSheet<bool>(
+  ///     context: context,
+  ///     isScrollControlled: true,
+  ///     backgroundColor: Colors.transparent,
+  ///     enableDrag: true,
+  ///     builder: (context) => RecordVisitBottomSheet(
+  ///       client: fullClient,
+  ///     ),
+  ///   );
+  ///
+  ///   if (result == true && mounted) {
+  ///     if (client.id.isNotEmpty) {
+  ///       await ref.read(itineraryRepositoryProvider).updateStatus(client.id, 'completed');
+  ///     }
+  ///     await ref.read(myDayStateProvider.notifier).refresh();
+  ///   }
+  /// }
 
   Future<void> _handleReleaseLoan(MyDayClient client) async {
     HapticUtils.lightImpact();
@@ -630,27 +643,28 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Touchpoint Sequence Completed:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ...TouchpointValidationService.getSequenceDisplay().map((item) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.check,
-                      size: 14,
-                      color: Colors.green[600],
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item)),
-                  ],
-                ),
-              );
-            }),
+            // COMMENTED OUT for Unli Touchpoint - no sequence pattern
+            // const Text(
+            //   'Touchpoint Sequence Completed:',
+            //   style: TextStyle(fontWeight: FontWeight.bold),
+            // ),
+            // const SizedBox(height: 8),
+            // ...TouchpointValidationService.getSequenceDisplay().map((item) {
+            //   return Padding(
+            //     padding: const EdgeInsets.only(left: 8, bottom: 4),
+            //     child: Row(
+            //       children: [
+            //         Icon(
+            //           LucideIcons.check,
+            //           size: 14,
+            //           color: Colors.green[600],
+            //         ),
+            //         const SizedBox(width: 8),
+            //         Expanded(child: Text(item)),
+            //       ],
+            //     ),
+            //   );
+            // }),
           ],
         ),
         actions: [
@@ -680,17 +694,18 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           children: [
             Text(validation.error ?? 'Invalid touchpoint sequence'),
             const SizedBox(height: 16),
-            const Text(
-              'Expected Sequence:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ...TouchpointValidationService.getSequenceDisplay().map((item) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Text('• $item'),
-              );
-            }),
+            // COMMENTED OUT for Unli Touchpoint - no sequence pattern
+            // const Text(
+            //   'Expected Sequence:',
+            //   style: TextStyle(fontWeight: FontWeight.bold),
+            // ),
+            // const SizedBox(height: 8),
+            // ...TouchpointValidationService.getSequenceDisplay().map((item) {
+            //   return Padding(
+            //     padding: const EdgeInsets.only(left: 8, bottom: 4),
+            //     child: Text('• $item'),
+            //   );
+            // }),
           ],
         ),
         actions: [
