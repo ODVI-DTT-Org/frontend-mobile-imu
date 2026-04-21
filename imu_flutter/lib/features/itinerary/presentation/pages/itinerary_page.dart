@@ -110,6 +110,202 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     return _selectedVisitIds.contains(visitId);
   }
 
+  // Build normal header with Select button
+  Widget _buildNormalHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Row(
+        children: [
+          const Spacer(),
+          const Text(
+            'Itinerary',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const Spacer(),
+          // Select mode button
+          GestureDetector(
+            onTap: () {
+              HapticUtils.lightImpact();
+              setState(() {
+                _isMultiSelectMode = true;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    LucideIcons.checkSquare,
+                    size: 18,
+                    color: Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Select',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build selection toolbar with counter and actions
+  Widget _buildSelectionToolbar() {
+    final selectedCount = _selectedVisitIds.length;
+    final totalVisits = ref.watch(itineraryByDateProvider(_selectedDate)).when(
+          data: (visits) => visits.length,
+          loading: () => 0,
+          error: (_, __) => 0,
+        );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Done button
+          GestureDetector(
+            onTap: _exitMultiSelectMode,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                LucideIcons.x,
+                size: 20,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Selection counter
+          Expanded(
+            child: Text(
+              '$selectedCount selected',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ),
+          // Select All/Deselect All
+          if (selectedCount < totalVisits)
+            GestureDetector(
+              onTap: () {
+                HapticUtils.lightImpact();
+                setState(() {
+                  final visits = ref.read(itineraryByDateProvider(_selectedDate)).value;
+                  visits?.forEach((visit) {
+                    _selectedVisitIds.add(visit.id);
+                  });
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Text(
+                  'Select All',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: () {
+                HapticUtils.lightImpact();
+                setState(() {
+                  _selectedVisitIds.clear();
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Text(
+                  'Deselect All',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(width: 12),
+          // Remove button
+          if (selectedCount > 0)
+            GestureDetector(
+              onTap: _onBulkRemove,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      LucideIcons.trash2,
+                      size: 16,
+                      color: Color(0xFFEF4444),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Remove',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   // Helper methods for touchpoint creation
   TouchpointStatus _parseTouchpointStatus(String status) {
     switch (status.toLowerCase()) {
@@ -775,12 +971,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        floatingActionButton: FloatingActionButton(
-          onPressed: _addVisit,
-          backgroundColor: const Color(0xFF0F172A),
-          foregroundColor: Colors.white,
-          child: const Icon(LucideIcons.plus),
-        ),
+        floatingActionButton: !_isMultiSelectMode
+            ? FloatingActionButton(
+                onPressed: _addVisit,
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                child: const Icon(LucideIcons.plus),
+              )
+            : null,
         body: GestureDetector(
           // Handle tap outside to exit multi-select mode
           onTap: () {
@@ -792,24 +990,11 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
           child: SafeArea(
             child: Column(
           children: [
-            // Header - centered title (per Figma)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  const Text(
-                    'Itinerary',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-            ),
+            // Header - app bar with title or selection toolbar
+            if (_isMultiSelectMode)
+              _buildSelectionToolbar()
+            else
+              _buildNormalHeader(),
 
             const SizedBox(height: 16),
 
@@ -979,12 +1164,49 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
                         // In multi-select mode, don't use SwipeableListTile
                         if (_isMultiSelectMode) {
+                          final isSelected = _isVisitSelected(visit.id);
                           return GestureDetector(
                             onLongPress: () => _onVisitLongPress(visit),
                             onTap: () => _onVisitTap(visit),
-                            child: ClientListTile(
-                              client: _itineraryItemToClient(visit),
-                              onTap: () => _onVisitTap(visit),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade200,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Selection checkbox
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    margin: const EdgeInsets.only(left: 17, right: 12, top: 14, bottom: 14),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade300,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      LucideIcons.check,
+                                      size: 14,
+                                      color: isSelected ? Colors.white : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  // Client tile content
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 17, top: 14, bottom: 14),
+                                      child: ClientListTile(
+                                        client: _itineraryItemToClient(visit),
+                                        onTap: () => _onVisitTap(visit),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         }

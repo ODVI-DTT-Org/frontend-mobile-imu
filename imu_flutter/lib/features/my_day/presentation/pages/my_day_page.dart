@@ -103,6 +103,129 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     return _selectedClientIds.contains(clientId);
   }
 
+  // Build selection toolbar with counter and actions
+  Widget _buildSelectionToolbar(int totalClients) {
+    final selectedCount = _selectedClientIds.length;
+
+    return Row(
+      children: [
+        // Select All/Deselect All
+        if (selectedCount < totalClients)
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticUtils.lightImpact();
+                setState(() {
+                  final state = ref.read(myDayStateProvider);
+                  state.clients.forEach((client) {
+                    _selectedClientIds.add(client.id);
+                  });
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.checkSquare,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Select All',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticUtils.lightImpact();
+                setState(() {
+                  _selectedClientIds.clear();
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.square,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Deselect All',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(width: 12),
+        // Remove button
+        if (selectedCount > 0)
+          GestureDetector(
+            onTap: _onBulkRemove,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    LucideIcons.trash2,
+                    size: 18,
+                    color: Color(0xFFEF4444),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Remove',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   // Helper methods for touchpoint creation
   TouchpointStatus _parseTouchpointStatus(String status) {
     switch (status.toLowerCase()) {
@@ -756,12 +879,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             ),
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showRecordVisitOptions(context),
-          backgroundColor: const Color(0xFF0F172A),
-          foregroundColor: Colors.white,
-          child: const Icon(LucideIcons.plus),
-        ),
+        floatingActionButton: !_isMultiSelectMode
+            ? FloatingActionButton(
+                onPressed: () => _showRecordVisitOptions(context),
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                child: const Icon(LucideIcons.plus),
+              )
+            : null,
       ),
     );
   }
@@ -893,21 +1018,51 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'My Day',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                    if (!_isMultiSelectMode) ...[
+                      const Text(
+                        'My Day',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
-                    ),
-                    Text(
-                      DateFormat('MMM d, yyyy').format(DateTime.now()),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                      Text(
+                        DateFormat('MMM d, yyyy').format(DateTime.now()),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      // Multi-select mode header
+                      Expanded(
+                        child: Text(
+                          '${_selectedClientIds.length} selected',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      // Done button
+                      GestureDetector(
+                        onTap: _exitMultiSelectMode,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            LucideIcons.x,
+                            size: 20,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -919,14 +1074,56 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
 
                 // Header buttons - change based on multi-select mode
                 if (!_isMultiSelectMode)
-                  HeaderButtons(
-                    onMultipleTimeIn: _onMultipleTimeIn,
-                    onAddClient: _onAddNewVisit,
+                  Row(
+                    children: [
+                      // Original header buttons
+                      Expanded(
+                        child: HeaderButtons(
+                          onMultipleTimeIn: _onMultipleTimeIn,
+                          onAddClient: _onAddNewVisit,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Select mode button
+                      GestureDetector(
+                        onTap: () {
+                          HapticUtils.lightImpact();
+                          setState(() {
+                            _isMultiSelectMode = true;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.checkSquare,
+                                size: 18,
+                                color: Color(0xFF64748B),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Select',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   )
                 else
-                  _MultiSelectHeaderButtons(
-                    selectedCount: _selectedClientIds.length,
-                    onRemove: _onBulkRemove,
+                  _buildSelectionToolbar(clients.length)
                     onCancel: _exitMultiSelectMode,
                   ),
               ],
@@ -1000,45 +1197,92 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             )
           else
             ...clients.map(
-              (client) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 4),
-                child: Dismissible(
-                  key: Key(client.id),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) => _confirmRemoveClient(client),
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(LucideIcons.trash2, color: Colors.red.shade600),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Remove',
-                          style: TextStyle(
-                            color: Colors.red.shade600,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+              (client) {
+                final isSelected = _isClientSelected(client.id);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 4),
+                  child: _isMultiSelectMode
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade200,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: GestureDetector(
+                            onLongPress: () => _onClientLongPress(client),
+                            onTap: () => _onClientTap(client),
+                            child: Row(
+                              children: [
+                                // Selection checkbox
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  margin: const EdgeInsets.only(left: 14, right: 12, top: 14, bottom: 14),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? const Color(0xFF3B82F6) : Colors.grey.shade300,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    LucideIcons.check,
+                                    size: 14,
+                                    color: isSelected ? Colors.white : Colors.grey.shade600,
+                                  ),
+                                ),
+                                // Client tile content
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 14, top: 14, bottom: 14),
+                                    child: ClientListTile(
+                                      client: _myDayClientToClient(client),
+                                      onTap: () => _onClientTap(client),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : Dismissible(
+                          key: Key(client.id),
+                          direction: DismissDirection.endToStart,
+                          onDismissed: (_) => _confirmRemoveClient(client),
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(LucideIcons.trash2, color: Colors.red.shade600),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Remove',
+                                  style: TextStyle(
+                                    color: Colors.red.shade600,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          child: GestureDetector(
+                            onLongPress: () => _onClientLongPress(client),
+                            child: ClientListTile(
+                              client: _myDayClientToClient(client),
+                              onTap: () => _onClientTap(client),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  child: GestureDetector(
-                    onLongPress: () => _onClientLongPress(client),
-                    child: ClientListTile(
-                      client: _myDayClientToClient(client),
-                      onTap: () => _onClientTap(client),
-                    ),
-                  ),
-                ),
-              ),
+                );
+              },
             ),
 
           const SizedBox(height: 100), // Bottom nav padding
