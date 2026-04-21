@@ -1774,11 +1774,13 @@ class _QuickActionsSection extends ConsumerWidget {
                 onTap: (isLoanReleased || !canRecordTouchpoint || !roleCanRecordTouchpoint) ? null : onRecordTouchpoint,
                 isPrimary: true,
               ),
-              _QuickActionButton(
-                icon: LucideIcons.userCheck,
-                label: 'Record Visit',
-                onTap: onRecordVisitOnly,
-              ),
+              // REMOVED: Duplicate "Record Visit" button - functionality already covered by "Record Touchpoint"
+              // All touchpoint recordings are marked as visits, so this button was redundant
+              // _QuickActionButton(
+              //   icon: LucideIcons.userCheck,
+              //   label: 'Record Visit',
+              //   onTap: onRecordVisitOnly,
+              // ),
               if (canReleaseLoan)
                 _QuickActionButton(
                   icon: LucideIcons.dollarSign,

@@ -11,7 +11,6 @@ import '../../features/sync/presentation/pages/sync_loading_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/clients/presentation/pages/clients_page.dart';
 import '../../features/clients/presentation/pages/client_detail_page.dart';
-import '../../features/clients/presentation/pages/favorites_page.dart';
 import '../../features/agencies/presentation/pages/add_prospect_agency_page.dart';
 import '../../features/agencies/presentation/pages/agency_detail_page.dart';
 import '../../features/groups/presentation/pages/group_detail_page.dart';
@@ -230,10 +229,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/clients/add',
         builder: (context, state) => const AddClientPage(),
-      ),
-      GoRoute(
-        path: '/favorites',
-        builder: (context, state) => const FavoritesPage(),
       ),
       GoRoute(
         path: '/clients/:id',

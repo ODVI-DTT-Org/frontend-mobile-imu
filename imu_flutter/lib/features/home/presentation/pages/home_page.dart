@@ -168,7 +168,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         context.push('/clients');
         break;
       case 'favorites':
-        context.push('/favorites');
+        context.push('/clients');
         break;
       case 'visits':
         context.push('/visits');
