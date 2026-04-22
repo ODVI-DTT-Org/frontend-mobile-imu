@@ -276,22 +276,15 @@ final clientFavoritesServiceProvider = Provider<ClientFavoritesService>((ref) {
 });
 
 /// Starred clients for the current user.
+/// Uses the shared state from clientFavoritesNotifierProvider for consistency.
 /// Hybrid approach: Try PowerSync first (for all clients), fall back to Hive cache (assigned clients).
 /// This works both online (PowerSync has data) and offline (Hive cache as fallback).
 final favoritedClientListProvider = StreamProvider<List<Client>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
-  // Query favorited client IDs from PowerSync
-  return PowerSyncService.database.asStream().asyncExpand((db) {
-    return db.watch(
-      'SELECT client_id FROM client_favorites WHERE user_id = ?',
-      parameters: [userId],
-    );
-  }).asyncMap((rows) async {
-    // Extract favorited client IDs
-    final favoriteIds = rows.map((r) => r['client_id'] as String).toSet();
-
+  // Watch the notifier state (single source of truth for favorite IDs)
+  return ref.watch(clientFavoritesNotifierProvider.notifier).stream.asyncMap((favoriteIds) async {
     if (favoriteIds.isEmpty) {
       logDebug('[favoritedClientListProvider] No favorites found');
       return [];
