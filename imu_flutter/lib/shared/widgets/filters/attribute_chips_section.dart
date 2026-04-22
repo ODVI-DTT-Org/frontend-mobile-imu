@@ -34,9 +34,9 @@ class AttributeChipsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // VISIT SECTION (moved to top)
+        // 2. Status (renamed from "Visit Status" to "visit status")
         _FilterGroup(
-          label: 'Visit Status',
+          label: 'visit status',
           values: const ['INTERESTED', 'UNDECIDED', 'NOT_INTERESTED'],
           selected: draftFilter.touchpointStatuses?.toSet() ?? {},
           labelOf: (v) => v == 'NOT_INTERESTED' ? 'Not Interested' : _label(v.replaceAll('_', ' ')),
@@ -49,23 +49,7 @@ class AttributeChipsSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
-        _FilterGroup(
-          label: 'Visit Reason',
-          values: options.touchpointReasons,
-          selected: draftFilter.touchpointReasons?.toSet() ?? {},
-          labelOf: (v) => v.split('_').map((w) => w.isEmpty ? w : w[0] + w.substring(1).toLowerCase()).join(' '),
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.touchpointReasons, v);
-            onChanged(draftFilter.copyWith(touchpointReasons: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(touchpointReasons: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-
-        const SizedBox(height: 20),
-
-        // OTHERS SECTION (moved to bottom)
+        // 4. Client Type
         _FilterGroup(
           label: 'Client Type',
           values: options.clientTypes,
@@ -80,6 +64,7 @@ class AttributeChipsSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
+        // 5. Market Type
         _FilterGroup(
           label: 'Market Type',
           values: options.marketTypes,
@@ -94,6 +79,7 @@ class AttributeChipsSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
+        // 6. Pension Type
         _FilterGroup(
           label: 'Pension Type',
           values: options.pensionTypes,
@@ -108,6 +94,7 @@ class AttributeChipsSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
+        // 7. Product Type
         _FilterGroup(
           label: 'Product Type',
           values: options.productTypes,
@@ -122,6 +109,7 @@ class AttributeChipsSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
+        // 8. Loan Type
         _FilterGroup(
           label: 'Loan Type',
           values: options.loanTypes.isNotEmpty

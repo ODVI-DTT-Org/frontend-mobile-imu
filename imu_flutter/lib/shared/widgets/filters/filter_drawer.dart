@@ -82,12 +82,14 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 1. Location
                       LocationDropdownSection(
                         draftFilter: _draftLocation,
                         showAllPsgc: widget.showAllPsgc,
                         onChanged: (f) => setState(() => _draftLocation = f),
                       ),
                       const SizedBox(height: 20),
+                      // 2. Status, 4. Client Type, 5. Market Type, 6. Pension Type, 7. Product Type, 8. Loan Type
                       optionsAsync.when(
                         data: (options) => AttributeChipsSection(
                           draftFilter: _draftAttrs,
@@ -105,6 +107,7 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                         ),
                       ),
                       const SizedBox(height: 20),
+                      // 3. Date
                       DateRangeSection(
                         draftFilter: _draftAttrs,
                         onChanged: (f) => setState(() => _draftAttrs = f),
