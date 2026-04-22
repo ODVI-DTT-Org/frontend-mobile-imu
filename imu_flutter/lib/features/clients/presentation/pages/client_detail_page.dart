@@ -335,8 +335,22 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     if (_client == null) return;
     final client = _client!;
 
+    // Load addresses from PowerSync (same way _viewAddresses does)
+    final addressRepo = ref.read(addressRepositoryProvider);
+    final tableAddresses = await addressRepo.getAddresses(widget.clientId);
+
+    // Include client's legacy address fields if not already represented
+    final addresses = List<Address>.from(tableAddresses);
+    final legacyFull = client.fullAddress ?? '';
+    if (legacyFull.isNotEmpty) {
+      final alreadyListed = addresses.any((a) => a.fullAddress == legacyFull);
+      if (!alreadyListed) {
+        addresses.add(Address.fromLegacyFields(client));
+      }
+    }
+
     // Case 1: No addresses found
-    if (client.addresses.isEmpty) {
+    if (addresses.isEmpty) {
       if (mounted) {
         AppNotification.showError(context, 'No address found for this client');
       }
@@ -344,13 +358,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
 
     // Case 2: Only one address - navigate directly
-    if (client.addresses.length == 1) {
-      await _navigateToAddress(client.addresses.first);
+    if (addresses.length == 1) {
+      await _navigateToAddress(addresses.first);
       return;
     }
 
     // Case 3: Multiple addresses - show picker
-    await _showAddressPicker(client.addresses);
+    await _showAddressPicker(addresses);
   }
 
   Future<void> _showAddressPicker(List<Address> addresses) async {
