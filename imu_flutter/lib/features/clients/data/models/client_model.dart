@@ -264,6 +264,8 @@ class Client {
     }
     // Use enum value
     return switch (marketType!) {
+      MarketType.bfpActive => 'BFP ACTIVE',
+      MarketType.bfpPension => 'BFP PENSION',
       MarketType.virgin => 'VIRGIN',
       MarketType.existing => 'EXISTING',
       MarketType.fullyPaid => 'FULLY PAID',

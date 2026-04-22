@@ -297,6 +297,8 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   String _getMarketTypeLabel(MarketType type) {
     switch (type) {
+      case MarketType.bfpActive: return 'BFP ACTIVE';
+      case MarketType.bfpPension: return 'BFP PENSION';
       case MarketType.virgin: return 'VIRGIN';
       case MarketType.existing: return 'EXISTING';
       case MarketType.fullyPaid: return 'FULLY PAID';
