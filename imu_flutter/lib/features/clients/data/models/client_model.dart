@@ -243,7 +243,7 @@ class Client {
     }
     // Use enum value
     return switch (loanType!) {
-      LoanType.firstLoan => 'NEW',
+      LoanType.newLoan => 'NEW',
       LoanType.additional => 'ADDITIONAL',
       LoanType.renewal => 'RENEWAL',
       LoanType.preterm => 'PRETERM',
@@ -264,9 +264,9 @@ class Client {
     }
     // Use enum value
     return switch (marketType!) {
-      MarketType.residential => 'Residential',
-      MarketType.commercial => 'Commercial',
-      MarketType.industrial => 'Industrial',
+      MarketType.virgin => 'VIRGIN',
+      MarketType.existing => 'EXISTING',
+      MarketType.fullyPaid => 'FULLY PAID',
     };
   }
 
@@ -617,14 +617,14 @@ class Client {
 
   /// Parse PensionType from string, return null if unknown (no default)
   static PensionType _parsePensionType(dynamic value) {
-    if (value == null) return PensionType.none;
+    if (value == null) return PensionType.others;
     final str = value.toString().toLowerCase();
     try {
       return PensionType.values.firstWhere(
         (e) => e.name.toLowerCase() == str,
       );
     } catch (_) {
-      return PensionType.none;
+      return PensionType.others;
     }
   }
 
@@ -885,7 +885,7 @@ enum PensionType {
 }
 
 enum LoanType {
-  new,
+  newLoan,
   additional,
   preterm,
   renewal,

@@ -355,7 +355,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
   LoanType? _parseLoanType(String? value) {
     if (value == null || value.isEmpty) return null;
     switch (value.toUpperCase()) {
-      case 'NEW': return LoanType.new;
+      case 'NEW': return LoanType.newLoan;
       case 'ADDITIONAL': return LoanType.additional;
       case 'RENEWAL': return LoanType.renewal;
       case 'PRETERM': return LoanType.preterm;

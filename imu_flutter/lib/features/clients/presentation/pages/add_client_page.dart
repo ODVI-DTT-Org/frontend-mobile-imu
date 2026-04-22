@@ -336,7 +336,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     if (value == null || value.isEmpty) return null;
     switch (value.toUpperCase()) {
       case 'NEW':
-        return LoanType.new;
+        return LoanType.newLoan;
       case 'ADDITIONAL':
         return LoanType.additional;
       case 'RENEWAL':
