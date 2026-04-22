@@ -60,8 +60,8 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   String _productType = 'BFP ACTIVE';
   String _pensionType = 'PNP - RETIREE OPTIONAL';
-  String _marketType = 'BFP ACTIVE';
-  String _clientType = 'VIRGIN';
+  String _marketType = 'VIRGIN';
+  String _clientType = 'POTENTIAL';
   String? _loanType;
   DateTime? _birthDate;
 
@@ -297,11 +297,11 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   String _getMarketTypeLabel(MarketType type) {
     switch (type) {
-      case MarketType.bfpActive: return 'BFP ACTIVE';
-      case MarketType.bfpPension: return 'BFP PENSION';
       case MarketType.virgin: return 'VIRGIN';
       case MarketType.existing: return 'EXISTING';
       case MarketType.fullyPaid: return 'FULLY PAID';
+      case MarketType.bfpActive: return 'BFP ACTIVE';
+      case MarketType.bfpPension: return 'BFP PENSION';
     }
   }
 
@@ -339,29 +339,25 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   MarketType _parseMarketType(String value) {
     switch (value) {
-      case 'BFP ACTIVE':
-        return MarketType.bfpActive;
-      case 'BFP PENSION':
-        return MarketType.bfpPension;
+      case 'VIRGIN':
+        return MarketType.virgin;
       case 'EXISTING':
         return MarketType.existing;
       case 'FULLY PAID':
         return MarketType.fullyPaid;
-      case 'VIRGIN':
-        return MarketType.virgin;
       default:
-        return MarketType.bfpActive;
+        return MarketType.virgin;
     }
   }
 
   ClientType _parseClientType(String value) {
     switch (value.toUpperCase()) {
-      case 'VIRGIN':
-        return ClientType.virgin;
+      case 'POTENTIAL':
+        return ClientType.potential;
       case 'EXISTING':
         return ClientType.existing;
       default:
-        return ClientType.virgin;
+        return ClientType.potential;
     }
   }
 
@@ -1117,10 +1113,10 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
           children: [
             Expanded(
               child: _ClientTypeButton(
-                label: 'Virgin',
-                isSelected: _clientType == 'VIRGIN',
+                label: 'Potential',
+                isSelected: _clientType == 'POTENTIAL',
                 colorScheme: colorScheme,
-                onTap: () { HapticUtils.selectionClick(); setState(() => _clientType = 'VIRGIN'); },
+                onTap: () { HapticUtils.selectionClick(); setState(() => _clientType = 'POTENTIAL'); },
               ),
             ),
             const SizedBox(width: 12),
@@ -1154,21 +1150,6 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
                       'BFP STP',
                       'NAPOLCOM',
                       'PNP PENSION',
-                      'PNP - RETIREE OPTIONAL',
-                      'PNP - RETIREE COMPULSORY',
-                      'PNP - RETIREE',
-                      'BFP - RETIREE',
-                      'BFP STP - RETIREE',
-                      'PNP - TRANSFEREE',
-                      'BFP - SURVIVOR',
-                      'PNP - SURVIVOR',
-                      'PNP - TPPD',
-                      'BFP - TPPD',
-                      'PNP - MINOR',
-                      'BFP - MINOR',
-                      'PNP - POSTHUMOUS MINOR',
-                      'PNP - POSTHUMOUS SPOUSE',
-                      'OTHERS',
                     ]
                         .map((t) => DropdownMenuItem(value: t, child: Text(t, style: TextStyle(fontSize: 12))))
                         .toList(),
@@ -1221,11 +1202,9 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Market Type', border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
           items: const [
-            'BFP ACTIVE',
-            'BFP PENSION',
+            'VIRGIN',
             'EXISTING',
             'FULLY PAID',
-            'OTHERS',
           ]
               .map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
           onChanged: (value) { if (value != null) { HapticUtils.lightImpact(); setState(() => _marketType = value); } },

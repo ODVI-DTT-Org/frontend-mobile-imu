@@ -67,8 +67,8 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   // Dropdown values
   String _productType = 'BFP ACTIVE';
   String _pensionType = 'PNP - RETIREE OPTIONAL';
-  String _marketType = 'BFP ACTIVE';
-  String _clientType = 'VIRGIN';
+  String _marketType = 'VIRGIN';
+  String _clientType = 'POTENTIAL';
   String? _loanType;
 
   // Date picker
@@ -1040,12 +1040,12 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
           children: [
             Expanded(
               child: _ClientTypeButton(
-                label: 'Virgin',
-                isSelected: _clientType == 'VIRGIN',
+                label: 'Potential',
+                isSelected: _clientType == 'POTENTIAL',
                 colorScheme: colorScheme,
                 onTap: () {
                   HapticUtils.selectionClick();
-                  setState(() => _clientType = 'VIRGIN');
+                  setState(() => _clientType = 'POTENTIAL');
                 },
               ),
             ),
@@ -1090,21 +1090,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                       'BFP STP',
                       'NAPOLCOM',
                       'PNP PENSION',
-                      'PNP - RETIREE OPTIONAL',
-                      'PNP - RETIREE COMPULSORY',
-                      'PNP - RETIREE',
-                      'BFP - RETIREE',
-                      'BFP STP - RETIREE',
-                      'PNP - TRANSFEREE',
-                      'BFP - SURVIVOR',
-                      'PNP - SURVIVOR',
-                      'PNP - TPPD',
-                      'BFP - TPPD',
-                      'PNP - MINOR',
-                      'BFP - MINOR',
-                      'PNP - POSTHUMOUS MINOR',
-                      'PNP - POSTHUMOUS SPOUSE',
-                      'OTHERS',
                     ]
                         .map((type) => DropdownMenuItem(value: type, child: Text(type, style: TextStyle(fontSize: 12))))
                         .toList(),
@@ -1178,11 +1163,9 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           ),
           items: const [
-            'BFP ACTIVE',
-            'BFP PENSION',
+            'VIRGIN',
             'EXISTING',
             'FULLY PAID',
-            'OTHERS',
           ]
               .map((type) => DropdownMenuItem(value: type, child: Text(type)))
               .toList(),
