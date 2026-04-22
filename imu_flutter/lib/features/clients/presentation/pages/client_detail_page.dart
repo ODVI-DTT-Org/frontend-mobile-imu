@@ -1808,12 +1808,14 @@ class _QuickActionsSection extends ConsumerWidget {
                 icon: LucideIcons.mapPin,
                 label: 'Navigate',
                 onTap: onNavigate,
+                isLoanReleased: isLoanReleased,
               ),
               _QuickActionButton(
                 icon: LucideIcons.clipboardList,
                 label: 'Record Touchpoint',
-                onTap: onRecordTouchpoint,
+                onTap: isLoanReleased ? null : onRecordTouchpoint,
                 isPrimary: true,
+                isLoanReleased: isLoanReleased,
               ),
               // REMOVED: Duplicate "Record Visit" button - functionality already covered by "Record Touchpoint"
               // All touchpoint recordings are marked as visits, so this button was redundant
@@ -1822,7 +1824,7 @@ class _QuickActionsSection extends ConsumerWidget {
               //   label: 'Record Visit',
               //   onTap: onRecordVisitOnly,
               // ),
-              if (canReleaseLoan)
+              if (canReleaseLoan && !isLoanReleased)
                 _QuickActionButton(
                   icon: LucideIcons.dollarSign,
                   label: 'Release Loan',
@@ -1833,6 +1835,7 @@ class _QuickActionsSection extends ConsumerWidget {
                 icon: LucideIcons.pencil,
                 label: 'Edit',
                 onTap: isLoanReleased ? null : onEdit,
+                isLoanReleased: isLoanReleased,
               ),
             ],
           ),
@@ -1849,6 +1852,7 @@ class _QuickActionButton extends StatelessWidget {
   final VoidCallback? onTap;
   final bool isPrimary;
   final Color? color;
+  final bool isLoanReleased;
 
   const _QuickActionButton({
     required this.icon,
@@ -1856,15 +1860,22 @@ class _QuickActionButton extends StatelessWidget {
     this.onTap,
     this.isPrimary = false,
     this.color,
+    this.isLoanReleased = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDisabled = onTap == null;
+    final showLoanReleasedStyle = isLoanReleased && !isDisabled;
 
     return GestureDetector(
       onTap: () {
         if (isDisabled) return;
+        if (showLoanReleasedStyle) {
+          HapticUtils.error();
+          AppNotification.showError(context, 'Cannot create touchpoints: Loan has been released');
+          return;
+        }
         HapticUtils.lightImpact();
         onTap!();
       },
@@ -1875,14 +1886,18 @@ class _QuickActionButton extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isDisabled
-              ? Colors.grey[100]
-              : (isPrimary ? const Color(0xFF0F172A) : (color ?? Colors.grey[100])),
+          color: showLoanReleasedStyle
+              ? Colors.orange.shade300
+              : isDisabled
+                  ? Colors.grey[100]
+                  : (isPrimary ? const Color(0xFF0F172A) : (color ?? Colors.grey[100])),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDisabled
-                ? Colors.grey[200]!
-                : (isPrimary ? const Color(0xFF0F172A) : (color ?? Colors.grey[300])!),
+            color: showLoanReleasedStyle
+                ? Colors.orange.shade300!
+                : isDisabled
+                    ? Colors.grey[200]!
+                    : (isPrimary ? const Color(0xFF0F172A) : (color ?? Colors.grey[300])!),
             width: 1,
           ),
         ),
@@ -1890,20 +1905,24 @@ class _QuickActionButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon,
-              color: isDisabled
-                  ? Colors.grey[400]
-                  : (isPrimary || color != null ? Colors.white : Colors.grey[700]),
+              showLoanReleasedStyle ? LucideIcons.lock : icon,
+              color: showLoanReleasedStyle
+                  ? Colors.orange.shade700
+                  : isDisabled
+                      ? Colors.grey[400]
+                      : (isPrimary || color != null ? Colors.white : Colors.grey[700]),
               size: 20,
             ),
             const SizedBox(height: 6),
             Text(
-              label,
+              showLoanReleasedStyle ? 'LOAN RELEASED' : label,
               style: TextStyle(
-                fontSize: 11,
-                color: isDisabled
-                    ? Colors.grey[400]
-                    : (isPrimary || color != null ? Colors.white : Colors.grey[700]),
+                fontSize: showLoanReleasedStyle ? 10 : 11,
+                color: showLoanReleasedStyle
+                    ? Colors.orange.shade700
+                    : isDisabled
+                        ? Colors.grey[400]
+                        : (isPrimary || color != null ? Colors.white : Colors.grey[700]),
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
