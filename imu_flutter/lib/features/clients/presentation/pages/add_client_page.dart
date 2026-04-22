@@ -273,29 +273,51 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
   PensionType _parsePensionType(String value) {
     switch (value) {
-      case 'SSS':
-        return PensionType.sss;
-      case 'GSIS':
-        return PensionType.gsis;
-      case 'Private':
-        return PensionType.private;
-      case 'None':
-        return PensionType.none;
+      case 'PNP - RETIREE OPTIONAL':
+        return PensionType.pnpRetireeOptional;
+      case 'PNP - RETIREE COMPULSORY':
+        return PensionType.pnpRetireeCompulsory;
+      case 'PNP - RETIREE':
+        return PensionType.pnpRetiree;
+      case 'BFP - RETIREE':
+        return PensionType.bfpRetiree;
+      case 'BFP STP - RETIREE':
+        return PensionType.bfpStpRetiree;
+      case 'PNP - TRANSFEREE':
+        return PensionType.pnpTransferree;
+      case 'BFP - SURVIVOR':
+        return PensionType.bfpSurvivor;
+      case 'PNP - SURVIVOR':
+        return PensionType.pnpSurvivor;
+      case 'PNP - TPPD':
+        return PensionType.pnpTppd;
+      case 'BFP - TPPD':
+        return PensionType.bfpTppd;
+      case 'PNP - MINOR':
+        return PensionType.pnpMinor;
+      case 'BFP - MINOR':
+        return PensionType.bfpMinor;
+      case 'PNP - POSTHUMOUS MINOR':
+        return PensionType.pnpPosthumousMinor;
+      case 'PNP - POSTHUMOUS SPOUSE':
+        return PensionType.pnpPosthumousSpouse;
+      case 'OTHERS':
+        return PensionType.others;
       default:
-        return PensionType.sss;
+        return PensionType.others;
     }
   }
 
   MarketType _parseMarketType(String value) {
     switch (value) {
-      case 'Residential':
-        return MarketType.residential;
-      case 'Commercial':
-        return MarketType.commercial;
-      case 'Industrial':
-        return MarketType.industrial;
+      case 'VIRGIN':
+        return MarketType.virgin;
+      case 'EXISTING':
+        return MarketType.existing;
+      case 'FULLY PAID':
+        return MarketType.fullyPaid;
       default:
-        return MarketType.residential;
+        return MarketType.virgin;
     }
   }
 
@@ -314,7 +336,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     if (value == null || value.isEmpty) return null;
     switch (value.toUpperCase()) {
       case 'NEW':
-        return LoanType.firstLoan;
+        return LoanType.new;
       case 'ADDITIONAL':
         return LoanType.additional;
       case 'RENEWAL':

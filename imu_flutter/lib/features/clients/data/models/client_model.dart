@@ -853,9 +853,9 @@ enum ClientType {
 }
 
 enum MarketType {
-  residential,
-  commercial,
-  industrial,
+  virgin,
+  existing,
+  fullyPaid,
 }
 
 enum ProductType {
@@ -867,17 +867,28 @@ enum ProductType {
 }
 
 enum PensionType {
-  sss,
-  gsis,
-  private,
-  none,
+  pnpRetireeOptional,
+  pnpRetireeCompulsory,
+  pnpRetiree,
+  bfpRetiree,
+  bfpStpRetiree,
+  pnpTransferree,
+  bfpSurvivor,
+  pnpSurvivor,
+  pnpTppd,
+  bfpTppd,
+  pnpMinor,
+  bfpMinor,
+  pnpPosthumousMinor,
+  pnpPosthumousSpouse,
+  others,
 }
 
 enum LoanType {
-  firstLoan,
+  new,
   additional,
-  renewal,
   preterm,
+  renewal,
 }
 
 enum AddressType {

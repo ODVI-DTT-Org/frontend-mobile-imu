@@ -277,18 +277,29 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   String _getPensionTypeLabel(PensionType type) {
     switch (type) {
-      case PensionType.sss: return 'SSS';
-      case PensionType.gsis: return 'GSIS';
-      case PensionType.private: return 'Private';
-      case PensionType.none: return 'None';
+      case PensionType.pnpRetireeOptional: return 'PNP - RETIREE OPTIONAL';
+      case PensionType.pnpRetireeCompulsory: return 'PNP - RETIREE COMPULSORY';
+      case PensionType.pnpRetiree: return 'PNP - RETIREE';
+      case PensionType.bfpRetiree: return 'BFP - RETIREE';
+      case PensionType.bfpStpRetiree: return 'BFP STP - RETIREE';
+      case PensionType.pnpTransferree: return 'PNP - TRANSFEREE';
+      case PensionType.bfpSurvivor: return 'BFP - SURVIVOR';
+      case PensionType.pnpSurvivor: return 'PNP - SURVIVOR';
+      case PensionType.pnpTppd: return 'PNP - TPPD';
+      case PensionType.bfpTppd: return 'BFP - TPPD';
+      case PensionType.pnpMinor: return 'PNP - MINOR';
+      case PensionType.bfpMinor: return 'BFP - MINOR';
+      case PensionType.pnpPosthumousMinor: return 'PNP - POSTHUMOUS MINOR';
+      case PensionType.pnpPosthumousSpouse: return 'PNP - POSTHUMOUS SPOUSE';
+      case PensionType.others: return 'OTHERS';
     }
   }
 
   String _getMarketTypeLabel(MarketType type) {
     switch (type) {
-      case MarketType.residential: return 'Residential';
-      case MarketType.commercial: return 'Commercial';
-      case MarketType.industrial: return 'Industrial';
+      case MarketType.virgin: return 'VIRGIN';
+      case MarketType.existing: return 'EXISTING';
+      case MarketType.fullyPaid: return 'FULLY PAID';
     }
   }
 
@@ -305,20 +316,31 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
   PensionType _parsePensionType(String value) {
     switch (value) {
-      case 'SSS': return PensionType.sss;
-      case 'GSIS': return PensionType.gsis;
-      case 'Private': return PensionType.private;
-      case 'None': return PensionType.none;
-      default: return PensionType.sss;
+      case 'PNP - RETIREE OPTIONAL': return PensionType.pnpRetireeOptional;
+      case 'PNP - RETIREE COMPULSORY': return PensionType.pnpRetireeCompulsory;
+      case 'PNP - RETIREE': return PensionType.pnpRetiree;
+      case 'BFP - RETIREE': return PensionType.bfpRetiree;
+      case 'BFP STP - RETIREE': return PensionType.bfpStpRetiree;
+      case 'PNP - TRANSFEREE': return PensionType.pnpTransferree;
+      case 'BFP - SURVIVOR': return PensionType.bfpSurvivor;
+      case 'PNP - SURVIVOR': return PensionType.pnpSurvivor;
+      case 'PNP - TPPD': return PensionType.pnpTppd;
+      case 'BFP - TPPD': return PensionType.bfpTppd;
+      case 'PNP - MINOR': return PensionType.pnpMinor;
+      case 'BFP - MINOR': return PensionType.bfpMinor;
+      case 'PNP - POSTHUMOUS MINOR': return PensionType.pnpPosthumousMinor;
+      case 'PNP - POSTHUMOUS SPOUSE': return PensionType.pnpPosthumousSpouse;
+      case 'OTHERS': return PensionType.others;
+      default: return PensionType.others;
     }
   }
 
   MarketType _parseMarketType(String value) {
     switch (value) {
-      case 'Residential': return MarketType.residential;
-      case 'Commercial': return MarketType.commercial;
-      case 'Industrial': return MarketType.industrial;
-      default: return MarketType.residential;
+      case 'VIRGIN': return MarketType.virgin;
+      case 'EXISTING': return MarketType.existing;
+      case 'FULLY PAID': return MarketType.fullyPaid;
+      default: return MarketType.virgin;
     }
   }
 
@@ -333,7 +355,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
   LoanType? _parseLoanType(String? value) {
     if (value == null || value.isEmpty) return null;
     switch (value.toUpperCase()) {
-      case 'NEW': return LoanType.firstLoan;
+      case 'NEW': return LoanType.new;
       case 'ADDITIONAL': return LoanType.additional;
       case 'RENEWAL': return LoanType.renewal;
       case 'PRETERM': return LoanType.preterm;
