@@ -100,21 +100,61 @@ final clientFavoritesServiceProvider = Provider<ClientFavoritesService>((ref) {
 });
 
 /// Starred clients for the current user.
-/// Queries directly from PowerSync (clients + client_favorites tables).
-/// This ensures ALL favorited clients are shown, not just those in Hive cache.
+/// Hybrid approach: Try PowerSync first (for all clients), fall back to Hive cache (assigned clients).
+/// This works both online (PowerSync has data) and offline (Hive cache as fallback).
 final favoritedClientListProvider = StreamProvider<List<Client>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
-  // Query favorited clients with full details from PowerSync
+  // Query favorited client IDs from PowerSync
   return PowerSyncService.database.asStream().asyncExpand((db) {
     return db.watch(
-      '''SELECT c.* FROM clients c
-         INNER JOIN client_favorites cf ON cf.client_id = c.id
-         WHERE cf.user_id = ?
-         AND c.deleted_at IS NULL
-         ORDER BY c.first_name, c.last_name''',
+      'SELECT client_id FROM client_favorites WHERE user_id = ?',
       parameters: [userId],
-    ).map((rows) => rows.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList());
+    );
+  }).asyncMap((rows) async {
+    // Extract favorited client IDs
+    final favoriteIds = rows.map((r) => r['client_id'] as String).toSet();
+
+    if (favoriteIds.isEmpty) {
+      logDebug('[favoritedClientListProvider] No favorites found');
+      return [];
+    }
+
+    logDebug('[favoritedClientListProvider] Found ${favoriteIds.length} favorited IDs: $favoriteIds');
+
+    // Try to get clients from PowerSync first
+    try {
+      final db = await PowerSyncService.database;
+      final placeholders = List.filled(favoriteIds.length, '?').join(',');
+      final result = await db.getAll(
+        'SELECT * FROM clients WHERE id IN ($placeholders) AND deleted_at IS NULL',
+        favoriteIds.toList(),
+      );
+
+      if (result.isNotEmpty) {
+        final clients = result.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList();
+        logDebug('[favoritedClientListProvider] Found ${clients.length} clients in PowerSync');
+        return clients..sort((a, b) => a.fullName.compareTo(b.fullName));
+      }
+    } catch (e) {
+      logError('[favoritedClientListProvider] Error querying PowerSync clients: $e');
+    }
+
+    // Fallback: Load from Hive cache (assigned clients only)
+    logDebug('[favoritedClientListProvider] PowerSync has no clients, falling back to Hive cache');
+    final hiveService = HiveService();
+    final rawClients = hiveService.getAllClients();
+    final allClients = rawClients.map((json) => Client.fromJson(json)).toList();
+
+    // Filter by favorited IDs
+    final favoritedClients = allClients
+        .where((c) => favoriteIds.contains(c.id))
+        .toList()
+      ..sort((a, b) => a.fullName.compareTo(b.fullName));
+
+    logDebug('[favoritedClientListProvider] Found ${favoritedClients.length} clients in Hive cache (assigned only)');
+
+    return favoritedClients;
   });
 });
