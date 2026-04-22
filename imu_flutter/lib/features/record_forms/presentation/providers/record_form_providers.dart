@@ -192,7 +192,7 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
 
       state = state.copyWith(
         isSubmitting: false,
-        successMessage: 'Touchpoint ${state.touchpointNumber}/7 recorded',
+        successMessage: 'Touchpoint #${state.touchpointNumber} recorded',
       );
 
       return true;

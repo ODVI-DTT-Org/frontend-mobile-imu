@@ -15,7 +15,7 @@ class TouchpointCalculatorService {
   /// Calculate the next touchpoint number for a client
   /// Returns 1 if no touchpoints exist
   /// Returns max(touchpoint_number) + 1 if touchpoints exist
-  /// Throws TouchpointLimitException if already 7 touchpoints
+  /// No limit on touchpoints anymore (unlimited)
   Future<int> calculateNextNumber(String clientId, List<Touchpoint> touchpoints) async {
     if (touchpoints.isEmpty) {
       return 1;
@@ -26,21 +26,16 @@ class TouchpointCalculatorService {
         .map((t) => t.touchpointNumber)
         .reduce((a, b) => a > b ? a : b);
 
-    if (maxNumber >= 7) {
-      throw const TouchpointLimitException(
-        'Maximum 7 touchpoints reached for this client',
-      );
-    }
-
+    // No more limit - always allow next touchpoint
     return maxNumber + 1;
   }
 
   /// Get the expected touchpoint type for a given number
-  /// Based on the pattern: Visit, Call, Call, Visit, Call, Call, Visit
+  /// Note: Pattern enforcement removed - type is determined by backend/API
+  /// This method is now deprecated and should not be used
+  @Deprecated('Touchpoint type is now determined by backend, not by pattern')
   TouchpointType getExpectedType(int touchpointNumber) {
-    if (touchpointNumber < 1 || touchpointNumber > 7) {
-      throw ArgumentError('Touchpoint number must be between 1 and 7');
-    }
-    return TouchpointPattern.types[touchpointNumber - 1];
+    // Return a default type - actual type comes from backend
+    return TouchpointType.visit;
   }
 }

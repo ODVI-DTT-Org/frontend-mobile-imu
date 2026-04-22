@@ -857,7 +857,9 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
           .where((client) => _selectedClientIds.contains(client.id))
           .map((client) {
             final nextTouchpointNumber = client.touchpointNumber;
-            final touchpointType = TouchpointPattern.getType(nextTouchpointNumber);
+            // Use client.nextTouchpointType directly (String from API, no strict pattern)
+            final touchpointTypeString = client.nextTouchpointType?.toLowerCase() ?? 'visit';
+            final touchpointType = touchpointTypeString == 'visit' ? TouchpointType.visit : TouchpointType.call;
 
             return {
               'client_id': client.id,

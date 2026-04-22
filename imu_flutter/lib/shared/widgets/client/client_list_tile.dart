@@ -12,7 +12,7 @@ import '../../../core/utils/app_notification.dart';
 /// Layout:
 ///   [Product Type]  [Pension Type]  [Loan Type?]  [STAR]
 ///   Name
-///   [X/7 • Call/Visit]
+///   [X • Call/Visit]
 ///   📍 Full address
 ///   [Schedule Today]  [Schedule Itinerary]
 class ClientListTile extends ConsumerWidget {
