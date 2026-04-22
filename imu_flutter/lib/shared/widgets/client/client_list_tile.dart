@@ -147,8 +147,18 @@ class ClientListTile extends ConsumerWidget {
                       try {
                         if (isStarred) {
                           await favoritesNotifier.remove(client.id ?? '');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Removed from favorites')),
+                            );
+                          }
                         } else {
                           await favoritesNotifier.add(client.id ?? '');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Added to favorites')),
+                            );
+                          }
                         }
                       } catch (_) {
                         if (context.mounted) {
