@@ -311,22 +311,12 @@ class ContactInformationExpansionPanel extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (address.streetAddress != null && address.streetAddress!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    address.streetAddress!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[900],
-                    ),
-                  ),
-                ],
                 Text(
                   address.fullAddress,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[900],
                   ),
                 ),
               ],

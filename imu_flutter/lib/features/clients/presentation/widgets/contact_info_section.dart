@@ -146,17 +146,10 @@ class ContactInfoSection extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (address.streetAddress != null && address.streetAddress!.isNotEmpty)
-          Text(
-            address.streetAddress!,
-            style: theme.textTheme.bodyMedium,
-          ),
-        if (address.streetAddress != null && address.streetAddress!.isNotEmpty)
-          const SizedBox(height: 4),
         Text(
           address.fullAddress,
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         if (address.postalCode != null && address.postalCode!.isNotEmpty) ...[

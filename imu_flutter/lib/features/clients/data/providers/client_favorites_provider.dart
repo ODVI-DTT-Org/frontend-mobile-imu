@@ -100,35 +100,21 @@ final clientFavoritesServiceProvider = Provider<ClientFavoritesService>((ref) {
 });
 
 /// Starred clients for the current user.
-/// Gets favorited IDs from PowerSync, then filters Hive cached clients by those IDs.
-/// This works because clients are stored in Hive (not PowerSync), while favorites are in PowerSync.
+/// Queries directly from PowerSync (clients + client_favorites tables).
+/// This ensures ALL favorited clients are shown, not just those in Hive cache.
 final favoritedClientListProvider = StreamProvider<List<Client>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
-  // Get favorited client IDs from PowerSync
+  // Query favorited clients with full details from PowerSync
   return PowerSyncService.database.asStream().asyncExpand((db) {
     return db.watch(
-      'SELECT client_id FROM client_favorites WHERE user_id = ?',
+      '''SELECT c.* FROM clients c
+         INNER JOIN client_favorites cf ON cf.client_id = c.id
+         WHERE cf.user_id = ?
+         AND c.deleted_at IS NULL
+         ORDER BY c.first_name, c.last_name''',
       parameters: [userId],
-    );
-  }).map((rows) {
-    // Extract favorited client IDs
-    final favoriteIds = rows.map((r) => r['client_id'] as String).toSet();
-
-    // Load all clients from Hive cache
-    final hiveService = HiveService();
-    final rawClients = hiveService.getAllClients();
-    final allClients = rawClients.map((json) => Client.fromJson(json)).toList();
-
-    // Filter clients by favorited IDs and sort by name
-    final favoritedClients = allClients
-        .where((c) => favoriteIds.contains(c.id))
-        .toList()
-      ..sort((a, b) => a.fullName.compareTo(b.fullName));
-
-    logDebug('[favoritedClientListProvider] Found ${favoritedClients.length} favorited clients out of ${allClients.length} total clients');
-
-    return favoritedClients;
+    ).map((rows) => rows.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList());
   });
 });

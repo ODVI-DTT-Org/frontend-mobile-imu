@@ -89,23 +89,12 @@ class AddressListTile extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // Street Address
-                if (address.streetAddress != null && address.streetAddress!.isNotEmpty)
-                  Text(
-                    address.streetAddress!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-
-                if (address.streetAddress != null && address.streetAddress!.isNotEmpty)
-                  const SizedBox(height: 4),
-
-                // Full Address (PSGC data)
+                // Full Address
                 Text(
                   address.fullAddress,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
 
