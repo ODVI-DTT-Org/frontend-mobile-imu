@@ -1373,7 +1373,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               label: 'TOUCHPOINT',
               color: Colors.green[700]!,
               enabled: true,
-              loanReleased: false,
+              loanReleased: loanReleased,
               onPressed: () => _handleRecordTouchpoint(),
             ),
           ),
@@ -1398,7 +1398,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
   }
 
-  /// Builds an action button that shows a red "Loan Released" badge when disabled due to loan release.
+  /// Builds an action button with orange "Loan Released" styling when loan is released.
   Widget _buildActionButton({
     required String label,
     required Color color,
@@ -1406,54 +1406,52 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     required bool loanReleased,
     required VoidCallback onPressed,
   }) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: enabled ? onPressed : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: enabled ? color : Colors.grey[300],
-              foregroundColor: enabled ? Colors.white : Colors.grey[600],
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(label),
-          ),
+    final isLoanReleased = loanReleased;
+
+    return ElevatedButton(
+      onPressed: isLoanReleased ? () {
+        HapticUtils.error();
+        AppNotification.showError(context, 'Cannot create touchpoints: Loan has been released');
+      } : (enabled ? onPressed : null),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isLoanReleased
+          ? Colors.orange.shade300
+          : (enabled ? color : Colors.grey[300]),
+        foregroundColor: isLoanReleased
+          ? Colors.orange.shade700
+          : (enabled ? Colors.white : Colors.grey[600]),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
-        if (loanReleased)
-          Positioned(
-            top: -8,
-            right: -4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.red[600],
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: const Text(
-                'Loan Released',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isLoanReleased ? LucideIcons.lock : _getIconForLabel(label),
+            size: 16
           ),
-      ],
+          const SizedBox(width: 8),
+          Text(
+            isLoanReleased ? 'LOAN RELEASED' : label,
+            style: TextStyle(fontSize: isLoanReleased ? 11 : 12),
+          ),
+        ],
+      ),
     );
+  }
+
+  /// Gets the appropriate icon for a button label.
+  IconData _getIconForLabel(String label) {
+    switch (label.toUpperCase()) {
+      case 'TOUCHPOINT':
+        return LucideIcons.clipboardList;
+      case 'RELEASE LOAN':
+        return LucideIcons.dollarSign;
+      default:
+        return LucideIcons.circle;
+    }
   }
 
   Widget _buildBadge(String text, Color backgroundColor) {
