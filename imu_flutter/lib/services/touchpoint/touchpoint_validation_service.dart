@@ -36,7 +36,7 @@ enum UserRole {
 /// Service for validating touchpoint sequences
 class TouchpointValidationService {
   /// COMMENTED OUT for Unli Touchpoint - no pattern restrictions
-  /// Touchpoint sequence pattern: Visit → Call → Call → Visit → Call → Call → Visit
+  /// NOTE: Touchpoint pattern no longer enforced - backend determines type
   // static const List<TouchpointType> _sequence = [
   //   TouchpointType.visit,  // 1st
   //   TouchpointType.call,   // 2nd

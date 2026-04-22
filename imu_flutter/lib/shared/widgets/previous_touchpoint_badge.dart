@@ -9,7 +9,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 ///
 /// Used in both My Day and Itinerary list displays.
 class PreviousTouchpointBadge extends StatelessWidget {
-  /// Last completed touchpoint number (1-7)
+  /// Last completed touchpoint number (unlimited)
   final int? touchpointNumber;
 
   /// Last completed touchpoint type (visit/call)

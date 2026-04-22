@@ -19,9 +19,9 @@ class PermissionService {
   /// Returns true if the role can create this touchpoint, false otherwise.
   ///
   /// OLD: COMMENTED OUT for Unli Touchpoint - had number restrictions
-  /// Touchpoint sequence: 1(Visit), 2(Call), 3(Call), 4(Visit), 5(Call), 6(Call), 7(Visit)
-  /// Caravan can only create Visit touchpoints (1, 4, 7).
-  /// Tele can only create Call touchpoints (2, 3, 5, 6).
+  /// Touchpoint pattern no longer enforced - backend determines type.
+  /// Caravan can only create Visit touchpoints.
+  /// Tele can only create Call touchpoints.
   // static bool canCreateTouchpoint({
   //   required UserRole role,
   //   required int touchpointNumber,

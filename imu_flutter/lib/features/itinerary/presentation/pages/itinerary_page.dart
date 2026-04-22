@@ -1802,7 +1802,7 @@ class _VisitCard extends StatelessWidget {
   Widget _buildNextTouchpointBadge(int touchpointNumber, String touchpointType) {
     final isVisit = touchpointType.toLowerCase() == 'visit';
     final badgeColor = isVisit ? const Color(0xFF3B82F6) : const Color(0xFF22C55E);
-    // touchpointNumber is the NEXT touchpoint (1-7), so completed = touchpointNumber - 1
+    // touchpointNumber is the NEXT touchpoint number, so completed count is touchpointNumber - 1
     final completedCount = touchpointNumber - 1;
 
     return Container(

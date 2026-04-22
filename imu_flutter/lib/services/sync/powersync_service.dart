@@ -44,7 +44,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('full_address'),
     // Touchpoint summary fields - NEW (denormalized from backend)
     Column.text('touchpoint_summary'), // JSON array of touchpoint history
-    Column.integer('touchpoint_number'), // Next touchpoint number (1-7)
+    Column.integer('touchpoint_number'), // Completed touchpoint count (unlimited)
     Column.text('next_touchpoint'), // Next touchpoint type ('Visit' or 'Call')
     // Audit fields - NEW
     Column.text('created_by'), // User ID of who created the client

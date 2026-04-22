@@ -1398,6 +1398,8 @@ enum TouchpointType {
 }
 
 /// Touchpoint pattern: Visit-Call-Call-Visit-Call-Call-Visit
+/// NOTE: Touchpoint pattern no longer enforced - backend determines type
+/// This class is kept for reference but is no longer used.
 class TouchpointPattern {
   static const List<TouchpointType> types = [
     TouchpointType.visit,  // 1st

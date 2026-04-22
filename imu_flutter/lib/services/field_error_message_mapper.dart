@@ -189,7 +189,7 @@ class FieldErrorMessageMapper {
 
     // Touchpoint number field validations
     'touchpoint_number.required': 'Please enter a touchpoint number',
-    'touchpoint_number.invalid': 'Invalid touchpoint number (must be 1-7)',
+    'touchpoint_number.invalid': 'Invalid touchpoint number (must be a positive number)',
 
     // Reason field validations
     'reason.required': 'Please select a reason',

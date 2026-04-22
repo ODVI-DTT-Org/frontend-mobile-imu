@@ -16,7 +16,7 @@ class MyDayClient {
   final String? notes; // Optional notes for the visit
   final String? status; // 'pending', 'in_progress', 'completed'
   final String? scheduledTime; // Scheduled time for the visit (HH:MM format)
-  final int? nextTouchpointNumber; // Backend-calculated next touchpoint number (1-7 or null if complete)
+  final int? nextTouchpointNumber; // Backend-calculated next touchpoint number (unlimited, null if complete)
   final String? nextTouchpointType; // Next touchpoint type ('Visit' or 'Call')
 
   final String? assignedByName;
@@ -77,14 +77,14 @@ class MyDayClient {
       throw ArgumentError('clientId is required and cannot be empty');
     }
 
-    // Validate and parse previous touchpoint number (must be 1-7)
+    // Validate and parse previous touchpoint number (must be positive)
     final previousTouchpointNumber = json['previous_touchpoint_number'] ?? json['previousTouchpointNumber'] as int?;
     int? validatedPreviousNumber;
     if (previousTouchpointNumber != null) {
-      if (previousTouchpointNumber >= 1 && previousTouchpointNumber <= 7) {
+      if (previousTouchpointNumber >= 1) {
         validatedPreviousNumber = previousTouchpointNumber;
       } else {
-        debugPrint('[MyDayClient] Invalid previous touchpoint number: $previousTouchpointNumber (must be 1-7), ignoring');
+        debugPrint('[MyDayClient] Invalid previous touchpoint number: $previousTouchpointNumber (must be positive), ignoring');
       }
     }
 

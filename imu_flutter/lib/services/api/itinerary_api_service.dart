@@ -134,14 +134,14 @@ class ItineraryItem {
 
     debugPrint('[ItineraryItem] Parsing date: $scheduledDateStr -> $scheduledDate (UTC: ${scheduledDate.toUtc()}, Local: ${DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day)})');
 
-    // Validate and parse previous touchpoint number (must be 1-7)
+    // Validate and parse previous touchpoint number (must be positive)
     final previousTouchpointNumber = json['previous_touchpoint_number'] as int?;
     int? validatedPreviousNumber;
     if (previousTouchpointNumber != null) {
-      if (previousTouchpointNumber >= 1 && previousTouchpointNumber <= 7) {
+      if (previousTouchpointNumber >= 1) {
         validatedPreviousNumber = previousTouchpointNumber;
       } else {
-        debugPrint('[ItineraryItem] Invalid previous touchpoint number: $previousTouchpointNumber (must be 1-7), ignoring');
+        debugPrint('[ItineraryItem] Invalid previous touchpoint number: $previousTouchpointNumber (must be positive), ignoring');
       }
     }
 
