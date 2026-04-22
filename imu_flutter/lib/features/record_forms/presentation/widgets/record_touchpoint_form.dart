@@ -194,7 +194,7 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                'Touchpoint #$touchpointNumber of 7',
+                'Touchpoint #$touchpointNumber',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
                   fontSize: 11,

@@ -48,7 +48,7 @@ class TouchpointValidationService {
   // ];
 
   /// COMMENTED OUT for Unli Touchpoint - no pattern restrictions
-  /// Touchpoint numbers for Visit type (1, 4, 7)
+  /// NOTE: Touchpoint pattern no longer enforced - backend determines type
   // static const List<int> _visitTouchpoints = [1, 4, 7];
 
   /// COMMENTED OUT for Unli Touchpoint - no pattern restrictions

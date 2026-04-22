@@ -9,7 +9,7 @@ class MyDayClient {
   final String fullName;
   final String? agencyName;
   final String? location;
-  final int touchpointNumber; // 1-7, 0 if not started
+  final int touchpointNumber; // Next touchpoint number, 0 if not started (unlimited)
   final String touchpointType; // 'visit' or 'call'
   final bool isTimeIn;
   final String priority; // 'low', 'normal', 'high'
@@ -66,7 +66,7 @@ class MyDayClient {
   });
 
   String get touchpointOrdinal {
-    if (touchpointNumber < 1 || touchpointNumber > 7) return '';
+    if (touchpointNumber < 1) return '';
     const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
     return ordinals[touchpointNumber - 1];
   }

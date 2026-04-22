@@ -73,9 +73,8 @@ class ClientStatusBadge extends StatelessWidget {
 
     // Priority 4: Call Touchpoint (for Caravan users only)
     if (currentUserRole == UserRole.caravan) {
-      final completedCount = client.completedTouchpoints;
-      if (completedCount < 7) {
-        // Use client.nextTouchpoint directly (String from API, no strict pattern)
+      // Show Call badge if there's a next touchpoint and it's a call type
+      if (client.nextTouchpoint != null) {
         final nextType = client.nextTouchpoint?.toLowerCase();
         if (nextType == 'call') {
           return _buildBadge(

@@ -944,7 +944,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           ref.invalidate(clientTouchpointsProvider);
 
           // Check if this was the last touchpoint (no next touchpoint)
-          if (nextTouchpoint == null) {
+          if (_client?.nextTouchpoint == null) {
             await _showTouchpointCompletionDialog();
           }
         },

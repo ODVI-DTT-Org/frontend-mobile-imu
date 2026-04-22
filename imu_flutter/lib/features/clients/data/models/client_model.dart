@@ -999,7 +999,7 @@ class Touchpoint {
   final String id;
   final String clientId;
   final String? userId; // The user (caravan/tele) who created this touchpoint (was agentId)
-  final int touchpointNumber; // 1-7
+  final int touchpointNumber; // Completed touchpoint count (unlimited)
   final TouchpointType type;
   final TouchpointReason reason;
   final TouchpointStatus status; // New: status field (Interested, Undecided, Not Interested, Completed)
