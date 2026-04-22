@@ -1,22 +1,61 @@
 // lib/services/gps/gps_capture_service.dart
 
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../location/enhanced_location_service.dart';
+import '../location/enhanced_location_provider.dart';
 
 class GPSData {
   final double latitude;
   final double longitude;
   final String address;
+  // Structured location fields
+  final String? barangay;
+  final String? municipality;
+  final String? province;
+  final String? region;
+  final String? source;
 
   const GPSData({
     required this.latitude,
     required this.longitude,
     required this.address,
+    this.barangay,
+    this.municipality,
+    this.province,
+    this.region,
+    this.source,
   });
 
+  /// Create GPSData from LocationAddress
+  factory GPSData.fromLocationAddress(LocationAddress locationAddress) {
+    return GPSData(
+      latitude: 0, // Will be set by caller
+      longitude: 0, // Will be set by caller
+      address: locationAddress.fullAddress,
+      barangay: locationAddress.barangay,
+      municipality: locationAddress.municipality,
+      province: locationAddress.province,
+      region: locationAddress.region,
+      source: locationAddress.source,
+    );
+  }
+
   @override
-  String toString() => 'GPSData(lat: $latitude, lng: $longitude, address: $address)';
+  String toString() => 'GPSData(lat: $latitude, lng: $longitude, address: $address, source: $source)';
+
+  /// Convert to JSON for API submission
+  Map<String, dynamic> toJson() => {
+    'latitude': latitude,
+    'longitude': longitude,
+    'address': address,
+    if (barangay != null) 'barangay': barangay,
+    if (municipality != null) 'municipality': municipality,
+    if (province != null) 'province': province,
+    if (region != null) 'region': region,
+    if (source != null) 'source': source,
+  };
 }
 
 class GPSRequiredException implements Exception {
@@ -30,9 +69,10 @@ class GPSRequiredException implements Exception {
 }
 
 class GPSCaptureService {
-  /// Captures current GPS location with address
+  /// Captures current GPS location with structured address
+  /// Uses EnhancedLocationService with Mapbox (online) + PSGC (offline)
   /// Throws GPSRequiredException if location cannot be obtained
-  Future<GPSData> captureLocation() async {
+  Future<GPSData> captureLocation({Ref? ref}) async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
     if (!serviceEnabled) {
@@ -53,48 +93,38 @@ class GPSCaptureService {
     }
 
     try {
+      // Get GPS coordinates
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
 
-      // Reverse geocode to get address
-      List<Placemark> placemarks = await placemarkFromCoordinates(
+      // Get structured address using EnhancedLocationService
+      final locationService = EnhancedLocationService();
+
+      // If ref is provided, configure Mapbox token from provider
+      if (ref != null) {
+        // Note: This requires the provider to be initialized first
+        // The Mapbox token should already be configured via provider
+      }
+
+      final locationAddress = await locationService.getAddressFromCoordinates(
         position.latitude,
         position.longitude,
       );
 
-      final address = _formatAddress(placemarks.first);
-
       return GPSData(
         latitude: position.latitude,
         longitude: position.longitude,
-        address: address,
+        address: locationAddress.fullAddress,
+        barangay: locationAddress.barangay,
+        municipality: locationAddress.municipality,
+        province: locationAddress.province,
+        region: locationAddress.region,
+        source: locationAddress.source,
       );
     } catch (e) {
       throw GPSRequiredException('Failed to capture location', e);
     }
-  }
-
-  String _formatAddress(Placemark placemark) {
-    final parts = <String>[];
-
-    if (placemark.street != null && placemark.street!.isNotEmpty) {
-      parts.add(placemark.street!);
-    }
-    if (placemark.subLocality != null && placemark.subLocality!.isNotEmpty) {
-      parts.add(placemark.subLocality!);
-    }
-    if (placemark.locality != null && placemark.locality!.isNotEmpty) {
-      parts.add(placemark.locality!);
-    }
-    if (placemark.administrativeArea != null && placemark.administrativeArea!.isNotEmpty) {
-      parts.add(placemark.administrativeArea!);
-    }
-    if (placemark.country != null && placemark.country!.isNotEmpty) {
-      parts.add(placemark.country!);
-    }
-
-    return parts.isNotEmpty ? parts.join(', ') : 'Unknown Location';
   }
 }

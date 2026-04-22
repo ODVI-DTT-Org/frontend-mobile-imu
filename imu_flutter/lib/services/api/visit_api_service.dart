@@ -53,6 +53,12 @@ class VisitApiService {
     double? latitude,
     double? longitude,
     String? address,
+    // Structured location fields
+    String? barangay,
+    String? municipality,
+    String? province,
+    String? region,
+    String? source,
   }) async {
     try {
       debugPrint('VisitApiService: Creating visit for client $clientId');
@@ -81,6 +87,12 @@ class VisitApiService {
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
           if (address != null) 'address': address,
+          // Structured location fields
+          if (barangay != null) 'barangay': barangay,
+          if (municipality != null) 'municipality': municipality,
+          if (province != null) 'province': province,
+          if (region != null) 'region': region,
+          if (source != null) 'source': source,
           'photo': await MultipartFile.fromFile(
             photoFile.path,
             filename: photoFile.path.split('/').last.split('\\').last,
@@ -114,6 +126,12 @@ class VisitApiService {
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
           if (address != null) 'address': address,
+          // Structured location fields
+          if (barangay != null) 'barangay': barangay,
+          if (municipality != null) 'municipality': municipality,
+          if (province != null) 'province': province,
+          if (region != null) 'region': region,
+          if (source != null) 'source': source,
         };
 
         response = await _dio.post(

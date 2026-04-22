@@ -2,25 +2,58 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../location/geolocation_service.dart';
 import '../../features/psgc/data/repositories/psgc_repository.dart';
+import 'mapbox_geocoding_service.dart';
 
-/// Enhanced location service with PSGC fallback for Philippine locations
+/// Enhanced location service with hybrid geocoding:
+/// - Online: Mapbox API (street-level precision)
+/// - Offline: PSGC data (municipality-level precision)
 class EnhancedLocationService {
   static final EnhancedLocationService _instance = EnhancedLocationService._internal();
   factory EnhancedLocationService() => _instance;
   EnhancedLocationService._internal();
 
   final _geoService = GeolocationService();
-  PsgcRepository? _psgcRepository;
+  final _mapboxService = MapboxGeocodingService();
+  final _connectivity = Connectivity();
 
-  /// Set PSGC repository for fallback location lookup
+  PsgcRepository? _psgcRepository;
+  String? _mapboxToken;
+
+  /// Set PSGC repository for offline location lookup
   void setPsgcRepository(PsgcRepository repository) {
     _psgcRepository = repository;
   }
 
+  /// Set Mapbox access token for online location lookup
+  void setMapboxToken(String token) {
+    _mapboxToken = token;
+    _mapboxService.setAccessToken(token);
+    debugPrint('EnhancedLocationService: Mapbox token configured');
+  }
+
+  /// Check if device is online
+  Future<bool> _isOnline() async {
+    try {
+      final result = await _connectivity.checkConnectivity();
+      return result.any(
+        (status) => status != ConnectivityResult.none,
+      );
+    } catch (e) {
+      debugPrint('EnhancedLocationService: Connectivity check failed: $e');
+      // Assume online if connectivity check fails
+      return true;
+    }
+  }
+
   /// Get comprehensive address from coordinates
-  /// Uses native geocoding first, then falls back to PSGC data
+  ///
+  /// Strategy:
+  /// 1. Try native geocoding (fast, works offline but limited data)
+  /// 2. If online and native incomplete, try Mapbox API (detailed, structured)
+  /// 3. If offline or Mapbox fails, fallback to PSGC data (bundled, reliable)
   Future<LocationAddress> getAddressFromCoordinates(
     double latitude,
     double longitude, {
@@ -28,7 +61,7 @@ class EnhancedLocationService {
   }) async {
     debugPrint('EnhancedLocationService: Getting address for ($latitude, $longitude)...');
 
-    // Try native geocoding first (more accurate for street-level)
+    // Step 1: Try native geocoding first (fastest, works offline)
     String? nativeAddress;
     int nativeComponentCount = 0;
 
@@ -51,17 +84,46 @@ class EnhancedLocationService {
           nativeAddress = parts.join(', ');
           nativeComponentCount = parts.where((p) => p.isNotEmpty).length;
           debugPrint('EnhancedLocationService: Native geocoding returned "$nativeAddress" ($nativeComponentCount components)');
+
+          // If native geocoding is complete enough, use it
+          if (nativeComponentCount >= 3 && nativeAddress.length >= 20) {
+            return LocationAddress(
+              fullAddress: nativeAddress,
+              source: 'Native',
+            );
+          }
         }
       } catch (e) {
         debugPrint('EnhancedLocationService: Native geocoding failed: $e');
       }
     }
 
-    // Fallback to PSGC if native geocoding returns incomplete data (< 3 components)
-    if (_psgcRepository != null &&
-        (nativeAddress == null ||
-            nativeComponentCount < 3 ||
-            nativeAddress.length < 15)) {
+    // Step 2: Check connectivity and try Mapbox if online
+    final isOnline = await _isOnline();
+    debugPrint('EnhancedLocationService: Device is ${isOnline ? 'online' : 'offline'}');
+
+    if (isOnline && _mapboxToken != null && _mapboxToken!.isNotEmpty) {
+      debugPrint('EnhancedLocationService: Trying Mapbox API...');
+      try {
+        final mapboxAddress = await _mapboxService.reverseGeocode(
+          latitude,
+          longitude,
+          includeStreetDetails: true,
+        );
+
+        if (mapboxAddress != null) {
+          debugPrint('EnhancedLocationService: Mapbox API succeeded');
+          return mapboxAddress;
+        }
+      } catch (e) {
+        debugPrint('EnhancedLocationService: Mapbox API failed: $e');
+      }
+    } else {
+      debugPrint('EnhancedLocationService: Skipping Mapbox (${isOnline ? 'no token' : 'offline'})');
+    }
+
+    // Step 3: Fallback to PSGC if available
+    if (_psgcRepository != null) {
       debugPrint('EnhancedLocationService: Using PSGC fallback...');
       try {
         final nearestMunicipality =
@@ -88,15 +150,17 @@ class EnhancedLocationService {
       }
     }
 
-    // Return native address if available, even if incomplete
+    // Step 4: Last resort - return native address if available
     if (nativeAddress != null) {
+      debugPrint('EnhancedLocationService: Using native address as last resort');
       return LocationAddress(
         fullAddress: nativeAddress,
         source: 'Native',
       );
     }
 
-    // Last resort: return GPS coordinates only
+    // Step 5: Absolute fallback - return coordinates only
+    debugPrint('EnhancedLocationService: All methods failed, returning coordinates');
     return LocationAddress(
       fullAddress: '$latitude, $longitude',
       source: 'Coordinates',
@@ -112,7 +176,7 @@ class EnhancedLocationService {
       barangay.region,
       'Philippines',
     ];
-    return parts.where((p) => p != null && p.isNotEmpty).join(', ');
+    return parts.where((p) => p.isNotEmpty).join(', ');
   }
 
   /// Get current position with comprehensive error handling (delegates to GeolocationService)
@@ -167,7 +231,7 @@ class LocationAddress {
   final String? province;
   final String? region;
   final String? country;
-  final String source; // 'Native', 'PSGC', 'Coordinates'
+  final String source; // 'Native', 'Mapbox', 'PSGC', 'Coordinates'
   final String? municipalityKind;
 
   LocationAddress({

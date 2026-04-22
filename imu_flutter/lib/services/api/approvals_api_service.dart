@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../auth/jwt_auth_service.dart';
 import '../../core/config/app_config.dart';
-import '../../core/utils/logger.dart';
 
 /// Service for approval-related API calls
 class ApprovalsApiService {
@@ -286,6 +285,12 @@ class ApprovalsApiService {
     double? latitude,
     double? longitude,
     String? address,
+    // Structured location fields
+    String? barangay,
+    String? municipality,
+    String? province,
+    String? region,
+    String? source,
     String? photoUrl,
     String? remarks,
   }) async {
@@ -325,6 +330,12 @@ class ApprovalsApiService {
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
           if (address != null) 'address': address,
+          // Structured location fields
+          if (barangay != null) 'barangay': barangay,
+          if (municipality != null) 'municipality': municipality,
+          if (province != null) 'province': province,
+          if (region != null) 'region': region,
+          if (source != null) 'source': source,
           if (photoUrl != null) 'photo_url': photoUrl,
           if (remarks != null) 'remarks': remarks,
         },

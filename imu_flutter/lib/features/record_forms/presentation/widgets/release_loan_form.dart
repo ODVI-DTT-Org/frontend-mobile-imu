@@ -258,6 +258,12 @@ class _ReleaseLoanFormState extends State<ReleaseLoanForm> {
         latitude: _formData.gpsLatitude,
         longitude: _formData.gpsLongitude,
         address: _formData.gpsAddress,
+        // Structured location fields from GPS capture
+        barangay: gps.barangay,
+        municipality: gps.municipality,
+        province: gps.province,
+        region: gps.region,
+        source: gps.source,
         photoUrl: _formData.photoPath,
         remarks: _formData.remarks?.trim().isNotEmpty == true ? _formData.remarks : null,
       );
