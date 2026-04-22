@@ -57,7 +57,14 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
   }
 
   /// Optimistically add client to favorites.
+  /// Manual check prevents duplicate entries at application level.
   Future<void> add(String clientId) async {
+    // Manual check #1: Check if already in state (optimistic)
+    if (state.contains(clientId)) {
+      logDebug('[ClientFavoritesNotifier] $clientId already in favorites (state check), skipping add');
+      return;
+    }
+
     _isUpdating = true;
     final previousState = state;
 
@@ -72,8 +79,21 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
       }
 
       final db = await PowerSyncService.database;
-      final id = const Uuid().v4();
 
+      // Manual check #2: Check if already exists in database before insert
+      final existing = await db.getAll(
+        'SELECT id FROM client_favorites WHERE user_id = ? AND client_id = ?',
+        [userId, clientId],
+      );
+
+      if (existing.isNotEmpty) {
+        logDebug('[ClientFavoritesNotifier] $clientId already exists in database, skipping insert');
+        // Don't revert - the optimistic state is correct
+        return;
+      }
+
+      // Safe to proceed with insert
+      final id = const Uuid().v4();
       await db.execute(
         'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
         [id, userId, clientId, DateTime.now().toIso8601String()],
@@ -95,7 +115,14 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
   }
 
   /// Optimistically remove client from favorites.
+  /// Manual check prevents unnecessary database operations.
   Future<void> remove(String clientId) async {
+    // Manual check #1: Check if NOT in state (optimistic)
+    if (!state.contains(clientId)) {
+      logDebug('[ClientFavoritesNotifier] $clientId not in favorites (state check), skipping remove');
+      return;
+    }
+
     _isUpdating = true;
     final previousState = state;
 
@@ -110,6 +137,20 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
       }
 
       final db = await PowerSyncService.database;
+
+      // Manual check #2: Verify the record exists before attempting delete
+      final existing = await db.getAll(
+        'SELECT id FROM client_favorites WHERE user_id = ? AND client_id = ?',
+        [userId, clientId],
+      );
+
+      if (existing.isEmpty) {
+        logDebug('[ClientFavoritesNotifier] $clientId not found in database, skipping delete');
+        // Don't revert - the optimistic state is correct
+        return;
+      }
+
+      // Safe to proceed with delete
       await db.execute(
         'DELETE FROM client_favorites WHERE user_id = ? AND client_id = ?',
         [userId, clientId],
