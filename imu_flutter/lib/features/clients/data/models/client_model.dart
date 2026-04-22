@@ -850,12 +850,15 @@ class Client {
 enum ClientType {
   potential,
   existing,
+  virgin,
 }
 
 enum MarketType {
   virgin,
   existing,
   fullyPaid,
+  bfpActive,
+  bfpPension,
 }
 
 enum ProductType {

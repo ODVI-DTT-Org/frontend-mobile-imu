@@ -66,9 +66,9 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
   // Dropdown values
   String _productType = 'BFP ACTIVE';
-  String _pensionType = 'SSS';
-  String _marketType = 'Residential';
-  String _clientType = 'POTENTIAL';
+  String _pensionType = 'PNP - RETIREE OPTIONAL';
+  String _marketType = 'BFP ACTIVE';
+  String _clientType = 'VIRGIN';
   String? _loanType;
 
   // Date picker
@@ -322,10 +322,10 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   }
 
   ClientType _parseClientType(String value) {
-    switch (value.toLowerCase()) {
-      case 'potential':
+    switch (value.toUpperCase()) {
+      case 'POTENTIAL':
         return ClientType.potential;
-      case 'existing':
+      case 'EXISTING':
         return ClientType.existing;
       default:
         return ClientType.potential;
@@ -1040,12 +1040,12 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
           children: [
             Expanded(
               child: _ClientTypeButton(
-                label: 'Potential',
-                isSelected: _clientType == 'POTENTIAL',
+                label: 'Virgin',
+                isSelected: _clientType == 'VIRGIN',
                 colorScheme: colorScheme,
                 onTap: () {
                   HapticUtils.selectionClick();
-                  setState(() => _clientType = 'POTENTIAL');
+                  setState(() => _clientType = 'VIRGIN');
                 },
               ),
             ),
@@ -1084,8 +1084,29 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
-                    items: const ['BFP ACTIVE', 'BFP PENSION', 'PNP PENSION', 'NAPOLCOM', 'BFP STP']
-                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                    items: const [
+                      'BFP ACTIVE',
+                      'BFP PENSION',
+                      'BFP STP',
+                      'NAPOLCOM',
+                      'PNP PENSION',
+                      'PNP - RETIREE OPTIONAL',
+                      'PNP - RETIREE COMPULSORY',
+                      'PNP - RETIREE',
+                      'BFP - RETIREE',
+                      'BFP STP - RETIREE',
+                      'PNP - TRANSFEREE',
+                      'BFP - SURVIVOR',
+                      'PNP - SURVIVOR',
+                      'PNP - TPPD',
+                      'BFP - TPPD',
+                      'PNP - MINOR',
+                      'BFP - MINOR',
+                      'PNP - POSTHUMOUS MINOR',
+                      'PNP - POSTHUMOUS SPOUSE',
+                      'OTHERS',
+                    ]
+                        .map((type) => DropdownMenuItem(value: type, child: Text(type, style: TextStyle(fontSize: 12))))
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
@@ -1115,8 +1136,24 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
-                    items: ['SSS', 'GSIS', 'Private', 'None']
-                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                    items: const [
+                      'PNP - RETIREE OPTIONAL',
+                      'PNP - RETIREE COMPULSORY',
+                      'PNP - RETIREE',
+                      'BFP - RETIREE',
+                      'BFP STP - RETIREE',
+                      'PNP - TRANSFEREE',
+                      'BFP - SURVIVOR',
+                      'PNP - SURVIVOR',
+                      'PNP - TPPD',
+                      'BFP - TPPD',
+                      'PNP - MINOR',
+                      'BFP - MINOR',
+                      'PNP - POSTHUMOUS MINOR',
+                      'PNP - POSTHUMOUS SPOUSE',
+                      'OTHERS',
+                    ]
+                        .map((type) => DropdownMenuItem(value: type, child: Text(type, style: TextStyle(fontSize: 12))))
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
@@ -1140,7 +1177,13 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
             isDense: true,
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           ),
-          items: ['Residential', 'Commercial', 'Industrial']
+          items: const [
+            'BFP ACTIVE',
+            'BFP PENSION',
+            'EXISTING',
+            'FULLY PAID',
+            'OTHERS',
+          ]
               .map((type) => DropdownMenuItem(value: type, child: Text(type)))
               .toList(),
           onChanged: (value) {
