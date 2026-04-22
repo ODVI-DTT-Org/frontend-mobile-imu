@@ -167,8 +167,8 @@ class TouchpointValidationService {
   //   if (nextNumber == null) {
   //     return TouchpointCanCreateResult(
   //       canCreate: false,
-  //       reason: 'All 7 touchpoints have been completed for this client',
-  //       completedTouchpoints: 7,
+  //       reason: 'All touchpoints have been completed for this client',
+  //       completedTouchpoints: client.touchpointNumber,
   //       nextTouchpointNumber: null,
   //       nextTouchpointType: null,
   //     );

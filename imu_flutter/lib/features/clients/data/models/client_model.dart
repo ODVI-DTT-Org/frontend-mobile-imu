@@ -1075,8 +1075,19 @@ class Touchpoint {
   String? get agentId => userId;
 
   String get ordinal {
-    const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
-    return ordinals[touchpointNumber - 1];
+    const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+    if (touchpointNumber >= 1 && touchpointNumber <= ordinals.length) {
+      return ordinals[touchpointNumber - 1];
+    }
+    // For touchpoints beyond our list, use pattern: 11th, 12th, 13th, etc.
+    final lastTwo = touchpointNumber % 100;
+    if (lastTwo >= 11 && lastTwo <= 13) return '${touchpointNumber}th';
+    switch (touchpointNumber % 10) {
+      case 1: return '${touchpointNumber}st';
+      case 2: return '${touchpointNumber}nd';
+      case 3: return '${touchpointNumber}rd';
+      default: return '${touchpointNumber}th';
+    }
   }
 
   Touchpoint copyWith({

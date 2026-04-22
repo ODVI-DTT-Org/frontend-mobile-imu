@@ -86,8 +86,19 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
   ];
 
   String get _ordinal {
-    const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
-    return ordinals[widget.touchpointNumber - 1];
+    const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+    if (widget.touchpointNumber >= 1 && widget.touchpointNumber <= ordinals.length) {
+      return ordinals[widget.touchpointNumber - 1];
+    }
+    // For touchpoints beyond our list, use pattern: 11th, 12th, 13th, etc.
+    final lastTwo = widget.touchpointNumber % 100;
+    if (lastTwo >= 11 && lastTwo <= 13) return '${widget.touchpointNumber}th';
+    switch (widget.touchpointNumber % 10) {
+      case 1: return '${widget.touchpointNumber}st';
+      case 2: return '${widget.touchpointNumber}nd';
+      case 3: return '${widget.touchpointNumber}rd';
+      default: return '${widget.touchpointNumber}th';
+    }
   }
 
   @override

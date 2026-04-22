@@ -3,7 +3,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 
 /// Touchpoint selector: 1st through 7th + Archive
-/// NOTE: Icons are now all phone (default) since touchpoint pattern is no longer enforced.
+/// NOTE: Limited to 7 buttons in UI, but backend supports unlimited touchpoints.
+/// Icons are now all phone (default) since touchpoint pattern is no longer enforced.
 /// The actual touchpoint type (Visit/Call) is determined by the backend.
 class TouchpointSelector extends StatelessWidget {
   final int selectedTouchpoint;
