@@ -47,6 +47,9 @@ export 'location_filter_providers.dart' show
 // Re-export touchpoint count provider
 export '../../services/touchpoint/touchpoint_count_service.dart' show
   touchpointCountServiceProvider;
+// Re-export enhanced location service with PSGC fallback
+export '../../services/location/enhanced_location_provider.dart' show
+  enhancedLocationServiceProvider;
 // Re-export touchpoint creation service provider
 export '../../services/touchpoint/touchpoint_creation_service.dart' show
   TouchpointCreationService;

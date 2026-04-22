@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../services/media/camera_service.dart';
-import '../../../../services/location/geolocation_service.dart';
+import '../../../../services/location/enhanced_location_service.dart';
+import '../../../../services/location/enhanced_location_provider.dart';
 import '../../../../services/touchpoint/touchpoint_validation_service.dart';
 import '../../../../services/touchpoint/touchpoint_creation_service.dart';
 import '../../../../shared/providers/app_providers.dart' show touchpointCreationServiceProvider;
@@ -856,18 +857,21 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
       // Set submitting state
       ref.read(touchpointFormProvider.notifier).setIsSubmitting(true);
 
-      // Capture GPS location automatically
-      final geoService = GeolocationService();
-      final position = await geoService.getCurrentPosition();
-      String? gpsAddress;
+      // Capture GPS location automatically with PSGC fallback
+      final enhancedLocationService = ref.read(enhancedLocationServiceProvider);
+      final position = await enhancedLocationService.getCurrentPosition();
+      LocationAddress? locationAddress;
 
       if (position != null) {
-        // Get address from coordinates (reverse geocoding)
-        gpsAddress = await geoService.getAddressFromCoordinates(
+        // Get address from coordinates (with PSGC fallback)
+        locationAddress = await enhancedLocationService.getAddressFromCoordinates(
           position.latitude,
           position.longitude,
         );
       }
+
+      // Format the address for display (use PSGC short address if available)
+      final displayAddress = locationAddress?.fullAddress;
 
       // Create Touchpoint object from form data
       final touchpoint = Touchpoint(
@@ -890,7 +894,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
         timeOut: state.timeOut.time,
         latitude: position?.latitude,
         longitude: position?.longitude,
-        address: gpsAddress,
+        address: displayAddress,
       );
 
       // Use TouchpointCreationService for online/offline logic
@@ -903,7 +907,7 @@ class _TouchpointFormModalState extends ConsumerState<TouchpointFormModal> {
 
       // Success
       if (mounted) {
-        showToast('Touchpoint recorded successfully');
+        showToast('Touchpoint recorded successfully at ${displayAddress ?? "Unknown location"}');
         // Invalidate providers to refresh my day and itinerary lists
         ref.invalidate(todayItineraryProvider);
         ref.invalidate(myDayStateProvider);

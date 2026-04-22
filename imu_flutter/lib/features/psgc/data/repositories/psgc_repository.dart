@@ -75,6 +75,56 @@ class PsgcRepository {
     await _assetService.loadIfNeeded();
     return _assetService.searchBarangays(query, municipality: municipality);
   }
+
+  /// Find the nearest municipality based on GPS coordinates
+  /// Returns a PsgcBarangay with full location information
+  Future<PsgcBarangay?> findNearestMunicipality(double latitude, double longitude) async {
+    await _assetService.loadIfNeeded();
+
+    PsgcBarangay? nearest;
+    double minDistance = double.infinity;
+
+    for (final barangay in _assetService.getAllBarangays()) {
+      final pinLocation = barangay.pinLocation;
+      if (pinLocation == null) continue;
+
+      final pinLat = pinLocation['latitude'] as double?;
+      final pinLng = pinLocation['longitude'] as double?;
+
+      if (pinLat == null || pinLng == null) continue;
+
+      // Calculate distance using Haversine formula
+      final distance = _calculateDistance(latitude, longitude, pinLat, pinLng);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = barangay;
+      }
+    }
+
+    return nearest;
+  }
+
+  /// Calculate distance between two GPS coordinates in kilometers using Haversine formula
+  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+
+    final dLat = _toRadians(lat2 - lat1);
+    final dLng = _toRadians(lng2 - lng1);
+
+    final a = (dLat / 2).abs() * (dLat / 2).abs() +
+              (dLng / 2).abs() * (dLng / 2).abs() *
+              (lat1).abs().cos() *
+              (lat2).abs().cos();
+
+    final c = 2 * (a.sqrt()).atan2((1 - a).sqrt(), a.sqrt());
+
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * (3.14159265359 / 180);
+  }
 }
 
 final psgcAssetServiceProvider = Provider<PsgcAssetService>((ref) {
