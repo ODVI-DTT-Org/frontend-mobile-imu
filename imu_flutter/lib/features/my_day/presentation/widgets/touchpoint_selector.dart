@@ -3,6 +3,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../../core/utils/haptic_utils.dart';
 
 /// Touchpoint selector: 1st through 7th + Archive
+/// NOTE: Icons are now all phone (default) since touchpoint pattern is no longer enforced.
+/// The actual touchpoint type (Visit/Call) is determined by the backend.
 class TouchpointSelector extends StatelessWidget {
   final int selectedTouchpoint;
   final ValueChanged<int> onTouchpointSelected;
@@ -31,7 +33,6 @@ class TouchpointSelector extends StatelessWidget {
 
   Widget _buildTouchpointButton(int number) {
     final isSelected = selectedTouchpoint == number;
-    final isVisit = number == 1 || number == 4 || number == 7;
 
     return GestureDetector(
       onTap: () {
@@ -49,7 +50,7 @@ class TouchpointSelector extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isVisit ? LucideIcons.mapPin : LucideIcons.phone,
+              LucideIcons.phone,
               size: 18,
               color: isSelected ? Colors.white : const Color(0xFF64748B),
             ),

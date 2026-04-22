@@ -285,10 +285,14 @@ class Client {
     return clientType.name.toUpperCase();
   }
 
+  /// Get the next touchpoint type as TouchpointType enum
+  /// Returns null if no next touchpoint (client completed all touchpoints)
   TouchpointType? get nextTouchpointType {
-    final next = completedTouchpoints;
-    if (next >= 7) return null;
-    return TouchpointPattern.types[next];
+    final nextTypeString = nextTouchpoint?.toLowerCase();
+    if (nextTypeString == null) return null;
+    if (nextTypeString == 'call') return TouchpointType.call;
+    if (nextTypeString == 'visit') return TouchpointType.visit;
+    return null;
   }
 
   /// Check if client's location matches the given municipality code

@@ -9,10 +9,10 @@ class TouchpointFilter {
 
   bool matches(Client client) {
     if (!hasFilter) return true;
-    // Archive (8): loan released or all 7 touchpoints completed
-    if (selectedNumbers.contains(8) && (client.touchpointNumber >= 7 || client.loanReleased)) return true;
-    // 1–7: match clients whose NEXT touchpoint is n (not who have completed n)
-    return selectedNumbers.any((n) => n <= 7 && client.nextTouchpointNumber == n);
+    // Archive (8): loan released or all touchpoints completed (no next touchpoint)
+    if (selectedNumbers.contains(8) && (client.nextTouchpoint == null || client.loanReleased)) return true;
+    // 1–7+: match clients whose NEXT touchpoint is n (not who have completed n)
+    return selectedNumbers.any((n) => client.nextTouchpointNumber == n);
   }
 
   TouchpointFilter toggle(int n) {

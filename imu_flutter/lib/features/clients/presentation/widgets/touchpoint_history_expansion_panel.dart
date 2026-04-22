@@ -4,7 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../clients/data/models/client_model.dart';
 
 /// Touchpoint History Expansion Panel
-/// Displays the 7-step touchpoint sequence with status indicators
+/// Displays the touchpoint history with status indicators
 class TouchpointHistoryExpansionPanel extends StatelessWidget {
   final Client client;
   final List<Touchpoint> touchpoints;
@@ -27,7 +27,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        '7 steps',
+        '${touchpoints.length} step${touchpoints.length == 1 ? '' : 's'}',
         style: TextStyle(
           fontSize: 12,
           color: Colors.grey[600],

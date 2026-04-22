@@ -64,9 +64,9 @@ class TouchpointValidationService {
   //   return _sequence[touchpointNumber - 1];
   // }
 
-  /// COMMENTED OUT for Unli Touchpoint - no 7-touchpoint limit
+  /// COMMENTED OUT for Unli Touchpoint - no touchpoint limit
   /// Get the next expected touchpoint number for a client
-  /// Returns null if all 7 touchpoints are completed
+  /// Returns null if all touchpoints are completed (no next type)
   // static int? getNextTouchpointNumber(Client client) {
   //   final completedCount = client.touchpointSummary.length;
   //   if (completedCount >= 7) return null;

@@ -943,8 +943,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           await _loadClient();
           ref.invalidate(clientTouchpointsProvider);
 
-          // Check if this was the last touchpoint
-          if (nextNumber == 7) {
+          // Check if this was the last touchpoint (no next touchpoint)
+          if (nextTouchpoint == null) {
             await _showTouchpointCompletionDialog();
           }
         },
@@ -1100,7 +1100,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     }
   }
 
-  /// Show dialog when all 7 touchpoints are completed
+  /// Show dialog when all touchpoints are completed (no next touchpoint)
   Future<void> _showTouchpointCompletionDialog() async {
     return showDialog(
       context: context,
@@ -1116,7 +1116,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Congratulations! ${_client?.fullName ?? 'This client'} has completed all 7 touchpoints.',
+              'Congratulations! ${_client?.fullName ?? 'This client'} has completed all touchpoints.',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
@@ -1704,7 +1704,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                   // 3. CMS Visit History
                   CmsVisitHistoryExpansionPanel(clientId: widget.clientId),
 
-                  // 4. Touchpoint History (7-step sequence)
+                  // 4. Touchpoint History
                   TouchpointHistoryExpansionPanel(
                     client: _client!,
                     touchpoints: _client!.touchpoints,

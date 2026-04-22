@@ -839,7 +839,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     _toggleClientSelection(client.id);
   }
 
-  /// Show dialog when all 7 touchpoints are completed
+  /// Show dialog when all touchpoints are completed (no next touchpoint)
   void _showTouchpointCompletionDialog(String clientName) {
     showDialog(
       context: context,
@@ -855,7 +855,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$clientName has completed all 7 touchpoints.',
+              '$clientName has completed all touchpoints.',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
