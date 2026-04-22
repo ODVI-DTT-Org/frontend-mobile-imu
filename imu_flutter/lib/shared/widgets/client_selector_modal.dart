@@ -564,7 +564,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   ),
 
                   const SizedBox(height: 4),
-                  const TouchpointFilterChips(),
+                  // const TouchpointFilterChips(),
 
                   // Active filter chips
                   const ActiveFilterChipsRow(),
@@ -756,7 +756,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   ),
 
                   const SizedBox(height: 4),
-                  const TouchpointFilterChips(),
+                  // const TouchpointFilterChips(),
 
                   // Filter toggle
                   if (widget.showAssignedFilter)

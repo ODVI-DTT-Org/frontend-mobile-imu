@@ -495,7 +495,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 ),
 
                 const SizedBox(height: 8),
-                const TouchpointFilterChips(),
+                // const TouchpointFilterChips(),
 
                 // Active filter chips row
                 const ActiveFilterChipsRow(),
@@ -705,7 +705,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
               ),
 
               const SizedBox(height: 8),
-              const TouchpointFilterChips(),
+              // const TouchpointFilterChips(),
 
               const SizedBox(height: 12),
 
