@@ -620,10 +620,10 @@ class ClientListCard extends ConsumerWidget {
       ),
     );
 
-    // Star icon overlay (top-right corner)
-    final isStarred = ref.watch(clientFavoritesProvider)
-        .maybeWhen(data: (ids) => ids.contains(client.id), orElse: () => false);
-    final favoritesService = ref.watch(clientFavoritesServiceProvider);
+    // Star icon overlay (top-right corner) - using optimistic notifier
+    final favorites = ref.watch(clientFavoritesNotifierProvider);
+    final isStarred = favorites.contains(client.id ?? '');
+    final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
 
     final stackedCard = Stack(
       children: [
@@ -635,9 +635,9 @@ class ClientListCard extends ConsumerWidget {
             onTap: () async {
               try {
                 if (isStarred) {
-                  await favoritesService.unstarClient(client.id!);
+                  await favoritesNotifier.remove(client.id ?? '');
                 } else {
-                  await favoritesService.starClient(client.id!);
+                  await favoritesNotifier.add(client.id ?? '');
                 }
               } catch (_) {
                 if (context.mounted) {

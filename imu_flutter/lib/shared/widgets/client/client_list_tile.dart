@@ -37,10 +37,10 @@ class ClientListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userRole = ref.watch(currentUserRoleProvider);
 
-    // Check if client is favorited
-    final isStarred = ref.watch(clientFavoritesProvider)
-        .maybeWhen(data: (ids) => ids.contains(client.id), orElse: () => false);
-    final favoritesService = ref.watch(clientFavoritesServiceProvider);
+    // Check if client is favorited (using optimistic notifier)
+    final favorites = ref.watch(clientFavoritesNotifierProvider);
+    final isStarred = favorites.contains(client.id ?? '');
+    final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
 
     // Address — prefer primary from addresses list, fall back to client fields
     String addressText = '';
@@ -146,9 +146,9 @@ class ClientListTile extends ConsumerWidget {
                     onTap: () async {
                       try {
                         if (isStarred) {
-                          await favoritesService.unstarClient(client.id!);
+                          await favoritesNotifier.remove(client.id ?? '');
                         } else {
-                          await favoritesService.starClient(client.id!);
+                          await favoritesNotifier.add(client.id ?? '');
                         }
                       } catch (_) {
                         if (context.mounted) {

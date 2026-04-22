@@ -6,7 +6,142 @@ import '../../../../shared/providers/app_providers.dart' show currentUserIdProvi
 import '../../../../core/utils/logger.dart';
 import '../models/client_model.dart';
 
+/// Notifier for managing client favorite status with optimistic updates.
+/// This prevents the star button from "unticking" during PowerSync sync cycles.
+class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
+  final Ref _ref;
+  bool _isUpdating = false;
+
+  ClientFavoritesNotifier(this._ref) : super({}) {
+    _initializeFromDatabase();
+  }
+
+  /// Initialize state from PowerSync database and watch for changes.
+  /// Only update state from DB when not in the middle of a manual update.
+  void _initializeFromDatabase() {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) {
+      state = {};
+      return;
+    }
+
+    // Load initial state
+    PowerSyncService.database.then((db) {
+      db.getAll(
+        'SELECT client_id FROM client_favorites WHERE user_id ?',
+        [userId],
+      ).then((rows) {
+        final ids = rows.map((r) => r['client_id'] as String).toSet();
+        if (!_isUpdating) {
+          state = ids;
+          logDebug('[ClientFavoritesNotifier] Initialized with ${ids.length} favorites');
+        }
+      });
+    });
+
+    // Watch for changes from PowerSync (but ignore during manual updates)
+    PowerSyncService.database.asStream().asyncExpand((db) {
+      return db.watch(
+        'SELECT client_id FROM client_favorites WHERE user_id = ?',
+        parameters: [userId],
+      );
+    }).listen((rows) {
+      if (_isUpdating) {
+        logDebug('[ClientFavoritesNotifier] Ignoring stream update during manual operation');
+        return;
+      }
+      final ids = rows.map((r) => r['client_id'] as String).toSet();
+      state = ids;
+      logDebug('[ClientFavoritesNotifier] Stream updated with ${ids.length} favorites');
+    });
+  }
+
+  /// Optimistically add client to favorites.
+  Future<void> add(String clientId) async {
+    _isUpdating = true;
+    final previousState = state;
+
+    // Optimistic update
+    state = {...state, clientId};
+    logDebug('[ClientFavoritesNotifier] Optimistically added $clientId, now ${state.length} favorites');
+
+    try {
+      final userId = _ref.read(currentUserIdProvider);
+      if (userId == null) {
+        throw Exception('User not logged in');
+      }
+
+      final db = await PowerSyncService.database;
+      final id = const Uuid().v4();
+
+      await db.execute(
+        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
+        [id, userId, clientId, DateTime.now().toIso8601String()],
+      );
+
+      logDebug('[ClientFavoritesNotifier] Successfully inserted $clientId into database');
+    } catch (e) {
+      // Revert on error
+      state = previousState;
+      logError('[ClientFavoritesNotifier] Failed to add $clientId, reverted state: $e');
+      rethrow;
+    } finally {
+      // Allow stream updates after a short delay to ensure sync cycle completes
+      Future.delayed(const Duration(seconds: 3), () {
+        _isUpdating = false;
+        logDebug('[ClientFavoritesNotifier] Resuming stream updates');
+      });
+    }
+  }
+
+  /// Optimistically remove client from favorites.
+  Future<void> remove(String clientId) async {
+    _isUpdating = true;
+    final previousState = state;
+
+    // Optimistic update
+    state = state.where((id) => id != clientId).toSet();
+    logDebug('[ClientFavoritesNotifier] Optimistically removed $clientId, now ${state.length} favorites');
+
+    try {
+      final userId = _ref.read(currentUserIdProvider);
+      if (userId == null) {
+        throw Exception('User not logged in');
+      }
+
+      final db = await PowerSyncService.database;
+      await db.execute(
+        'DELETE FROM client_favorites WHERE user_id = ? AND client_id = ?',
+        [userId, clientId],
+      );
+
+      logDebug('[ClientFavoritesNotifier] Successfully removed $clientId from database');
+    } catch (e) {
+      // Revert on error
+      state = previousState;
+      logError('[ClientFavoritesNotifier] Failed to remove $clientId, reverted state: $e');
+      rethrow;
+    } finally {
+      // Allow stream updates after a short delay
+      Future.delayed(const Duration(seconds: 3), () {
+        _isUpdating = false;
+        logDebug('[ClientFavoritesNotifier] Resuming stream updates');
+      });
+    }
+  }
+
+  /// Check if a client is favorited.
+  bool contains(String clientId) => state.contains(clientId);
+}
+
+/// Provider for the favorites notifier.
+final clientFavoritesNotifierProvider = StateNotifierProvider<ClientFavoritesNotifier, Set<String>>((ref) {
+  return ClientFavoritesNotifier(ref);
+});
+
 /// Live set of favorited client IDs for the current user, from PowerSync SQLite.
+/// NOTE: This is now deprecated in favor of clientFavoritesNotifierProvider for optimistic updates.
+/// Kept for backward compatibility with favoritedClientListProvider.
 final clientFavoritesProvider = StreamProvider<Set<String>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value({});

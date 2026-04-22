@@ -1570,9 +1570,9 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         actions: [
           Consumer(
             builder: (context, ref, _) {
-              final isStarred = ref.watch(clientFavoritesProvider)
-                  .maybeWhen(data: (ids) => ids.contains(widget.clientId), orElse: () => false);
-              final favoritesService = ref.watch(clientFavoritesServiceProvider);
+              final favorites = ref.watch(clientFavoritesNotifierProvider);
+              final isStarred = favorites.contains(widget.clientId);
+              final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
               return IconButton(
                 icon: Icon(
                   isStarred ? Icons.star : Icons.star_border,
@@ -1584,14 +1584,14 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     logDebug('[ClientDetailPage] ${isStarred ? "Unstarring" : "Starring"} client: ${widget.clientId}');
 
                     if (isStarred) {
-                      await favoritesService.unstarClient(widget.clientId);
+                      await favoritesNotifier.remove(widget.clientId);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Removed from favorites')),
                         );
                       }
                     } else {
-                      await favoritesService.starClient(widget.clientId);
+                      await favoritesNotifier.add(widget.clientId);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Added to favorites')),
