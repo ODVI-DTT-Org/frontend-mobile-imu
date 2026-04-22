@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../clients/data/models/client_model.dart';
 import '../../../clients/data/models/address_model.dart' as addr;
 import '../../../clients/data/models/phone_number_model.dart' as ph;
+import '../../../../services/maps/map_service.dart';
 
 /// Contact Information Expansion Panel
 /// Displays all client contact information including phone numbers,
@@ -49,7 +50,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
               const SizedBox(height: 16),
               _buildEmailSection(),
               const SizedBox(height: 16),
-              _buildAddressesSection(),
+              _buildAddressesSection(context),
               const SizedBox(height: 16),
               _buildSocialMediaSection(),
             ],
@@ -247,7 +248,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
     return addresses;
   }
 
-  Widget _buildAddressesSection() {
+  Widget _buildAddressesSection(BuildContext context) {
     final addresses = _effectiveAddresses();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +271,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ...addresses.map((address) => _buildAddressTile(address)),
+              ...addresses.map((address) => _buildAddressTile(context, address)),
               const SizedBox(height: 8),
               _buildAddButton('+ Add Address', onAddAddress),
             ],
@@ -280,7 +281,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildAddressTile(addr.Address address) {
+  Widget _buildAddressTile(BuildContext context, addr.Address address) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -324,7 +325,7 @@ class ContactInformationExpansionPanel extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(LucideIcons.navigation, size: 16, color: Colors.green[700]),
-            onPressed: () => _openMap(address),
+            onPressed: () => _openMap(context, address),
             tooltip: 'Navigate',
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             padding: EdgeInsets.zero,
@@ -444,17 +445,94 @@ class ContactInformationExpansionPanel extends StatelessWidget {
     }
   }
 
-  Future<void> _openMap(addr.Address address) async {
-    final query = address.fullAddress;
-    final Uri launchUri = Uri(
-      scheme: 'https',
-      host: 'www.google.com',
-      path: '/maps/search/',
-      queryParameters: {'api': '1', 'query': query},
-    );
-    if (!await launchUrl(launchUri)) {
-      throw Exception('Could not launch $launchUri');
+  Future<void> _openMap(BuildContext context, addr.Address address) async {
+    // Check if address has GPS coordinates
+    if (address.latitude != null && address.longitude != null) {
+      await _openNavigationPicker(
+        context: context,
+        latitude: address.latitude!,
+        longitude: address.longitude!,
+        label: address.fullAddress,
+      );
+    } else if (address.fullAddress.isNotEmpty) {
+      // Fallback to text-based search if no coordinates
+      final query = Uri.encodeComponent(address.fullAddress);
+      final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+      if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open maps')),
+          );
+        }
+      }
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No address available')),
+        );
+      }
     }
+  }
+
+  Future<void> _openNavigationPicker({
+    required BuildContext context,
+    required double latitude,
+    required double longitude,
+    required String label,
+  }) async {
+    if (!context.mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Navigate with', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.map),
+              title: const Text('Google Maps'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final ok = await MapService().openGoogleMapsNavigation(
+                  latitude: latitude,
+                  longitude: longitude,
+                  label: label,
+                );
+                if (!ok && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open Google Maps')),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.navigation),
+              title: const Text('Waze'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final ok = await MapService().openWazeNavigation(
+                  latitude: latitude,
+                  longitude: longitude,
+                );
+                if (!ok && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open Waze')),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openLink(String url) async {
