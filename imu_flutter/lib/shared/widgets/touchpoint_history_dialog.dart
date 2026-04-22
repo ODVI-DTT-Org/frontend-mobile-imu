@@ -103,14 +103,17 @@ void showTouchpointDetails(BuildContext context, Touchpoint touchpoint) {
                   const SizedBox(height: 16),
 
                   // Remarks
-                  if (touchpoint.remarks != null && touchpoint.remarks!.isNotEmpty)
+                  if (touchpoint.remarks != null &&
+                      touchpoint.remarks!.isNotEmpty)
                     _buildDetailRow(
                       'Remarks',
                       touchpoint.remarks!,
                       LucideIcons.alignLeft,
                       Colors.grey[700]!,
                     ),
-                  if (touchpoint.remarks != null && touchpoint.remarks!.isNotEmpty) const SizedBox(height: 16),
+                  if (touchpoint.remarks != null &&
+                      touchpoint.remarks!.isNotEmpty)
+                    const SizedBox(height: 16),
 
                   // Photo section (at bottom)
                   _buildPhotoSection(touchpoint),
@@ -141,7 +144,8 @@ Widget _buildLocationSection(Touchpoint touchpoint) {
 }
 
 Widget _buildPhotoSection(Touchpoint touchpoint) {
-  final hasPhoto = touchpoint.photoPath != null && touchpoint.photoPath!.isNotEmpty;
+  final hasPhoto =
+      touchpoint.photoPath != null && touchpoint.photoPath!.isNotEmpty;
 
   if (!hasPhoto) {
     // Show placeholder
@@ -280,10 +284,12 @@ class TouchpointHistoryDialog extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<TouchpointHistoryDialog> createState() => _TouchpointHistoryDialogState();
+  ConsumerState<TouchpointHistoryDialog> createState() =>
+      _TouchpointHistoryDialogState();
 }
 
-class _TouchpointHistoryDialogState extends ConsumerState<TouchpointHistoryDialog> {
+class _TouchpointHistoryDialogState
+    extends ConsumerState<TouchpointHistoryDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -349,7 +355,8 @@ class _TouchpointHistoryDialogState extends ConsumerState<TouchpointHistoryDialo
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.alertCircle, size: 48, color: Colors.red[400]),
+                          Icon(LucideIcons.alertCircle,
+                              size: 48, color: Colors.red[400]),
                           const SizedBox(height: 16),
                           Text(
                             'Failed to load history',
@@ -367,7 +374,8 @@ class _TouchpointHistoryDialogState extends ConsumerState<TouchpointHistoryDialo
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.calendarX, size: 48, color: Colors.grey[400]),
+                          Icon(LucideIcons.calendarX,
+                              size: 48, color: Colors.grey[400]),
                           const SizedBox(height: 16),
                           Text(
                             'No touchpoints yet',
@@ -394,7 +402,8 @@ class _TouchpointHistoryDialogState extends ConsumerState<TouchpointHistoryDialo
                     padding: const EdgeInsets.all(16),
                     itemCount: touchpoints.length,
                     itemBuilder: (context, index) {
-                      return _TouchpointHistoryItem(touchpoint: touchpoints[index]);
+                      return _TouchpointHistoryItem(
+                          touchpoint: touchpoints[index]);
                     },
                   );
                 },
@@ -431,10 +440,12 @@ class TouchpointHistoryBottomSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<TouchpointHistoryBottomSheet> createState() => _TouchpointHistoryBottomSheetState();
+  ConsumerState<TouchpointHistoryBottomSheet> createState() =>
+      _TouchpointHistoryBottomSheetState();
 }
 
-class _TouchpointHistoryBottomSheetState extends ConsumerState<TouchpointHistoryBottomSheet> {
+class _TouchpointHistoryBottomSheetState
+    extends ConsumerState<TouchpointHistoryBottomSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -512,7 +523,8 @@ class _TouchpointHistoryBottomSheetState extends ConsumerState<TouchpointHistory
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(LucideIcons.alertCircle, size: 48, color: Colors.red[400]),
+                        Icon(LucideIcons.alertCircle,
+                            size: 48, color: Colors.red[400]),
                         const SizedBox(height: 16),
                         Text(
                           'Failed to load history',
@@ -530,7 +542,8 @@ class _TouchpointHistoryBottomSheetState extends ConsumerState<TouchpointHistory
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(LucideIcons.calendarX, size: 48, color: Colors.grey[400]),
+                        Icon(LucideIcons.calendarX,
+                            size: 48, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         Text(
                           'No touchpoints yet',
@@ -557,7 +570,8 @@ class _TouchpointHistoryBottomSheetState extends ConsumerState<TouchpointHistory
                   padding: const EdgeInsets.all(16),
                   itemCount: touchpoints.length,
                   itemBuilder: (context, index) {
-                    return _TouchpointHistoryItem(touchpoint: touchpoints[index]);
+                    return _TouchpointHistoryItem(
+                        touchpoint: touchpoints[index]);
                   },
                 );
               },
@@ -633,9 +647,11 @@ class _TouchpointHistoryItem extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isVisit ? Colors.blue[100] : Colors.green[100],
+                            color:
+                                isVisit ? Colors.blue[100] : Colors.green[100],
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -643,7 +659,9 @@ class _TouchpointHistoryItem extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: isVisit ? Colors.blue[700] : Colors.green[700],
+                              color: isVisit
+                                  ? Colors.blue[700]
+                                  : Colors.green[700],
                             ),
                           ),
                         ),
@@ -659,11 +677,13 @@ class _TouchpointHistoryItem extends StatelessWidget {
                         const SizedBox(width: 8),
                         // Status badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: statusColor.withOpacity(0.3)),
+                            border:
+                                Border.all(color: statusColor.withOpacity(0.3)),
                           ),
                           child: Text(
                             touchpoint.status.apiValue,
@@ -710,7 +730,8 @@ class _TouchpointHistoryItem extends StatelessWidget {
               icon: const Icon(LucideIcons.eye, size: 14),
               label: const Text('View Details'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 foregroundColor: isVisit ? Colors.blue[700] : Colors.green[700],
                 side: BorderSide(
                   color: isVisit ? Colors.blue[200]! : Colors.green[200]!,

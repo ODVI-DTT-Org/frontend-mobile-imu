@@ -33,7 +33,8 @@ Touchpoint createTestTouchpoint({
 
 void main() {
   group('Touchpoint Test Helpers', () {
-    testWidgets('createTestTouchpoint creates valid touchpoint', (tester) async {
+    testWidgets('createTestTouchpoint creates valid touchpoint',
+        (tester) async {
       // Arrange & Act
       final touchpoint = createTestTouchpoint(
         touchpointNumber: 3,
@@ -49,7 +50,8 @@ void main() {
       expect(touchpoint.type, equals(TouchpointType.call));
       expect(touchpoint.reason, equals(TouchpointReason.loanInquiry));
       expect(touchpoint.status, equals(TouchpointStatus.interested));
-      expect(touchpoint.timeInGpsAddress, equals('123 Main St, Manila, Metro Manila'));
+      expect(touchpoint.timeInGpsAddress,
+          equals('123 Main St, Manila, Metro Manila'));
       expect(touchpoint.remarks, equals('Client interested in the product.'));
     });
 
@@ -136,7 +138,8 @@ void main() {
       expect(touchpoint.timeInGpsAddress, isNotNull);
     });
 
-    testWidgets('falls back to address when timeInGpsAddress is null', (tester) async {
+    testWidgets('falls back to address when timeInGpsAddress is null',
+        (tester) async {
       // Arrange
       final touchpoint = createTestTouchpoint(
         touchpointNumber: 1,
@@ -257,7 +260,8 @@ void main() {
       expect(touchpoint.reason, equals(TouchpointReason.forProcessing));
       expect(touchpoint.status, equals(TouchpointStatus.completed));
       expect(touchpoint.status.apiValue, equals('COMPLETED'));
-      expect(touchpoint.timeInGpsAddress, equals('456 Oak Ave, Quezon City, Metro Manila'));
+      expect(touchpoint.timeInGpsAddress,
+          equals('456 Oak Ave, Quezon City, Metro Manila'));
       expect(touchpoint.remarks, equals('Documents submitted successfully.'));
       expect(touchpoint.photoPath, isNull);
     });
