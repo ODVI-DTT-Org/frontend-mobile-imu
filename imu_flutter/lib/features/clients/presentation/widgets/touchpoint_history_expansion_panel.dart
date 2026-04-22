@@ -45,7 +45,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       'No touchpoints recorded yet',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
                   ),
                 )

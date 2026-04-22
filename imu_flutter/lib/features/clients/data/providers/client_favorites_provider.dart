@@ -28,7 +28,7 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
     // Load initial state
     PowerSyncService.database.then((db) {
       db.getAll(
-        'SELECT client_id FROM client_favorites WHERE user_id ?',
+        'SELECT client_id FROM client_favorites WHERE user_id = ?',
         [userId],
       ).then((rows) {
         final ids = rows.map((r) => r['client_id'] as String).toSet();
