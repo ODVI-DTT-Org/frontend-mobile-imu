@@ -567,6 +567,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             description: 'Create touchpoint + visit',
             value: 'touchpoint',
             isDisabled: !canRecordTouchpoint,
+            isLoanReleased: visit.loanReleased,
           ),
           ActionOption(
             icon: LucideIcons.mapPin,

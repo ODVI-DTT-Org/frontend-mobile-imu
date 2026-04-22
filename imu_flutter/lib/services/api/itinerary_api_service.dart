@@ -43,6 +43,8 @@ class ItineraryItem {
   final String? previousTouchpointType; // Last completed touchpoint type (visit/call)
   final DateTime? previousTouchpointDate; // Last completed touchpoint date
 
+  final bool loanReleased; // Whether the client's loan has been released
+
   ItineraryItem({
     required this.id,
     required this.clientId,
@@ -70,6 +72,7 @@ class ItineraryItem {
     this.previousTouchpointReason,
     this.previousTouchpointType,
     this.previousTouchpointDate,
+    this.loanReleased = false,
   });
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) {
@@ -108,6 +111,14 @@ class ItineraryItem {
     productType ??= (json['client'] as Map<String, dynamic>?)?['product_type'] as String?;
     pensionType ??= (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?;
     loanType ??= (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?;
+
+    // Parse loan_released from client expand or flat fields
+    bool loanReleased = false;
+    if (json['expand'] != null && json['expand']['client_id'] != null) {
+      final client = json['expand']['client_id'] as Map<String, dynamic>;
+      loanReleased = client['loan_released'] as bool? ?? false;
+    }
+    loanReleased = json['loan_released'] as bool? ?? loanReleased;
 
     // Parse scheduled date - convert UTC timestamps to local time
     // Backend can send either:
@@ -176,6 +187,7 @@ class ItineraryItem {
       previousTouchpointDate: json['previous_touchpoint_date'] != null
           ? DateTime.parse(json['previous_touchpoint_date'])
           : null,
+      loanReleased: loanReleased,
     );
   }
 
@@ -232,6 +244,7 @@ class ItineraryItem {
           : null,
       nextTouchpointNumber: nextNum,
       nextTouchpointType: nextType,
+      loanReleased: row['loan_released'] as bool? ?? false,
     );
   }
 
