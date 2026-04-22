@@ -1,9 +1,256 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/api/client_api_service.dart';
+
+/// Show touchpoint details in a modal bottom sheet
+void showTouchpointDetails(BuildContext context, Touchpoint touchpoint) {
+  final isVisit = touchpoint.type == TouchpointType.visit;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(
+                  isVisit ? LucideIcons.mapPin : LucideIcons.phone,
+                  color: isVisit ? Colors.blue : Colors.green,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Touchpoint #${touchpoint.touchpointNumber}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${isVisit ? 'Visit' : 'Call'} • ${DateFormat('MMM d, yyyy').format(touchpoint.date)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status
+                  _buildDetailRow(
+                    'Status',
+                    touchpoint.status.apiValue,
+                    LucideIcons.badgeCheck,
+                    _getStatusColor(touchpoint.status),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Reason
+                  if (touchpoint.reason != null)
+                    _buildDetailRow(
+                      'Reason',
+                      touchpoint.reason!.apiValue,
+                      LucideIcons.messageCircle,
+                      Colors.grey[700]!,
+                    ),
+                  if (touchpoint.reason != null) const SizedBox(height: 16),
+
+                  // Location (simplified - address only)
+                  _buildLocationSection(touchpoint),
+                  const SizedBox(height: 16),
+
+                  // Remarks
+                  if (touchpoint.remarks != null && touchpoint.remarks!.isNotEmpty)
+                    _buildDetailRow(
+                      'Remarks',
+                      touchpoint.remarks!,
+                      LucideIcons.alignLeft,
+                      Colors.grey[700]!,
+                    ),
+                  if (touchpoint.remarks != null && touchpoint.remarks!.isNotEmpty) const SizedBox(height: 16),
+
+                  // Photo section (at bottom)
+                  _buildPhotoSection(touchpoint),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildLocationSection(Touchpoint touchpoint) {
+  // Priority: timeInGpsAddress > address field
+  final address = touchpoint.timeInGpsAddress ?? touchpoint.address;
+
+  if (address == null || address.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  return _buildDetailRow(
+    'Location',
+    address,
+    LucideIcons.mapPin,
+    Colors.grey[700]!,
+  );
+}
+
+Widget _buildPhotoSection(Touchpoint touchpoint) {
+  final hasPhoto = touchpoint.photoPath != null && touchpoint.photoPath!.isNotEmpty;
+
+  if (!hasPhoto) {
+    // Show placeholder
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(LucideIcons.camera, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 8),
+          Text(
+            'No photo',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show photo
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: Image.file(
+      File(touchpoint.photoPath!),
+      width: double.infinity,
+      height: 200,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        width: double.infinity,
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.image, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+              'Unable to load photo',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Color _getStatusColor(TouchpointStatus status) {
+  switch (status) {
+    case TouchpointStatus.interested:
+      return Colors.green;
+    case TouchpointStatus.undecided:
+      return Colors.orange;
+    case TouchpointStatus.notInterested:
+      return Colors.red;
+    case TouchpointStatus.completed:
+      return Colors.blue;
+    case TouchpointStatus.followUpNeeded:
+      return Colors.purple;
+    case TouchpointStatus.incomplete:
+      return Colors.grey;
+  }
+}
+
+Widget _buildDetailRow(String label, String value, IconData icon, Color color) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, size: 16, color: color),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
 
 /// Bottom sheet showing touchpoint history for a client
 class TouchpointHistoryDialog extends ConsumerStatefulWidget {
@@ -459,7 +706,7 @@ class _TouchpointHistoryItem extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => _showTouchpointDetails(context, touchpoint),
+              onPressed: () => showTouchpointDetails(context, touchpoint),
               icon: const Icon(LucideIcons.eye, size: 14),
               label: const Text('View Details'),
               style: OutlinedButton.styleFrom(
@@ -491,184 +738,6 @@ class _TouchpointHistoryItem extends StatelessWidget {
       case TouchpointStatus.incomplete:
         return Colors.grey;
     }
-  }
-
-  void _showTouchpointDetails(BuildContext context, Touchpoint touchpoint) {
-    final isVisit = touchpoint.type == TouchpointType.visit;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    isVisit ? LucideIcons.mapPin : LucideIcons.phone,
-                    color: isVisit ? Colors.blue : Colors.green,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Touchpoint #${touchpoint.touchpointNumber}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${isVisit ? 'Visit' : 'Call'} • ${DateFormat('MMM d, yyyy').format(touchpoint.date)}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.x),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Status
-                    _buildDetailRow(
-                      'Status',
-                      touchpoint.status.apiValue,
-                      LucideIcons.badgeCheck,
-                      _getStatusColor(touchpoint.status),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Reason
-                    if (touchpoint.reason != null)
-                      _buildDetailRow(
-                        'Reason',
-                        touchpoint.reason!.apiValue,
-                        LucideIcons.messageCircle,
-                        Colors.grey[700]!,
-                      ),
-                    if (touchpoint.reason != null) const SizedBox(height: 16),
-
-                    // Remarks
-                    if (touchpoint.remarks != null && touchpoint.remarks!.isNotEmpty)
-                      _buildDetailRow(
-                        'Remarks',
-                        touchpoint.remarks!,
-                        LucideIcons.alignLeft,
-                        Colors.grey[700]!,
-                      ),
-                    if (touchpoint.remarks != null && touchpoint.remarks!.isNotEmpty) const SizedBox(height: 16),
-
-                    // Address
-                    if (touchpoint.address != null && touchpoint.address!.isNotEmpty)
-                      _buildDetailRow(
-                        'Address',
-                        touchpoint.address!,
-                        LucideIcons.mapPin,
-                        Colors.grey[700]!,
-                      ),
-                    if (touchpoint.address != null && touchpoint.address!.isNotEmpty) const SizedBox(height: 16),
-
-                    // GPS Location
-                    if (touchpoint.latitude != null && touchpoint.longitude != null)
-                      _buildDetailRow(
-                        'GPS Location',
-                        '${touchpoint.latitude!.toStringAsFixed(6)}, ${touchpoint.longitude!.toStringAsFixed(6)}',
-                        LucideIcons.crosshair,
-                        Colors.grey[700]!,
-                      ),
-                    if (touchpoint.latitude != null && touchpoint.longitude != null) const SizedBox(height: 16),
-
-                    // Time In/Out
-                    if (touchpoint.timeIn != null)
-                      _buildDetailRow(
-                        'Time In',
-                        DateFormat('HH:mm').format(touchpoint.timeIn!),
-                        LucideIcons.clock,
-                        Colors.grey[700]!,
-                      ),
-                    if (touchpoint.timeIn != null) const SizedBox(height: 8),
-                    if (touchpoint.timeOut != null)
-                      _buildDetailRow(
-                        'Time Out',
-                        DateFormat('HH:mm').format(touchpoint.timeOut!),
-                        LucideIcons.clock,
-                        Colors.grey[700]!,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, IconData icon, Color color) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   String _getOrdinalSuffix(int number) {
