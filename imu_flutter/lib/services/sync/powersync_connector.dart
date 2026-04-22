@@ -330,17 +330,18 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
 
       case 'client_favorites':
         final clientId = data['client_id'] as String?;
-        final id = data['id'] as String?;
         if (clientId == null) {
           logError('client_favorites op missing client_id — skipping');
           return;
         }
         if (op.op == UpdateType.put) {
           // Star client - POST to favorite endpoint with id in body
-          // IMPORTANT: Send id so backend uses the same UUID instead of generating a new one
+          // IMPORTANT: Use op.id (PowerSync row ID) not data['id']
+          // op.id is the actual id column value from the database
+          logDebug('[client_favorites] Posting to $_apiUrl/clients/$clientId/favorite with op.id: ${op.id}');
           await _httpClient.post(
             '$_apiUrl/clients/$clientId/favorite',
-            data: {'id': id},
+            data: {'id': op.id},
             options: Options(headers: headers),
           );
         } else if (op.op == UpdateType.delete) {
