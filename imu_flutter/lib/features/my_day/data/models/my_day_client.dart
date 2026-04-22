@@ -35,6 +35,7 @@ class MyDayClient {
   final String? pensionType;  // raw e.g. 'GSIS'
   final String? loanType;     // raw e.g. 'SALARY'
   final String? address;      // flat string e.g. 'San Jose, Ilocos Norte'
+  final bool loanReleased;    // Whether the client's loan has been released
 
   MyDayClient({
     required this.id,
@@ -63,6 +64,7 @@ class MyDayClient {
     this.pensionType,
     this.loanType,
     this.address,
+    this.loanReleased = false,
   });
 
   String get touchpointOrdinal {
@@ -126,6 +128,7 @@ class MyDayClient {
       loanType: (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?,
       address: (json['client'] as Map<String, dynamic>?)?['full_address'] as String?
           ?? json['address'] as String?,
+      loanReleased: (json['client'] as Map<String, dynamic>?)?['loan_released'] as bool? ?? false,
     );
   }
 
@@ -214,6 +217,7 @@ class MyDayClient {
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,
       address: addressStr,
+      loanReleased: row['loan_released'] as bool? ?? false,
     );
   }
 
@@ -241,6 +245,7 @@ class MyDayClient {
     'pension_type': pensionType,
     'loan_type': loanType,
     'address': address,
+    'loan_released': loanReleased,
   };
 
   MyDayClient copyWith({
@@ -270,6 +275,7 @@ class MyDayClient {
     String? pensionType,
     String? loanType,
     String? address,
+    bool? loanReleased,
   }) {
     return MyDayClient(
       id: id ?? this.id,
@@ -298,6 +304,7 @@ class MyDayClient {
       pensionType: pensionType ?? this.pensionType,
       loanType: loanType ?? this.loanType,
       address: address ?? this.address,
+      loanReleased: loanReleased ?? this.loanReleased,
     );
   }
 
@@ -327,7 +334,8 @@ class MyDayClient {
           other.productType == productType &&
           other.pensionType == pensionType &&
           other.loanType == loanType &&
-          other.address == address;
+          other.address == address &&
+          other.loanReleased == loanReleased;
 
   @override
   int get hashCode => Object.hashAll([
@@ -354,6 +362,7 @@ class MyDayClient {
         pensionType,
         loanType,
         address,
+        loanReleased,
       ]);
 
   @override

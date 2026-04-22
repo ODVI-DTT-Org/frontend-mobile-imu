@@ -535,6 +535,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             description: 'Create touchpoint + visit',
             value: 'touchpoint',
             isDisabled: !canRecordTouchpoint,
+            isLoanReleased: client.loanReleased,
           ),
           // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
           // ActionOption(

@@ -10,6 +10,7 @@ class ActionOption {
   final String value;
   final bool isDestructive;
   final bool isDisabled;
+  final bool isLoanReleased;
   final Color? iconColor;
 
   const ActionOption({
@@ -19,6 +20,7 @@ class ActionOption {
     required this.value,
     this.isDestructive = false,
     this.isDisabled = false,
+    this.isLoanReleased = false,
     this.iconColor,
   });
 }
@@ -187,35 +189,72 @@ class ActionBottomSheet extends StatelessWidget {
 
   Widget _buildOption(BuildContext context, ActionOption option) {
     final isDisabled = option.isDisabled;
-    final iconColor = isDisabled
-        ? Colors.grey.shade400
-        : (option.iconColor ?? (option.isDestructive ? Colors.red.shade600 : const Color(0xFF0F172A)));
+    final isLoanReleased = option.isLoanReleased;
+
+    Color iconColor;
+    Color? titleColor;
+    Color? subtitleColor;
+    IconData displayIcon;
+    String displayTitle;
+    String? displayDescription;
+
+    if (isLoanReleased) {
+      // Loan released styling: orange with lock icon
+      iconColor = Colors.orange.shade700;
+      titleColor = Colors.orange.shade700;
+      subtitleColor = Colors.orange.shade600;
+      displayIcon = LucideIcons.lock;
+      displayTitle = 'LOAN RELEASED';
+      displayDescription = 'Cannot create touchpoints: Loan has been released';
+    } else {
+      // Normal styling
+      iconColor = isDisabled
+          ? Colors.grey.shade400
+          : (option.iconColor ?? (option.isDestructive ? Colors.red.shade600 : const Color(0xFF0F172A)));
+      titleColor = isDisabled
+          ? Colors.grey.shade400
+          : (option.isDestructive ? Colors.red.shade700 : null);
+      subtitleColor = isDisabled ? Colors.grey.shade300 : Colors.grey.shade600;
+      displayIcon = option.icon;
+      displayTitle = option.title;
+      displayDescription = option.description;
+    }
 
     return Column(
       children: [
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-          leading: Icon(option.icon, color: iconColor, size: 22),
+          leading: Icon(displayIcon, color: iconColor, size: 22),
           title: Text(
-            option.title,
+            displayTitle,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: isLoanReleased ? 14 : 16,
               fontWeight: FontWeight.w500,
-              color: isDisabled
-                  ? Colors.grey.shade400
-                  : (option.isDestructive ? Colors.red.shade700 : null),
+              color: titleColor,
             ),
           ),
-          subtitle: option.description != null
+          subtitle: displayDescription != null
               ? Text(
-                  option.description!,
+                  displayDescription!,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isDisabled ? Colors.grey.shade300 : Colors.grey.shade600,
+                    color: subtitleColor,
                   ),
                 )
               : null,
           onTap: isDisabled ? null : () {
+            if (isLoanReleased) {
+              HapticUtils.error();
+              // Show error notification
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(displayDescription ?? 'Cannot create touchpoints: Loan has been released'),
+                  backgroundColor: Colors.orange.shade700,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
             HapticUtils.lightImpact();
             Navigator.of(context).pop(option.value);
           },
