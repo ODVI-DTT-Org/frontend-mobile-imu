@@ -230,20 +230,19 @@ class ClientListCard extends ConsumerWidget {
 
     final role = ref.watch(currentUserRoleProvider);
     final nextTpNum = client.nextTouchpointNumber;
-    const callNumbers = {2, 3, 5, 6};
-    const visitNumbers = {1, 4, 7};
+    final nextTpType = client.nextTouchpoint?.toLowerCase();
 
     // Loan released → green card
-    // My turn (Caravan=Visit, Tele=Call) → blue card
+    // My turn (Caravan=Visit, Tele=Call) → blue card (backend-determined type)
     // Not my turn → white card + grayed out (opacity)
     final isLoanReleased = effectiveLoanReleased;
-    final isMyTurn = nextTpNum != null && (
-      (role == UserRole.caravan && visitNumbers.contains(nextTpNum)) ||
-      (role == UserRole.tele   && callNumbers.contains(nextTpNum))
+    final isMyTurn = nextTpType != null && (
+      (role == UserRole.caravan && nextTpType == 'visit') ||
+      (role == UserRole.tele   && nextTpType == 'call')
     );
-    final isNotMyTurn = nextTpNum != null && (
-      (role == UserRole.caravan && callNumbers.contains(nextTpNum)) ||
-      (role == UserRole.tele   && visitNumbers.contains(nextTpNum))
+    final isNotMyTurn = nextTpType != null && (
+      (role == UserRole.caravan && nextTpType == 'call') ||
+      (role == UserRole.tele   && nextTpType == 'visit')
     );
 
     final latestTouchpoint = effectiveTouchpoints.isNotEmpty
