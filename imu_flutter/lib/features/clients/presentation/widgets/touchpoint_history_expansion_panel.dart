@@ -63,7 +63,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
           orElse: () => null,
         );
 
-    final type = _getExpectedType(touchpointNumber);
+    // Use actual touchpoint type if available, otherwise use client's nextTouchpoint
+    final type = touchpoint?.type ?? _getNextTouchpointType(touchpointNumber);
     final status = _getTouchpointStatus(touchpoint);
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
@@ -362,21 +363,18 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
     );
   }
 
-  TouchpointType _getExpectedType(int number) {
-    // Touchpoint sequence pattern: Visit → Call → Call → Visit → Call → Call → Visit
-    switch (number) {
-      case 1:
-      case 4:
-      case 7:
-        return TouchpointType.visit;
-      case 2:
-      case 3:
-      case 5:
-      case 6:
-        return TouchpointType.call;
-      default:
-        return TouchpointType.visit;
+  /// Get the next touchpoint type from client data (backend-determined)
+  /// This is used for pending touchpoints where the actual type is not yet known
+  TouchpointType _getNextTouchpointType(int touchpointNumber) {
+    // Check if this is the next pending touchpoint
+    if (client.nextTouchpointNumber == touchpointNumber) {
+      // Use the backend-provided next touchpoint type
+      final nextType = client.nextTouchpoint?.toLowerCase();
+      if (nextType == 'call') return TouchpointType.call;
+      if (nextType == 'visit') return TouchpointType.visit;
     }
+    // Default to Visit for future touchpoints (type will be determined by backend)
+    return TouchpointType.visit;
   }
 
   String _getTouchpointStatus(Touchpoint? touchpoint) {
