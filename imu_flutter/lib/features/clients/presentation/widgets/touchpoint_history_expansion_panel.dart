@@ -27,7 +27,9 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        '${touchpoints.length} step${touchpoints.length == 1 ? '' : 's'}',
+        touchpoints.isEmpty
+            ? 'No touchpoints yet'
+            : '${touchpoints.length} touchpoint${touchpoints.length == 1 ? '' : 's'}',
         style: TextStyle(
           fontSize: 12,
           color: Colors.grey[600],
@@ -37,35 +39,30 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '7-STEP TOUCHPOINT SEQUENCE',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
+          child: touchpoints.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No touchpoints recorded yet',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...touchpoints.map((touchpoint) => _buildTouchpointTile(context, touchpoint)),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              ...List.generate(7, (index) => _buildTouchpointTile(context, index + 1)),
-            ],
-          ),
         ),
       ],
     );
   }
 
-  Widget _buildTouchpointTile(BuildContext context, int touchpointNumber) {
-    final touchpoint = touchpoints.cast<Touchpoint?>().firstWhere(
-          (tp) => tp?.touchpointNumber == touchpointNumber,
-          orElse: () => null,
-        );
-
-    // Use actual touchpoint type if available, otherwise use client's nextTouchpoint
-    final type = touchpoint?.type ?? _getNextTouchpointType(touchpointNumber);
-    final status = _getTouchpointStatus(touchpoint);
+  Widget _buildTouchpointTile(BuildContext context, Touchpoint touchpoint) {
+    final type = touchpoint.type;
+    final status = 'Completed';
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
 
@@ -86,7 +83,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                   Icon(statusIcon, size: 14, color: statusColor),
                   const SizedBox(width: 4),
                   Text(
-                    'TP$touchpointNumber: ${type.name}',
+                    'TP${touchpoint.touchpointNumber}: ${type.name}',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -105,48 +102,34 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                 color: statusColor,
               ),
             ),
-            if (touchpoint != null) ...[
-              const Spacer(),
-              Icon(Icons.chevron_right, size: 16, color: Colors.grey[400]),
-            ],
+            const Spacer(),
+            Icon(Icons.chevron_right, size: 16, color: Colors.grey[400]),
           ],
         ),
-        if (touchpoint != null) ...[
-          const SizedBox(height: 8),
+        const SizedBox(height: 8),
+        Text(
+          'Date: ${_formatDate(touchpoint.date)}',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[700],
+          ),
+        ),
+        if (touchpoint.userId != null)
           Text(
-            'Date: ${_formatDate(touchpoint!.date)}',
+            'Agent: ${touchpoint.userId}',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[700],
             ),
           ),
-          if (touchpoint.userId != null)
-            Text(
-              'Agent: ${touchpoint.userId}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[700],
-              ),
-            ),
-          if (touchpoint.status != null)
-            Text(
-              'Status: ${touchpoint.status?.name ?? '—'}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[700],
-              ),
-            ),
-        ] else if (status == 'Pending') ...[
-          const SizedBox(height: 4),
+        if (touchpoint.status != null)
           Text(
-            'Scheduled: ${_getScheduledDate(touchpointNumber)}',
+            'Status: ${touchpoint.status?.name ?? '—'}',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[600],
-              fontStyle: FontStyle.italic,
+              color: Colors.grey[700],
             ),
           ),
-        ],
       ],
     );
 
@@ -160,23 +143,18 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: touchpoint != null
-          ? Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => _showTouchpointDetailDialog(context, touchpoint),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: tileContent,
-                ),
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(12),
-              child: tileContent,
-            ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _showTouchpointDetailDialog(context, touchpoint),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: tileContent,
+          ),
+        ),
+      ),
     );
   }
 
@@ -363,67 +341,16 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
     );
   }
 
-  /// Get the next touchpoint type from client data (backend-determined)
-  /// This is used for pending touchpoints where the actual type is not yet known
-  TouchpointType _getNextTouchpointType(int touchpointNumber) {
-    // Check if this is the next pending touchpoint
-    if (client.nextTouchpointNumber == touchpointNumber) {
-      // Use the backend-provided next touchpoint type
-      final nextType = client.nextTouchpoint?.toLowerCase();
-      if (nextType == 'call') return TouchpointType.call;
-      if (nextType == 'visit') return TouchpointType.visit;
-    }
-    // Default to Visit for future touchpoints (type will be determined by backend)
-    return TouchpointType.visit;
-  }
-
-  String _getTouchpointStatus(Touchpoint? touchpoint) {
-    if (touchpoint == null) {
-      // Check if this is the next pending touchpoint
-      if (client.nextTouchpointNumber != null &&
-          touchpoints.length < client.nextTouchpointNumber!) {
-        return 'Pending';
-      }
-      return 'Not Started';
-    }
-    return 'Completed';
-  }
-
   Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Completed':
-        return Colors.green;
-      case 'Pending':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
+    return Colors.green;
   }
 
   IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'Completed':
-        return LucideIcons.checkCircle;
-      case 'Pending':
-        return LucideIcons.clock;
-      default:
-        return LucideIcons.circle;
-    }
+    return LucideIcons.checkCircle;
   }
 
   String _formatDate(DateTime? date) {
     if (date == null) return '—';
     return '${date.month}/${date.day}/${date.year}';
-  }
-
-  String _getScheduledDate(int touchpointNumber) {
-    // Calculate expected date based on previous touchpoint dates
-    // This is a simplified calculation - you may want to enhance this
-    final lastTouchpoint = touchpoints.isNotEmpty ? touchpoints.last : null;
-    if (lastTouchpoint != null) {
-      final scheduledDate = lastTouchpoint.date.add(const Duration(days: 7));
-      return '${scheduledDate.month}/${scheduledDate.day}/${scheduledDate.year}';
-    }
-    return 'TBD';
   }
 }
