@@ -1480,6 +1480,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         return Colors.blue;
       case ClientType.existing:
         return Colors.green;
+      case ClientType.virgin:
+        return Colors.purple;
     }
   }
 
