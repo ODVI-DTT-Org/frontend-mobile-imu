@@ -199,4 +199,89 @@ void main() {
       expect(touchpoint.photoPath!.isEmpty, isTrue);
     });
   });
+
+  group('Remarks Display Logic', () {
+    testWidgets('remarks are present when set', (tester) async {
+      // Arrange
+      final touchpoint = createTestTouchpoint(
+        touchpointNumber: 1,
+        remarks: 'This is a remark.',
+      );
+
+      // Act & Assert
+      expect(touchpoint.remarks, equals('This is a remark.'));
+      expect(touchpoint.remarks!.isNotEmpty, isTrue);
+    });
+
+    testWidgets('remarks can be null', (tester) async {
+      // Arrange
+      final touchpoint = createTestTouchpoint(
+        touchpointNumber: 1,
+        remarks: null,
+      );
+
+      // Act & Assert
+      expect(touchpoint.remarks, isNull);
+    });
+
+    testWidgets('remarks can be empty string', (tester) async {
+      // Arrange
+      final touchpoint = createTestTouchpoint(
+        touchpointNumber: 1,
+        remarks: '',
+      );
+
+      // Act & Assert
+      expect(touchpoint.remarks, equals(''));
+      expect(touchpoint.remarks!.isEmpty, isTrue);
+    });
+  });
+
+  group('Integration - Complete Touchpoint Data', () {
+    testWidgets('complete touchpoint with all fields', (tester) async {
+      // Arrange
+      final touchpoint = createTestTouchpoint(
+        touchpointNumber: 5,
+        type: TouchpointType.visit,
+        reason: TouchpointReason.forProcessing,
+        status: TouchpointStatus.completed,
+        timeInGpsAddress: '456 Oak Ave, Quezon City, Metro Manila',
+        remarks: 'Documents submitted successfully.',
+        photoPath: null,
+      );
+
+      // Act & Assert - Verify all fields
+      expect(touchpoint.touchpointNumber, equals(5));
+      expect(touchpoint.type, equals(TouchpointType.visit));
+      expect(touchpoint.type.apiValue, equals('Visit'));
+      expect(touchpoint.reason, equals(TouchpointReason.forProcessing));
+      expect(touchpoint.status, equals(TouchpointStatus.completed));
+      expect(touchpoint.status.apiValue, equals('COMPLETED'));
+      expect(touchpoint.timeInGpsAddress, equals('456 Oak Ave, Quezon City, Metro Manila'));
+      expect(touchpoint.remarks, equals('Documents submitted successfully.'));
+      expect(touchpoint.photoPath, isNull);
+    });
+
+    testWidgets('minimal touchpoint with required fields only', (tester) async {
+      // Arrange - Only required fields
+      final touchpoint = createTestTouchpoint(
+        touchpointNumber: 1,
+        type: TouchpointType.call,
+        reason: TouchpointReason.interested,
+        status: TouchpointStatus.interested,
+      );
+
+      // Act & Assert - Required fields present
+      expect(touchpoint.touchpointNumber, equals(1));
+      expect(touchpoint.type, equals(TouchpointType.call));
+      expect(touchpoint.reason, equals(TouchpointReason.interested));
+      expect(touchpoint.status, equals(TouchpointStatus.interested));
+
+      // Optional fields null/empty
+      expect(touchpoint.photoPath, isNull);
+      expect(touchpoint.timeInGpsAddress, isNull);
+      expect(touchpoint.remarks, isNull);
+      expect(touchpoint.address, isNull);
+    });
+  });
 }
