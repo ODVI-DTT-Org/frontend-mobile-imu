@@ -1721,7 +1721,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                   // 4. Touchpoint History
                   TouchpointHistoryExpansionPanel(
                     client: _client!,
-                    touchpoints: _client!.touchpoints,
+                    touchpoints: _client!.touchpointSummary,
                   ),
 
                   const SizedBox(height: 100), // Bottom padding
