@@ -390,7 +390,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Row(
                           children: [
-                            _buildFilterChip('★ Starred', 'starred'),
+                            _buildFilterChip('★ Favorites', 'starred'),
                             const SizedBox(width: 8),
                             _buildFilterChip('Assigned', 'assigned'),
                             const SizedBox(width: 8),
@@ -400,7 +400,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       ),
                     if (displayableClients.isEmpty)
                       const Expanded(
-                        child: Center(child: Text('No starred clients', style: TextStyle(color: Colors.grey))),
+                        child: Center(child: Text('No favorites yet', style: TextStyle(color: Colors.grey))),
                       )
                     else
                       Expanded(
@@ -574,7 +574,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
-                          _buildFilterChip('★ Starred', 'starred'),
+                          _buildFilterChip('★ Favorites', 'starred'),
                           const SizedBox(width: 8),
                           _buildFilterChip('Assigned', 'assigned'),
                           const SizedBox(width: 8),
@@ -764,7 +764,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
-                          _buildFilterChip('★ Starred', 'starred'),
+                          _buildFilterChip('★ Favorites', 'starred'),
                           const SizedBox(width: 8),
                           _buildFilterChip('Assigned', 'assigned'),
                           const SizedBox(width: 8),
