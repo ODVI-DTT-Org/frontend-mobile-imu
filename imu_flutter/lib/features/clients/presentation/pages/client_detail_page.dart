@@ -1715,10 +1715,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     onAddAddress: _addAddress,
                   ),
 
-                  // 3. CMS Visit History
-                  CmsVisitHistoryExpansionPanel(clientId: widget.clientId),
-
-                  // 4. Touchpoint History
+                  // 3. Touchpoint History
                   TouchpointHistoryExpansionPanel(
                     client: _client!,
                     touchpoints: _client!.touchpointSummary,
