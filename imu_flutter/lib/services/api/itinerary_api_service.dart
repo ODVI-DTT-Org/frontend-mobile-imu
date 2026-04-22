@@ -199,27 +199,10 @@ class ItineraryItem {
       scheduledDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
     }
 
-    // Derive next touchpoint from touchpoint_summary
-    const sequence = ['Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'];
-    int? nextNum;
-    String? nextType;
-    final summaryJson = row['touchpoint_summary'] as String?;
-    if (summaryJson != null && summaryJson.isNotEmpty && summaryJson != 'null') {
-      try {
-        final decoded = jsonDecode(summaryJson);
-        if (decoded is List) {
-          final completed = decoded
-              .whereType<Map<String, dynamic>>()
-              .map((t) => (t['touchpoint_number'] as num?)?.toInt() ?? 0)
-              .where((n) => n > 0)
-              .toSet();
-          for (var i = 1; i <= 7; i++) {
-            if (!completed.contains(i)) { nextNum = i; break; }
-          }
-        }
-      } catch (_) {}
-    }
-    if (nextNum != null) nextType = sequence[nextNum - 1];
+    // Derive next touchpoint from client data (backend-determined, no pattern)
+    // Use next_touchpoint and next_touchpoint_number from enriched row
+    final nextNum = row['next_touchpoint_number'] as int?;
+    final nextType = row['next_touchpoint'] as String?;
 
     return ItineraryItem(
       id: row['id'] as String,

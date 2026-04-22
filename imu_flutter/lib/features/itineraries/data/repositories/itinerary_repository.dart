@@ -411,6 +411,7 @@ Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   }
   enriched['touchpoint_number'] = cached['touchpoint_number'];
   enriched['next_touchpoint_number'] = cached['next_touchpoint_number'] ?? cached['nextTouchpointNumber'];
+  enriched['next_touchpoint'] = cached['next_touchpoint'] ?? cached['nextTouchpoint'];
   return enriched;
 }
 

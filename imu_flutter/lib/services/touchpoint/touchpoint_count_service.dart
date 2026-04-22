@@ -56,7 +56,7 @@ class TouchpointCountService {
       final counts = <String, int>{};
       for (final client in response.items) {
         if (client.id != null) {
-          // Use completedTouchpoints which is touchpointNumber - 1
+          // Use completedTouchpoints getter (returns touchpointNumber directly)
           counts[client.id!] = client.completedTouchpoints;
         }
       }
