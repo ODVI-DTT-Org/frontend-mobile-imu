@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../services/sync/powersync_service.dart';
+import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider;
 import '../../../../core/utils/logger.dart';
 import '../models/client_model.dart';
@@ -98,18 +99,36 @@ final clientFavoritesServiceProvider = Provider<ClientFavoritesService>((ref) {
   return ClientFavoritesService(ref);
 });
 
-/// Starred clients for the current user, from PowerSync SQLite.
+/// Starred clients for the current user.
+/// Gets favorited IDs from PowerSync, then filters Hive cached clients by those IDs.
+/// This works because clients are stored in Hive (not PowerSync), while favorites are in PowerSync.
 final favoritedClientListProvider = StreamProvider<List<Client>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
+
+  // Get favorited client IDs from PowerSync
   return PowerSyncService.database.asStream().asyncExpand((db) {
     return db.watch(
-      '''SELECT c.* FROM clients c
-         JOIN client_favorites cf ON cf.client_id = c.id
-         WHERE cf.user_id = ?
-         AND (c.deleted_at IS NULL)
-         ORDER BY c.first_name, c.last_name''',
+      'SELECT client_id FROM client_favorites WHERE user_id = ?',
       parameters: [userId],
-    ).map((rows) => rows.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList());
+    );
+  }).map((rows) {
+    // Extract favorited client IDs
+    final favoriteIds = rows.map((r) => r['client_id'] as String).toSet();
+
+    // Load all clients from Hive cache
+    final hiveService = HiveService();
+    final rawClients = hiveService.getAllClients();
+    final allClients = rawClients.map((json) => Client.fromJson(json)).toList();
+
+    // Filter clients by favorited IDs and sort by name
+    final favoritedClients = allClients
+        .where((c) => favoriteIds.contains(c.id))
+        .toList()
+      ..sort((a, b) => a.fullName.compareTo(b.fullName));
+
+    logDebug('[favoritedClientListProvider] Found ${favoritedClients.length} favorited clients out of ${allClients.length} total clients');
+
+    return favoritedClients;
   });
 });

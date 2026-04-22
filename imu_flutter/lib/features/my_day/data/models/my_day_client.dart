@@ -118,10 +118,6 @@ class MyDayClient {
     );
   }
 
-  static const List<String> _sequence = [
-    'Visit', 'Call', 'Call', 'Visit', 'Call', 'Call', 'Visit'
-  ];
-
   static String _buildFullName(String? lastName, String? firstName, {String? middleName}) {
     final last = (lastName ?? '').trim();
     final first = (firstName ?? '').trim();
@@ -153,22 +149,11 @@ class MyDayClient {
       } catch (_) {}
     }
 
-    final completedNumbers = touchpoints
-        .map((t) => (t['touchpoint_number'] as num?)?.toInt() ?? 0)
-        .where((n) => n > 0)
-        .toSet();
-
-    int? nextNum;
-    for (int i = 1; i <= 7; i++) {
-      if (!completedNumbers.contains(i)) {
-        nextNum = i;
-        break;
-      }
-    }
-
-    final nextType = nextNum != null ? _sequence[nextNum - 1] : null;
+    // Use next_touchpoint and next_touchpoint_number from enriched row (backend-determined)
+    final nextNum = row['next_touchpoint_number'] as int?;
+    final nextType = row['next_touchpoint'] as String?;
     final currentNum = nextNum ?? 0;
-    final currentType = nextNum != null ? nextType!.toLowerCase() : 'visit';
+    final currentType = nextType?.toLowerCase() ?? 'visit';
 
     Map<String, dynamic>? lastTouchpoint;
     if (touchpoints.isNotEmpty) {
