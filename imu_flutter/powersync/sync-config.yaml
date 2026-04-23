@@ -61,6 +61,14 @@ streams:
         FROM approvals a
         WHERE a.status = 'pending'
 
+  # Client favorites - for current user's starred clients
+  client_favorites:
+    auto_subscribe: true
+    queries:
+      - SELECT cf.id, cf.user_id, cf.client_id, cf.created_at
+        FROM client_favorites cf
+        WHERE cf.user_id = auth.user_id()
+
   # Addresses - for clients assigned to user via area assignments
   addresses:
     auto_subscribe: true
