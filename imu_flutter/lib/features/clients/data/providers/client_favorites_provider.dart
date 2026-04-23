@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider;
@@ -92,10 +93,10 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
       }
 
       // Safe to proceed with insert
-      // PowerSync auto-generates id - no need to specify it
+      final id = const Uuid().v4();
       await db.execute(
-        'INSERT OR IGNORE INTO client_favorites (user_id, client_id, created_at) VALUES (?, ?, ?)',
-        [userId, clientId, DateTime.now().toIso8601String()],
+        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
+        [id, userId, clientId, DateTime.now().toIso8601String()],
       );
 
       logDebug('[ClientFavoritesNotifier] Successfully inserted $clientId into database');
@@ -215,11 +216,14 @@ class ClientFavoritesService {
       final db = await PowerSyncService.database;
       logDebug('[ClientFavoritesService] Database obtained, executing INSERT');
 
-      // PowerSync auto-generates id - no need to specify it
+      // PowerSync requires id in INSERT statements (generates UUID for local record)
+      final id = const Uuid().v4();
+      logDebug('[ClientFavoritesService] Generated id: $id');
+
       // Optimistic local insert - PowerSync will upload this automatically
       await db.execute(
-        'INSERT OR IGNORE INTO client_favorites (user_id, client_id, created_at) VALUES (?, ?, ?)',
-        [userId, clientId, DateTime.now().toIso8601String()],
+        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
+        [id, userId, clientId, DateTime.now().toIso8601String()],
       );
 
       logDebug('[ClientFavoritesService] INSERT executed successfully for clientId: $clientId');
