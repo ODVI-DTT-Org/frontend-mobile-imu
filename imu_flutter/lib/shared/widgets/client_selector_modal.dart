@@ -105,29 +105,25 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     _searchDebounce.run(() {
       if (!mounted) return;
 
-      setState(() {
-        _searchQuery = _searchController.text;
-        _currentPage = 1; // Reset to first page on search
-      });
+      // Store search query WITHOUT calling setState to prevent keyboard from closing
+      _searchQuery = _searchController.text;
+      _currentPage = 1; // Reset to first page on search
 
-      // Defer provider updates until after build cycle
-      Future.microtask(() {
-        if (!mounted) return;
-
-        // Update the appropriate search query provider based on mode
-        if (_clientFilter == 'starred') {
-          // Starred uses local SQLite — no server call needed
-        } else if (_clientFilter == 'assigned') {
-          ref.read(assignedClientSearchQueryProvider.notifier).state = _searchQuery;
-          ref.read(assignedClientPageProvider.notifier).state = _currentPage;
-          ref.invalidate(assignedClientsProvider);
-        } else {
-          // All Clients: update online search query provider
-          ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
-          ref.read(onlineClientPageProvider.notifier).state = _currentPage;
-          ref.invalidate(onlineClientsProvider);
-        }
-      });
+      // Update the appropriate search query provider based on mode
+      if (_clientFilter == 'starred') {
+        // Starred uses local SQLite — no server call needed
+        // Trigger rebuild for starred filter
+        setState(() {});
+      } else if (_clientFilter == 'assigned') {
+        ref.read(assignedClientSearchQueryProvider.notifier).state = _searchQuery;
+        ref.read(assignedClientPageProvider.notifier).state = _currentPage;
+        ref.invalidate(assignedClientsProvider);
+      } else {
+        // All Clients: update online search query provider
+        ref.read(onlineClientSearchQueryProvider.notifier).state = _searchQuery;
+        ref.read(onlineClientPageProvider.notifier).state = _currentPage;
+        ref.invalidate(onlineClientsProvider);
+      }
     });
   }
 
@@ -309,17 +305,17 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         _applyClientFilter();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF0F172A) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.grey[700],
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            fontSize: 14,
+            fontSize: 13,
           ),
         ),
       ),
@@ -359,17 +355,19 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   padding: EdgeInsets.only(bottom: keyboardHeight),
                   child: Column(
                     children: [
+                      // Handle bar
                       Container(
-                        margin: const EdgeInsets.only(top: 12),
-                        width: 40,
-                        height: 4,
+                        margin: const EdgeInsets.only(top: 8),
+                        width: 36,
+                        height: 3,
                         decoration: BoxDecoration(
                           color: Colors.grey[300],
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
+                      // Compact header
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
                         ),
@@ -379,26 +377,49 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 4),
-                                  Text(DateFormat('EEEE, MMMM d').format(widget.selectedDate),
-                                      style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                                  Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 2),
+                                  Text(DateFormat('EEE, MMM d').format(widget.selectedDate),
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                                 ],
                               ),
                             ),
-                            IconButton(icon: const Icon(LucideIcons.x), onPressed: () => Navigator.pop(context)),
+                            IconButton(
+                              icon: const Icon(LucideIcons.x, size: 20),
+                              onPressed: () => Navigator.pop(context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
                           ],
                         ),
                       ),
+                      // Compact search bar
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search...',
+                            prefixIcon: const Icon(LucideIcons.search, size: 18),
+                            hintStyle: const TextStyle(fontSize: 14),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Compact filter chips
                       if (widget.showAssignedFilter)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           child: Row(
                             children: [
                               _buildFilterChip('★ Favorites', 'starred'),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               _buildFilterChip('Assigned', 'assigned'),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               _buildFilterChip('All Clients', 'all'),
                             ],
                           ),
@@ -451,7 +472,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final displayableClients = _getDisplayableClients(clients);
 
         return DraggableScrollableSheet(
-          initialChildSize: 0.7,
+          initialChildSize: 0.75,
           minChildSize: 0.5,
           maxChildSize: 0.95,
           expand: false,
@@ -470,17 +491,17 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   children: [
                     // Handle bar
                     Container(
-                      margin: const EdgeInsets.only(top: 12),
-                      width: 40,
-                      height: 4,
+                      margin: const EdgeInsets.only(top: 8),
+                      width: 36,
+                      height: 3,
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    // Header
+                    // Compact header
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         border: Border(
                           bottom: BorderSide(color: Colors.grey[200]!),
@@ -495,15 +516,15 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                                 Text(
                                   widget.title,
                                   style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
-                                  DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                                  DateFormat('EEE, MMM d').format(widget.selectedDate),
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     color: Colors.grey[600],
                                   ),
                                 ),
@@ -511,141 +532,99 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(LucideIcons.x),
+                            icon: const Icon(LucideIcons.x, size: 20),
                             onPressed: () => Navigator.pop(context),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           ),
                         ],
                       ),
                     ),
-                    // Search bar
+                    // Compact search bar
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Search clients...',
-                          prefixIcon: const Icon(LucideIcons.search, size: 20),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_searchController.text.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(LucideIcons.x, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _filterClients();
-                                  },
-                                ),
-                              Builder(
-                                builder: (ctx) {
-                                  final count = ref.watch(activeFilterCountProvider);
-                                  return Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.tune),
-                                        onPressed: _showFilterDrawer,
-                                      ),
-                                      if (count > 0)
-                                        Positioned(
-                                          right: 6,
-                                          top: 6,
-                                          child: Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
+                          hintText: 'Search...',
+                          prefixIcon: const Icon(LucideIcons.search, size: 18),
+                          hintStyle: const TextStyle(fontSize: 14),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(color: Colors.grey[300]!),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 4),
-                    // const TouchpointFilterChips(),
-
-                    // Active filter chips
-                    const ActiveFilterChipsRow(),
-                    // Filter toggle
+                    // Compact filter chips
                     if (widget.showAssignedFilter)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         child: Row(
                           children: [
                             _buildFilterChip('★ Favorites', 'starred'),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             _buildFilterChip('Assigned', 'assigned'),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             _buildFilterChip('All Clients', 'all'),
                           ],
                         ),
                       ),
-                    // Client count indicator
-                    if (totalItems > 0)
+                    // Compact client count and pagination
+                    if (totalItems > 0 || totalPages > 1)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: Text(
-                          'Showing ${displayableClients.length} of $totalItems clients',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                    // Pagination controls
-                    if (totalPages > 1)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Previous page button
-                            IconButton(
-                              icon: const Icon(LucideIcons.chevronLeft, size: 18),
-                              onPressed: _currentPage > 1
-                                  ? () => _goToPage(_currentPage - 1)
-                                  : null,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            ),
-                            // Page indicator
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                'Page $_currentPage of $totalPages',
+                            // Client count
+                            if (totalItems > 0)
+                              Text(
+                                '${displayableClients.length} of $totalItems',
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[700],
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
                                 ),
                               ),
-                            ),
-                            // Next page button
-                            IconButton(
-                              icon: const Icon(LucideIcons.chevronRight, size: 18),
-                              onPressed: _currentPage < totalPages
-                                  ? () => _goToPage(_currentPage + 1)
-                                  : null,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            ),
+                            // Pagination controls
+                            if (totalPages > 1)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(LucideIcons.chevronLeft, size: 16),
+                                    onPressed: _currentPage > 1
+                                        ? () => _goToPage(_currentPage - 1)
+                                        : null,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '$_currentPage/$totalPages',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(LucideIcons.chevronRight, size: 16),
+                                    onPressed: _currentPage < totalPages
+                                        ? () => _goToPage(_currentPage + 1)
+                                        : null,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -662,7 +641,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       },
       loading: () {
         return DraggableScrollableSheet(
-          initialChildSize: 0.7,
+          initialChildSize: 0.75,
           minChildSize: 0.5,
           maxChildSize: 0.95,
           expand: false,
@@ -676,17 +655,17 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                 children: [
                   // Handle bar
                   Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
-                    height: 4,
+                    margin: const EdgeInsets.only(top: 8),
+                    width: 36,
+                    height: 3,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  // Header
+                  // Compact header
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(color: Colors.grey[200]!),
@@ -701,15 +680,15 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                               Text(
                                 widget.title,
                                 style: const TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
-                                DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                                DateFormat('EEE, MMM d').format(widget.selectedDate),
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 12,
                                   color: Colors.grey[600],
                                 ),
                               ),
@@ -717,69 +696,41 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(LucideIcons.x),
+                          icon: const Icon(LucideIcons.x, size: 20),
                           onPressed: () => Navigator.pop(context),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         ),
                       ],
                     ),
                   ),
-                  // Search bar
+                  // Compact search bar
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search clients...',
-                        prefixIcon: const Icon(LucideIcons.search, size: 20),
-                        suffixIcon: Builder(
-                          builder: (ctx) {
-                            final count = ref.watch(activeFilterCountProvider);
-                            return Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.tune),
-                                  onPressed: _showFilterDrawer,
-                                ),
-                                if (count > 0)
-                                  Positioned(
-                                    right: 6,
-                                    top: 6,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
+                        hintText: 'Search...',
+                        prefixIcon: const Icon(LucideIcons.search, size: 18),
+                        hintStyle: const TextStyle(fontSize: 14),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.grey[300]!),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 4),
-                  // const TouchpointFilterChips(),
-
                   // Filter toggle
                   if (widget.showAssignedFilter)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       child: Row(
                         children: [
                           _buildFilterChip('★ Favorites', 'starred'),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           _buildFilterChip('Assigned', 'assigned'),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           _buildFilterChip('All Clients', 'all'),
                         ],
                       ),
@@ -788,7 +739,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   Expanded(
                     child: ListView.builder(
                       controller: scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       itemCount: 7, // Show 7 skeleton cards
                       itemBuilder: (context, index) => _buildClientSkeleton(),
                     ),
@@ -938,35 +889,35 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   Widget _buildClientSkeleton() {
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 _buildSkeletonCircle(),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSkeletonLine(width: 120),
-                      const SizedBox(height: 4),
-                      _buildSkeletonLine(width: 180),
-                      const SizedBox(height: 4),
                       _buildSkeletonLine(width: 100),
+                      const SizedBox(height: 3),
+                      _buildSkeletonLine(width: 150),
+                      const SizedBox(height: 3),
+                      _buildSkeletonLine(width: 80),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(child: _buildSkeletonButton()),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(child: _buildSkeletonButton()),
               ],
             ),
@@ -978,8 +929,8 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   Widget _buildSkeletonCircle() {
     return Container(
-      width: 40,
-      height: 40,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         color: Colors.grey.shade300,
         shape: BoxShape.circle,
@@ -989,21 +940,21 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
   Widget _buildSkeletonLine({required double width}) {
     return Container(
-      height: 12,
+      height: 10,
       width: width,
       decoration: BoxDecoration(
         color: Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(3),
       ),
     );
   }
 
   Widget _buildSkeletonButton() {
     return Container(
-      height: 36,
+      height: 32,
       decoration: BoxDecoration(
         color: Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
     );
   }
