@@ -78,7 +78,11 @@ class LocationCard extends HookWidget {
 
     useEffect(() {
       final fetch = locationFetcher ?? _defaultFetch;
+      bool mounted = true;
+
       fetch().then((data) {
+        if (!mounted) return; // Check if widget is still mounted
+
         if (data != null) {
           location.value = data;
           status.value = _GpsStatus.acquired;
@@ -88,8 +92,11 @@ class LocationCard extends HookWidget {
           onFailed();
         }
       });
-      return null;
-    }, const []);
+
+      return () {
+        mounted = false; // Cleanup: mark as unmounted
+      };
+    }, const [],);
 
     return SectionCard(
       title: 'LOCATION',
@@ -113,7 +120,7 @@ class LocationCard extends HookWidget {
               'Acquiring location...',
               style: TextStyle(color: Color(0xFF64748B)),
             ),
-          ]),
+          ],),
         );
       case _GpsStatus.acquired:
         final loc = data!;
@@ -171,7 +178,7 @@ class LocationCard extends HookWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ]),
+              ],),
               const SizedBox(height: 4),
               const Text(
                 'Location access is required',
