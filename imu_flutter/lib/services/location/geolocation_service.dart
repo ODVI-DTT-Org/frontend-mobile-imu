@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../services/error_logging_helper.dart';
+import '../../features/psgc/data/repositories/psgc_repository.dart';
 
 /// Result enum for location operations
 enum LocationResult {

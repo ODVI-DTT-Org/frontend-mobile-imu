@@ -81,8 +81,14 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     _searchDebounce.run(() {
       if (!mounted) return;
 
+      final newQuery = _searchController.text;
+
+      // Only update if the query has actually changed
+      // This prevents duplicate fetches when keyboard is dismissed
+      if (newQuery == _searchQuery) return;
+
       setState(() {
-        _searchQuery = _searchController.text;
+        _searchQuery = newQuery;
         _currentPage = 1; // Reset to first page on search
       });
 

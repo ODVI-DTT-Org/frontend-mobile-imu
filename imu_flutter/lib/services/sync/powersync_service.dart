@@ -222,8 +222,8 @@ const Schema _powerSyncSchema = Schema([
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
+  // PowerSync automatically adds 'id' column - do not define it explicitly
   Table('client_favorites', [
-    Column.text('id'),
     Column.text('user_id'),
     Column.text('client_id'),
     Column.text('created_at'),

@@ -100,7 +100,13 @@ class ItineraryItem {
     String? loanType;
     if (json['expand'] != null && json['expand']['client_id'] != null) {
       final client = json['expand']['client_id'] as Map<String, dynamic>;
-      address = client['address'] as String?;
+      // Build full address from addresses array if available
+      if (client['addresses'] != null && client['addresses'] is List && (client['addresses'] as List).isNotEmpty) {
+        final firstAddress = (client['addresses'] as List).first as Map<String, dynamic>;
+        address = _buildFullAddress(firstAddress);
+      } else {
+        address = client['address'] as String?;
+      }
       productType = client['product_type'] as String?;
       pensionType = client['pension_type'] as String?;
       loanType = client['loan_type'] as String?;
@@ -228,10 +234,13 @@ class ItineraryItem {
       touchpointType: nextType,
       notes: row['notes'] as String?,
       address: () {
-        final parts = [
-          if ((row['municipality'] as String?)?.isNotEmpty == true) row['municipality'] as String,
-          if ((row['province'] as String?)?.isNotEmpty == true) row['province'] as String,
-        ];
+        final parts = <String>[];
+        final barangay = row['barangay'] as String?;
+        if (barangay != null && barangay.isNotEmpty) parts.add('Brgy. $barangay');
+        final municipality = row['municipality'] as String?;
+        if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+        final province = row['province'] as String?;
+        if (province != null && province.isNotEmpty) parts.add(province);
         return parts.isEmpty ? null : parts.join(', ');
       }(),
       latitude: null,
@@ -314,6 +323,20 @@ class ItineraryItem {
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
       previousTouchpointDate: previousTouchpointDate ?? this.previousTouchpointDate,
     );
+  }
+
+  /// Build full address from address map (street, barangay, municipality, province)
+  static String _buildFullAddress(Map<String, dynamic> address) {
+    final parts = <String>[];
+    final street = address['street'] as String?;
+    if (street != null && street.isNotEmpty) parts.add(street);
+    final barangay = address['barangay'] as String?;
+    if (barangay != null && barangay.isNotEmpty) parts.add('Brgy. $barangay');
+    final municipality = address['city'] as String?;
+    if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+    final province = address['province'] as String?;
+    if (province != null && province.isNotEmpty) parts.add(province);
+    return parts.join(', ');
   }
 }
 

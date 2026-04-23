@@ -269,7 +269,7 @@ class MyDayApiService {
           // Get addresses from client data (now included in backend response)
           final addresses = clientData['addresses'] as List<dynamic>? ?? [];
           final location = addresses.isNotEmpty
-              ? (addresses.first as Map<String, dynamic>)['street'] as String?
+              ? _buildFullAddress(addresses.first as Map<String, dynamic>)
               : null;
 
           return MyDayClient(
@@ -517,6 +517,20 @@ class MyDayApiService {
         originalError: e,
       );
     }
+  }
+
+  /// Build full address from address map (street, barangay, municipality, province)
+  String _buildFullAddress(Map<String, dynamic> address) {
+    final parts = <String>[];
+    final street = address['street'] as String?;
+    if (street != null && street.isNotEmpty) parts.add(street);
+    final barangay = address['barangay'] as String?;
+    if (barangay != null && barangay.isNotEmpty) parts.add('Brgy. $barangay');
+    final municipality = address['city'] as String?;
+    if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+    final province = address['province'] as String?;
+    if (province != null && province.isNotEmpty) parts.add(province);
+    return parts.join(', ');
   }
 }
 

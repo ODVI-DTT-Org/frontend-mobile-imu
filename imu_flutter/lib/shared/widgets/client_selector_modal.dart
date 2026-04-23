@@ -335,6 +335,9 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     // Watch touchpoint counts for badges
     final touchpointCountsAsync = ref.watch(clientTouchpointCountsProvider);
 
+    // Watch keyboard height changes to trigger rebuilds when keyboard appears/disappears
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
     // Starred filter uses local PowerSync SQLite — no server pagination
     if (_clientFilter == 'starred') {
       final starredAsync = ref.watch(favoritedClientListProvider);
@@ -352,61 +355,64 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                child: Column(
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(top: 12),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                Text(DateFormat('EEEE, MMMM d').format(widget.selectedDate),
-                                    style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                              ],
-                            ),
-                          ),
-                          IconButton(icon: const Icon(LucideIcons.x), onPressed: () => Navigator.pop(context)),
-                        ],
-                      ),
-                    ),
-                    if (widget.showAssignedFilter)
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: keyboardHeight),
+                  child: Column(
+                    children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        margin: const EdgeInsets.only(top: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                        ),
                         child: Row(
                           children: [
-                            _buildFilterChip('★ Favorites', 'starred'),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('Assigned', 'assigned'),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('All Clients', 'all'),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 4),
+                                  Text(DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                                      style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                                ],
+                              ),
+                            ),
+                            IconButton(icon: const Icon(LucideIcons.x), onPressed: () => Navigator.pop(context)),
                           ],
                         ),
                       ),
-                    if (displayableClients.isEmpty)
-                      const Expanded(
-                        child: Center(child: Text('No favorites yet', style: TextStyle(color: Colors.grey))),
-                      )
-                    else
-                      Expanded(
-                        child: _buildClientList(displayableClients, displayableClients.length, touchpointCountsAsync, scrollController),
-                      ),
-                  ],
+                      if (widget.showAssignedFilter)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              _buildFilterChip('★ Favorites', 'starred'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('Assigned', 'assigned'),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('All Clients', 'all'),
+                            ],
+                          ),
+                        ),
+                      if (displayableClients.isEmpty)
+                        const Expanded(
+                          child: Center(child: Text('No favorites yet', style: TextStyle(color: Colors.grey))),
+                        )
+                      else
+                        Expanded(
+                          child: _buildClientList(displayableClients, displayableClients.length, touchpointCountsAsync, scrollController),
+                        ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -450,199 +456,205 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
           maxChildSize: 0.95,
           expand: false,
           builder: (context, scrollController) {
+            // Get keyboard height for safe area padding
+            final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
             return Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               ),
-              child: Column(
-                children: [
-                  // Handle bar
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Colors.grey[200]!),
+              child: Padding(
+                padding: EdgeInsets.only(bottom: keyboardHeight),
+                child: Column(
+                  children: [
+                    // Handle bar
+                    Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Colors.grey[200]!),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  DateFormat('EEEE, MMMM d').format(widget.selectedDate),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(LucideIcons.x),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Search bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search clients...',
+                          prefixIcon: const Icon(LucideIcons.search, size: 20),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                widget.title,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
+                              if (_searchController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(LucideIcons.x, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _filterClients();
+                                  },
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                DateFormat('EEEE, MMMM d').format(widget.selectedDate),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
+                              Builder(
+                                builder: (ctx) {
+                                  final count = ref.watch(activeFilterCountProvider);
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.tune),
+                                        onPressed: _showFilterDrawer,
+                                      ),
+                                      if (count > 0)
+                                        Positioned(
+                                          right: 6,
+                                          top: 6,
+                                          child: Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
                             ],
                           ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
-                        IconButton(
-                          icon: const Icon(LucideIcons.x),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  // Search bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search clients...',
-                        prefixIcon: const Icon(LucideIcons.search, size: 20),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
+
+                    const SizedBox(height: 4),
+                    // const TouchpointFilterChips(),
+
+                    // Active filter chips
+                    const ActiveFilterChipsRow(),
+                    // Filter toggle
+                    if (widget.showAssignedFilter)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
                           children: [
-                            if (_searchController.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(LucideIcons.x, size: 18),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _filterClients();
-                                },
+                            _buildFilterChip('★ Favorites', 'starred'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Assigned', 'assigned'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('All Clients', 'all'),
+                          ],
+                        ),
+                      ),
+                    // Client count indicator
+                    if (totalItems > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Text(
+                          'Showing ${displayableClients.length} of $totalItems clients',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                    // Pagination controls
+                    if (totalPages > 1)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Previous page button
+                            IconButton(
+                              icon: const Icon(LucideIcons.chevronLeft, size: 18),
+                              onPressed: _currentPage > 1
+                                  ? () => _goToPage(_currentPage - 1)
+                                  : null,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
+                            // Page indicator
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            Builder(
-                              builder: (ctx) {
-                                final count = ref.watch(activeFilterCountProvider);
-                                return Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.tune),
-                                      onPressed: _showFilterDrawer,
-                                    ),
-                                    if (count > 0)
-                                      Positioned(
-                                        right: 6,
-                                        top: 6,
-                                        child: Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
+                              child: Text(
+                                'Page $_currentPage of $totalPages',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ),
+                            // Next page button
+                            IconButton(
+                              icon: const Icon(LucideIcons.chevronRight, size: 18),
+                              onPressed: _currentPage < totalPages
+                                  ? () => _goToPage(_currentPage + 1)
+                                  : null,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
                           ],
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
+                    // Client list
+                    Expanded(
+                      child: _buildClientList(displayableClients, totalItems, touchpointCountsAsync, scrollController),
                     ),
-                  ),
-
-                  const SizedBox(height: 4),
-                  // const TouchpointFilterChips(),
-
-                  // Active filter chips
-                  const ActiveFilterChipsRow(),
-                  // Filter toggle
-                  if (widget.showAssignedFilter)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
-                          _buildFilterChip('★ Favorites', 'starred'),
-                          const SizedBox(width: 8),
-                          _buildFilterChip('Assigned', 'assigned'),
-                          const SizedBox(width: 8),
-                          _buildFilterChip('All Clients', 'all'),
-                        ],
-                      ),
-                    ),
-                  // Client count indicator
-                  if (totalItems > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: Text(
-                        'Showing ${displayableClients.length} of $totalItems clients',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                  // Pagination controls
-                  if (totalPages > 1)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Previous page button
-                          IconButton(
-                            icon: const Icon(LucideIcons.chevronLeft, size: 18),
-                            onPressed: _currentPage > 1
-                                ? () => _goToPage(_currentPage - 1)
-                                : null,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          ),
-                          // Page indicator
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              'Page $_currentPage of $totalPages',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ),
-                          // Next page button
-                          IconButton(
-                            icon: const Icon(LucideIcons.chevronRight, size: 18),
-                            onPressed: _currentPage < totalPages
-                                ? () => _goToPage(_currentPage + 1)
-                                : null,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          ),
-                        ],
-                      ),
-                    ),
-                  // Client list
-                  Expanded(
-                    child: _buildClientList(displayableClients, totalItems, touchpointCountsAsync, scrollController),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },

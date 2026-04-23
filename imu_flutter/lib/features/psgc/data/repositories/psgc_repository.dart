@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/psgc_models.dart';
 import '../services/psgc_asset_service.dart';
@@ -84,21 +85,26 @@ class PsgcRepository {
     PsgcBarangay? nearest;
     double minDistance = double.infinity;
 
-    for (final barangay in _assetService.getAllBarangays()) {
-      final pinLocation = barangay.pinLocation;
-      if (pinLocation == null) continue;
+    // Iterate through all municipalities and their barangays
+    final allMunicipalities = await getAllMunicipalities();
+    for (final municipality in allMunicipalities) {
+      final barangays = _assetService.barangaysForMunicipality(municipality.name);
+      for (final barangay in barangays) {
+        final pinLocation = barangay.pinLocation;
+        if (pinLocation == null) continue;
 
-      final pinLat = pinLocation['latitude'] as double?;
-      final pinLng = pinLocation['longitude'] as double?;
+        final pinLat = pinLocation['latitude'] as double?;
+        final pinLng = pinLocation['longitude'] as double?;
 
-      if (pinLat == null || pinLng == null) continue;
+        if (pinLat == null || pinLng == null) continue;
 
-      // Calculate distance using Haversine formula
-      final distance = _calculateDistance(latitude, longitude, pinLat, pinLng);
+        // Calculate distance using Haversine formula
+        final distance = _calculateDistance(latitude, longitude, pinLat, pinLng);
 
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearest = barangay;
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = barangay;
+        }
       }
     }
 
@@ -114,16 +120,16 @@ class PsgcRepository {
 
     final a = (dLat / 2).abs() * (dLat / 2).abs() +
               (dLng / 2).abs() * (dLng / 2).abs() *
-              (lat1).abs().cos() *
-              (lat2).abs().cos();
+              math.cos(_toRadians(lat1)) *
+              math.cos(_toRadians(lat2));
 
-    final c = 2 * (a.sqrt()).atan2((1 - a).sqrt(), a.sqrt());
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
 
     return earthRadius * c;
   }
 
   double _toRadians(double degree) {
-    return degree * (3.14159265359 / 180);
+    return degree * (math.pi / 180);
   }
 }
 

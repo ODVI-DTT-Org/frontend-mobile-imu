@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider;
@@ -93,10 +92,10 @@ class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
       }
 
       // Safe to proceed with insert
-      final id = const Uuid().v4();
+      // PowerSync auto-generates id - no need to specify it
       await db.execute(
-        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
-        [id, userId, clientId, DateTime.now().toIso8601String()],
+        'INSERT OR IGNORE INTO client_favorites (user_id, client_id, created_at) VALUES (?, ?, ?)',
+        [userId, clientId, DateTime.now().toIso8601String()],
       );
 
       logDebug('[ClientFavoritesNotifier] Successfully inserted $clientId into database');
@@ -216,15 +215,11 @@ class ClientFavoritesService {
       final db = await PowerSyncService.database;
       logDebug('[ClientFavoritesService] Database obtained, executing INSERT');
 
-      // PowerSync requires an id column for all tables
-      // Generate a UUID for the local record
-      final id = const Uuid().v4();
-      logDebug('[ClientFavoritesService] Generated id: $id');
-
+      // PowerSync auto-generates id - no need to specify it
       // Optimistic local insert - PowerSync will upload this automatically
       await db.execute(
-        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
-        [id, userId, clientId, DateTime.now().toIso8601String()],
+        'INSERT OR IGNORE INTO client_favorites (user_id, client_id, created_at) VALUES (?, ?, ?)',
+        [userId, clientId, DateTime.now().toIso8601String()],
       );
 
       logDebug('[ClientFavoritesService] INSERT executed successfully for clientId: $clientId');
@@ -279,51 +274,53 @@ final clientFavoritesServiceProvider = Provider<ClientFavoritesService>((ref) {
 /// Uses the shared state from clientFavoritesNotifierProvider for consistency.
 /// Hybrid approach: Try PowerSync first (for all clients), fall back to Hive cache (assigned clients).
 /// This works both online (PowerSync has data) and offline (Hive cache as fallback).
-final favoritedClientListProvider = StreamProvider<List<Client>>((ref) {
+/// Uses FutureProvider with ref.watch() to automatically update when favorite IDs change.
+final favoritedClientListProvider = FutureProvider<List<Client>>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return Stream.value([]);
+  if (userId == null) return [];
 
   // Watch the notifier state (single source of truth for favorite IDs)
-  return ref.watch(clientFavoritesNotifierProvider.notifier).stream.asyncMap((favoriteIds) async {
-    if (favoriteIds.isEmpty) {
-      logDebug('[favoritedClientListProvider] No favorites found');
-      return [];
+  // ref.watch() ensures this provider rebuilds when favorite IDs change
+  final favoriteIds = ref.watch(clientFavoritesNotifierProvider);
+
+  if (favoriteIds.isEmpty) {
+    logDebug('[favoritedClientListProvider] No favorites found');
+    return [];
+  }
+
+  logDebug('[favoritedClientListProvider] Found ${favoriteIds.length} favorited IDs: $favoriteIds');
+
+  // Try to get clients from PowerSync first
+  try {
+    final db = await PowerSyncService.database;
+    final placeholders = List.filled(favoriteIds.length, '?').join(',');
+    final result = await db.getAll(
+      'SELECT * FROM clients WHERE id IN ($placeholders) AND deleted_at IS NULL',
+      favoriteIds.toList(),
+    );
+
+    if (result.isNotEmpty) {
+      final clients = result.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList();
+      logDebug('[favoritedClientListProvider] Found ${clients.length} clients in PowerSync');
+      return clients..sort((a, b) => a.fullName.compareTo(b.fullName));
     }
+  } catch (e) {
+    logError('[favoritedClientListProvider] Error querying PowerSync clients: $e');
+  }
 
-    logDebug('[favoritedClientListProvider] Found ${favoriteIds.length} favorited IDs: $favoriteIds');
+  // Fallback: Load from Hive cache (assigned clients only)
+  logDebug('[favoritedClientListProvider] PowerSync has no clients, falling back to Hive cache');
+  final hiveService = HiveService();
+  final rawClients = hiveService.getAllClients();
+  final allClients = rawClients.map((json) => Client.fromJson(json)).toList();
 
-    // Try to get clients from PowerSync first
-    try {
-      final db = await PowerSyncService.database;
-      final placeholders = List.filled(favoriteIds.length, '?').join(',');
-      final result = await db.getAll(
-        'SELECT * FROM clients WHERE id IN ($placeholders) AND deleted_at IS NULL',
-        favoriteIds.toList(),
-      );
+  // Filter by favorited IDs
+  final favoritedClients = allClients
+      .where((c) => favoriteIds.contains(c.id))
+      .toList()
+    ..sort((a, b) => a.fullName.compareTo(b.fullName));
 
-      if (result.isNotEmpty) {
-        final clients = result.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList();
-        logDebug('[favoritedClientListProvider] Found ${clients.length} clients in PowerSync');
-        return clients..sort((a, b) => a.fullName.compareTo(b.fullName));
-      }
-    } catch (e) {
-      logError('[favoritedClientListProvider] Error querying PowerSync clients: $e');
-    }
+  logDebug('[favoritedClientListProvider] Found ${favoritedClients.length} clients in Hive cache (assigned only)');
 
-    // Fallback: Load from Hive cache (assigned clients only)
-    logDebug('[favoritedClientListProvider] PowerSync has no clients, falling back to Hive cache');
-    final hiveService = HiveService();
-    final rawClients = hiveService.getAllClients();
-    final allClients = rawClients.map((json) => Client.fromJson(json)).toList();
-
-    // Filter by favorited IDs
-    final favoritedClients = allClients
-        .where((c) => favoriteIds.contains(c.id))
-        .toList()
-      ..sort((a, b) => a.fullName.compareTo(b.fullName));
-
-    logDebug('[favoritedClientListProvider] Found ${favoritedClients.length} clients in Hive cache (assigned only)');
-
-    return favoritedClients;
-  });
+  return favoritedClients;
 });
