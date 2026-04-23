@@ -11,7 +11,7 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/no
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/photo_card.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/unified_action_bottom_sheet.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart'
-    show releaseCreationServiceProvider;
+    show releaseCreationServiceProvider, assignedClientsProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 
 class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
@@ -82,6 +82,8 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
 
         if (context.mounted) {
           AppNotification.showSuccess(context, 'Loan release recorded successfully');
+          // Invalidate cache to refresh loan released status in clients list
+          ref.invalidate(assignedClientsProvider);
           Navigator.of(context).pop(true);
         }
       } catch (e) {

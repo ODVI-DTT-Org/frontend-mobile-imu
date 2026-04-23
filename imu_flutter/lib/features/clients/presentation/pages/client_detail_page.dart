@@ -1040,6 +1040,24 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     await HiveService().saveClient(updated);
   }
 
+  /// Updates the Hive cache entry after loan release so that
+  /// the clients list immediately shows the loan released status.
+  Future<void> _updateHiveAfterLoanRelease(String clientId) async {
+    final cached = HiveService().getClient(clientId);
+    if (cached == null) return;
+    final updated = Map<String, dynamic>.from(cached);
+    updated['loan_released'] = true;
+    updated['loan_released_at'] = DateTime.now().toIso8601String();
+    // Also update touchpoint_status to disable touchpoint creation
+    final raw = updated['touchpoint_status'];
+    if (raw is Map) {
+      final ts = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+      ts['canCreateTouchpoint'] = false;
+      updated['touchpoint_status'] = ts;
+    }
+    await HiveService().saveClient(updated);
+  }
+
   TouchpointStatus _parseTouchpointStatus(String status) {
     switch (status.toLowerCase()) {
       case 'interested':
@@ -1109,8 +1127,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
-      await _loadClient();
+      // Immediately update Hive cache so the UI shows loan released status
+      await _updateHiveAfterLoanRelease(widget.clientId);
+
+      // Invalidate both client providers to refresh loan released status
+      await _loadClient(); // Invalidates clientByIdProvider
       ref.invalidate(clientTouchpointsProvider);
+      ref.invalidate(assignedClientsProvider); // Refresh clients list cache
     }
   }
 

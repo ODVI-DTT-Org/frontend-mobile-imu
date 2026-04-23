@@ -161,9 +161,9 @@ class Client {
 
   String get fullAddress {
     final parts = <String>[];
-    if (barangay != null && barangay!.isNotEmpty) parts.add(barangay!);
-    if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
     if (province != null && province!.isNotEmpty) parts.add(province!);
+    if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
+    if (barangay != null && barangay!.isNotEmpty) parts.add(barangay!);
     if (region != null && region!.isNotEmpty) parts.add(region!);
     return parts.join(', ');
   }
