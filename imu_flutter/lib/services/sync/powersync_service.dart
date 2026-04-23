@@ -223,6 +223,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('updated_at'),
   ]),
   Table('client_favorites', [
+    Column.text('id'),
     Column.text('user_id'),
     Column.text('client_id'),
     Column.text('created_at'),

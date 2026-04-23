@@ -637,16 +637,12 @@ class ClientListCard extends ConsumerWidget {
                 if (isStarred) {
                   await favoritesNotifier.remove(client.id ?? '');
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Removed from favorites')),
-                    );
+                    AppNotification.showSuccess(context, 'Removed from favorites');
                   }
                 } else {
                   await favoritesNotifier.add(client.id ?? '');
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Added to favorites')),
-                    );
+                    AppNotification.showSuccess(context, 'Added to favorites');
                   }
                 }
               } catch (_) {

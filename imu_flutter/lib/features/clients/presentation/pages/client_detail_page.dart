@@ -1586,16 +1586,12 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     if (isStarred) {
                       await favoritesNotifier.remove(widget.clientId);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Removed from favorites')),
-                        );
+                        AppNotification.showSuccess(context, 'Removed from favorites');
                       }
                     } else {
                       await favoritesNotifier.add(widget.clientId);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Added to favorites')),
-                        );
+                        AppNotification.showSuccess(context, 'Added to favorites');
                       }
                     }
 
