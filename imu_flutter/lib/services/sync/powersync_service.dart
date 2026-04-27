@@ -64,7 +64,11 @@ const Schema _powerSyncSchema = Schema([
     Column.real('latitude'),
     Column.real('longitude'),
     Column.integer('is_primary'),
+    Column.integer('psgc_id'),         // NEW: PSGC reference
+    Column.text('street_address'),     // NEW: combined street/barangay rendering
     Column.text('created_at'),
+    Column.text('updated_at'),         // NEW
+    Column.text('deleted_at'),         // NEW
   ]),
   Table('phone_numbers', [
     Column.text('client_id'),
@@ -72,6 +76,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('label'),
     Column.integer('is_primary'),
     Column.text('created_at'),
+    Column.text('updated_at'),         // NEW
     Column.text('deleted_at'),
   ]),
   // NOTE: Touchpoints table removed from PowerSync schema
@@ -227,6 +232,17 @@ const Schema _powerSyncSchema = Schema([
     Column.text('user_id'),
     Column.text('client_id'),
     Column.text('created_at'),
+  ]),
+  // PSGC reference data — declared so PowerSync can write rows here when
+  // referenced by clients/addresses subqueries. Mobile doesn't directly
+  // query this table, but PowerSync requires the schema to declare it.
+  Table('psgc', [
+    Column.text('region'),
+    Column.text('province'),
+    Column.text('mun_city_kind'),
+    Column.text('mun_city'),
+    Column.text('barangay'),
+    Column.text('zip_code'),
   ]),
 ]);
 
