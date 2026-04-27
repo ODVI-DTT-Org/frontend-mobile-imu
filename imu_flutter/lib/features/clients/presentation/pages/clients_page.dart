@@ -40,7 +40,7 @@ import '../../../../models/client_status.dart';
 import '../../../my_day/presentation/providers/my_day_provider.dart' show myDayStateProvider;
 import '../../../../shared/widgets/skeletons/client_skeleton.dart';
 import '../../data/models/client_model.dart';
-import '../../data/providers/client_favorites_provider.dart';
+import '../../data/providers/client_favorites_provider.dart' show FavoritesResult, favoritedClientListProvider, clientFavoritesNotifierProvider;
 import '../../../../services/api/itinerary_api_service.dart';
 
 /// Client view mode enum
@@ -304,10 +304,21 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
             ? ref.watch(onlineClientsProvider)
             : ref.watch(favoritedClientListProvider);
 
+    // Watch favorites state and online status for the favorites tab
+    final favoriteState = ref.watch(clientFavoritesNotifierProvider);
+    final isOnline = ref.watch(isOnlineProvider);
+
     return clientsAsync.when(
       data: (data) {
         // Handle different data structures
-        final clients = data is ClientsResponse ? data.items : data as List<Client>;
+        final clients = _viewMode == ClientViewMode.favorites
+            ? (data as FavoritesResult).clients
+            : data is ClientsResponse
+                ? data.items
+                : data as List<Client>;
+        final favoritesResult = _viewMode == ClientViewMode.favorites
+            ? (data as FavoritesResult)
+            : null;
         final meta = data is ClientsResponse ? data : null;
 
         // Filter locally for favorites mode with search
@@ -519,7 +530,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
                 // Client list
                 Expanded(
-                  child: paginatedClients.isEmpty
+                  child: _viewMode == ClientViewMode.favorites &&
+                          favoriteState.isInitialSyncing &&
+                          favoriteState.ids.isEmpty
+                      ? _buildFavoritesSkeleton()
+                      : paginatedClients.isEmpty
                       ? _buildEmptyState()
                       : Column(
                           children: [
@@ -537,6 +552,33 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                                 ),
                               ),
                             ),
+                            // Inline footer: unresolved favorites while offline
+                            if (_viewMode == ClientViewMode.favorites &&
+                                favoritesResult != null &&
+                                favoritesResult.unresolvedCount > 0 &&
+                                !isOnline)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(LucideIcons.cloudOff, size: 16),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${favoritesResult.unresolvedCount} favorite${favoritesResult.unresolvedCount == 1 ? "" : "s"} couldn\'t load offline. Connect to sync.',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                 ),
@@ -1035,6 +1077,26 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
             style: TextStyle(color: Colors.grey.shade500),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Skeleton list shown when the favorites tab is loading on a fresh
+  /// device — i.e., PowerSync's initial sync hasn't delivered the
+  /// client_favorites rows yet.
+  Widget _buildFavoritesSkeleton() {
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
+      itemCount: 5,
+      itemBuilder: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+        child: Container(
+          height: 72,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
     );
   }

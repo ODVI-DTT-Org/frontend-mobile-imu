@@ -919,7 +919,7 @@ class ClientApiService {
   /// Fetch full client records by ID. Used as a last-resort fallback by
   /// the favorites tab when a favorited client is missing from local
   /// PowerSync and Hive cache. Caps at 100 IDs per request.
-  Future<List<Client>> fetchClientsByIds(List<String> ids) async {
+  Future<List<Client>> fetchClientsByIdsPost(List<String> ids) async {
     if (ids.isEmpty) return [];
     if (ids.length > 100) {
       throw ArgumentError('fetchClientsByIds: max 100 ids per request, got ${ids.length}');

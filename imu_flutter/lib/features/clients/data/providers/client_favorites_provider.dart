@@ -1,208 +1,125 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
-import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider;
+import '../../../../services/api/client_api_service.dart';
+import '../../../../shared/providers/app_providers.dart' show currentUserIdProvider, isOnlineProvider;
 import '../../../../core/utils/logger.dart';
 import '../models/client_model.dart';
 
-/// Notifier for managing client favorite status with optimistic updates.
-/// This prevents the star button from "unticking" during PowerSync sync cycles.
-class ClientFavoritesNotifier extends StateNotifier<Set<String>> {
+/// State shape for the favorites notifier.
+class FavoritesState {
+  final Set<String> ids;
+  final bool isInitialSyncing;
+  const FavoritesState({required this.ids, required this.isInitialSyncing});
+
+  FavoritesState copyWith({Set<String>? ids, bool? isInitialSyncing}) =>
+      FavoritesState(
+        ids: ids ?? this.ids,
+        isInitialSyncing: isInitialSyncing ?? this.isInitialSyncing,
+      );
+
+  static const empty = FavoritesState(ids: <String>{}, isInitialSyncing: false);
+}
+
+class ClientFavoritesNotifier extends StateNotifier<FavoritesState> {
   final Ref _ref;
   bool _isUpdating = false;
 
-  ClientFavoritesNotifier(this._ref) : super({}) {
+  ClientFavoritesNotifier(this._ref)
+      : super(const FavoritesState(ids: <String>{}, isInitialSyncing: true)) {
     _initializeFromDatabase();
   }
 
-  /// Initialize state from PowerSync database and watch for changes.
-  /// Only update state from DB when not in the middle of a manual update.
   void _initializeFromDatabase() {
     final userId = _ref.read(currentUserIdProvider);
     if (userId == null) {
-      state = {};
+      state = FavoritesState.empty;
       return;
     }
 
-    // Load initial state
-    PowerSyncService.database.then((db) {
-      db.getAll(
-        'SELECT client_id FROM client_favorites WHERE user_id = ?',
-        [userId],
-      ).then((rows) {
-        final ids = rows.map((r) => r['client_id'] as String).toSet();
-        if (!_isUpdating) {
-          state = ids;
-          logDebug('[ClientFavoritesNotifier] Initialized with ${ids.length} favorites');
-        }
-      });
-    });
-
-    // Watch for changes from PowerSync (but ignore during manual updates)
+    // Watch the favorites table; emit non-empty cancels initial-syncing.
     PowerSyncService.database.asStream().asyncExpand((db) {
       return db.watch(
         'SELECT client_id FROM client_favorites WHERE user_id = ?',
         parameters: [userId],
       );
     }).listen((rows) {
-      if (_isUpdating) {
-        logDebug('[ClientFavoritesNotifier] Ignoring stream update during manual operation');
-        return;
-      }
+      if (_isUpdating) return;
       final ids = rows.map((r) => r['client_id'] as String).toSet();
-      state = ids;
-      logDebug('[ClientFavoritesNotifier] Stream updated with ${ids.length} favorites');
+      state = FavoritesState(ids: ids, isInitialSyncing: false);
+    });
+
+    // Belt-and-braces: if waitForInitialSync resolves and the stream is
+    // still empty, drop the syncing flag (we know sync is done; an empty
+    // result is now authoritative).
+    PowerSyncService.waitForInitialSync().then((_) {
+      if (mounted && state.isInitialSyncing) {
+        state = state.copyWith(isInitialSyncing: false);
+      }
+    }).catchError((e) {
+      logError('[ClientFavoritesNotifier] waitForInitialSync error: $e');
+      if (mounted) state = state.copyWith(isInitialSyncing: false);
     });
   }
 
-  /// Optimistically add client to favorites.
-  /// Manual check prevents duplicate entries at application level.
-  Future<void> add(String clientId) async {
-    // Manual check #1: Check if already in state (optimistic)
-    if (state.contains(clientId)) {
-      logDebug('[ClientFavoritesNotifier] $clientId already in favorites (state check), skipping add');
-      return;
-    }
-
+  Future<void> add(Client client) async {
+    if (state.ids.contains(client.id)) return;
     _isUpdating = true;
-    final previousState = state;
-
-    // Optimistic update
-    state = {...state, clientId};
-    logDebug('[ClientFavoritesNotifier] Optimistically added $clientId, now ${state.length} favorites');
-
+    final previous = state;
+    state = state.copyWith(ids: {...state.ids, client.id});
     try {
-      final userId = _ref.read(currentUserIdProvider);
-      if (userId == null) {
-        throw Exception('User not logged in');
-      }
-
-      final db = await PowerSyncService.database;
-
-      // Manual check #2: Check if already exists in database before insert
-      final existing = await db.getAll(
-        'SELECT id FROM client_favorites WHERE user_id = ? AND client_id = ?',
-        [userId, clientId],
-      );
-
-      if (existing.isNotEmpty) {
-        logDebug('[ClientFavoritesNotifier] $clientId already exists in database, skipping insert');
-        // Don't revert - the optimistic state is correct
-        return;
-      }
-
-      // Safe to proceed with insert
-      final id = const Uuid().v4();
-      await db.execute(
-        'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
-        [id, userId, clientId, DateTime.now().toIso8601String()],
-      );
-
-      logDebug('[ClientFavoritesNotifier] Successfully inserted $clientId into database');
+      await _ref.read(clientFavoritesServiceProvider).starClient(client);
     } catch (e) {
-      // Revert on error
-      state = previousState;
-      logError('[ClientFavoritesNotifier] Failed to add $clientId, reverted state: $e');
+      state = previous;
       rethrow;
     } finally {
-      // Allow stream updates after a short delay to ensure sync cycle completes
       Future.delayed(const Duration(seconds: 3), () {
         _isUpdating = false;
-        logDebug('[ClientFavoritesNotifier] Resuming stream updates');
       });
     }
   }
 
-  /// Optimistically remove client from favorites.
-  /// Manual check prevents unnecessary database operations.
   Future<void> remove(String clientId) async {
-    // Manual check #1: Check if NOT in state (optimistic)
-    if (!state.contains(clientId)) {
-      logDebug('[ClientFavoritesNotifier] $clientId not in favorites (state check), skipping remove');
-      return;
-    }
-
+    if (!state.ids.contains(clientId)) return;
     _isUpdating = true;
-    final previousState = state;
-
-    // Optimistic update
-    state = state.where((id) => id != clientId).toSet();
-    logDebug('[ClientFavoritesNotifier] Optimistically removed $clientId, now ${state.length} favorites');
-
+    final previous = state;
+    state = state.copyWith(ids: state.ids.where((id) => id != clientId).toSet());
     try {
-      final userId = _ref.read(currentUserIdProvider);
-      if (userId == null) {
-        throw Exception('User not logged in');
-      }
-
-      final db = await PowerSyncService.database;
-
-      // Manual check #2: Verify the record exists before attempting delete
-      final existing = await db.getAll(
-        'SELECT id FROM client_favorites WHERE user_id = ? AND client_id = ?',
-        [userId, clientId],
-      );
-
-      if (existing.isEmpty) {
-        logDebug('[ClientFavoritesNotifier] $clientId not found in database, skipping delete');
-        // Don't revert - the optimistic state is correct
-        return;
-      }
-
-      // Safe to proceed with delete
-      await db.execute(
-        'DELETE FROM client_favorites WHERE user_id = ? AND client_id = ?',
-        [userId, clientId],
-      );
-
-      logDebug('[ClientFavoritesNotifier] Successfully removed $clientId from database');
+      await _ref.read(clientFavoritesServiceProvider).unstarClient(clientId);
     } catch (e) {
-      // Revert on error
-      state = previousState;
-      logError('[ClientFavoritesNotifier] Failed to remove $clientId, reverted state: $e');
+      state = previous;
       rethrow;
     } finally {
-      // Allow stream updates after a short delay
       Future.delayed(const Duration(seconds: 3), () {
         _isUpdating = false;
-        logDebug('[ClientFavoritesNotifier] Resuming stream updates');
       });
     }
   }
 
-  /// Check if a client is favorited.
-  bool contains(String clientId) => state.contains(clientId);
+  bool contains(String clientId) => state.ids.contains(clientId);
 }
 
 /// Provider for the favorites notifier.
-final clientFavoritesNotifierProvider = StateNotifierProvider<ClientFavoritesNotifier, Set<String>>((ref) {
+final clientFavoritesNotifierProvider =
+    StateNotifierProvider<ClientFavoritesNotifier, FavoritesState>((ref) {
   return ClientFavoritesNotifier(ref);
 });
 
-/// Live set of favorited client IDs for the current user, from PowerSync SQLite.
-/// NOTE: This is now deprecated in favor of clientFavoritesNotifierProvider for optimistic updates.
-/// Kept for backward compatibility with favoritedClientListProvider.
-final clientFavoritesProvider = StreamProvider<Set<String>>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return Stream.value({});
-  return PowerSyncService.database.asStream().asyncExpand((db) {
-    return db.watch(
-      'SELECT client_id FROM client_favorites WHERE user_id = ?',
-      parameters: [userId],
-    ).map((rows) => rows.map((r) => r['client_id'] as String).toSet());
-  });
-});
-
-/// Service for starring/unstarring clients with optimistic local SQLite updates.
+/// Service for starring/unstarring clients.
 /// PowerSync handles all API uploads automatically.
 class ClientFavoritesService {
   final Ref _ref;
 
   ClientFavoritesService(this._ref);
 
-  Future<void> starClient(String clientId) async {
-    logDebug('[ClientFavoritesService] Starting starClient for clientId: $clientId');
+  /// Star a client. Writes to PowerSync `client_favorites` (which uploads to
+  /// the backend via the connector) AND caches the full client record into
+  /// Hive immediately so the Favorites tab can render it offline.
+  Future<void> starClient(Client client) async {
+    logDebug('[ClientFavoritesService] Starting starClient for clientId: ${client.id}');
 
     final userId = _ref.read(currentUserIdProvider);
     if (userId == null) {
@@ -210,29 +127,25 @@ class ClientFavoritesService {
       throw Exception('User not logged in');
     }
 
-    logDebug('[ClientFavoritesService] userId: $userId');
-
     try {
       final db = await PowerSyncService.database;
-      logDebug('[ClientFavoritesService] Database obtained, executing INSERT');
-
-      // PowerSync requires id in INSERT statements (generates UUID for local record)
       final id = const Uuid().v4();
-      logDebug('[ClientFavoritesService] Generated id: $id');
-
-      // Optimistic local insert - PowerSync will upload this automatically
       await db.execute(
         'INSERT OR IGNORE INTO client_favorites (id, user_id, client_id, created_at) VALUES (?, ?, ?, ?)',
-        [id, userId, clientId, DateTime.now().toIso8601String()],
+        [id, userId, client.id, DateTime.now().toIso8601String()],
       );
+      logDebug('[ClientFavoritesService] PowerSync insert succeeded for clientId: ${client.id}');
 
-      logDebug('[ClientFavoritesService] INSERT executed successfully for clientId: $clientId');
+      // Cache the full client record into Hive (cache-on-favorite, Bug 2A fix)
+      try {
+        await HiveService().saveClient(client.toJson());
+        logDebug('[ClientFavoritesService] Hive cache write succeeded for clientId: ${client.id}');
+      } catch (e, stackTrace) {
+        // Non-fatal: the favorite is recorded; Hive can re-sync later.
+        logError('[ClientFavoritesService] Hive cache write failed for clientId: ${client.id}', e, stackTrace);
+      }
     } catch (e, stackTrace) {
-      logError(
-        '[ClientFavoritesService] Failed to star client $clientId',
-        e,
-        stackTrace,
-      );
+      logError('[ClientFavoritesService] Failed to star client ${client.id}', e, stackTrace);
       rethrow;
     }
   }
@@ -246,25 +159,15 @@ class ClientFavoritesService {
       throw Exception('User not logged in');
     }
 
-    logDebug('[ClientFavoritesService] userId: $userId');
-
     try {
       final db = await PowerSyncService.database;
-      logDebug('[ClientFavoritesService] Database obtained, executing DELETE');
-
-      // Optimistic local delete - PowerSync will upload this automatically
-      final result = await db.execute(
+      await db.execute(
         'DELETE FROM client_favorites WHERE user_id = ? AND client_id = ?',
         [userId, clientId],
       );
-
-      logDebug('[ClientFavoritesService] DELETE executed successfully for clientId: $clientId, rows affected: $result');
+      logDebug('[ClientFavoritesService] DELETE executed successfully for clientId: $clientId');
     } catch (e, stackTrace) {
-      logError(
-        '[ClientFavoritesService] Failed to unstar client $clientId',
-        e,
-        stackTrace,
-      );
+      logError('[ClientFavoritesService] Failed to unstar client $clientId', e, stackTrace);
       rethrow;
     }
   }
@@ -274,57 +177,99 @@ final clientFavoritesServiceProvider = Provider<ClientFavoritesService>((ref) {
   return ClientFavoritesService(ref);
 });
 
+/// Result type for favoritedClientListProvider — carries both the resolved
+/// clients and a count of IDs we couldn't resolve (used for the "X favorites
+/// couldn't load offline" footer).
+class FavoritesResult {
+  final List<Client> clients;
+  final int unresolvedCount;
+  const FavoritesResult({required this.clients, required this.unresolvedCount});
+}
+
 /// Starred clients for the current user.
-/// Uses the shared state from clientFavoritesNotifierProvider for consistency.
-/// Hybrid approach: Try PowerSync first (for all clients), fall back to Hive cache (assigned clients).
-/// This works both online (PowerSync has data) and offline (Hive cache as fallback).
-/// Uses FutureProvider with ref.watch() to automatically update when favorite IDs change.
-final favoritedClientListProvider = FutureProvider<List<Client>>((ref) async {
+/// Fallback chain: Hive → local PowerSync clients → POST /clients/by-ids.
+/// Hive is checked first because cache-on-favorite (Bug 2A) populates it
+/// at star time, and because it has embedded addresses/phones the UI uses.
+final favoritedClientListProvider = FutureProvider<FavoritesResult>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return [];
+  if (userId == null) {
+    return const FavoritesResult(clients: [], unresolvedCount: 0);
+  }
 
-  // Watch the notifier state (single source of truth for favorite IDs)
-  // ref.watch() ensures this provider rebuilds when favorite IDs change
-  final favoriteIds = ref.watch(clientFavoritesNotifierProvider);
-
+  final favoriteState = ref.watch(clientFavoritesNotifierProvider);
+  final favoriteIds = favoriteState.ids;
   if (favoriteIds.isEmpty) {
-    logDebug('[favoritedClientListProvider] No favorites found');
-    return [];
+    return const FavoritesResult(clients: [], unresolvedCount: 0);
   }
 
-  logDebug('[favoritedClientListProvider] Found ${favoriteIds.length} favorited IDs: $favoriteIds');
+  logDebug('[favoritedClientListProvider] Resolving ${favoriteIds.length} favorited IDs');
 
-  // Try to get clients from PowerSync first
-  try {
-    final db = await PowerSyncService.database;
-    final placeholders = List.filled(favoriteIds.length, '?').join(',');
-    final result = await db.getAll(
-      'SELECT * FROM clients WHERE id IN ($placeholders) AND deleted_at IS NULL',
-      favoriteIds.toList(),
-    );
+  final hive = HiveService();
+  final found = <Client>[];
+  final missingIds = <String>[];
 
-    if (result.isNotEmpty) {
-      final clients = result.map((r) => Client.fromRow(Map<String, dynamic>.from(r))).toList();
-      logDebug('[favoritedClientListProvider] Found ${clients.length} clients in PowerSync');
-      return clients..sort((a, b) => a.fullName.compareTo(b.fullName));
+  // Tier 1: Hive cache (primary source)
+  for (final id in favoriteIds) {
+    final json = hive.getClient(id);
+    if (json != null) {
+      found.add(Client.fromJson(json));
+    } else {
+      missingIds.add(id);
     }
-  } catch (e) {
-    logError('[favoritedClientListProvider] Error querying PowerSync clients: $e');
   }
 
-  // Fallback: Load from Hive cache (assigned clients only)
-  logDebug('[favoritedClientListProvider] PowerSync has no clients, falling back to Hive cache');
-  final hiveService = HiveService();
-  final rawClients = hiveService.getAllClients();
-  final allClients = rawClients.map((json) => Client.fromJson(json)).toList();
+  // Tier 2: local PowerSync clients
+  if (missingIds.isNotEmpty) {
+    try {
+      final db = await PowerSyncService.database;
+      final placeholders = List.filled(missingIds.length, '?').join(',');
+      final rows = await db.getAll(
+        'SELECT * FROM clients WHERE id IN ($placeholders) AND deleted_at IS NULL',
+        missingIds,
+      );
+      final stillMissing = <String>[];
+      final foundFromPS = <String>{};
+      for (final row in rows) {
+        final c = Client.fromRow(Map<String, dynamic>.from(row));
+        found.add(c);
+        foundFromPS.add(c.id);
+        // Cache forward into Hive so future reads are faster
+        await hive.saveClient(c.toJson());
+      }
+      for (final id in missingIds) {
+        if (!foundFromPS.contains(id)) stillMissing.add(id);
+      }
+      missingIds
+        ..clear()
+        ..addAll(stillMissing);
+    } catch (e) {
+      logError('[favoritedClientListProvider] PowerSync tier failed: $e');
+      // Don't abort; fall through to API tier with the same missing list
+    }
+  }
 
-  // Filter by favorited IDs
-  final favoritedClients = allClients
-      .where((c) => favoriteIds.contains(c.id))
-      .toList()
-    ..sort((a, b) => a.fullName.compareTo(b.fullName));
+  // Tier 3: REST API (only if online)
+  if (missingIds.isNotEmpty) {
+    final isOnline = ref.read(isOnlineProvider);
+    if (isOnline) {
+      try {
+        final api = ref.read(clientApiServiceProvider);
+        // Chunk if more than 100; backend caps at 100 per request
+        for (var i = 0; i < missingIds.length; i += 100) {
+          final chunk = missingIds.sublist(i, math.min(i + 100, missingIds.length));
+          final fetched = await api.fetchClientsByIdsPost(chunk);
+          for (final c in fetched) {
+            found.add(c);
+            await hive.saveClient(c.toJson());
+            missingIds.remove(c.id);
+          }
+        }
+      } catch (e) {
+        logError('[favoritedClientListProvider] API tier failed: $e');
+      }
+    }
+  }
 
-  logDebug('[favoritedClientListProvider] Found ${favoritedClients.length} clients in Hive cache (assigned only)');
-
-  return favoritedClients;
+  found.sort((a, b) => a.fullName.compareTo(b.fullName));
+  return FavoritesResult(clients: found, unresolvedCount: missingIds.length);
 });

@@ -1593,8 +1593,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         actions: [
           Consumer(
             builder: (context, ref, _) {
-              final favorites = ref.watch(clientFavoritesNotifierProvider);
-              final isStarred = favorites.contains(widget.clientId);
+              final favoriteState = ref.watch(clientFavoritesNotifierProvider);
+              final isStarred = favoriteState.ids.contains(widget.clientId);
               final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
               return IconButton(
                 icon: Icon(
@@ -1612,7 +1612,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                         AppNotification.showSuccess(context, 'Removed from favorites');
                       }
                     } else {
-                      await favoritesNotifier.add(widget.clientId);
+                      await favoritesNotifier.add(client);
                       if (context.mounted) {
                         AppNotification.showSuccess(context, 'Added to favorites');
                       }
