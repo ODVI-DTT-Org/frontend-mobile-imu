@@ -1590,14 +1590,20 @@ class _VisitCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // LOAN RELEASED gets its own row so it can't be mistaken for
+                // just another small chip — same treatment as ClientListTile.
+                if (visit.loanReleased) ...[
+                  const _LoanReleasedBadge(),
+                  const SizedBox(height: 8),
+                ],
                 // Touchpoint info badges
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
-                    if (visit.loanReleased) const _LoanReleasedBadge(),
-                    // Next touchpoint badge (from ItineraryItem)
+                    // Next touchpoint badge — suppressed when loan released
+                    // (the green pill above already says the visit is done).
                     if (!visit.loanReleased &&
                         visit.touchpointNumber != null &&
                         visit.touchpointType != null)

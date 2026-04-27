@@ -413,8 +413,10 @@ Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   enriched['next_touchpoint_number'] = cached['next_touchpoint_number'] ?? cached['nextTouchpointNumber'];
   enriched['next_touchpoint'] = cached['next_touchpoint'] ?? cached['nextTouchpoint'];
   // Client.toJson stores camelCase ('loanReleased'); LoanReleaseWatcher writes
-  // snake_case. Read either so the action-sheet guard for released loans fires.
-  enriched['loan_released'] = cached['loanReleased'] ?? cached['loan_released'];
+  // snake_case. The SELECT now also LEFT JOINs clients.loan_released, so only
+  // fall back to Hive when the JOIN didn't populate the column.
+  enriched['loan_released'] ??=
+      cached['loanReleased'] ?? cached['loan_released'];
   return enriched;
 }
 
@@ -431,7 +433,13 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
   try {
     final db = await PowerSyncService.database;
     await for (final rows in db.watch(
-      '''SELECT * FROM itineraries i
+      // LEFT JOIN so we still surface visits when the client row hasn't
+      // synced yet. loan_released comes from PowerSync's local clients
+      // table directly — Hive enrichment used to be the only source and
+      // would silently leave it null when the client wasn't cached.
+      '''SELECT i.*, c.loan_released
+         FROM itineraries i
+         LEFT JOIN clients c ON c.id = i.client_id
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
          ORDER BY i.scheduled_time ASC''',
       parameters: [userId, dateStr],
