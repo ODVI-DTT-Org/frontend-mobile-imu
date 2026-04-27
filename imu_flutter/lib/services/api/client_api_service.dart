@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -912,6 +914,46 @@ class ClientApiService {
       case ProductType.bfpStp:
         return 'BFP STP';
     }
+  }
+
+  /// Fetch full client records by ID. Used as a last-resort fallback by
+  /// the favorites tab when a favorited client is missing from local
+  /// PowerSync and Hive cache. Caps at 100 IDs per request.
+  Future<List<Client>> fetchClientsByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    if (ids.length > 100) {
+      throw ArgumentError('fetchClientsByIds: max 100 ids per request, got ${ids.length}');
+    }
+
+    final token = _authService.accessToken;
+    if (token == null) {
+      throw ApiException(message: 'Not authenticated - Please login again');
+    }
+
+    final response = await _dio.post(
+      '${AppConfig.apiBaseUrl}/api/clients/by-ids',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ),
+      data: jsonEncode({'ids': ids}),
+    );
+
+    if (response.statusCode == 401) {
+      throw ApiException(message: 'Unauthorized', statusCode: 401);
+    }
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'fetchClientsByIds failed: ${response.statusCode} ${response.data}',
+        statusCode: response.statusCode,
+      );
+    }
+
+    final data = response.data as Map<String, dynamic>;
+    final clientsJson = (data['clients'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return clientsJson.map(Client.fromJson).toList();
   }
 }
 
