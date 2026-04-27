@@ -253,7 +253,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   }
 
   void _showFilterDrawer(BuildContext context) {
-    showFilterDrawer(context, showAllPsgc: _viewMode != ClientViewMode.assigned);
+    showFilterDrawer(context);
   }
 
   @override

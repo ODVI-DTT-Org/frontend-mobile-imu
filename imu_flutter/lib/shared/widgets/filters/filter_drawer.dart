@@ -11,9 +11,7 @@ import 'attribute_chips_section.dart';
 import 'date_range_section.dart';
 
 class FilterDrawer extends ConsumerStatefulWidget {
-  final bool showAllPsgc;
-
-  const FilterDrawer({super.key, required this.showAllPsgc});
+  const FilterDrawer({super.key});
 
   @override
   ConsumerState<FilterDrawer> createState() => _FilterDrawerState();
@@ -85,16 +83,32 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                       // 1. Location
                       LocationDropdownSection(
                         draftFilter: _draftLocation,
-                        showAllPsgc: widget.showAllPsgc,
                         onChanged: (f) => setState(() => _draftLocation = f),
                       ),
                       const SizedBox(height: 20),
-                      // 2. Status, 4. Client Type, 5. Market Type, 6. Pension Type, 7. Product Type, 8. Loan Type
+                      // 2. Visit Status
+                      AttributeChipsSection(
+                        draftFilter: _draftAttrs,
+                        options: const ClientFilterOptions(),
+                        onChanged: (f) => setState(() => _draftAttrs = f),
+                        showVisitStatus: true,
+                        showOthers: false,
+                      ),
+                      const SizedBox(height: 20),
+                      // 3. Date Range (paired with visit status)
+                      DateRangeSection(
+                        draftFilter: _draftAttrs,
+                        onChanged: (f) => setState(() => _draftAttrs = f),
+                      ),
+                      const SizedBox(height: 20),
+                      // 4. Other attributes — Client Type, Market Type, Pension Type, Product Type, Loan Type
                       optionsAsync.when(
                         data: (options) => AttributeChipsSection(
                           draftFilter: _draftAttrs,
                           options: options,
                           onChanged: (f) => setState(() => _draftAttrs = f),
+                          showVisitStatus: false,
+                          showOthers: true,
                         ),
                         loading: () => const Padding(
                           padding: EdgeInsets.symmetric(vertical: 16),
@@ -104,13 +118,9 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                           draftFilter: _draftAttrs,
                           options: const ClientFilterOptions(),
                           onChanged: (f) => setState(() => _draftAttrs = f),
+                          showVisitStatus: false,
+                          showOthers: true,
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      // 3. Date
-                      DateRangeSection(
-                        draftFilter: _draftAttrs,
-                        onChanged: (f) => setState(() => _draftAttrs = f),
                       ),
                     ],
                   ),
@@ -148,14 +158,14 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
   }
 }
 
-void showFilterDrawer(BuildContext context, {required bool showAllPsgc}) {
+void showFilterDrawer(BuildContext context) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close filters',
     barrierColor: Colors.black54,
     transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (_, __, ___) => FilterDrawer(showAllPsgc: showAllPsgc),
+    pageBuilder: (_, __, ___) => const FilterDrawer(),
     transitionBuilder: (_, anim, __, child) {
       return SlideTransition(
         position: Tween<Offset>(

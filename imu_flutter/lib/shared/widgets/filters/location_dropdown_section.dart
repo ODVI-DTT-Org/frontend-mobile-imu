@@ -1,31 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/location_filter.dart';
-import '../../../shared/providers/location_filter_providers.dart';
-import '../../../features/psgc/data/models/psgc_models.dart';
 import '../../../features/psgc/data/repositories/psgc_repository.dart';
 import 'searchable_picker_sheet.dart';
 
 class LocationDropdownSection extends ConsumerWidget {
   final LocationFilter draftFilter;
-  final bool showAllPsgc;
   final void Function(LocationFilter) onChanged;
 
   const LocationDropdownSection({
     super.key,
     required this.draftFilter,
-    required this.showAllPsgc,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final provincesAsync = showAllPsgc
-        ? ref.watch(provincesProvider)
-        : ref.watch(assignedAreasProvider).whenData((areas) =>
-            areas.provinces
-                .map((p) => PsgcProvince(name: p, code: p, region: ''))
-                .toList());
+    // Always source provinces from PSGC so the municipality lookup
+    // (also PSGC) finds matches regardless of view mode.
+    final provincesAsync = ref.watch(provincesProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

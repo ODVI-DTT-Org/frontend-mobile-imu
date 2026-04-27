@@ -40,7 +40,7 @@ class _UnifiedClientSelectorBottomSheetState
   }
 
   void _showFilterDrawer() {
-    showFilterDrawer(context, showAllPsgc: true);
+    showFilterDrawer(context);
   }
 
   @override

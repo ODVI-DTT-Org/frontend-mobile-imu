@@ -76,8 +76,24 @@ class ClientAttributeFilter {
       if (!loanTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
-      final hasMatch = client.touchpoints.any((tp) =>
-          touchpointStatuses!.any((s) => s.toUpperCase() == tp.status.apiValue.toUpperCase()),);
+      // Lifecycle statuses, aligned with backend (callable, completed,
+      // no_progress, loan_released). See backend/src/routes/clients.ts:775.
+      final ts = client.touchpointStatus;
+      if (ts == null) return false;
+      final loanReleased = ts.loanReleased;
+      final hasMatch = touchpointStatuses!.any((s) {
+        switch (s) {
+          case 'callable':
+            return ts.canCreateTouchpoint && !loanReleased;
+          case 'completed':
+            return ts.isComplete && !loanReleased;
+          case 'no_progress':
+            return ts.completedTouchpoints == 0 && !loanReleased;
+          case 'loan_released':
+            return loanReleased;
+        }
+        return false;
+      });
       if (!hasMatch) return false;
     }
     return true;

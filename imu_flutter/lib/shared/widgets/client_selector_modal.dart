@@ -323,7 +323,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   }
 
   void _showFilterDrawer() {
-    showFilterDrawer(context, showAllPsgc: _clientFilter == 'all');
+    showFilterDrawer(context);
   }
 
   @override

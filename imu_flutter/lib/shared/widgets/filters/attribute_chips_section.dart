@@ -8,13 +8,34 @@ class AttributeChipsSection extends StatelessWidget {
   final ClientAttributeFilter draftFilter;
   final ClientFilterOptions options;
   final void Function(ClientAttributeFilter) onChanged;
+  final bool showVisitStatus;
+  final bool showOthers;
 
   const AttributeChipsSection({
     super.key,
     required this.draftFilter,
     required this.options,
     required this.onChanged,
+    this.showVisitStatus = true,
+    this.showOthers = true,
   });
+
+  // Backend-aligned lifecycle statuses (see backend/src/routes/clients.ts:775).
+  // The web admin uses these same values; INTERESTED/UNDECIDED/NOT_INTERESTED
+  // here previously had no effect because the backend didn't recognise them.
+  static const _visitStatusValues = <String>[
+    'callable',
+    'completed',
+    'no_progress',
+    'loan_released',
+  ];
+
+  static const _visitStatusLabels = <String, String>{
+    'callable': 'Callable',
+    'completed': 'Completed',
+    'no_progress': 'No Progress',
+    'loan_released': 'Loan Released',
+  };
 
   List<String> _toggle(List<String>? current, String value) {
     final list = List<String>.from(current ?? []);
@@ -34,97 +55,94 @@ class AttributeChipsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 2. Status (renamed from "Visit Status" to "visit status")
-        _FilterGroup(
-          label: 'visit status',
-          values: const ['INTERESTED', 'UNDECIDED', 'NOT_INTERESTED'],
-          selected: draftFilter.touchpointStatuses?.toSet() ?? {},
-          labelOf: (v) => v == 'NOT_INTERESTED' ? 'Not Interested' : _label(v.replaceAll('_', ' ')),
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.touchpointStatuses, v);
-            onChanged(draftFilter.copyWith(touchpointStatuses: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(touchpointStatuses: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-        const SizedBox(height: 12),
-        // 4. Client Type
-        _FilterGroup(
-          label: 'Client Type',
-          values: options.clientTypes,
-          selected: draftFilter.clientTypes?.toSet() ?? {},
-          labelOf: _label,
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.clientTypes, v);
-            onChanged(draftFilter.copyWith(clientTypes: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(clientTypes: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-        const SizedBox(height: 12),
-        // 5. Market Type
-        _FilterGroup(
-          label: 'Market Type',
-          values: options.marketTypes,
-          selected: draftFilter.marketTypes?.toSet() ?? {},
-          labelOf: _label,
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.marketTypes, v);
-            onChanged(draftFilter.copyWith(marketTypes: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(marketTypes: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-        const SizedBox(height: 12),
-        // 6. Pension Type
-        _FilterGroup(
-          label: 'Pension Type',
-          values: options.pensionTypes,
-          selected: draftFilter.pensionTypes?.toSet() ?? {},
-          labelOf: _label,
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.pensionTypes, v);
-            onChanged(draftFilter.copyWith(pensionTypes: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(pensionTypes: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-        const SizedBox(height: 12),
-        // 7. Product Type
-        _FilterGroup(
-          label: 'Product Type',
-          values: options.productTypes,
-          selected: draftFilter.productTypes?.toSet() ?? {},
-          labelOf: _label,
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.productTypes, v);
-            onChanged(draftFilter.copyWith(productTypes: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(productTypes: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
-        const SizedBox(height: 12),
-        // 8. Loan Type
-        _FilterGroup(
-          label: 'Loan Type',
-          values: options.loanTypes.isNotEmpty
-              ? options.loanTypes
-              : const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM'],
-          selected: draftFilter.loanTypes?.toSet() ?? {},
-          labelOf: _label,
-          onToggle: (v) {
-            final updated = _toggle(draftFilter.loanTypes, v);
-            onChanged(draftFilter.copyWith(loanTypes: updated.isEmpty ? null : updated));
-          },
-          onApply: (selected) {
-            onChanged(draftFilter.copyWith(loanTypes: selected.isEmpty ? null : selected.toList()));
-          },
-        ),
+        if (showVisitStatus)
+          _FilterGroup(
+            label: 'Visit Status',
+            values: _visitStatusValues,
+            selected: draftFilter.touchpointStatuses?.toSet() ?? {},
+            labelOf: (v) => _visitStatusLabels[v] ?? _label(v.replaceAll('_', ' ')),
+            onToggle: (v) {
+              final updated = _toggle(draftFilter.touchpointStatuses, v);
+              onChanged(draftFilter.copyWith(touchpointStatuses: updated.isEmpty ? null : updated));
+            },
+            onApply: (selected) {
+              onChanged(draftFilter.copyWith(touchpointStatuses: selected.isEmpty ? null : selected.toList()));
+            },
+          ),
+        if (showOthers) ...[
+          if (showVisitStatus) const SizedBox(height: 12),
+          _FilterGroup(
+            label: 'Client Type',
+            values: options.clientTypes,
+            selected: draftFilter.clientTypes?.toSet() ?? {},
+            labelOf: _label,
+            onToggle: (v) {
+              final updated = _toggle(draftFilter.clientTypes, v);
+              onChanged(draftFilter.copyWith(clientTypes: updated.isEmpty ? null : updated));
+            },
+            onApply: (selected) {
+              onChanged(draftFilter.copyWith(clientTypes: selected.isEmpty ? null : selected.toList()));
+            },
+          ),
+          const SizedBox(height: 12),
+          _FilterGroup(
+            label: 'Market Type',
+            values: options.marketTypes,
+            selected: draftFilter.marketTypes?.toSet() ?? {},
+            labelOf: _label,
+            onToggle: (v) {
+              final updated = _toggle(draftFilter.marketTypes, v);
+              onChanged(draftFilter.copyWith(marketTypes: updated.isEmpty ? null : updated));
+            },
+            onApply: (selected) {
+              onChanged(draftFilter.copyWith(marketTypes: selected.isEmpty ? null : selected.toList()));
+            },
+          ),
+          const SizedBox(height: 12),
+          _FilterGroup(
+            label: 'Pension Type',
+            values: options.pensionTypes,
+            selected: draftFilter.pensionTypes?.toSet() ?? {},
+            labelOf: _label,
+            onToggle: (v) {
+              final updated = _toggle(draftFilter.pensionTypes, v);
+              onChanged(draftFilter.copyWith(pensionTypes: updated.isEmpty ? null : updated));
+            },
+            onApply: (selected) {
+              onChanged(draftFilter.copyWith(pensionTypes: selected.isEmpty ? null : selected.toList()));
+            },
+          ),
+          const SizedBox(height: 12),
+          _FilterGroup(
+            label: 'Product Type',
+            values: options.productTypes,
+            selected: draftFilter.productTypes?.toSet() ?? {},
+            labelOf: _label,
+            onToggle: (v) {
+              final updated = _toggle(draftFilter.productTypes, v);
+              onChanged(draftFilter.copyWith(productTypes: updated.isEmpty ? null : updated));
+            },
+            onApply: (selected) {
+              onChanged(draftFilter.copyWith(productTypes: selected.isEmpty ? null : selected.toList()));
+            },
+          ),
+          const SizedBox(height: 12),
+          _FilterGroup(
+            label: 'Loan Type',
+            values: options.loanTypes.isNotEmpty
+                ? options.loanTypes
+                : const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM'],
+            selected: draftFilter.loanTypes?.toSet() ?? {},
+            labelOf: _label,
+            onToggle: (v) {
+              final updated = _toggle(draftFilter.loanTypes, v);
+              onChanged(draftFilter.copyWith(loanTypes: updated.isEmpty ? null : updated));
+            },
+            onApply: (selected) {
+              onChanged(draftFilter.copyWith(loanTypes: selected.isEmpty ? null : selected.toList()));
+            },
+          ),
+        ],
       ],
     );
   }
