@@ -128,7 +128,7 @@ class MyDayClient {
       loanType: (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?,
       address: (json['client'] as Map<String, dynamic>?)?['full_address'] as String?
           ?? json['address'] as String?,
-      loanReleased: (json['client'] as Map<String, dynamic>?)?['loan_released'] as bool? ?? false,
+      loanReleased: _parseBool((json['client'] as Map<String, dynamic>?)?['loan_released']),
     );
   }
 
@@ -217,8 +217,21 @@ class MyDayClient {
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,
       address: addressStr,
-      loanReleased: row['loan_released'] as bool? ?? false,
+      loanReleased: _parseBool(row['loan_released']),
     );
+  }
+
+  /// SQLite stores booleans as integers (0/1), but PostgREST returns true bools.
+  /// Cope with both shapes.
+  static bool _parseBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) {
+      final lower = value.toLowerCase();
+      return lower == 'true' || lower == '1';
+    }
+    return false;
   }
 
   Map<String, dynamic> toJson() => {

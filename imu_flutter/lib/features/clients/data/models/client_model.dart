@@ -1553,7 +1553,7 @@ class ClientTouchpointStatus {
       isComplete: json['is_complete'] as bool? ?? false,
       lastTouchpointType: json['last_touchpoint_type'] as String?,
       lastTouchpointAgentName: json['last_touchpoint_agent_name'] as String?,
-      loanReleased: json['loan_released'] as bool? ?? false,
+      loanReleased: Client._parseBool(json['loan_released']),
       loanReleasedAt: json['loan_released_at'] != null
           ? DateTime.parse(json['loan_released_at'] as String)
           : null,
@@ -1591,10 +1591,10 @@ class ClientTouchpointStatus {
       canCreateTouchpoint: false, // Will be computed locally if not provided
       expectedRole: null,
       isComplete: (row['touchpoint_number'] as int? ?? 0) >= 7 ||
-                  (row['loan_released'] as bool? ?? false),
+                  Client._parseBool(row['loan_released']),
       lastTouchpointType: row['last_touchpoint_type'] as String?,
       lastTouchpointAgentName: row['last_touchpoint_agent_name'] as String?,
-      loanReleased: row['loan_released'] as bool? ?? false,
+      loanReleased: Client._parseBool(row['loan_released']),
       loanReleasedAt: row['loan_released_at'] != null
           ? DateTime.parse(row['loan_released_at'] as String)
           : null,

@@ -118,13 +118,16 @@ class ItineraryItem {
     pensionType ??= (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?;
     loanType ??= (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?;
 
-    // Parse loan_released from client expand or flat fields
+    // Parse loan_released from client expand or flat fields.
+    // Source can be REST (true bool) or PowerSync (int 0/1) — _parseBool handles both.
     bool loanReleased = false;
     if (json['expand'] != null && json['expand']['client_id'] != null) {
       final client = json['expand']['client_id'] as Map<String, dynamic>;
-      loanReleased = client['loan_released'] as bool? ?? false;
+      loanReleased = _parseBool(client['loan_released']);
     }
-    loanReleased = json['loan_released'] as bool? ?? loanReleased;
+    if (json['loan_released'] != null) {
+      loanReleased = _parseBool(json['loan_released']);
+    }
 
     // Parse scheduled date - convert UTC timestamps to local time
     // Backend can send either:
@@ -253,8 +256,21 @@ class ItineraryItem {
           : null,
       nextTouchpointNumber: nextNum,
       nextTouchpointType: nextType,
-      loanReleased: row['loan_released'] as bool? ?? false,
+      loanReleased: _parseBool(row['loan_released']),
     );
+  }
+
+  /// SQLite stores booleans as integers (0/1), but PostgREST returns true bools.
+  /// Cope with both shapes.
+  static bool _parseBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) {
+      final lower = value.toLowerCase();
+      return lower == 'true' || lower == '1';
+    }
+    return false;
   }
 
   Map<String, dynamic> toJson() {
