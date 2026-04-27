@@ -28,6 +28,7 @@ class BackgroundSyncService extends ChangeNotifier {
 
   Timer? _syncTimer;
   Timer? _pendingCheckTimer;
+  Timer? _fastRetryTimer;
   StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
   AppLifecycleState? _lifecycleState;
 
@@ -41,8 +42,7 @@ class BackgroundSyncService extends ChangeNotifier {
   // Configuration
   Duration _syncInterval = const Duration(minutes: 15); // Default 15 minutes
   Duration _pendingCheckInterval = const Duration(minutes: 2); // Check pending count every 2min
-  static const int _maxSyncRetries = 10;
-  int _currentSyncRetry = 0;
+  static const Duration _fastRetryInterval = Duration(seconds: 60); // Active retry while drain pending
 
   // Sync status callbacks
   final List<Function()> _syncStartCallbacks = [];
@@ -143,6 +143,32 @@ class BackgroundSyncService extends ChangeNotifier {
     _pendingCheckTimer = null;
   }
 
+  /// Start fast-retry loop — fires every 60s while pendingCount > 0.
+  /// Self-terminates when the queue drains. Used after a failed sync or
+  /// PowerSync connect error so stranded uploads aren't stuck waiting for
+  /// the 15-minute periodic timer.
+  void _startFastRetry() {
+    if (_fastRetryTimer != null) return; // already running
+    logDebug('BackgroundSyncService: Starting fast-retry loop ($_pendingCount pending)');
+    _fastRetryTimer = Timer.periodic(_fastRetryInterval, (_) async {
+      if (_pendingCount <= 0) {
+        _stopFastRetry();
+        return;
+      }
+      if (_isOnlineAndAuthenticated() && !_isSyncing) {
+        logDebug('BackgroundSyncService: Fast retry fired ($_pendingCount pending)');
+        performSync();
+      }
+    });
+  }
+
+  void _stopFastRetry() {
+    if (_fastRetryTimer == null) return;
+    logDebug('BackgroundSyncService: Stopping fast-retry loop');
+    _fastRetryTimer?.cancel();
+    _fastRetryTimer = null;
+  }
+
   /// Handle app resumed event
   void _onAppResumed() {
     final isAuth = _authService.isAuthenticated;
@@ -210,6 +236,7 @@ class BackgroundSyncService extends ChangeNotifier {
         await _connectPowerSync();
       } catch (e, stackTrace) {
         logError('BackgroundSyncService: Failed to connect PowerSync', e);
+        _lastSyncError = 'Failed to connect to sync service';
         // Log critical error - PowerSync connection blocks all sync operations
         await ErrorLoggingHelper.logCriticalError(
           operation: 'PowerSync connection',
@@ -220,6 +247,11 @@ class BackgroundSyncService extends ChangeNotifier {
             'isOnline': _connectivityService.isOnline,
           },
         );
+        // Pending uploads are stranded — kick off the fast-retry loop so the
+        // next attempt happens in 60s instead of waiting for the 15min timer.
+        await _updatePendingCount();
+        if (_pendingCount > 0) _startFastRetry();
+        notifyListeners();
         return SyncResult(
           success: false,
           errorMessage: 'Failed to connect to sync service',
@@ -228,7 +260,6 @@ class BackgroundSyncService extends ChangeNotifier {
     }
 
     _isSyncing = true;
-    _currentSyncRetry = 0;
     notifyListeners();
 
     // Notify sync start
@@ -248,7 +279,6 @@ class BackgroundSyncService extends ChangeNotifier {
 
       _lastSyncTime = DateTime.now();
       _lastSyncError = null;
-      _currentSyncRetry = 0;
 
       await _updatePendingCount();
 
@@ -263,6 +293,14 @@ class BackgroundSyncService extends ChangeNotifier {
         }
       }
 
+      // Drained — stop the fast-retry loop. If anything remains (timeout
+      // path), keep retrying until it clears.
+      if (_pendingCount == 0) {
+        _stopFastRetry();
+      } else {
+        _startFastRetry();
+      }
+
       notifyListeners();
 
       return SyncResult(
@@ -271,28 +309,24 @@ class BackgroundSyncService extends ChangeNotifier {
       );
     } catch (e, stackTrace) {
       _lastSyncError = e.toString();
-      _currentSyncRetry++;
 
-      logError('BackgroundSyncService: Sync failed (attempt $_currentSyncRetry/$_maxSyncRetries)', e, stackTrace);
+      logError('BackgroundSyncService: Sync failed', e, stackTrace);
 
-      // Retry if max retries not reached
-      if (_currentSyncRetry < _maxSyncRetries) {
-        logDebug('BackgroundSyncService: Retrying sync in 5 seconds...');
-        await Future.delayed(const Duration(seconds: 5));
-        return performSync();
-      }
-
-      // Log critical error - sync failed after all retries
+      // Log critical error - sync failed
       await ErrorLoggingHelper.logCriticalError(
         operation: 'background sync',
         error: e,
         stackTrace: stackTrace,
         context: {
-          'retryCount': _currentSyncRetry.toString(),
-          'maxRetries': _maxSyncRetries.toString(),
           'pendingCount': _pendingCount.toString(),
         },
       );
+
+      // Pending uploads are stranded — kick off the fast-retry loop instead
+      // of recursing into performSync (which the _isSyncing guard would have
+      // blocked anyway, since finally hasn't fired yet).
+      await _updatePendingCount();
+      if (_pendingCount > 0) _startFastRetry();
 
       // Notify sync error
       for (final callback in _syncErrorCallbacks) {
@@ -446,6 +480,7 @@ class BackgroundSyncService extends ChangeNotifier {
     logDebug('BackgroundSyncService: Disposing...');
     _stopPeriodicSync();
     _stopPendingCheckTimer();
+    _stopFastRetry();
     _connectivitySubscription?.cancel();
     clearCallbacks();
     super.dispose();
