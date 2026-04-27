@@ -420,6 +420,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       productType: queryParams['product_type'],
       loanType: queryParams['loan_type'],
       touchpointStatus: queryParams['touchpoint_status'],
+      visitStatus: queryParams['visit_status'],
       loanReleased: queryParams['loan_released'] == 'true' ? true : null,
       municipalityIds: municipalityIds,
       nextTouchpointNumbers: nextTouchpointNumbers,

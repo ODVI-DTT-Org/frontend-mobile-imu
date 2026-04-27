@@ -20,20 +20,26 @@ class AttributeChipsSection extends StatelessWidget {
     this.showOthers = true,
   });
 
-  // Backend-aligned lifecycle statuses (see backend/src/routes/clients.ts:775).
-  // The web admin uses these same values; INTERESTED/UNDECIDED/NOT_INTERESTED
-  // here previously had no effect because the backend didn't recognise them.
+  // Per-touchpoint interest level (matches the TouchpointStatus enum the
+  // backend stores in touchpoints.status and denormalises into
+  // clients.touchpoint_summary). Filtered server-side via the visit_status
+  // query param (see backend/src/routes/clients.ts), with 'loan_released'
+  // routed to the existing loan_released boolean param instead.
   static const _visitStatusValues = <String>[
-    'callable',
-    'completed',
-    'no_progress',
+    'INTERESTED',
+    'NOT_INTERESTED',
+    'UNDECIDED',
+    'COMPLETED',
+    'FOLLOW_UP_NEEDED',
     'loan_released',
   ];
 
   static const _visitStatusLabels = <String, String>{
-    'callable': 'Callable',
-    'completed': 'Completed',
-    'no_progress': 'No Progress',
+    'INTERESTED': 'Interested',
+    'NOT_INTERESTED': 'Not Interested',
+    'UNDECIDED': 'Undecided',
+    'COMPLETED': 'Completed',
+    'FOLLOW_UP_NEEDED': 'Follow-up Needed',
     'loan_released': 'Loan Released',
   };
 

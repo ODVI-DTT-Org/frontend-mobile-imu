@@ -76,24 +76,27 @@ class ClientAttributeFilter {
       if (!loanTypes!.any((f) => f.toUpperCase() == raw)) return false;
     }
     if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
-      // Lifecycle statuses, aligned with backend (callable, completed,
-      // no_progress, loan_released). See backend/src/routes/clients.ts:775.
-      final ts = client.touchpointStatus;
-      if (ts == null) return false;
-      final loanReleased = ts.loanReleased;
-      final hasMatch = touchpointStatuses!.any((s) {
-        switch (s) {
-          case 'callable':
-            return ts.canCreateTouchpoint && !loanReleased;
-          case 'completed':
-            return ts.isComplete && !loanReleased;
-          case 'no_progress':
-            return ts.completedTouchpoints == 0 && !loanReleased;
-          case 'loan_released':
-            return loanReleased;
-        }
-        return false;
-      });
+      // Per-touchpoint interest level (matches the TouchpointStatus enum the
+      // backend stores in touchpoints.status, denormalised into
+      // clients.touchpoint_summary). 'loan_released' is a special chip that
+      // checks the Client.loanReleased boolean instead.
+      final loanReleasedSelected = touchpointStatuses!.contains('loan_released');
+      final interestSelected =
+          touchpointStatuses!.where((s) => s != 'loan_released').toSet();
+
+      bool hasMatch = false;
+      if (loanReleasedSelected && client.loanReleased) {
+        hasMatch = true;
+      }
+      if (!hasMatch && interestSelected.isNotEmpty) {
+        // Prefer the denormalised summary (matches backend); fall back to the
+        // full touchpoints list if the summary is empty (legacy rows).
+        final source = client.touchpointSummary.isNotEmpty
+            ? client.touchpointSummary
+            : client.touchpoints;
+        hasMatch = source.any((tp) =>
+            interestSelected.contains(tp.status.apiValue.toUpperCase()));
+      }
       if (!hasMatch) return false;
     }
     return true;
@@ -117,13 +120,14 @@ class ClientAttributeFilter {
       params['loan_type'] = loanTypes!.join(',');
     }
     if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
-      // /api/clients sorts by touchpoint_status but doesn't filter on it.
-      // Promote the 'loan_released' lifecycle value to a dedicated boolean
-      // param so the WHERE clause actually narrows on released loans.
-      final remaining =
+      // visit_status filters per-touchpoint interest level via the backend's
+      // jsonb_array_elements(touchpoint_summary) EXISTS check (added in
+      // backend feat: visit_status filter). 'loan_released' is a separate
+      // chip that maps to the dedicated loan_released boolean param.
+      final interest =
           touchpointStatuses!.where((s) => s != 'loan_released').toList();
-      if (remaining.isNotEmpty) {
-        params['touchpoint_status'] = remaining.join(',');
+      if (interest.isNotEmpty) {
+        params['visit_status'] = interest.join(',');
       }
       if (touchpointStatuses!.contains('loan_released')) {
         params['loan_released'] = 'true';
