@@ -18,7 +18,7 @@ def keyAliasValue = System.getenv("KEY_ALIAS") ?: keystoreProperties['keyAlias']
 def keyPasswordValue = System.getenv("KEY_PASSWORD") ?: keystoreProperties['keyPassword']?.toString()
 
 android {
-    namespace "com.odvi.imu"
+    namespace "imu.cfbtools.app"
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
@@ -41,7 +41,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.odvi.imu"
+        applicationId "imu.cfbtools.app"
         minSdk 23
         targetSdk 36
         versionCode flutter.versionCode

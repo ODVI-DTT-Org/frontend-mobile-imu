@@ -60,7 +60,7 @@
 }
 
 ## Prevent obfuscation of model classes
--keep class com.odvi.imu.** { *; }
+-keep class imu.cfbtools.app.** { *; }
 -keep class **_Model { *; }
 -keep class **_Provider { *; }
 

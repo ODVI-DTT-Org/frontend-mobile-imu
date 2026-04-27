@@ -1,4 +1,4 @@
-package com.odvi.imu
+package imu.cfbtools.app
 
 import io.flutter.embedding.android.FlutterActivity
 
