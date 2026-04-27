@@ -339,7 +339,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       final starredAsync = ref.watch(favoritedClientListProvider);
       return starredAsync.when(
         data: (clients) {
-          final displayableClients = _getDisplayableClients(clients);
+          final displayableClients = _getDisplayableClients(clients.clients);
           return DraggableScrollableSheet(
             initialChildSize: 0.7,
             minChildSize: 0.5,

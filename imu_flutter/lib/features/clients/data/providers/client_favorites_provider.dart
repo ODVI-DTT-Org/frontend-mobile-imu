@@ -66,10 +66,12 @@ class ClientFavoritesNotifier extends StateNotifier<FavoritesState> {
   }
 
   Future<void> add(Client client) async {
-    if (state.ids.contains(client.id)) return;
+    final id = client.id;
+    if (id == null) return;
+    if (state.ids.contains(id)) return;
     _isUpdating = true;
     final previous = state;
-    state = state.copyWith(ids: {...state.ids, client.id});
+    state = state.copyWith(ids: {...state.ids, id});
     try {
       await _ref.read(clientFavoritesServiceProvider).starClient(client);
     } catch (e) {
@@ -232,7 +234,7 @@ final favoritedClientListProvider = FutureProvider<FavoritesResult>((ref) async 
       for (final row in rows) {
         final c = Client.fromRow(Map<String, dynamic>.from(row));
         found.add(c);
-        foundFromPS.add(c.id);
+        foundFromPS.add(c.id!);
         // Cache forward into Hive so future reads are faster
         await hive.saveClient(c.toJson());
       }

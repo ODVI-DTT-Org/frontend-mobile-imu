@@ -622,7 +622,7 @@ class ClientListCard extends ConsumerWidget {
 
     // Star icon overlay (top-right corner) - using optimistic notifier
     final favorites = ref.watch(clientFavoritesNotifierProvider);
-    final isStarred = favorites.contains(client.id ?? '');
+    final isStarred = favorites.ids.contains(client.id ?? '');
     final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
 
     final stackedCard = Stack(
@@ -640,7 +640,7 @@ class ClientListCard extends ConsumerWidget {
                     AppNotification.showSuccess(context, 'Removed from favorites');
                   }
                 } else {
-                  await favoritesNotifier.add(client.id ?? '');
+                  await favoritesNotifier.add(client);
                   if (context.mounted) {
                     AppNotification.showSuccess(context, 'Added to favorites');
                   }

@@ -39,7 +39,7 @@ class ClientListTile extends ConsumerWidget {
 
     // Check if client is favorited (using optimistic notifier)
     final favorites = ref.watch(clientFavoritesNotifierProvider);
-    final isStarred = favorites.contains(client.id ?? '');
+    final isStarred = favorites.ids.contains(client.id ?? '');
     final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
 
     // Address — prefer primary from addresses list, fall back to client fields
@@ -151,7 +151,7 @@ class ClientListTile extends ConsumerWidget {
                             AppNotification.showSuccess(context, 'Removed from favorites');
                           }
                         } else {
-                          await favoritesNotifier.add(client.id ?? '');
+                          await favoritesNotifier.add(client);
                           if (context.mounted) {
                             AppNotification.showSuccess(context, 'Added to favorites');
                           }

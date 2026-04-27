@@ -304,9 +304,8 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
             ? ref.watch(onlineClientsProvider)
             : ref.watch(favoritedClientListProvider);
 
-    // Watch favorites state and online status for the favorites tab
+    // Watch favorites state for the favorites tab
     final favoriteState = ref.watch(clientFavoritesNotifierProvider);
-    final isOnline = ref.watch(isOnlineProvider);
 
     return clientsAsync.when(
       data: (data) {
@@ -533,7 +532,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                   child: _viewMode == ClientViewMode.favorites &&
                           favoriteState.isInitialSyncing &&
                           favoriteState.ids.isEmpty
-                      ? _buildFavoritesSkeleton()
+                      ? _buildFavoritesSkeleton(isTablet)
                       : paginatedClients.isEmpty
                       ? _buildEmptyState()
                       : Column(
@@ -1084,7 +1083,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   /// Skeleton list shown when the favorites tab is loading on a fresh
   /// device — i.e., PowerSync's initial sync hasn't delivered the
   /// client_favorites rows yet.
-  Widget _buildFavoritesSkeleton() {
+  Widget _buildFavoritesSkeleton(bool isTablet) {
     return ListView.builder(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 17),
       itemCount: 5,

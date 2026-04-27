@@ -946,7 +946,7 @@ class ClientApiService {
     }
     if (response.statusCode != 200) {
       throw ApiException(
-        'fetchClientsByIds failed: ${response.statusCode} ${response.data}',
+        message: 'fetchClientsByIds failed: ${response.statusCode} ${response.data}',
         statusCode: response.statusCode,
       );
     }
