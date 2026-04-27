@@ -561,14 +561,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             description: 'Open navigation to client address',
             value: 'navigate',
           ),
-          ActionOption(
-            icon: LucideIcons.listChecks,
-            title: 'Record Touchpoint',
-            description: 'Create touchpoint + visit',
-            value: 'touchpoint',
-            isDisabled: !canRecordTouchpoint,
-            isLoanReleased: visit.loanReleased,
-          ),
+          if (!visit.loanReleased)
+            ActionOption(
+              icon: LucideIcons.listChecks,
+              title: 'Record Touchpoint',
+              description: 'Create touchpoint + visit',
+              value: 'touchpoint',
+              isDisabled: !canRecordTouchpoint,
+            ),
           ActionOption(
             icon: LucideIcons.mapPin,
             title: 'Record Visit Only',

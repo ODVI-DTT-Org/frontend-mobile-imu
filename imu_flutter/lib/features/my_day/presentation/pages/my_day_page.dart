@@ -529,14 +529,14 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
             description: 'Open navigation to client address',
             value: 'navigate',
           ),
-          ActionOption(
-            icon: LucideIcons.listChecks,
-            title: 'Record Touchpoint',
-            description: 'Create touchpoint + visit',
-            value: 'touchpoint',
-            isDisabled: !canRecordTouchpoint,
-            isLoanReleased: client.loanReleased,
-          ),
+          if (!client.loanReleased)
+            ActionOption(
+              icon: LucideIcons.listChecks,
+              title: 'Record Touchpoint',
+              description: 'Create touchpoint + visit',
+              value: 'touchpoint',
+              isDisabled: !canRecordTouchpoint,
+            ),
           // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
           // ActionOption(
           //   icon: LucideIcons.mapPin,
