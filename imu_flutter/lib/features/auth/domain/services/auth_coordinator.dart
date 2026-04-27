@@ -12,6 +12,7 @@ import '../../../../services/connectivity_service.dart';
 import '../../../../services/auth/jwt_auth_service.dart';
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/powersync_connector.dart';
+import '../../../../services/sync/pending_upload_guard.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -967,13 +968,24 @@ class AuthCoordinator extends ChangeNotifier {
         // NOTE: PowerSync connection failures should NOT affect login success
         try {
           debugPrint('AuthCoordinator: Connecting to PowerSync...');
-          final connector = IMUPowerSyncConnector(
-            authService: jwtAuth,
-            powersyncUrl: AppConfig.powerSyncUrl,
-            apiUrl: AppConfig.postgresApiUrl,
+
+          // Migration safeguard: check for pending uploads before reconnecting.
+          // If offline with pending writes, warn user so they don't lose data.
+          final status = await PendingUploadGuard.check(
+            pendingCountProvider: () => PowerSyncService.pendingUploadCount,
+            isOnlineProvider: () => ConnectivityService().isOnline,
           );
-          await PowerSyncService.connect(connector);
-          debugPrint('AuthCoordinator: PowerSync connected successfully');
+          if (status == PendingUploadStatus.mustWait) {
+            debugPrint('AuthCoordinator: Pending uploads exist and offline — skipping PowerSync connect');
+          } else {
+            final connector = IMUPowerSyncConnector(
+              authService: jwtAuth,
+              powersyncUrl: AppConfig.powerSyncUrl,
+              apiUrl: AppConfig.postgresApiUrl,
+            );
+            await PowerSyncService.connect(connector);
+            debugPrint('AuthCoordinator: PowerSync connected successfully');
+          }
         } catch (e) {
           // Log the error but DON'T fail the login
           // PowerSync sync errors are non-critical - app can still function
