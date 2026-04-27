@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:imu_flutter/services/location/enhanced_location_provider.dart';
 
 class LocationData {
   final double lat;
@@ -27,7 +28,7 @@ typedef LocationFetcher = Future<LocationData?> Function();
 
 enum _GpsStatus { acquiring, acquired, failed }
 
-Future<LocationData?> _defaultFetch() async {
+Future<LocationData?> _enhancedFetch(WidgetRef ref) async {
   try {
     final permission = await Geolocator.requestPermission();
     if (permission == LocationPermission.denied ||
@@ -37,27 +38,22 @@ Future<LocationData?> _defaultFetch() async {
     final position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
-    final placemarks = await placemarkFromCoordinates(
+    final service = ref.read(enhancedLocationServiceProvider);
+    final addr = await service.getAddressFromCoordinates(
       position.latitude,
       position.longitude,
     );
-    final place = placemarks.isNotEmpty ? placemarks.first : null;
-    final address = place != null
-        ? [place.subLocality, place.locality]
-            .where((s) => s != null && s.isNotEmpty)
-            .join(', ')
-        : '${position.latitude.toStringAsFixed(4)}°N, ${position.longitude.toStringAsFixed(4)}°E';
     return LocationData(
       lat: position.latitude,
       lng: position.longitude,
-      address: address,
+      address: addr.fullAddress,
     );
   } catch (_) {
     return null;
   }
 }
 
-class LocationCard extends HookWidget {
+class LocationCard extends HookConsumerWidget {
   final void Function(LocationData) onAcquired;
   final VoidCallback onFailed;
   final bool showError;
@@ -72,12 +68,12 @@ class LocationCard extends HookWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final status = useState(_GpsStatus.acquiring);
     final location = useState<LocationData?>(null);
 
     useEffect(() {
-      final fetch = locationFetcher ?? _defaultFetch;
+      final fetch = locationFetcher ?? () => _enhancedFetch(ref);
       bool mounted = true;
 
       fetch().then((data) {

@@ -1,10 +1,7 @@
 // lib/services/gps/gps_capture_service.dart
 
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../location/enhanced_location_service.dart';
-import '../location/enhanced_location_provider.dart';
 
 class GPSData {
   final double latitude;
@@ -69,10 +66,15 @@ class GPSRequiredException implements Exception {
 }
 
 class GPSCaptureService {
+  final EnhancedLocationService _locationService;
+
+  GPSCaptureService({EnhancedLocationService? locationService})
+      : _locationService = locationService ?? EnhancedLocationService();
+
   /// Captures current GPS location with structured address
   /// Uses EnhancedLocationService with Mapbox (online) + PSGC (offline)
   /// Throws GPSRequiredException if location cannot be obtained
-  Future<GPSData> captureLocation({Ref? ref}) async {
+  Future<GPSData> captureLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
     if (!serviceEnabled) {
@@ -93,22 +95,12 @@ class GPSCaptureService {
     }
 
     try {
-      // Get GPS coordinates
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
 
-      // Get structured address using EnhancedLocationService
-      final locationService = EnhancedLocationService();
-
-      // If ref is provided, configure Mapbox token from provider
-      if (ref != null) {
-        // Note: This requires the provider to be initialized first
-        // The Mapbox token should already be configured via provider
-      }
-
-      final locationAddress = await locationService.getAddressFromCoordinates(
+      final locationAddress = await _locationService.getAddressFromCoordinates(
         position.latitude,
         position.longitude,
       );

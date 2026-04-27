@@ -1,6 +1,7 @@
 // lib/features/record_forms/presentation/widgets/release_loan_form.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:imu_flutter/shared/widgets/expansion_form_panel.dart';
@@ -10,13 +11,13 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/ph
 import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/notes_panel.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/info_banner_panel.dart';
 import 'package:imu_flutter/features/record_forms/data/models/release_form_data.dart';
+import 'package:imu_flutter/features/record_forms/presentation/providers/record_form_providers.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
-import 'package:imu_flutter/services/gps/gps_capture_service.dart';
 import 'package:imu_flutter/services/api/approvals_api_service.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/app_notification.dart';
 
-class ReleaseLoanForm extends StatefulWidget {
+class ReleaseLoanForm extends ConsumerStatefulWidget {
   final Client client;
 
   const ReleaseLoanForm({
@@ -25,10 +26,10 @@ class ReleaseLoanForm extends StatefulWidget {
   });
 
   @override
-  State<ReleaseLoanForm> createState() => _ReleaseLoanFormState();
+  ConsumerState<ReleaseLoanForm> createState() => _ReleaseLoanFormState();
 }
 
-class _ReleaseLoanFormState extends State<ReleaseLoanForm> {
+class _ReleaseLoanFormState extends ConsumerState<ReleaseLoanForm> {
   late ReleaseFormData _formData;
   bool _isSubmitting = false;
   bool _timeExpanded = false;
@@ -217,7 +218,7 @@ class _ReleaseLoanFormState extends State<ReleaseLoanForm> {
 
     try {
       // Capture GPS (required)
-      final gpsService = GPSCaptureService();
+      final gpsService = ref.read(gpsCaptureServiceProvider);
       final gps = await gpsService.captureLocation();
 
       // Update form data with GPS

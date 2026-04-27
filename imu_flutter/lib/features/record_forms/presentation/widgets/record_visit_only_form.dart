@@ -11,7 +11,7 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/no
 import 'package:imu_flutter/features/record_forms/presentation/widgets/panels/info_banner_panel.dart';
 import 'package:imu_flutter/features/record_forms/data/models/visit_form_data.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
-import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/features/record_forms/presentation/providers/record_form_providers.dart';
 import 'package:imu_flutter/services/api/my_day_api_service.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/app_notification.dart';
@@ -183,7 +183,7 @@ class _RecordVisitOnlyFormState extends ConsumerState<RecordVisitOnlyForm> {
 
     try {
       // Capture GPS (required)
-      final gpsService = GPSCaptureService();
+      final gpsService = ref.read(gpsCaptureServiceProvider);
       final gps = await gpsService.captureLocation();
 
       // Update form data with GPS

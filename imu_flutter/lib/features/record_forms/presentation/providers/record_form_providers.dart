@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_data.dart';
 import 'package:imu_flutter/features/record_forms/domain/services/touchpoint_calculator_service.dart';
 import 'package:imu_flutter/services/gps/gps_capture_service.dart';
+import 'package:imu_flutter/services/location/enhanced_location_provider.dart';
 import 'package:imu_flutter/services/api/touchpoint_api_service.dart';
 import 'package:imu_flutter/services/api/my_day_api_service.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart' show Client;
@@ -56,7 +57,7 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
     TouchpointCalculatorService? calculatorService,
     TouchpointApiService? touchpointApi,
     required Ref ref,
-  })  : _gpsService = gpsService ?? GPSCaptureService(),
+  })  : _gpsService = gpsService ?? ref.read(gpsCaptureServiceProvider),
        _calculatorService = calculatorService ?? TouchpointCalculatorService(),
        _touchpointApi = touchpointApi ?? TouchpointApiService(),
        _ref = ref,
@@ -216,9 +217,10 @@ final touchpointFormProvider = StateNotifierProvider.family<TouchpointFormNotifi
   },
 );
 
-// GPS Service Provider
+// GPS Service Provider — uses the Mapbox/PSGC-configured EnhancedLocationService
 final gpsCaptureServiceProvider = Provider<GPSCaptureService>((ref) {
-  return GPSCaptureService();
+  final locationService = ref.watch(enhancedLocationServiceProvider);
+  return GPSCaptureService(locationService: locationService);
 });
 
 // Calculator Service Provider
