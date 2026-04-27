@@ -851,6 +851,9 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       loanTypeRaw: item.loanType,
       nextTouchpointNumber: item.touchpointNumber,
       municipality: item.address,
+      // Drives the "LOAN RELEASED" badge in ClientListTile (mirrors the
+      // same propagation we do in my_day_page.dart's _myDayClientToClient).
+      loanReleased: item.loanReleased,
       createdAt: DateTime.now(),
     );
   }
