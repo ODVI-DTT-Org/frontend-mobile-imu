@@ -92,6 +92,7 @@ import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/sync/sync_service.dart';
 import '../../services/location/geolocation_service.dart';
+import '../../services/location/enhanced_location_provider.dart';
 import '../../core/services/location_service.dart';
 import '../../features/targets/data/models/target_model.dart';
 import '../../features/visits/data/models/missed_visit_model.dart';
@@ -697,12 +698,15 @@ final currentLocationProvider = FutureProvider<LocationData?>((ref) async {
 
   if (position == null) return null;
 
-  final address = await geoService.getAddressFromCoordinates(
+  // Use Mapbox + PSGC fallback (not native-only) so address survives
+  // when the OS geocoder returns nothing.
+  final locationService = ref.read(enhancedLocationServiceProvider);
+  final addressResult = await locationService.getAddressFromCoordinates(
     position.latitude,
     position.longitude,
   );
 
-  return LocationData.fromPosition(position, address: address);
+  return LocationData.fromPosition(position, address: addressResult.fullAddress);
 });
 
 // ==================== UI State Providers ====================

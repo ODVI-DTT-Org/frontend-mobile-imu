@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
+import '../../../../services/location/enhanced_location_provider.dart';
 import '../../../../services/location/geolocation_service.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../services/api/touchpoint_api_service.dart';
@@ -771,14 +772,18 @@ class _MultipleTimeInSheetState extends ConsumerState<MultipleTimeInSheet> {
         return;
       }
 
-      final address = await LoadingHelper.withLoading(
+      // Use Mapbox + PSGC fallback (not native-only) so we still get an
+      // address when the OS geocoder returns nothing.
+      final locationService = ref.read(enhancedLocationServiceProvider);
+      final addressResult = await LoadingHelper.withLoading(
         ref: ref,
         message: 'Getting address...',
-        operation: () => _geoService.getAddressFromCoordinates(
+        operation: () => locationService.getAddressFromCoordinates(
           position.latitude,
           position.longitude,
         ),
       );
+      final address = addressResult?.fullAddress;
 
       final timestamp = DateTime.now();
       final formattedTime = DateFormat('h:mm a').format(timestamp);

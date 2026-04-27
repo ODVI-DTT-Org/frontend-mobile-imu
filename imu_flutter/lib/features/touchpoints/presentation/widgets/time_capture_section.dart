@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../services/location/enhanced_location_provider.dart';
 import '../../../../services/location/geolocation_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../shared/utils/loading_helper.dart';
@@ -395,11 +396,13 @@ class _TimeCaptureSectionState extends ConsumerState<TimeCaptureSection> {
       if (!mounted) return;
 
       if (result == LocationResult.success && position != null) {
-        // Show loading for address lookup
-        final address = await LoadingHelper.withLoading(
+        // Use Mapbox + PSGC fallback (not native-only) so we still get an
+        // address when the OS geocoder returns nothing.
+        final locationService = ref.read(enhancedLocationServiceProvider);
+        final addressResult = await LoadingHelper.withLoading(
           ref: ref,
           message: 'Getting address...',
-          operation: () => _geoService.getAddressFromCoordinates(
+          operation: () => locationService.getAddressFromCoordinates(
             position.latitude,
             position.longitude,
           ),
@@ -410,7 +413,7 @@ class _TimeCaptureSectionState extends ConsumerState<TimeCaptureSection> {
         HapticUtils.success();
 
         // Call onCapture with full GPS data
-        widget.onCapture(selectedTime, position.latitude, position.longitude, address);
+        widget.onCapture(selectedTime, position.latitude, position.longitude, addressResult?.fullAddress);
       } else {
         // Handle specific error cases
         switch (result) {
