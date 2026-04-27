@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/haptic_utils.dart';
 import '../../services/sync/powersync_service.dart';
+import '../../services/sync/loan_release_watcher.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/auth/auth_service.dart' show jwtAuthProvider;
 import 'background_sync_indicator.dart';
@@ -19,6 +20,10 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Eagerly start the LoanReleaseWatcher so it stays alive for the session.
+    // Disposed automatically on logout via the provider's lifecycle hook.
+    ref.watch(loanReleaseWatcherProvider);
+
     return Scaffold(
       body: Stack(
         children: [
