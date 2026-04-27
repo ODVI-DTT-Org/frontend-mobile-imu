@@ -253,7 +253,13 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
   }
 
   void _showFilterDrawer(BuildContext context) {
-    showFilterDrawer(context);
+    showFilterDrawer(
+      context,
+      // Assigned Clients tab only filters within the user's assigned areas;
+      // All Clients and Favorites use the full PSGC list.
+      restrictLocationToAssignedAreas:
+          _viewMode == ClientViewMode.assigned,
+    );
   }
 
   @override

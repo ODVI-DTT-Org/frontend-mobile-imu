@@ -11,7 +11,15 @@ import 'attribute_chips_section.dart';
 import 'date_range_section.dart';
 
 class FilterDrawer extends ConsumerStatefulWidget {
-  const FilterDrawer({super.key});
+  /// When true, the Location dropdowns are restricted to the user's assigned
+  /// provinces/municipalities. Used by the Assigned Clients tab so the picker
+  /// only surfaces values the user actually has clients in.
+  final bool restrictLocationToAssignedAreas;
+
+  const FilterDrawer({
+    super.key,
+    this.restrictLocationToAssignedAreas = false,
+  });
 
   @override
   ConsumerState<FilterDrawer> createState() => _FilterDrawerState();
@@ -84,6 +92,8 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                       LocationDropdownSection(
                         draftFilter: _draftLocation,
                         onChanged: (f) => setState(() => _draftLocation = f),
+                        restrictToAssignedAreas:
+                            widget.restrictLocationToAssignedAreas,
                       ),
                       const SizedBox(height: 20),
                       // 2. Visit Status
@@ -158,14 +168,19 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
   }
 }
 
-void showFilterDrawer(BuildContext context) {
+void showFilterDrawer(
+  BuildContext context, {
+  bool restrictLocationToAssignedAreas = false,
+}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close filters',
     barrierColor: Colors.black54,
     transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (_, __, ___) => const FilterDrawer(),
+    pageBuilder: (_, __, ___) => FilterDrawer(
+      restrictLocationToAssignedAreas: restrictLocationToAssignedAreas,
+    ),
     transitionBuilder: (_, anim, __, child) {
       return SlideTransition(
         position: Tween<Offset>(
