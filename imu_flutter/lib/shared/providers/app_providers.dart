@@ -113,6 +113,9 @@ import '../../services/touchpoint/touchpoint_count_service.dart';
 import '../../services/touchpoint/touchpoint_creation_service.dart';
 import '../../services/visit/visit_creation_service.dart';
 import '../../services/release/release_creation_service.dart';
+import '../../services/release/pending_release_service.dart';
+
+export '../../services/release/pending_release_service.dart' show pendingReleaseServiceProvider, PendingReleaseService, PendingFlushResult;
 import '../../services/client/client_mutation_service.dart';
 import '../../services/api/visit_api_service.dart' show VisitApiService, visitApiServiceProvider;
 import '../../services/api/release_api_service.dart' show releaseApiServiceProvider;
@@ -634,7 +637,16 @@ final releaseCreationServiceProvider = Provider<ReleaseCreationService>((ref) {
   final approvalsApi = ref.watch(approvalsApiServiceProvider);
   final uploadApi = ref.watch(uploadApiServiceProvider);
   final role = ref.watch(currentUserRoleProvider);
-  return ReleaseCreationService(connectivity, releaseApi, visitApi, approvalsApi, uploadApi, role);
+  final pendingQueue = ref.watch(pendingReleaseServiceProvider);
+  return ReleaseCreationService(
+    connectivity,
+    releaseApi,
+    visitApi,
+    approvalsApi,
+    uploadApi,
+    role,
+    pendingQueue: pendingQueue,
+  );
 });
 
 /// Client mutation service provider

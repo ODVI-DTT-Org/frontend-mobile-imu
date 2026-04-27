@@ -49,6 +49,11 @@ class BackgroundSyncService extends ChangeNotifier {
   final List<Function(DateTime)> _syncCompleteCallbacks = [];
   final List<Function(String, dynamic)> _syncErrorCallbacks = [];
 
+  // Extra async tasks run inside performSync after PowerSync drains.
+  // Used to flush app-level offline queues (e.g. PendingReleaseService) that
+  // live outside the PowerSync CRUD pipeline.
+  final List<Future<void> Function()> _extraSyncTasks = [];
+
   BackgroundSyncService({
     required ConnectivityService connectivityService,
     required JwtAuthService authService,
@@ -277,6 +282,18 @@ class BackgroundSyncService extends ChangeNotifier {
       // PowerSync automatically handles both upload and download
       await _waitForPendingUploads();
 
+      // Flush app-level queues that don't ride on PowerSync's CRUD pipeline.
+      // Failures here don't abort the sync — each task is responsible for its
+      // own retry policy, and we don't want a stuck queue to mask a successful
+      // PowerSync drain.
+      for (final task in _extraSyncTasks) {
+        try {
+          await task();
+        } catch (e) {
+          logError('BackgroundSyncService: Extra sync task failed', e);
+        }
+      }
+
       _lastSyncTime = DateTime.now();
       _lastSyncError = null;
 
@@ -467,11 +484,18 @@ class BackgroundSyncService extends ChangeNotifier {
     _syncErrorCallbacks.add(callback);
   }
 
+  /// Register an async task to run inside performSync after PowerSync drains.
+  /// Use for flushing queues that don't ride on PowerSync's CRUD pipeline.
+  void registerExtraSyncTask(Future<void> Function() task) {
+    _extraSyncTasks.add(task);
+  }
+
   /// Unregister all callbacks
   void clearCallbacks() {
     _syncStartCallbacks.clear();
     _syncCompleteCallbacks.clear();
     _syncErrorCallbacks.clear();
+    _extraSyncTasks.clear();
   }
 
   /// Dispose resources

@@ -7,10 +7,16 @@ import 'package:imu_flutter/services/api/release_api_service.dart';
 import 'package:imu_flutter/services/api/upload_api_service.dart';
 import 'package:imu_flutter/services/api/visit_api_service.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
+import 'package:imu_flutter/services/release/pending_release_service.dart';
 
 /// Creates loan releases.
-/// Releases require an internet connection — they are high-stakes financial
-/// transactions requiring server confirmation and cannot be safely queued offline.
+///
+/// Online: each role's flow runs against the backend immediately.
+/// Offline: the submission is enqueued in [PendingReleaseService] and flushed
+/// by [BackgroundSyncService] when connectivity returns. The queued path is
+/// best-effort — financially-sensitive submissions still need a final
+/// server confirmation, but enqueueing prevents data loss when reps capture
+/// releases in the field with intermittent service.
 ///
 /// Role routing:
 /// - Admin: direct release via POST /releases (immediate, no approval needed)
@@ -22,6 +28,7 @@ class ReleaseCreationService {
   final ApprovalsApiService _approvalsApi;
   final UploadApiService _uploadApi;
   final UserRole _role;
+  final PendingReleaseService? _pendingQueue;
 
   ReleaseCreationService(
     this._connectivity,
@@ -29,10 +36,11 @@ class ReleaseCreationService {
     this._visitApi,
     this._approvalsApi,
     this._uploadApi,
-    this._role,
-  );
+    this._role, {
+    PendingReleaseService? pendingQueue,
+  }) : _pendingQueue = pendingQueue;
 
-  Future<void> createCompleteLoanRelease({
+  Future<ReleaseSubmitOutcome> createCompleteLoanRelease({
     required String clientId,
     required String timeIn,
     required String timeOut,
@@ -48,9 +56,33 @@ class ReleaseCreationService {
     String? address,
   }) async {
     if (!_connectivity.isOnline) {
-      throw ApiException(
-        message: 'Loan release requires an internet connection. Please connect and try again.',
+      // Offline: enqueue for later flush by BackgroundSyncService. We need a
+      // queue instance — if none was injected (legacy callers), keep the
+      // historical behavior and surface the offline error so the form can
+      // tell the user.
+      if (_pendingQueue == null) {
+        throw ApiException(
+          message: 'Loan release requires an internet connection. Please connect and try again.',
+        );
+      }
+      await _pendingQueue.enqueue(
+        role: _role,
+        clientId: clientId,
+        timeIn: timeIn,
+        timeOut: timeOut,
+        odometerArrival: odometerArrival,
+        odometerDeparture: odometerDeparture,
+        productType: productType,
+        loanType: loanType,
+        udiNumber: udiNumber,
+        remarks: remarks,
+        photoPath: photoPath,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
       );
+      debugPrint('ReleaseCreationService: Offline — queued release for later upload');
+      return ReleaseSubmitOutcome.queued;
     }
 
     if (_role == UserRole.admin) {
@@ -100,5 +132,8 @@ class ReleaseCreationService {
         remarks: remarks,
       );
     }
+    return ReleaseSubmitOutcome.submitted;
   }
 }
+
+enum ReleaseSubmitOutcome { submitted, queued }

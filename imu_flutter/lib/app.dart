@@ -43,6 +43,22 @@ class _IMUAppState extends ConsumerState<IMUApp> with WidgetsBindingObserver {
     // Get the background sync service and initialize it
     _backgroundSyncService = ref.read(backgroundSyncServiceProvider);
 
+    // Register the offline loan release queue flush so it runs after each
+    // PowerSync drain. The release flow can't ride on PowerSync directly
+    // because there's no local `releases` table — see PendingReleaseService.
+    _backgroundSyncService!.registerExtraSyncTask(() async {
+      final queue = ref.read(pendingReleaseServiceProvider);
+      final result = await queue.flush(
+        resolveService: (_) => ref.read(releaseCreationServiceProvider),
+      );
+      if (result.uploaded > 0 || result.dropped > 0) {
+        debugPrint(
+          'IMUApp: Pending release flush — uploaded=${result.uploaded} '
+          'dropped=${result.dropped} remaining=${result.remaining}',
+        );
+      }
+    });
+
     // Initialize the service (starts timers and listeners)
     // Run silently in background without blocking UI
     Future.microtask(() async {
