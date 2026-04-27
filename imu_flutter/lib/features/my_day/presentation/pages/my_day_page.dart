@@ -778,6 +778,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
       loanTypeRaw: c.loanType,
       nextTouchpointNumber: c.nextTouchpointNumber,
       municipality: c.address,
+      // Drives the "LOAN RELEASED" badge in ClientListTile.
+      loanReleased: c.loanReleased,
       createdAt: DateTime.now(),
     );
   }

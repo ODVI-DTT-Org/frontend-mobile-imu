@@ -569,12 +569,13 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
               value: 'touchpoint',
               isDisabled: !canRecordTouchpoint,
             ),
-          ActionOption(
-            icon: LucideIcons.mapPin,
-            title: 'Record Visit Only',
-            description: 'Create visit without touchpoint',
-            value: 'visit_only',
-          ),
+          // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
+          // ActionOption(
+          //   icon: LucideIcons.mapPin,
+          //   title: 'Record Visit Only',
+          //   description: 'Create visit without touchpoint',
+          //   value: 'visit_only',
+          // ),
           ActionOption(
             icon: LucideIcons.dollarSign,
             title: 'Release Loan',
@@ -596,9 +597,10 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         case 'touchpoint':
           await _handleRecordTouchpoint(visit);
           break;
-        case 'visit_only':
-          await _handleRecordVisitOnly(visit);
-          break;
+        // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
+        // case 'visit_only':
+        //   await _handleRecordVisitOnly(visit);
+        //   break;
         case 'release_loan':
           await _handleReleaseLoan(visit);
           break;
@@ -749,34 +751,34 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
 
   }
 
-  Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
-    HapticUtils.lightImpact();
-
-    final clientRepo = ref.read(clientRepositoryProvider);
-    final fullClient = await clientRepo.getClient(visit.clientId);
-    if (fullClient == null) {
-      if (mounted) {
-        AppNotification.showError(context, 'Client not found');
-      }
-      return;
-    }
-
-    // Show as bottom sheet instead of full screen
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-      builder: (context) => RecordVisitBottomSheet(
-        client: fullClient,
-      ),
-    );
-
-    if (result == true && visit.id.isNotEmpty) {
-      await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
-      ref.invalidate(myDayStateProvider);
-    }
-  }
+  /// COMMENTED OUT for Unli Touchpoint - visit only functionality removed
+  /// Future<void> _handleRecordVisitOnly(ItineraryItem visit) async {
+  ///   HapticUtils.lightImpact();
+  ///
+  ///   final clientRepo = ref.read(clientRepositoryProvider);
+  ///   final fullClient = await clientRepo.getClient(visit.clientId);
+  ///   if (fullClient == null) {
+  ///     if (mounted) {
+  ///       AppNotification.showError(context, 'Client not found');
+  ///     }
+  ///     return;
+  ///   }
+  ///
+  ///   final result = await showModalBottomSheet<bool>(
+  ///     context: context,
+  ///     isScrollControlled: true,
+  ///     backgroundColor: Colors.transparent,
+  ///     enableDrag: true,
+  ///     builder: (context) => RecordVisitBottomSheet(
+  ///       client: fullClient,
+  ///     ),
+  ///   );
+  ///
+  ///   if (result == true && visit.id.isNotEmpty) {
+  ///     await ref.read(itineraryRepositoryProvider).updateStatus(visit.id, 'completed');
+  ///     ref.invalidate(myDayStateProvider);
+  ///   }
+  /// }
 
   Future<void> _handleReleaseLoan(ItineraryItem visit) async {
     HapticUtils.lightImpact();
@@ -1594,8 +1596,11 @@ class _VisitCard extends StatelessWidget {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
+                    if (visit.loanReleased) const _LoanReleasedBadge(),
                     // Next touchpoint badge (from ItineraryItem)
-                    if (visit.touchpointNumber != null && visit.touchpointType != null)
+                    if (!visit.loanReleased &&
+                        visit.touchpointNumber != null &&
+                        visit.touchpointType != null)
                       _buildNextTouchpointBadge(
                         visit.touchpointNumber!,
                         visit.touchpointType!,
@@ -2418,6 +2423,40 @@ class _PillButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Green pill shown on visit cards when the underlying client's loan has
+/// been released. Mirrors the badge in `ClientListTile` so the visual
+/// language stays consistent across pages.
+class _LoanReleasedBadge extends StatelessWidget {
+  const _LoanReleasedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.checkCircle, size: 11, color: Color(0xFF16A34A)),
+          SizedBox(width: 4),
+          Text(
+            'LOAN RELEASED',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF16A34A),
+            ),
+          ),
+        ],
       ),
     );
   }
