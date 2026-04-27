@@ -561,14 +561,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             description: 'Open navigation to client address',
             value: 'navigate',
           ),
-          if (!visit.loanReleased)
-            ActionOption(
-              icon: LucideIcons.listChecks,
-              title: 'Record Touchpoint',
-              description: 'Create touchpoint + visit',
-              value: 'touchpoint',
-              isDisabled: !canRecordTouchpoint,
-            ),
+          ActionOption(
+            icon: LucideIcons.listChecks,
+            title: 'Record Touchpoint',
+            description: 'Create touchpoint + visit',
+            value: 'touchpoint',
+            isDisabled: !canRecordTouchpoint,
+            isLoanReleased: visit.loanReleased,
+          ),
           // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
           // ActionOption(
           //   icon: LucideIcons.mapPin,
