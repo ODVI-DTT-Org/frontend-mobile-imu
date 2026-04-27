@@ -412,6 +412,9 @@ Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   enriched['touchpoint_number'] = cached['touchpoint_number'];
   enriched['next_touchpoint_number'] = cached['next_touchpoint_number'] ?? cached['nextTouchpointNumber'];
   enriched['next_touchpoint'] = cached['next_touchpoint'] ?? cached['nextTouchpoint'];
+  // Client.toJson stores camelCase ('loanReleased'); LoanReleaseWatcher writes
+  // snake_case. Read either so the action-sheet guard for released loans fires.
+  enriched['loan_released'] = cached['loanReleased'] ?? cached['loan_released'];
   return enriched;
 }
 

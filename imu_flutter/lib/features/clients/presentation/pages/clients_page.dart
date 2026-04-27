@@ -320,13 +320,23 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
             : null;
         final meta = data is ClientsResponse ? data : null;
 
-        // Filter locally for favorites mode with search
+        // Favorites are returned without upstream filtering — apply the
+        // attribute filter (visit-status, types, etc.) and then search
+        // client-side before pagination.
         var paginatedClients = clients;
-        if (_viewMode == ClientViewMode.favorites && _searchQuery.isNotEmpty) {
-          paginatedClients = clients.where((client) =>
-            client.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            (client.municipality?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
-          ).toList();
+        if (_viewMode == ClientViewMode.favorites) {
+          final attributeFilter = ref.watch(clientAttributeFilterProvider);
+          if (attributeFilter.hasFilter) {
+            paginatedClients = paginatedClients
+                .where((client) => attributeFilter.matches(client))
+                .toList();
+          }
+          if (_searchQuery.isNotEmpty) {
+            paginatedClients = paginatedClients.where((client) =>
+              client.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              (client.municipality?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
+            ).toList();
+          }
         }
 
         // Calculate pagination info

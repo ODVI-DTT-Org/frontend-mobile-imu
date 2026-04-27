@@ -117,7 +117,17 @@ class ClientAttributeFilter {
       params['loan_type'] = loanTypes!.join(',');
     }
     if (touchpointStatuses != null && touchpointStatuses!.isNotEmpty) {
-      params['touchpoint_status'] = touchpointStatuses!.join(',');
+      // /api/clients sorts by touchpoint_status but doesn't filter on it.
+      // Promote the 'loan_released' lifecycle value to a dedicated boolean
+      // param so the WHERE clause actually narrows on released loans.
+      final remaining =
+          touchpointStatuses!.where((s) => s != 'loan_released').toList();
+      if (remaining.isNotEmpty) {
+        params['touchpoint_status'] = remaining.join(',');
+      }
+      if (touchpointStatuses!.contains('loan_released')) {
+        params['loan_released'] = 'true';
+      }
     }
     if (touchpointReasons != null && touchpointReasons!.isNotEmpty) {
       params['touchpoint_reason_codes'] = touchpointReasons!.join(',');
