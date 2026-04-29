@@ -240,14 +240,13 @@ The app requires the following permissions (must be justified in Play Console):
 
 1. **INTERNET** - Required for API communication and data sync
 2. **ACCESS_NETWORK_STATE** - Required to check network connectivity
-3. **ACCESS_FINE_LOCATION** - Required for GPS tracking and address verification
-4. **ACCESS_COARSE_LOCATION** - Required for approximate location
-5. **ACCESS_BACKGROUND_LOCATION** - Required for location tracking during touchpoints
-6. **CAMERA** - Required for capturing touchpoint photos
-7. **RECORD_AUDIO** - Required for recording touchpoint notes
-8. **POST_NOTIFICATIONS** - Required for sync status notifications
-9. **VIBRATE** - Required for haptic feedback
-10. **READ_EXTERNAL_STORAGE** (if applicable) - For accessing photos
+3. **ACCESS_FINE_LOCATION** - Required for GPS tracking and address verification (foreground only)
+4. **ACCESS_COARSE_LOCATION** - Required for approximate location (foreground only)
+5. **CAMERA** - Required for capturing touchpoint photos
+6. **RECORD_AUDIO** - Required for recording touchpoint notes
+7. **POST_NOTIFICATIONS** - Required for sync status notifications
+8. **VIBRATE** - Required for haptic feedback
+9. **READ_EXTERNAL_STORAGE** (if applicable) - For accessing photos
 
 ### Content Rating
 - **Rating:** Everyone
