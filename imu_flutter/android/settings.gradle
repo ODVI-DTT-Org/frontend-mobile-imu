@@ -28,16 +28,16 @@ include ":app"
 gradle.beforeProject { project ->
     if (project.name != "app") {
         project.ext.flutter = [
-            compileSdkVersion: 35,
-            minSdkVersion: 21,
-            targetSdkVersion: 35,
+            compileSdkVersion: 36,
+            minSdkVersion: 23,
+            targetSdkVersion: 36,
             ndkVersion: "27.0.12077973"
         ]
     }
     // Also set android.compileSdkVersion for subprojects
     project.afterEvaluate {
         if (project.hasProperty("android")) {
-            project.android.compileSdkVersion 35
+            project.android.compileSdkVersion 36
         }
     }
 }
