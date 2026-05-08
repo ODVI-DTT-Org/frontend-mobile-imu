@@ -111,6 +111,12 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 
   StreamSubscription? _syncStatusSubscription;
 
+  /// Tracks whether we've observed PowerSync actively syncing (downloading or
+  /// uploading). Used by [_listenToSyncStatus] to distinguish a real
+  /// "sync finished" idle-connected state from the initial idle-connected state
+  /// that fires immediately after a fresh connection (before any download).
+  bool _hasSeenSyncActivity = false;
+
   EnhancedSyncLoadingNotifier(this._powerSyncDb)
       : _preferencesService = SyncPreferencesService(),
         super(const EnhancedSyncLoadingState()) {
@@ -160,28 +166,30 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 
     logDebug('[SyncLoadingPage] ❌ No local data found. Will attempt PowerSync connection...');
 
-    // Check if already synced recently
+    // If the user has synced before (any time in the past), don't gate the UI
+    // on a fresh PowerSync handshake — local SQLite still has data from previous
+    // sessions and PowerSync will reconnect/refresh in the background. The home
+    // page renders reactively as new data arrives. This avoids the failure mode
+    // where logout clears the Hive cache, the second login hits a slow connect,
+    // and the user sees "Sync Failed" while the actual sync is fine in the
+    // background.
     final lastSync = await _preferencesService.getLastSyncTime();
     if (lastSync != null) {
       final syncAge = DateTime.now().difference(lastSync);
-      if (syncAge.inMinutes < 5) {
-        // Synced recently, skip PowerSync sync
-        logDebug('[SyncLoadingPage] Synced recently (${syncAge.inMinutes} minutes ago), skipping...');
-        state = state.copyWith(
-          isInitializing: false,
-          isSyncing: false,
-          isConnected: true,
-          syncComplete: true,
-          progress: 1.0,
-          currentStep: 'Data is up to date',
-        );
-        // Navigation handled by widget
-        return;
-      }
+      logDebug('[SyncLoadingPage] Last sync ${syncAge.inMinutes} min ago — skipping wait, going straight to home.');
+      state = state.copyWith(
+        isInitializing: false,
+        isSyncing: false,
+        isConnected: true,
+        syncComplete: true,
+        progress: 1.0,
+        currentStep: 'Welcome back',
+      );
+      return;
     }
 
-    // No local data and no recent sync - try PowerSync
-    logDebug('[SyncLoadingPage] No local data found, attempting PowerSync sync...');
+    // First-ever login (no prior sync recorded) — run the full sync flow with progress UI.
+    logDebug('[SyncLoadingPage] No prior sync recorded, attempting full PowerSync sync...');
     await _startPowerSyncSync();
   }
 
@@ -217,6 +225,12 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   }
 
   Future<void> _startPowerSyncSync() async {
+    // Attach the status listener BEFORE the connect-wait. If the connect-wait
+    // times out (slow network), the listener stays alive and recovers the UI
+    // when PowerSync eventually reaches an idle-connected state — see the
+    // recovery branch in [_listenToSyncStatus].
+    _listenToSyncStatus();
+
     try {
       // Step 1: Wait for PowerSync to connect
       state = state.copyWith(
@@ -224,17 +238,35 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         progress: 0.1,
       );
 
-      // Wait for connection (with timeout)
-      final connected = await _waitForConnection(timeout: const Duration(seconds: 10));
+      // Wait for connection. 30s gives the connector enough time to fetch
+      // a fresh PowerSync token (HTTP round-trip) and open the WebSocket on
+      // slow mobile networks; 10s was too tight on subsequent logins where
+      // credentials had to be re-fetched.
+      final connected = await _waitForConnection(timeout: const Duration(seconds: 30));
 
       if (!connected) {
+        // Don't strand the user with a "Sync Failed" title. Leave errorMessage
+        // empty so the screen continues to read "Syncing Your Data" while the
+        // listener watches in the background — when PowerSync reaches an
+        // idle-connected state, [_listenToSyncStatus] flips syncComplete and
+        // navigation kicks in.
         state = state.copyWith(
           isInitializing: false,
           isSyncing: false,
           isConnected: false,
-          errorMessage: 'Failed to connect to PowerSync. Please check your connection.',
-          progress: 0.0,
+          currentStep: 'Still connecting to sync service…',
+          progress: 0.1,
         );
+
+        // After another 30s with no recovery, show a real error so the user
+        // isn't stuck staring at a perpetually "syncing" screen when offline.
+        Future.delayed(const Duration(seconds: 30), () {
+          if (!mounted) return;
+          if (state.syncComplete || state.isConnected) return;
+          state = state.copyWith(
+            errorMessage: 'Couldn\'t reach the sync service. Check your connection and try again.',
+          );
+        });
         return;
       }
 
@@ -263,15 +295,21 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         return;
       }
 
-      // Step 3: No local data — wait for full initial sync
-      _listenToSyncStatus();
+      // Step 3: No local data — wait for full initial sync. Status listener is
+      // already attached from the top of this method.
       await PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 60));
+
+      // Persist the sync timestamp eagerly so a subsequent login can fast-track
+      // even if the widget is disposed before the trailing state writes below.
+      await _preferencesService.saveLastSyncTime();
+
+      // Bail out if the listener-induced recovery already navigated us away.
+      if (!mounted) return;
 
       // Step 4: Count rows in each table
       await _countTableRows();
 
-      // Step 5: Save sync time
-      await _preferencesService.saveLastSyncTime();
+      if (!mounted) return;
 
       state = state.copyWith(
         isSyncing: false,
@@ -280,12 +318,8 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         progress: 1.0,
       );
 
-      // Navigate to home after a short delay
-      Future.delayed(const Duration(milliseconds: 500), () {
-        // Navigation handled by widget
-      });
-
     } catch (e) {
+      if (!mounted) return;
       logError('[SyncLoadingPage] Sync failed', e);
       state = state.copyWith(
         isInitializing: false,
@@ -326,24 +360,35 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   }
 
   void _listenToSyncStatus() {
+    _syncStatusSubscription?.cancel();
     _syncStatusSubscription = _powerSyncDb.statusStream.listen((status) {
       if (!mounted) return;
 
+      final isConnected = status.connected;
       final isDownloading = status.downloading;
       final isUploading = status.uploading;
+      final isIdleConnected = isConnected && !isDownloading && !isUploading;
+
+      if (isDownloading || isUploading) {
+        _hasSeenSyncActivity = true;
+      }
 
       String stepMessage;
       double progress;
-
       if (isDownloading) {
         stepMessage = 'Downloading data from server...';
         progress = 0.3;
       } else if (isUploading) {
         stepMessage = 'Uploading local changes...';
         progress = 0.7;
-      } else {
+      } else if (isIdleConnected) {
         stepMessage = 'Sync complete!';
         progress = 1.0;
+      } else {
+        // Disconnected / still connecting — don't overwrite a more specific
+        // message set by the calling flow, but keep the progress at the start.
+        stepMessage = state.currentStep;
+        progress = state.progress;
       }
 
       // Update table status based on sync state
@@ -356,10 +401,28 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         return tableStatus;
       }).toList();
 
+      // Recovery: if PowerSync has reached an idle-connected state AFTER doing
+      // real work, the sync is effectively done. Mark complete and clear any
+      // stale error message — this is what unsticks the UI when an earlier
+      // connect-timeout had set "Sync Failed" before PowerSync managed to come
+      // online in the background.
+      //
+      // We require either (a) actual sync activity to have been observed, or
+      // (b) a previously-set error message that this idle-connected state
+      // contradicts. Without this gate, the very first idle-connected emission
+      // (right after connect, before any download starts) would mark complete
+      // for a first-ever login, which would skip the rest of the flow.
+      final shouldRecoverComplete = isIdleConnected &&
+          (_hasSeenSyncActivity || state.errorMessage.isNotEmpty);
+
       state = state.copyWith(
         currentStep: stepMessage,
         progress: progress,
         tableStatus: updatedTableStatus,
+        isConnected: isConnected,
+        isSyncing: isDownloading || isUploading,
+        syncComplete: shouldRecoverComplete ? true : state.syncComplete,
+        errorMessage: shouldRecoverComplete ? '' : state.errorMessage,
       );
     });
   }
