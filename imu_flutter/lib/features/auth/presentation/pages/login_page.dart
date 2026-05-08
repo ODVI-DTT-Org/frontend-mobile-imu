@@ -102,6 +102,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  /// Map a raw [authState.error] string to a short, user-friendly message.
+  /// Returns null when there's no error to show.
+  String? _friendlyAuthError(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final lower = raw.toLowerCase();
+    if (lower.contains('invalid email or password') ||
+        lower.contains('invalid credentials')) {
+      return 'Email or password is incorrect.';
+    }
+    if (lower.contains('account is disabled') || lower.contains('account disabled')) {
+      return 'This account is disabled. Contact your administrator.';
+    }
+    if (lower.contains('user not found') || lower.contains('email not found')) {
+      return 'No account found for this email.';
+    }
+    if (lower.contains('network error') ||
+        lower.contains('socketexception') ||
+        lower.contains('timeout') ||
+        lower.contains('connection') ||
+        lower.contains('unreachable')) {
+      return 'Couldn\'t reach the server. Check your connection and try again.';
+    }
+    // Strip the leading "Exception: " that Dart adds when rethrowing strings.
+    final cleaned = raw.replaceFirst(RegExp(r'^Exception:\s*'), '');
+    return cleaned.isEmpty ? 'Login failed. Please try again.' : cleaned;
+  }
+
+  /// Clear the auth error from state. Called when the user starts editing
+  /// either input field, so the inline notice dismisses naturally on retry.
+  void _clearAuthErrorIfPresent() {
+    if (ref.read(authNotifierProvider).error != null) {
+      ref.read(authNotifierProvider.notifier).clearError();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -290,6 +325,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: 48),
 
+                // Inline auth-error notice. Shown directly above the form so
+                // the user always sees feedback from a failed login, even if
+                // the floating toast didn't fire (e.g. router rebuilt the page
+                // and the listener missed the state transition).
+                if (_friendlyAuthError(authState.error) != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.alertCircle, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _friendlyAuthError(authState.error)!,
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Email field
                 TextFormField(
                   controller: _emailController,
@@ -301,6 +367,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   enabled: !authState.isLoading,
+                  onChanged: (_) => _clearAuthErrorIfPresent(),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
@@ -333,6 +400,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                   enabled: !authState.isLoading,
                   textInputAction: TextInputAction.done,
+                  onChanged: (_) => _clearAuthErrorIfPresent(),
                   onFieldSubmitted: (_) => _handleLogin(),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
