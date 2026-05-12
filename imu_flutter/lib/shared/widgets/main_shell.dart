@@ -9,6 +9,8 @@ import '../../services/connectivity_service.dart';
 import '../../services/auth/auth_service.dart' show jwtAuthProvider;
 import 'background_sync_indicator.dart';
 import 'offline_banner.dart';
+import '../../features/attendance/data/models/attendance_record.dart';
+import '../providers/app_providers.dart' show todayAttendanceProvider;
 
 class MainShell extends ConsumerWidget {
   final Widget child;
@@ -32,6 +34,7 @@ class MainShell extends ConsumerWidget {
             children: [
               const OfflineBanner(),
               const _SessionExpiryWarning(),
+              const _AttendanceReminderBanner(),
               Expanded(child: child),
               const BottomNavBar(),
             ],
@@ -43,6 +46,70 @@ class MainShell extends ConsumerWidget {
             child: _SyncStatusOverlay(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AttendanceReminderBanner extends ConsumerWidget {
+  const _AttendanceReminderBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final todayAttendance = ref.watch(todayAttendanceProvider);
+
+    String? message;
+    IconData? icon;
+    Color? backgroundColor;
+    Color? foregroundColor;
+
+    if (todayAttendance == null) {
+      message = 'Please clock in';
+      icon = LucideIcons.logIn;
+      backgroundColor = const Color(0xFFDCFCE7);
+      foregroundColor = const Color(0xFF166534);
+    } else if (todayAttendance.status == AttendanceStatus.checkedIn) {
+      message = 'Please clock out';
+      icon = LucideIcons.logOut;
+      backgroundColor = const Color(0xFFFEF3C7);
+      foregroundColor = const Color(0xFF92400E);
+    }
+
+    if (message == null || icon == null || backgroundColor == null || foregroundColor == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Material(
+      color: backgroundColor,
+      child: InkWell(
+        onTap: () => context.push('/attendance'),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: foregroundColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      color: foregroundColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Icon(
+                  LucideIcons.chevronRight,
+                  size: 16,
+                  color: foregroundColor,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

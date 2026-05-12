@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:powersync/powersync.dart' hide Column, SyncStatus;
 import '../../../../services/sync/powersync_service.dart';
+import '../../../../services/sync/powersync_connector.dart';
 import '../../../../services/api/background_sync_service.dart';
 import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
@@ -107,6 +108,7 @@ const Map<String, String> _tableDisplayNames = {
 /// Enhanced sync loading state notifier
 class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState> {
   final PowerSyncDatabase _powerSyncDb;
+  final IMUPowerSyncConnector _powerSyncConnector;
   final SyncPreferencesService _preferencesService;
 
   StreamSubscription? _syncStatusSubscription;
@@ -117,7 +119,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   /// that fires immediately after a fresh connection (before any download).
   bool _hasSeenSyncActivity = false;
 
-  EnhancedSyncLoadingNotifier(this._powerSyncDb)
+  EnhancedSyncLoadingNotifier(this._powerSyncDb, this._powerSyncConnector)
       : _preferencesService = SyncPreferencesService(),
         super(const EnhancedSyncLoadingState()) {
     _init();
@@ -232,6 +234,18 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     _listenToSyncStatus();
 
     try {
+      if (!PowerSyncService.isConnected) {
+        logDebug('[SyncLoadingPage] PowerSync not connected yet — starting connection from sync page.');
+        try {
+          await PowerSyncService.connect(_powerSyncConnector);
+        } catch (e) {
+          // Keep the existing wait/status flow alive after a failed connect
+          // attempt. This mirrors the startup path where PowerSync may still
+          // recover after an initial failure without blocking app login.
+          logWarning('[SyncLoadingPage] Initial connect attempt from sync page failed: $e');
+        }
+      }
+
       // Step 1: Wait for PowerSync to connect
       state = state.copyWith(
         currentStep: 'Connecting to PowerSync service...',
@@ -467,8 +481,8 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 }
 
 /// Provider for enhanced sync loading state
-final enhancedSyncLoadingProvider = StateNotifierProvider.autoDispose.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, int sessionKey})>((ref, params) {
-  return EnhancedSyncLoadingNotifier(params.database);
+final enhancedSyncLoadingProvider = StateNotifierProvider.autoDispose.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, IMUPowerSyncConnector connector, int sessionKey})>((ref, params) {
+  return EnhancedSyncLoadingNotifier(params.database, params.connector);
 });
 
 /// Provider to prevent duplicate navigation
@@ -507,12 +521,13 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
   @override
   Widget build(BuildContext context) {
     final powerSyncDb = ref.watch(powerSyncDatabaseProvider);
+    final powerSyncConnector = ref.watch(powerSyncConnectorProvider);
     final isNavigating = ref.watch(_isNavigatingProvider);
     final sessionKey = ref.watch(_syncSessionKeyProvider);
 
     return powerSyncDb.when(
       data: (db) {
-        final syncState = ref.watch(enhancedSyncLoadingProvider((database: db, sessionKey: sessionKey)));
+        final syncState = ref.watch(enhancedSyncLoadingProvider((database: db, connector: powerSyncConnector, sessionKey: sessionKey)));
 
         // FIX: Handle case where sync is already complete on page load (e.g., after logout/login)
         // The ref.listen only fires on state changes, not when state equals a value
@@ -527,7 +542,7 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
         }
 
         // Auto-navigate when sync completes (for state changes during page lifecycle)
-        ref.listen<EnhancedSyncLoadingState>(enhancedSyncLoadingProvider((database: db, sessionKey: sessionKey)), (prev, next) {
+        ref.listen<EnhancedSyncLoadingState>(enhancedSyncLoadingProvider((database: db, connector: powerSyncConnector, sessionKey: sessionKey)), (prev, next) {
           if (next.syncComplete && !isNavigating && mounted) {
             ref.read(_isNavigatingProvider.notifier).state = true;
             // Navigate to home after a short delay
