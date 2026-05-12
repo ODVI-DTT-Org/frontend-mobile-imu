@@ -81,7 +81,7 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
            FROM itineraries i
            LEFT JOIN clients c ON c.id = i.client_id
            WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status != 'cancelled'
-           ORDER BY i.scheduled_time ASC""",
+           ORDER BY datetime(i.created_at) DESC, i.scheduled_time ASC""",
         parameters: [userId, dateStr],
       )) {
         final normalizedRows = normalizeItineraryRowsForDisplay(rows);
