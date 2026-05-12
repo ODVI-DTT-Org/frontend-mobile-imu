@@ -11,6 +11,7 @@ import '../../features/clients/data/models/client_model.dart' show Client;
 import '../../features/itineraries/data/repositories/itinerary_repository.dart';
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
+import '../../services/local_storage/hive_service.dart';
 import '../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
     onlineClientsProvider,
@@ -279,6 +280,12 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
 
     try {
       final targetDate = customDate ?? widget.selectedDate;
+
+      // Persist the selected client locally before creating the itinerary row.
+      // Newly added "All Clients" entries can reach My Day / Itinerary before
+      // the PowerSync clients table or assigned-clients Hive bootstrap is fully
+      // ready, which leaves the display query with no name fields to render.
+      await HiveService().saveClient(client.toJson());
 
       final repo = ref.read(itineraryRepositoryProvider);
       final userId = ref.read(currentUserIdProvider);
