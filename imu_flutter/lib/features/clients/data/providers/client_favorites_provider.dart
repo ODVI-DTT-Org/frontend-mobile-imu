@@ -140,7 +140,7 @@ class ClientFavoritesService {
 
       // Cache the full client record into Hive (cache-on-favorite, Bug 2A fix)
       try {
-        await HiveService().saveClient(client.toJson());
+        await HiveService().saveClient(client.toJson(), cacheSource: 'favorite');
         logDebug('[ClientFavoritesService] Hive cache write succeeded for clientId: ${client.id}');
       } catch (e, stackTrace) {
         // Non-fatal: the favorite is recorded; Hive can re-sync later.

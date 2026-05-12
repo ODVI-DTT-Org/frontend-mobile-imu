@@ -76,6 +76,18 @@ class ClientSelectorModal extends ConsumerStatefulWidget {
   }
 }
 
+bool shouldDisableClientAddAction({
+  required String? clientId,
+  required Set<String> scheduledClientIds,
+  required Set<String> addingClientIds,
+  required Set<String> addedClientIds,
+}) {
+  if (clientId == null || clientId.isEmpty) return true;
+  return scheduledClientIds.contains(clientId) ||
+      addingClientIds.contains(clientId) ||
+      addedClientIds.contains(clientId);
+}
+
 class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   final _searchController = TextEditingController();
   final _searchDebounce = Debounce(milliseconds: 300);
@@ -83,6 +95,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   String _clientFilter = 'assigned'; // 'assigned' or 'all'
   Set<String> _addingClientIds = {};
   Set<String> _addedClientIds = {};
+  Set<String> _scheduledClientIds = {};
 
   // Pagination state
   final int _itemsPerPage = 10;
@@ -92,6 +105,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    Future.microtask(_loadScheduledClientIds);
   }
 
   @override
@@ -192,6 +206,25 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     _applyClientFilter();
   }
 
+  Future<void> _loadScheduledClientIds() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    try {
+      final repo = ref.read(itineraryRepositoryProvider);
+      final scheduledIds = await repo.getClientIdsByDate(userId, widget.selectedDate);
+      if (!mounted) return;
+      setState(() {
+        _scheduledClientIds = scheduledIds;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _scheduledClientIds = {};
+      });
+    }
+  }
+
   int _totalPages(ClientsResponse meta) {
     return meta.totalPages;
   }
@@ -233,6 +266,13 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       return;
     }
 
+    if (customDate == null && _scheduledClientIds.contains(client.id!)) {
+      if (mounted) {
+        showToast('${client.fullName} is already scheduled for ${_formatDateShort(widget.selectedDate)}');
+      }
+      return;
+    }
+
     setState(() {
       _addingClientIds.add(client.id!);
     });
@@ -259,6 +299,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         setState(() {
           if (client.id != null) {
             _addedClientIds.add(client.id!);
+            _scheduledClientIds.add(client.id!);
           }
         });
 
@@ -860,14 +901,20 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
         final client = displayableClients[index];
         final isAdding = _addingClientIds.contains(client.id);
         final isAdded = client.id != null && _addedClientIds.contains(client.id);
+        final isScheduled = shouldDisableClientAddAction(
+          clientId: client.id,
+          scheduledClientIds: _scheduledClientIds,
+          addingClientIds: _addingClientIds,
+          addedClientIds: _addedClientIds,
+        );
 
         final actionButtons = [
           _buildActionButton(
-            icon: isAdded ? LucideIcons.checkCircle : LucideIcons.calendar,
-            label: isAdded ? 'Added' : 'Add Today',
+            icon: isScheduled ? LucideIcons.checkCircle : LucideIcons.calendar,
+            label: isAdded ? 'Added' : (isScheduled ? 'Scheduled' : 'Add Today'),
             isPrimary: true,
             isLoading: isAdding,
-            onTap: isAdded || isAdding ? null : () => _addClientToItinerary(client),
+            onTap: isScheduled ? null : () => _addClientToItinerary(client),
           ),
           _buildActionButton(
             icon: LucideIcons.calendarClock,

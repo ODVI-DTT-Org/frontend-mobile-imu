@@ -242,6 +242,24 @@ class ItineraryRepository {
       final db = await PowerSyncService.database;
       final id = itinerary.id.isEmpty ? _uuid.v4() : itinerary.id;
       final now = DateTime.now().toIso8601String();
+      final caravanId = itinerary.caravanId;
+      final clientId = itinerary.clientId;
+      final scheduledDate = itinerary.scheduledDate;
+
+      if (caravanId != null && clientId != null && scheduledDate != null) {
+        final scheduledDateStr =
+            '${scheduledDate.year}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}';
+        final existingRows = await db.getAll(
+          "SELECT id FROM itineraries WHERE user_id = ? AND client_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' LIMIT 1",
+          [caravanId, clientId, scheduledDateStr],
+        );
+
+        if (existingRows.isNotEmpty) {
+          final existingId = existingRows.first['id'] as String? ?? id;
+          logDebug('Skipped duplicate itinerary for client: $clientId on $scheduledDateStr');
+          return itinerary.copyWith(id: existingId, createdAt: DateTime.parse(now));
+        }
+      }
 
       await db.execute(
         '''INSERT INTO itineraries (
@@ -420,6 +438,58 @@ Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   return enriched;
 }
 
+int _itineraryDisplayRowScore(Map<String, dynamic> row) {
+  var score = 0;
+  for (final key in const [
+    'first_name',
+    'last_name',
+    'middle_name',
+    'municipality',
+    'province',
+    'product_type',
+    'pension_type',
+    'loan_type',
+    'touchpoint_summary',
+  ]) {
+    final value = row[key];
+    if (value is String && value.trim().isNotEmpty) {
+      score++;
+    } else if (value != null && value is! String) {
+      score++;
+    }
+  }
+  return score;
+}
+
+List<Map<String, dynamic>> normalizeItineraryRowsForDisplay(List<Map<String, dynamic>> rows) {
+  final normalized = <Map<String, dynamic>>[];
+  final indexByClientId = <String, int>{};
+
+  for (final rawRow in rows) {
+    final row = enrichItineraryRowFromHive(rawRow);
+    final clientId = row['client_id'] as String?;
+
+    if (clientId == null || clientId.isEmpty) {
+      normalized.add(row);
+      continue;
+    }
+
+    final existingIndex = indexByClientId[clientId];
+    if (existingIndex == null) {
+      indexByClientId[clientId] = normalized.length;
+      normalized.add(row);
+      continue;
+    }
+
+    final existingRow = normalized[existingIndex];
+    if (_itineraryDisplayRowScore(row) > _itineraryDisplayRowScore(existingRow)) {
+      normalized[existingIndex] = row;
+    }
+  }
+
+  return normalized;
+}
+
 /// Stream provider for itineraries on a specific date — queries PowerSync local SQLite
 /// Returns items for the current user, ordered by scheduled_time.
 final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateTime>((ref, date) async* {
@@ -437,7 +507,11 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
       // synced yet. loan_released comes from PowerSync's local clients
       // table directly — Hive enrichment used to be the only source and
       // would silently leave it null when the client wasn't cached.
-      '''SELECT i.*, c.loan_released
+      '''SELECT i.*, c.first_name, c.last_name, c.middle_name,
+                c.municipality, c.province,
+                c.product_type, c.pension_type, c.loan_type,
+                c.touchpoint_summary, c.touchpoint_number, c.next_touchpoint,
+                c.loan_released
          FROM itineraries i
          LEFT JOIN clients c ON c.id = i.client_id
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
@@ -445,7 +519,8 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
       parameters: [userId, dateStr],
     )) {
       debugPrint('[ItineraryRepo] itineraryByDateProvider: ${rows.length} rows from PowerSync');
-      yield rows.map((r) => ItineraryItem.fromPowerSync(enrichItineraryRowFromHive(r))).toList();
+      final normalizedRows = normalizeItineraryRowsForDisplay(rows);
+      yield normalizedRows.map(ItineraryItem.fromPowerSync).toList();
     }
   } catch (e) {
     logError('itineraryByDateProvider error', e);

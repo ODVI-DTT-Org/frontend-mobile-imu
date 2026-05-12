@@ -64,7 +64,11 @@ class HiveService {
     await box.clear();
     final entries = {
       for (final c in clients)
-        if (c['id'] != null) c['id'] as String: jsonEncode(c),
+        if (c['id'] != null)
+          c['id'] as String: jsonEncode({
+            ...c,
+            '_cache_source': 'assigned',
+          }),
     };
     await box.putAll(entries);
     debugPrint('HiveService: Saved ${entries.length} clients to cache');
@@ -79,10 +83,18 @@ class HiveService {
   }
 
   /// Save (upsert) a single client
-  Future<void> saveClient(Map<String, dynamic> client) async {
+  Future<void> saveClient(Map<String, dynamic> client, {String? cacheSource}) async {
     final id = client['id'] as String?;
     if (id == null || !Hive.isBoxOpen(_clientsBox)) return;
-    await _clients.put(id, jsonEncode(client));
+    final existing = getClient(id);
+    await _clients.put(id, jsonEncode({
+      ...?existing,
+      ...client,
+      if (cacheSource != null)
+        '_cache_source': cacheSource
+      else if (existing?['_cache_source'] != null)
+        '_cache_source': existing!['_cache_source'],
+    }));
   }
 
   /// Get a single cached client by ID

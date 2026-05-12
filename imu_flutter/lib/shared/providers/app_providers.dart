@@ -436,6 +436,10 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
 /// Assigned clients — reads from Hive cache, applies filters/search/pagination locally.
 /// Cache is populated on login via REST API (fetchAllAssignedClients).
+List<Map<String, dynamic>> filterAssignedClientCache(List<Map<String, dynamic>> rawClients) {
+  return rawClients.where((client) => client['_cache_source'] == 'assigned').toList();
+}
+
 final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
   final page = ref.watch(assignedClientPageProvider);
@@ -448,7 +452,7 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
   // Load from Hive cache (populated on login from REST API)
   final hiveService = HiveService();
-  var rawClients = hiveService.getAllClients();
+  var rawClients = filterAssignedClientCache(hiveService.getAllClients());
 
   var cachedClients = rawClients.map((json) => Client.fromJson(json)).toList();
 

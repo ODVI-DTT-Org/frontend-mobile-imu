@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/my_day_client.dart';
-import '../../../itineraries/data/repositories/itinerary_repository.dart' show enrichItineraryRowFromHive;
+import '../../../itineraries/data/repositories/itinerary_repository.dart' show normalizeItineraryRowsForDisplay;
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../core/utils/logger.dart';
@@ -73,10 +73,19 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
     try {
       final db = await PowerSyncService.database;
       await for (final rows in db.watch(
-        "SELECT * FROM itineraries WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled' ORDER BY scheduled_time ASC",
+        """SELECT i.*, c.first_name, c.last_name, c.middle_name,
+                  c.municipality, c.province,
+                  c.product_type, c.pension_type, c.loan_type,
+                  c.touchpoint_summary, c.touchpoint_number, c.next_touchpoint,
+                  c.loan_released
+           FROM itineraries i
+           LEFT JOIN clients c ON c.id = i.client_id
+           WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status != 'cancelled'
+           ORDER BY i.scheduled_time ASC""",
         parameters: [userId, dateStr],
       )) {
-        yield rows.map((r) => MyDayClient.fromPowerSync(enrichItineraryRowFromHive(r))).toList();
+        final normalizedRows = normalizeItineraryRowsForDisplay(rows);
+        yield normalizedRows.map(MyDayClient.fromPowerSync).toList();
       }
     } catch (e) {
       logError('MyDayNotifier stream error', e);
