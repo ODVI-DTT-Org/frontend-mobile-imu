@@ -23,13 +23,12 @@ import '../../../../shared/providers/app_providers.dart' show
     releaseApiServiceProvider,
     uploadApiServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
-import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
 import '../providers/my_day_provider.dart';
 import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider, Itinerary;
 import '../widgets/header_buttons.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
-import '../../../../shared/widgets/client/client_list_tile.dart';
+import '../../../../shared/widgets/client/client_card.dart';
 import '../widgets/multiple_time_in_sheet.dart';
 import '../../data/models/my_day_client.dart';
 import '../../../../services/api/itinerary_api_service.dart' show ItineraryItem;
@@ -762,28 +761,6 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     context.push('/clients/${client.clientId}/edit');
   }
 
-  /// Converts a MyDayClient to a minimal Client for ClientListTile display.
-  Client _myDayClientToClient(MyDayClient c) {
-    return Client(
-      id: c.clientId,
-      firstName: c.firstName ?? '',
-      lastName: c.lastName ?? '',
-      middleName: c.middleName,
-      clientType: ClientType.potential,
-      productType: ProductType.bfpActive,
-      pensionType: PensionType.others,
-      productTypeRaw: c.productType,
-      pensionTypeRaw: c.pensionType,
-      loanType: c.loanType != null ? LoanType.newLoan : null,
-      loanTypeRaw: c.loanType,
-      nextTouchpointNumber: c.nextTouchpointNumber,
-      municipality: c.address,
-      // Drives the "LOAN RELEASED" badge in ClientListTile.
-      loanReleased: c.loanReleased,
-      createdAt: DateTime.now(),
-    );
-  }
-
   Future<void> _viewHistory(MyDayClient client) async {
     HapticUtils.lightImpact();
     if (mounted) {
@@ -1365,8 +1342,20 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                                 Expanded(
                                   child: Padding(
                                     padding: const EdgeInsets.only(right: 14, top: 14, bottom: 14),
-                                    child: ClientListTile(
-                                      client: _myDayClientToClient(client),
+                                    child: ClientCard(
+                                      clientName: client.fullName,
+                                      address: client.address,
+                                      priority: client.priority,
+                                      loanReleased: client.loanReleased,
+                                      isCompleted:
+                                          client.nextTouchpointNumber == null,
+                                      lastTouchpointType:
+                                          client.previousTouchpointType,
+                                      lastTouchpointNumber:
+                                          client.previousTouchpointNumber,
+                                      lastTouchpointDate:
+                                          client.previousTouchpointDate,
+                                      scheduledTime: client.scheduledTime,
                                       onTap: () => _onClientTap(client),
                                     ),
                                   ),
@@ -1405,8 +1394,20 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                           ),
                           child: GestureDetector(
                             onLongPress: () => _onClientLongPress(client),
-                            child: ClientListTile(
-                              client: _myDayClientToClient(client),
+                            child: ClientCard(
+                              clientName: client.fullName,
+                              address: client.address,
+                              priority: client.priority,
+                              loanReleased: client.loanReleased,
+                              isCompleted:
+                                  client.nextTouchpointNumber == null,
+                              lastTouchpointType:
+                                  client.previousTouchpointType,
+                              lastTouchpointNumber:
+                                  client.previousTouchpointNumber,
+                              lastTouchpointDate:
+                                  client.previousTouchpointDate,
+                              scheduledTime: client.scheduledTime,
                               onTap: () => _onClientTap(client),
                             ),
                           ),

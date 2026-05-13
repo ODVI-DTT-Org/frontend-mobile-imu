@@ -13,7 +13,7 @@ import '../../../../shared/widgets/skeletons/itinerary_skeleton.dart';
 import '../../../../shared/widgets/action_bottom_sheet.dart';
 import '../../../../shared/widgets/client_selector_modal.dart';
 import '../../../../shared/widgets/client/client_list_card.dart';
-import '../../../../shared/widgets/client/client_list_tile.dart';
+import '../../../../shared/widgets/client/client_card.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
@@ -31,7 +31,6 @@ import '../../../../features/clients/data/repositories/client_repository.dart' s
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../shared/widgets/touchpoint_history_dialog.dart';
 import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
-import '../../../../features/clients/data/models/client_model.dart';
 import '../../../../features/record_forms/presentation/widgets/record_touchpoint_bottom_sheet.dart';
 import '../../../../features/record_forms/presentation/widgets/record_visit_bottom_sheet.dart';
 import '../../../../features/record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
@@ -829,35 +828,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     context.push('/clients/${visit.clientId}/edit');
   }
 
-  /// Converts an ItineraryItem to a minimal Client for ClientListTile display.
-  /// clientName is stored as "LastName, FirstName" format.
-  Client _itineraryItemToClient(ItineraryItem item) {
-    final commaIdx = item.clientName.indexOf(',');
-    final lastName = commaIdx >= 0
-        ? item.clientName.substring(0, commaIdx).trim()
-        : item.clientName.trim();
-    final firstName =
-        commaIdx >= 0 ? item.clientName.substring(commaIdx + 1).trim() : '';
-    return Client(
-      id: item.clientId,
-      firstName: firstName,
-      lastName: lastName,
-      clientType: ClientType.potential,
-      productType: ProductType.bfpActive,
-      pensionType: PensionType.others,
-      productTypeRaw: item.productType,
-      pensionTypeRaw: item.pensionType,
-      loanType: item.loanType != null ? LoanType.newLoan : null,
-      loanTypeRaw: item.loanType,
-      nextTouchpointNumber: item.touchpointNumber,
-      municipality: item.address,
-      // Drives the "LOAN RELEASED" badge in ClientListTile (mirrors the
-      // same propagation we do in my_day_page.dart's _myDayClientToClient).
-      loanReleased: item.loanReleased,
-      createdAt: DateTime.now(),
-    );
-  }
-
   Future<void> _viewDetails(ItineraryItem visit) async {
     HapticUtils.lightImpact();
     if (mounted && visit.clientId != null) {
@@ -1342,8 +1312,19 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                                   Expanded(
                                     child: Padding(
                                       padding: const EdgeInsets.only(right: 17, top: 14, bottom: 14),
-                                      child: ClientListTile(
-                                        client: _itineraryItemToClient(visit),
+                                      child: ClientCard(
+                                        clientName: visit.clientName,
+                                        address: visit.address,
+                                        priority: visit.priority,
+                                        loanReleased: visit.loanReleased,
+                                        isCompleted:
+                                            visit.nextTouchpointNumber == null,
+                                        lastTouchpointType:
+                                            visit.previousTouchpointType,
+                                        lastTouchpointNumber:
+                                            visit.previousTouchpointNumber,
+                                        lastTouchpointDate:
+                                            visit.previousTouchpointDate,
                                         onTap: () => _onVisitTap(visit),
                                       ),
                                     ),
@@ -1367,8 +1348,18 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                             await _onVisitTap(visit);
                           },
                           onLongPress: () => _onVisitLongPress(visit),
-                          child: ClientListTile(
-                            client: _itineraryItemToClient(visit),
+                          child: ClientCard(
+                            clientName: visit.clientName,
+                            address: visit.address,
+                            priority: visit.priority,
+                            loanReleased: visit.loanReleased,
+                            isCompleted: visit.nextTouchpointNumber == null,
+                            lastTouchpointType:
+                                visit.previousTouchpointType,
+                            lastTouchpointNumber:
+                                visit.previousTouchpointNumber,
+                            lastTouchpointDate:
+                                visit.previousTouchpointDate,
                             onTap: () => _onVisitTap(visit),
                           ),
                         );
@@ -1594,7 +1585,7 @@ class _VisitCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // LOAN RELEASED gets its own row so it can't be mistaken for
-                // just another small chip — same treatment as ClientListTile.
+                // just another small chip, matching the ClientCard treatment.
                 if (visit.loanReleased) ...[
                   const _LoanReleasedBadge(),
                   const SizedBox(height: 8),
@@ -2438,7 +2429,7 @@ class _PillButton extends StatelessWidget {
 }
 
 /// Green pill shown on visit cards when the underlying client's loan has
-/// been released. Mirrors the badge in `ClientListTile` so the visual
+/// been released. Mirrors the badge in `ClientCard` so the visual
 /// language stays consistent across pages.
 class _LoanReleasedBadge extends StatelessWidget {
   const _LoanReleasedBadge();
