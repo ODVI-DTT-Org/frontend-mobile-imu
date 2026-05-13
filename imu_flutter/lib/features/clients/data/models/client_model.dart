@@ -1046,8 +1046,9 @@ class Touchpoint {
   final double? timeOutGpsLng;
   final String? timeOutGpsAddress;
 
-  final String? rejectionReason; // NEW: Reason for touchpoint rejection
-  final DateTime? updatedAt; // NEW: Last update timestamp
+  final String? rejectionReason;
+  final DateTime? updatedAt;
+  final String? source; // e.g. "CMS" for legacy imported records
 
   final DateTime createdAt;
 
@@ -1058,7 +1059,7 @@ class Touchpoint {
     required this.touchpointNumber,
     required this.type,
     required this.reason,
-    this.status = TouchpointStatus.interested, // Default status
+    this.status = TouchpointStatus.interested,
     this.typeRaw,
     this.reasonRaw,
     this.statusRaw,
@@ -1082,8 +1083,9 @@ class Touchpoint {
     this.timeOutGpsLat,
     this.timeOutGpsLng,
     this.timeOutGpsAddress,
-    this.rejectionReason, // NEW
-    this.updatedAt, // NEW
+    this.rejectionReason,
+    this.updatedAt,
+    this.source,
     required this.createdAt,
   });
 
@@ -1138,14 +1140,15 @@ class Touchpoint {
     double? timeOutGpsLat,
     double? timeOutGpsLng,
     String? timeOutGpsAddress,
-    String? rejectionReason, // NEW
-    DateTime? updatedAt, // NEW
+    String? rejectionReason,
+    DateTime? updatedAt,
+    String? source,
     DateTime? createdAt,
   }) {
     return Touchpoint(
       id: id ?? this.id,
       clientId: clientId ?? this.clientId,
-      userId: userId ?? agentId ?? this.userId, // Support both parameter names
+      userId: userId ?? agentId ?? this.userId,
       touchpointNumber: touchpointNumber ?? this.touchpointNumber,
       type: type ?? this.type,
       reason: reason ?? this.reason,
@@ -1173,8 +1176,9 @@ class Touchpoint {
       timeOutGpsLat: timeOutGpsLat ?? this.timeOutGpsLat,
       timeOutGpsLng: timeOutGpsLng ?? this.timeOutGpsLng,
       timeOutGpsAddress: timeOutGpsAddress ?? this.timeOutGpsAddress,
-      rejectionReason: rejectionReason ?? this.rejectionReason, // NEW
-      updatedAt: updatedAt ?? this.updatedAt, // NEW
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      updatedAt: updatedAt ?? this.updatedAt,
+      source: source ?? this.source,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1212,8 +1216,9 @@ class Touchpoint {
     'time_out_gps_lat': timeOutGpsLat,
     'time_out_gps_lng': timeOutGpsLng,
     'time_out_gps_address': timeOutGpsAddress,
-    'rejection_reason': rejectionReason, // NEW
-    'updated_at': updatedAt?.toIso8601String(), // NEW
+    'rejection_reason': rejectionReason,
+    'updated_at': updatedAt?.toIso8601String(),
+    'source': source,
     'created_at': createdAt?.toIso8601String(),
   };
 
@@ -1287,9 +1292,23 @@ class Touchpoint {
       return value as T?;
     }
 
+    // For legacy/CMS data the payload has a nested 'visit' or 'call' sub-object
+    // that holds reason, time_in, time_out, remarks, odometer, etc.
+    // Fall back to those nested values when the top-level fields are absent.
+    final nested = (json['visit'] as Map<String, dynamic>?) ?? (json['call'] as Map<String, dynamic>?);
+    String? nested_s(String key) => nested?[key] as String?;
+    double? nested_d(String key) {
+      final v = nested?[key];
+      if (v == null) return null;
+      if (v is double) return v;
+      if (v is int) return v.toDouble();
+      if (v is String) return double.tryParse(v);
+      return null;
+    }
+
     // Capture raw values before parsing
     final typeRaw = getValue<String>('touchpoint_type', 'touchpointType') ?? getValue<String>('type', 'type');
-    final reasonRaw = getValue<String>('reason', 'reason');
+    final reasonRaw = getValue<String>('reason', 'reason') ?? nested_s('reason');
     final statusRaw = getValue<String>('status', 'status');
 
     return Touchpoint(
@@ -1304,27 +1323,30 @@ class Touchpoint {
       reasonRaw: reasonRaw,
       statusRaw: statusRaw,
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
-      address: getValue<String>('address', 'address'),
+      address: getValue<String>('address', 'address') ?? nested_s('address'),
       timeArrival: parseTime(getValue<String>('time_arrival', 'timeArrival')),
       timeDeparture: parseTime(getValue<String>('time_departure', 'timeDeparture')),
-      odometerArrival: getValue<String>('odometer_arrival', 'odometerArrival'),
-      odometerDeparture: getValue<String>('odometer_departure', 'odometerDeparture'),
+      odometerArrival: getValue<String>('odometer_arrival', 'odometerArrival') ?? nested_s('odometer_arrival'),
+      odometerDeparture: getValue<String>('odometer_departure', 'odometerDeparture') ?? nested_s('odometer_departure'),
       nextVisitDate: parseDateTime(getValue<String>('next_visit_date', 'nextVisitDate')),
-      remarks: getValue<String>('notes', 'remarks') ?? getValue<String>('remarks', 'remarks'),
-      photoPath: getValue<String>('photo_url', 'photoUrl') ?? getValue<String>('photo_path', 'photoPath'),
+      remarks: getValue<String>('notes', 'remarks') ?? getValue<String>('remarks', 'remarks')
+          ?? nested_s('notes') ?? nested_s('remarks'),
+      photoPath: getValue<String>('photo_url', 'photoUrl') ?? getValue<String>('photo_path', 'photoPath')
+          ?? nested_s('photo_url'),
       audioPath: getValue<String>('audio_url', 'audioUrl') ?? getValue<String>('audio_path', 'audioPath'),
-      latitude: getValue<double>('latitude', 'latitude'),
-      longitude: getValue<double>('longitude', 'longitude'),
-      timeIn: parseDateTime(getValue<String>('time_in', 'timeIn')),
+      latitude: getValue<double>('latitude', 'latitude') ?? nested_d('latitude'),
+      longitude: getValue<double>('longitude', 'longitude') ?? nested_d('longitude'),
+      timeIn: parseDateTime(getValue<String>('time_in', 'timeIn')) ?? parseDateTime(nested_s('time_in')),
       timeInGpsLat: getValue<double>('time_in_gps_lat', 'timeInGpsLat'),
       timeInGpsLng: getValue<double>('time_in_gps_lng', 'timeInGpsLng'),
       timeInGpsAddress: getValue<String>('time_in_gps_address', 'timeInGpsAddress'),
-      timeOut: parseDateTime(getValue<String>('time_out', 'timeOut')),
+      timeOut: parseDateTime(getValue<String>('time_out', 'timeOut')) ?? parseDateTime(nested_s('time_out')),
       timeOutGpsLat: getValue<double>('time_out_gps_lat', 'timeOutGpsLat'),
       timeOutGpsLng: getValue<double>('time_out_gps_lng', 'timeOutGpsLng'),
       timeOutGpsAddress: getValue<String>('time_out_gps_address', 'timeOutGpsAddress'),
-      rejectionReason: getValue<String>('rejection_reason', 'rejectionReason'), // NEW
+      rejectionReason: getValue<String>('rejection_reason', 'rejectionReason'),
       updatedAt: parseDateTime(getValue<String>('updated_at', 'updatedAt')),
+      source: getValue<String>('source', 'source') ?? nested_s('source'),
       createdAt: parseDateTime(getValue<String>('created_at', 'createdAt')) ?? DateTime.now(),
     );
   }

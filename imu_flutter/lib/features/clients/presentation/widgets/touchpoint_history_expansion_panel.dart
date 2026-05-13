@@ -108,6 +108,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     _chip(statusLabel, statusColor.withOpacity(0.15), statusColor),
+                    if (touchpoint.source != null && touchpoint.source!.isNotEmpty)
+                      _chip(touchpoint.source!, Colors.grey[200]!, Colors.grey[600]!),
                     const Spacer(),
                     Text(
                       _formatDate(touchpoint.date),
@@ -254,6 +256,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _tpDetailRow(LucideIcons.calendar, 'Date', DateFormat('MMM d, yyyy').format(tp.date)),
+                      if (tp.source != null && tp.source!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.tag, 'Source', tp.source!),
                       if (tp.reasonRaw != null && tp.reasonRaw!.isNotEmpty)
                         _tpDetailRow(LucideIcons.messageCircle, 'Reason', _formatReason(tp.reasonRaw)),
                       if (tp.timeIn != null)
