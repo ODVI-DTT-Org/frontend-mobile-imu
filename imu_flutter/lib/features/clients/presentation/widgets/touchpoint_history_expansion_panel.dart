@@ -17,6 +17,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sorted = [...touchpoints]..sort((a, b) => b.touchpointNumber.compareTo(a.touchpointNumber));
+
     return ExpansionTile(
       title: Text(
         'TOUCHPOINT HISTORY',
@@ -27,9 +29,9 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        touchpoints.isEmpty
+        sorted.isEmpty
             ? 'No touchpoints yet'
-            : '${touchpoints.length} touchpoint${touchpoints.length == 1 ? '' : 's'}',
+            : '${sorted.length} touchpoint${sorted.length == 1 ? '' : 's'}',
         style: TextStyle(
           fontSize: 12,
           color: Colors.grey[600],
@@ -39,7 +41,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: touchpoints.isEmpty
+          child: sorted.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -51,9 +53,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ...touchpoints.map((touchpoint) => _buildTouchpointTile(context, touchpoint)),
-                  ],
+                  children: sorted.map((tp) => _buildTouchpointTile(context, tp)).toList(),
                 ),
         ),
       ],
@@ -61,86 +61,21 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
   }
 
   Widget _buildTouchpointTile(BuildContext context, Touchpoint touchpoint) {
-    final type = touchpoint.type;
-    final status = 'Completed';
-    final statusColor = _getStatusColor(status);
-    final statusIcon = _getStatusIcon(status);
-
-    final tileContent = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(statusIcon, size: 14, color: statusColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    'TP${touchpoint.touchpointNumber}: ${type.name}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              status,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: statusColor,
-              ),
-            ),
-            const Spacer(),
-            Icon(Icons.chevron_right, size: 16, color: Colors.grey[400]),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Date: ${_formatDate(touchpoint.date)}',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[700],
-          ),
-        ),
-        if (touchpoint.userId != null)
-          Text(
-            'Agent: ${touchpoint.userId}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
-            ),
-          ),
-        if (touchpoint.status != null)
-          Text(
-            'Status: ${touchpoint.status?.name ?? '—'}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
-            ),
-          ),
-      ],
-    );
+    final isVisit = touchpoint.type == TouchpointType.visit;
+    final typeColor = isVisit ? Colors.purple : Colors.orange;
+    final statusLabel = _statusLabel(touchpoint);
+    final statusColor = _statusColor(touchpoint);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: statusColor.withOpacity(0.3),
-          width: 1,
+        border: Border(
+          left: BorderSide(
+            color: typeColor,
+            width: 3,
+          ),
         ),
       ),
       child: Material(
@@ -151,16 +86,92 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
           onTap: () => _showTouchpointDetailDialog(context, touchpoint),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: tileContent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top row: number + type + status + date
+                Row(
+                  children: [
+                    Text(
+                      '#${touchpoint.touchpointNumber}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _chip(
+                      isVisit ? 'Visit' : 'Call',
+                      typeColor.withOpacity(0.15),
+                      typeColor,
+                    ),
+                    const SizedBox(width: 6),
+                    _chip(statusLabel, statusColor.withOpacity(0.15), statusColor),
+                    const Spacer(),
+                    Text(
+                      _formatDate(touchpoint.date),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+                // Reason row
+                if (touchpoint.reasonRaw != null && touchpoint.reasonRaw!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(LucideIcons.messageCircle, size: 12, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _formatReason(touchpoint.reasonRaw),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // Time in/out row
+                if (touchpoint.timeIn != null || touchpoint.timeOut != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(LucideIcons.clock, size: 12, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatTimeRange(touchpoint.timeIn, touchpoint.timeOut),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _chip(String label, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+      ),
+    );
+  }
+
   void _showTouchpointDetailDialog(BuildContext context, Touchpoint tp) {
     final isVisit = tp.type == TouchpointType.visit;
-    final statusColor = _getStatusColor('Completed');
+    final statusColor = _statusColor(tp);
+    final statusLabel = _statusLabel(tp);
 
     showDialog(
       context: context,
@@ -203,38 +214,22 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Touchpoint ${tp.touchpointNumber} Details',
+                            'Touchpoint #${tp.touchpointNumber}',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey[800]),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isVisit ? Colors.blue[100] : Colors.green[100],
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  isVisit ? 'Visit' : 'Call',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isVisit ? Colors.blue[800] : Colors.green[800],
-                                  ),
-                                ),
+                              _chip(
+                                isVisit ? 'Visit' : 'Call',
+                                isVisit ? Colors.blue[100]! : Colors.green[100]!,
+                                isVisit ? Colors.blue[800]! : Colors.green[800]!,
                               ),
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  tp.status.name,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor),
-                                ),
+                              _chip(
+                                statusLabel,
+                                statusColor.withOpacity(0.15),
+                                statusColor,
                               ),
                             ],
                           ),
@@ -259,6 +254,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _tpDetailRow(LucideIcons.calendar, 'Date', DateFormat('MMM d, yyyy').format(tp.date)),
+                      if (tp.reasonRaw != null && tp.reasonRaw!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.messageCircle, 'Reason', _formatReason(tp.reasonRaw)),
                       if (tp.timeIn != null)
                         _tpDetailRow(LucideIcons.logIn, 'Time In', DateFormat('MMM d, y h:mm a').format(tp.timeIn!.toLocal())),
                       if (tp.timeOut != null)
@@ -269,9 +266,6 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                         _tpDetailRow(LucideIcons.mapPin, 'Departure Location', tp.timeOutGpsAddress!),
                       if (tp.address != null)
                         _tpDetailRow(LucideIcons.home, 'Address', tp.address!),
-                      _tpDetailRow(LucideIcons.messageCircle, 'Reason', tp.reason.apiValue),
-                      if (tp.userId != null)
-                        _tpDetailRow(LucideIcons.user, 'Agent', tp.userId!),
                       if (tp.odometerArrival != null)
                         _tpDetailRow(LucideIcons.gauge, 'Odometer (Arrival)', tp.odometerArrival!),
                       if (tp.odometerDeparture != null)
@@ -280,7 +274,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                         _tpDetailRow(LucideIcons.calendarPlus, 'Next Visit Date', DateFormat('MMM d, yyyy').format(tp.nextVisitDate!)),
                       if (tp.rejectionReason != null)
                         _tpDetailRow(LucideIcons.alertCircle, 'Rejection Reason', tp.rejectionReason!),
-                      if (tp.remarks != null) ...[
+                      if (tp.remarks != null && tp.remarks!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text('Remarks', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600])),
                         const SizedBox(height: 4),
@@ -341,16 +335,52 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String status) {
-    return Colors.green;
+  String _statusLabel(Touchpoint tp) {
+    // Use the raw string from backend if available (already human-readable)
+    if (tp.statusRaw != null && tp.statusRaw!.isNotEmpty) return tp.statusRaw!;
+    switch (tp.status) {
+      case TouchpointStatus.interested: return 'Interested';
+      case TouchpointStatus.undecided: return 'Undecided';
+      case TouchpointStatus.notInterested: return 'Not Interested';
+      case TouchpointStatus.completed: return 'Completed';
+      case TouchpointStatus.followUpNeeded: return 'Follow Up Needed';
+      case TouchpointStatus.incomplete: return 'Incomplete';
+    }
   }
 
-  IconData _getStatusIcon(String status) {
-    return LucideIcons.checkCircle;
+  Color _statusColor(Touchpoint tp) {
+    final label = _statusLabel(tp).toLowerCase();
+    if (label.contains('interested') && !label.contains('not')) return Colors.green;
+    if (label.contains('not interested')) return Colors.red;
+    if (label.contains('undecided')) return Colors.amber[700]!;
+    if (label.contains('completed')) return Colors.blue;
+    if (label.contains('follow up')) return Colors.orange;
+    if (label.contains('incomplete')) return Colors.grey[600]!;
+    return Colors.grey[600]!;
+  }
+
+  String _formatReason(String? raw) {
+    if (raw == null || raw.isEmpty) return '—';
+    return raw
+        .replaceAll('_', ' ')
+        .toLowerCase()
+        .split(' ')
+        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w)
+        .join(' ');
   }
 
   String _formatDate(DateTime? date) {
     if (date == null) return '—';
-    return '${date.month}/${date.day}/${date.year}';
+    return DateFormat('MMM d, yyyy').format(date);
+  }
+
+  String _formatTimeRange(DateTime? timeIn, DateTime? timeOut) {
+    final fmt = DateFormat('h:mm a');
+    if (timeIn != null && timeOut != null) {
+      return '${fmt.format(timeIn.toLocal())} – ${fmt.format(timeOut.toLocal())}';
+    }
+    if (timeIn != null) return 'In: ${fmt.format(timeIn.toLocal())}';
+    if (timeOut != null) return 'Out: ${fmt.format(timeOut.toLocal())}';
+    return '—';
   }
 }

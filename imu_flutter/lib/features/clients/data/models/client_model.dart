@@ -1296,7 +1296,7 @@ class Touchpoint {
       id: json['id'] ?? '',
       clientId: getValue<String>('client_id', 'clientId') ?? '',
       userId: getValue<String>('user_id', 'userId') ?? getValue<String>('agent_id', 'agentId'),
-      touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? 1,
+      touchpointNumber: getValue<int>('touchpoint_number', 'touchpointNumber') ?? (json['number'] as int?) ?? 1,
       type: TouchpointType.fromApi(typeRaw ?? 'VISIT'),
       reason: TouchpointReason.fromApi(reasonRaw ?? 'INTERESTED'),
       status: TouchpointStatus.fromApi(statusRaw ?? 'INTERESTED'),
