@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:flutter/material.dart' hide TimeOfDay;
-import 'package:flutter/material.dart' as flutter show TimeOfDay;
+import 'package:flutter/material.dart';
+import '../../../../features/clients/data/models/client_model.dart' show TouchpointStatus, TouchpointReason, TouchpointType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -2230,7 +2230,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
     final initialTime = isArrival ? _timeArrival : _timeDeparture;
     final time = await showTimePicker(
       context: context,
-      initialTime: flutter.TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
+      initialTime: TimeOfDay(hour: initialTime.hour, minute: initialTime.minute),
     );
     if (time != null) {
       setState(() {

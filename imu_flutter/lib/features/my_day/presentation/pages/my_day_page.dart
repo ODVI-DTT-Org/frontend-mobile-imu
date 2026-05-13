@@ -24,6 +24,7 @@ import '../../../../shared/providers/app_providers.dart' show
     uploadApiServiceProvider;
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../../features/clients/data/repositories/client_repository.dart' show clientRepositoryProvider;
+import '../../../../features/clients/data/models/client_model.dart' show TouchpointStatus, TouchpointReason;
 import '../providers/my_day_provider.dart';
 import '../../../../features/itineraries/data/repositories/itinerary_repository.dart' show itineraryRepositoryProvider, Itinerary;
 import '../widgets/header_buttons.dart';
