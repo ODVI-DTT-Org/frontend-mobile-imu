@@ -426,8 +426,13 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
       // contradicts. Without this gate, the very first idle-connected emission
       // (right after connect, before any download starts) would mark complete
       // for a first-ever login, which would skip the rest of the flow.
+      // The progress >= 0.1 guard covers the edge case where PowerSync was
+      // already idle-connected when the page mounted (e.g. fast reconnect after
+      // logout) — if we're already mid-attempt we treat idle as done.
       final shouldRecoverComplete = isIdleConnected &&
-          (_hasSeenSyncActivity || state.errorMessage.isNotEmpty);
+          (_hasSeenSyncActivity ||
+              state.errorMessage.isNotEmpty ||
+              state.progress >= 0.1);
 
       state = state.copyWith(
         currentStep: stepMessage,
