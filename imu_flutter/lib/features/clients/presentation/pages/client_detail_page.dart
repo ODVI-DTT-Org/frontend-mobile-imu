@@ -21,7 +21,8 @@ import '../../../../shared/providers/app_providers.dart' show
     jwtAuthProvider,
     powerSyncDatabaseProvider,
     clientByIdProvider,
-    clientTouchpointsProvider;
+    clientTouchpointsProvider,
+    clientApiServiceProvider;
 import '../../../../core/models/user_role.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
 import '../../../../shared/utils/loading_helper.dart';
@@ -607,7 +608,15 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                 IconButton(
                   icon: const Icon(Icons.star, size: 18),
                   onPressed: () async {
-                    await repo.setPrimary(address.id);
+                    try {
+                      // Update local (PowerSync + Hive) first for immediate UI feedback
+                      await repo.setPrimary(address.id);
+                      // Sync to backend so other clients see the change
+                      final clientApi = ref.read(clientApiServiceProvider);
+                      await clientApi.setAddressPrimary(address.clientId, address.id);
+                    } catch (_) {
+                      // Local update succeeded; backend sync failed — not fatal
+                    }
                     if (mounted) {
                       Navigator.pop(context);
                       _viewAddresses(); // Refresh

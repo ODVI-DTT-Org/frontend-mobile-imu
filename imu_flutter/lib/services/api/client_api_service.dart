@@ -959,6 +959,29 @@ class ClientApiService {
     final clientsJson = (data['clients'] as List<dynamic>).cast<Map<String, dynamic>>();
     return clientsJson.map(Client.fromJson).toList();
   }
+
+  /// Set an address as primary for a client
+  Future<void> setAddressPrimary(String clientId, String addressId) async {
+    final token = _authService.accessToken;
+    if (token == null) throw ApiException(message: 'Not authenticated');
+
+    final response = await _dio.patch(
+      '${AppConfig.postgresApiUrl}/clients/$clientId/addresses/$addressId/set-primary',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        message: 'Failed to set primary address: ${response.statusCode}',
+        statusCode: response.statusCode,
+      );
+    }
+  }
 }
 
 /// Response model for paginated clients list
