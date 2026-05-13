@@ -1902,7 +1902,7 @@ class _VisitFormModalState extends State<_VisitFormModal> {
       _touchpoint = widget.existingVisit!['touchpoint'] ?? _touchpoint;
 
       if (widget.existingVisit!['date'] != null) {
-        _selectedDate = DateTime.parse(widget.existingVisit!['date']);
+        _selectedDate = DateTime.tryParse(widget.existingVisit!['date']) ?? _selectedDate;
       }
     }
   }

@@ -119,9 +119,9 @@ class AttendanceRecord {
     return AttendanceRecord(
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
-      date: DateTime.parse(json['date']),
-      checkInTime: json['checkInTime'] != null ? DateTime.parse(json['checkInTime']) : null,
-      checkOutTime: json['checkOutTime'] != null ? DateTime.parse(json['checkOutTime']) : null,
+      date: DateTime.tryParse(json['date'] ?? '') ?? DateTime.now(),
+      checkInTime: json['checkInTime'] != null ? DateTime.tryParse(json['checkInTime']) : null,
+      checkOutTime: json['checkOutTime'] != null ? DateTime.tryParse(json['checkOutTime']) : null,
       checkInLocation: json['checkInLocation'] != null
           ? AttendanceLocation.fromJson(json['checkInLocation'])
           : null,

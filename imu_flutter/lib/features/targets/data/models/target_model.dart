@@ -159,8 +159,8 @@ class Target {
     return Target(
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
-      periodStart: DateTime.parse(json['periodStart']),
-      periodEnd: DateTime.parse(json['periodEnd']),
+      periodStart: DateTime.tryParse(json['periodStart'] ?? '') ?? DateTime.now(),
+      periodEnd: DateTime.tryParse(json['periodEnd'] ?? '') ?? DateTime.now(),
       period: TargetPeriod.values.firstWhere(
         (e) => e.name == json['period'],
         orElse: () => TargetPeriod.weekly,
@@ -171,11 +171,9 @@ class Target {
       touchpointsCompleted: json['touchpointsCompleted'] ?? 0,
       newClientsTarget: json['newClientsTarget'] ?? 0,
       newClientsAdded: json['newClientsAdded'] ?? 0,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
+          ? DateTime.tryParse(json['updatedAt'])
           : null,
     );
   }

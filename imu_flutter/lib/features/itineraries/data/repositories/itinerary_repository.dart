@@ -43,23 +43,23 @@ class Itinerary {
       caravanId: json['user_id'] ?? json['caravan_id'] ?? json['caravanId'],
       clientId: json['client_id'] ?? json['clientId'],
       scheduledDate: json['scheduled_date'] != null
-          ? DateTime.parse(json['scheduled_date'])
+          ? DateTime.tryParse(json['scheduled_date'])
           : json['scheduledDate'] != null
-              ? DateTime.parse(json['scheduledDate'])
+              ? DateTime.tryParse(json['scheduledDate'])
               : null,
       scheduledTime: json['scheduled_time'] ?? json['scheduledTime'],
       status: json['status'],
       priority: json['priority'],
       notes: json['notes'],
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
+          ? DateTime.tryParse(json['created_at'])
           : json['createdAt'] != null
-              ? DateTime.parse(json['createdAt'])
+              ? DateTime.tryParse(json['createdAt'])
               : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'])
+          ? DateTime.tryParse(json['updated_at'])
           : json['updatedAt'] != null
-              ? DateTime.parse(json['updatedAt'])
+              ? DateTime.tryParse(json['updatedAt'])
               : null,
     );
   }

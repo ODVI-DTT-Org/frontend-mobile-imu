@@ -121,7 +121,7 @@ class MyDayClient {
       previousTouchpointReason: json['previous_touchpoint_reason'] ?? json['previousTouchpointReason'],
       previousTouchpointType: json['previous_touchpoint_type'] ?? json['previousTouchpointType'],
       previousTouchpointDate: json['previous_touchpoint_date'] != null
-          ? DateTime.parse(json['previous_touchpoint_date'])
+          ? DateTime.tryParse(json['previous_touchpoint_date'])
           : null,
       productType: (json['client'] as Map<String, dynamic>?)?['product_type'] as String?,
       pensionType: (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?,

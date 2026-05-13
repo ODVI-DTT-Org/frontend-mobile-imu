@@ -1322,7 +1322,7 @@ class Touchpoint {
       typeRaw: typeRaw,
       reasonRaw: reasonRaw,
       statusRaw: statusRaw,
-      date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
+      date: json['date'] != null ? (DateTime.tryParse(json['date']) ?? DateTime.now()) : DateTime.now(),
       address: getValue<String>('address', 'address') ?? nested_s('address'),
       timeArrival: parseTime(getValue<String>('time_arrival', 'timeArrival')),
       timeDeparture: parseTime(getValue<String>('time_departure', 'timeDeparture')),

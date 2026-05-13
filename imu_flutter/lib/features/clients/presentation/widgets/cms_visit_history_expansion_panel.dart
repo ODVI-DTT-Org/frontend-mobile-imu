@@ -87,7 +87,7 @@ class CmsVisitHistoryExpansionPanel extends ConsumerWidget {
     final type = visit['type'] == 'release_loan' ? 'Loan Release' : 'Regular Visit';
     final source = visit['source'] as String?;
     final timeIn = visit['time_in'] != null
-        ? DateFormat('MMM d, y h:mm a').format(DateTime.parse(visit['time_in']).toLocal())
+        ? (() { final dt = DateTime.tryParse(visit['time_in']); return dt != null ? DateFormat('MMM d, y h:mm a').format(dt.toLocal()) : null; })()
         : null;
     final agentFirst = visit['agent_first_name'] as String?;
     final agentLast = visit['agent_last_name'] as String?;
@@ -170,10 +170,10 @@ class CmsVisitHistoryExpansionPanel extends ConsumerWidget {
     final type = visit['type'] == 'release_loan' ? 'Loan Release' : 'Regular Visit';
     final source = visit['source'] as String?;
     final timeIn = visit['time_in'] != null
-        ? DateFormat('MMM d, y h:mm a').format(DateTime.parse(visit['time_in']).toLocal())
+        ? (() { final dt = DateTime.tryParse(visit['time_in']); return dt != null ? DateFormat('MMM d, y h:mm a').format(dt.toLocal()) : null; })()
         : null;
     final timeOut = visit['time_out'] != null
-        ? DateFormat('MMM d, y h:mm a').format(DateTime.parse(visit['time_out']).toLocal())
+        ? (() { final dt = DateTime.tryParse(visit['time_out']); return dt != null ? DateFormat('MMM d, y h:mm a').format(dt.toLocal()) : null; })()
         : null;
     final agentFirst = visit['agent_first_name'] as String?;
     final agentLast = visit['agent_last_name'] as String?;
