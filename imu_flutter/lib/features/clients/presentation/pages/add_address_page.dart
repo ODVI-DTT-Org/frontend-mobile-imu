@@ -7,7 +7,8 @@ import 'package:imu_flutter/features/clients/data/repositories/address_repositor
 import 'package:imu_flutter/shared/widgets/psgc_selector.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
-import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider, jwtAuthProvider, powerSyncDatabaseProvider;
+import 'package:imu_flutter/shared/providers/app_providers.dart' show addressRepositoryProvider, jwtAuthProvider, powerSyncDatabaseProvider, clientApiServiceProvider;
+import 'package:imu_flutter/features/clients/data/models/client_model.dart' as clientModel;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 import '../../../../core/models/user_role.dart';
 
@@ -81,6 +82,27 @@ class AddAddressPage extends HookConsumerWidget {
           );
         } else {
           await addressRepo.createAddress(clientId, data);
+          try {
+            final clientApi = ref.read(clientApiServiceProvider);
+            final apiAddress = clientModel.Address(
+              id: const Uuid().v4(),
+              type: clientModel.AddressType.values.firstWhere(
+                (t) => t.name == label.value.name,
+                orElse: () => clientModel.AddressType.home,
+              ),
+              street: streetAddress.text.trim(),
+              barangay: selectedPsgc.value?.barangay,
+              city: selectedPsgc.value!.municipality,
+              province: selectedPsgc.value?.province,
+              postalCode: postalCode.text.trim().isEmpty ? null : postalCode.text.trim(),
+              isPrimary: isPrimary.value,
+              latitude: latitude.value,
+              longitude: longitude.value,
+            );
+            await clientApi.addAddress(clientId, apiAddress);
+          } catch (e) {
+            debugPrint('[AddAddressPage] Backend sync failed (offline?): $e');
+          }
         }
 
         if (context.mounted) {
