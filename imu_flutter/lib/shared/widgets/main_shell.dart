@@ -69,10 +69,13 @@ class _AttendanceReminderBanner extends ConsumerWidget {
       backgroundColor = const Color(0xFFDCFCE7);
       foregroundColor = const Color(0xFF166534);
     } else if (todayAttendance.status == AttendanceStatus.checkedIn) {
-      message = 'Please clock out';
-      icon = LucideIcons.logOut;
-      backgroundColor = const Color(0xFFFEF3C7);
-      foregroundColor = const Color(0xFF92400E);
+      final phHour = DateTime.now().toUtc().add(const Duration(hours: 8)).hour;
+      if (phHour >= 18) {
+        message = 'Please clock out';
+        icon = LucideIcons.logOut;
+        backgroundColor = const Color(0xFFFEF3C7);
+        foregroundColor = const Color(0xFF92400E);
+      }
     }
 
     if (message == null || icon == null || backgroundColor == null || foregroundColor == null) {
