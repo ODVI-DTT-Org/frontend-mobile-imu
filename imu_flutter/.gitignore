@@ -113,7 +113,8 @@ api_keys.dart
 secrets.dart
 *.env
 .env.*
-.env.dev
+# .env.dev is committed — it has no secrets, just public URLs and a placeholder JWT_SECRET
+!.env.dev
 .env.prod
 .env.qa
 

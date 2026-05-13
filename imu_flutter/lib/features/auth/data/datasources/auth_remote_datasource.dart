@@ -118,7 +118,7 @@ class LoginResponse {
 
     return LoginResponse(
       accessToken: json['access_token'] as String,
-      refreshToken: json['refresh_token'] as String,
+      refreshToken: json['refresh_token'] as String? ?? '',
       expiresIn: json['expires_in'] as int? ?? 3600,
       userId: userId,
     );
