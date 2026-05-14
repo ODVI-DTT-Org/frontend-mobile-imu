@@ -494,11 +494,11 @@ class Client {
       'birthDate': birthDate?.toIso8601String(),
       'phone': phone,
       'remarks': remarks,
-      'clientType': clientType.name,
-      'marketType': marketType?.name,
-      'productType': productType.name,
-      'pensionType': pensionType.name,
-      'loanType': loanType?.name,
+      'clientType': clientTypeRaw ?? clientType.name,
+      'marketType': marketTypeRaw ?? marketType?.name,
+      'productType': productTypeRaw ?? productType.name,
+      'pensionType': pensionTypeRaw ?? pensionType.name,
+      'loanType': loanTypeRaw ?? loanType?.name,
       'pan': pan,
       'email': email,
       'facebookLink': facebookLink,
@@ -583,8 +583,9 @@ class Client {
   static ClientType _parseClientType(dynamic value) {
     if (value == null) return ClientType.potential;
     final str = value.toString().toLowerCase();
+    final stripped = str.replaceAll('_', '');
     return ClientType.values.firstWhere(
-      (e) => e.name.toLowerCase() == str,
+      (e) => e.name.toLowerCase() == str || e.name.toLowerCase() == stripped,
       orElse: () => ClientType.potential,
     );
   }
@@ -593,9 +594,10 @@ class Client {
   static MarketType? _parseMarketType(dynamic value) {
     if (value == null) return null;
     final str = value.toString().toLowerCase();
+    final stripped = str.replaceAll('_', '');
     try {
       return MarketType.values.firstWhere(
-        (e) => e.name.toLowerCase() == str,
+        (e) => e.name.toLowerCase() == str || e.name.toLowerCase() == stripped,
       );
     } catch (_) {
       return null;
@@ -606,12 +608,13 @@ class Client {
   static ProductType _parseProductType(dynamic value) {
     if (value == null) return ProductType.bfpActive;
     final str = value.toString().toLowerCase();
+    final stripped = str.replaceAll('_', '');
     try {
       return ProductType.values.firstWhere(
-        (e) => e.name.toLowerCase() == str,
+        (e) => e.name.toLowerCase() == str || e.name.toLowerCase() == stripped,
       );
     } catch (_) {
-      return ProductType.bfpActive; // Fallback for new clients
+      return ProductType.bfpActive;
     }
   }
 
@@ -619,9 +622,10 @@ class Client {
   static PensionType _parsePensionType(dynamic value) {
     if (value == null) return PensionType.others;
     final str = value.toString().toLowerCase();
+    final stripped = str.replaceAll('_', '');
     try {
       return PensionType.values.firstWhere(
-        (e) => e.name.toLowerCase() == str,
+        (e) => e.name.toLowerCase() == str || e.name.toLowerCase() == stripped,
       );
     } catch (_) {
       return PensionType.others;
@@ -632,9 +636,12 @@ class Client {
   static LoanType? _parseLoanType(dynamic value) {
     if (value == null) return null;
     final str = value.toString().toLowerCase();
+    // DB stores 'NEW' but enum is 'newLoan' — handle explicitly
+    if (str == 'new') return LoanType.newLoan;
+    final stripped = str.replaceAll('_', '');
     try {
       return LoanType.values.firstWhere(
-        (e) => e.name.toLowerCase() == str,
+        (e) => e.name.toLowerCase() == str || e.name.toLowerCase() == stripped,
       );
     } catch (_) {
       return null;

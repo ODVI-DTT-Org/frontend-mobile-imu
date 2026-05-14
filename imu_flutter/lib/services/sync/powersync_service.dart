@@ -415,12 +415,17 @@ class PowerSyncService {
 
     logDebug('Waiting for initial PowerSync sync...');
 
-    // Create a completer that will complete when sync finishes or times out
     final completer = Completer<void>();
     StreamSubscription? subscription;
+    bool seenDownloading = false;
+    // When connected but no download has started yet, we can't tell whether the
+    // server has nothing to push or is simply about to start. We wait up to 2s
+    // for a download to begin; if still idle after that we assume "nothing to
+    // sync" and let the caller continue.
+    Timer? nothingToSyncTimer;
 
-    // Timeout timer
     final timeoutTimer = Timer(timeout, () {
+      nothingToSyncTimer?.cancel();
       subscription?.cancel();
       if (!completer.isCompleted) {
         logWarning('Initial sync timed out after ${timeout.inSeconds} seconds');
@@ -428,15 +433,35 @@ class PowerSyncService {
       }
     });
 
-    // Listen to sync status
-    subscription = db.statusStream.listen((status) {
-      if (status.connected && !status.downloading) {
+    void complete() {
+      if (!completer.isCompleted) {
         logDebug('Initial sync completed');
         timeoutTimer.cancel();
+        nothingToSyncTimer?.cancel();
         subscription?.cancel();
-        if (!completer.isCompleted) {
-          debugLocalSyncState();
-          completer.complete();
+        debugLocalSyncState();
+        completer.complete();
+      }
+    }
+
+    subscription = db.statusStream.listen((status) {
+      if (status.downloading) {
+        seenDownloading = true;
+        nothingToSyncTimer?.cancel();
+        nothingToSyncTimer = null;
+      }
+      if (status.connected && !status.downloading) {
+        if (seenDownloading) {
+          // Download finished → sync genuinely complete.
+          complete();
+        } else {
+          // Idle-connected without any download observed yet. Start a 2-second
+          // grace timer: if downloading starts we cancel it; if we're still idle
+          // after 2s the server has nothing to push and we can proceed.
+          nothingToSyncTimer ??= Timer(const Duration(seconds: 2), () {
+            logDebug('Initial sync: idle-connected for 2s with no downloads — assuming nothing to sync');
+            complete();
+          });
         }
       }
     });
