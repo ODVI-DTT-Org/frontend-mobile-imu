@@ -11,7 +11,7 @@ import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/logger.dart';
-import '../../../../shared/providers/app_providers.dart' show isLoadingOverlayVisibleProvider, loadingMessageProvider;
+import '../../../../shared/providers/app_providers.dart' show isLoadingOverlayVisibleProvider, loadingMessageProvider, assignedClientsFetchProvider, AssignedClientsFetchState;
 
 /// Table sync status
 class TableSyncStatus {
@@ -112,6 +112,10 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   final SyncPreferencesService _preferencesService;
 
   StreamSubscription? _syncStatusSubscription;
+
+  /// Completer used to race `_waitForConnection` against background Hive population.
+  /// Completed by [onBackgroundFetchComplete] when the REST client sync finishes.
+  Completer<void>? _hivePopulatedCompleter;
 
   /// Tracks whether we've observed PowerSync actively syncing (downloading or
   /// uploading). Used by [_listenToSyncStatus] to distinguish a real
@@ -246,24 +250,49 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         }
       }
 
-      // Step 1: Wait for PowerSync to connect
+      // Step 1: Wait for PowerSync to connect — race against background Hive population.
+      // _syncClientsInBackground() runs in parallel and may populate Hive before
+      // PowerSync manages to connect (especially when the sync service returns 500s).
+      // Whichever arrives first wins; we check Hive count on either non-connected outcome.
       state = state.copyWith(
         currentStep: 'Connecting to PowerSync service...',
         progress: 0.1,
       );
 
-      // Wait for connection. 30s gives the connector enough time to fetch
-      // a fresh PowerSync token (HTTP round-trip) and open the WebSocket on
-      // slow mobile networks; 10s was too tight on subsequent logins where
-      // credentials had to be re-fetched.
-      final connected = await _waitForConnection(timeout: const Duration(seconds: 30));
+      _hivePopulatedCompleter = Completer<void>();
+      String raceWinner;
+      try {
+        raceWinner = await Future.any([
+          // 30s gives the connector enough time to fetch a token and open the WebSocket.
+          _waitForConnection(timeout: const Duration(seconds: 30)).then((c) => c ? 'connected' : 'timeout'),
+          _hivePopulatedCompleter!.future.then((_) => 'hive'),
+        ]);
+      } catch (_) {
+        raceWinner = 'timeout';
+      } finally {
+        _hivePopulatedCompleter = null;
+      }
 
-      if (!connected) {
-        // Don't strand the user with a "Sync Failed" title. Leave errorMessage
-        // empty so the screen continues to read "Syncing Your Data" while the
-        // listener watches in the background — when PowerSync reaches an
-        // idle-connected state, [_listenToSyncStatus] flips syncComplete and
-        // navigation kicks in.
+      if (raceWinner != 'connected') {
+        // Hive signal or timeout — check whether local data is now available.
+        final hiveCount = HiveService().cachedClientCount;
+        if (hiveCount > 0) {
+          logDebug('[SyncLoadingPage] Hive has $hiveCount clients (winner: $raceWinner) — skipping PowerSync wait.');
+          await _preferencesService.saveLastSyncTime();
+          if (!mounted) return;
+          state = state.copyWith(
+            isInitializing: false,
+            isSyncing: false,
+            syncComplete: true,
+            progress: 1.0,
+            currentStep: 'Using local data (PowerSync will sync in background)',
+          );
+          return;
+        }
+
+        // No Hive data and PowerSync unreachable — stay on screen, keep listener alive.
+        // Don't show "Sync Failed" yet; [_listenToSyncStatus] will flip syncComplete when
+        // PowerSync eventually reaches an idle-connected state.
         state = state.copyWith(
           isInitializing: false,
           isSyncing: false,
@@ -272,8 +301,8 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
           progress: 0.1,
         );
 
-        // After another 30s with no recovery, show a real error so the user
-        // isn't stuck staring at a perpetually "syncing" screen when offline.
+        // After another 30s with no recovery, surface a real error so the user
+        // isn't stuck staring at a perpetually "syncing" screen when truly offline.
         Future.delayed(const Duration(seconds: 30), () {
           if (!mounted) return;
           if (state.syncComplete || state.isConnected) return;
@@ -346,13 +375,14 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 
   Future<bool> _waitForConnection({required Duration timeout}) async {
     final completer = Completer<bool>();
+    StreamSubscription? subscription;
     final timer = Timer(timeout, () {
+      subscription?.cancel();
       if (!completer.isCompleted) {
         completer.complete(false);
       }
     });
 
-    StreamSubscription? subscription;
     subscription = _powerSyncDb.statusStream.listen((status) {
       if (status.connected) {
         timer.cancel();
@@ -478,16 +508,58 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     state = state.copyWith(tableStatus: updatedTableStatus);
   }
 
+  /// Called by the provider listener when the background REST client sync completes.
+  /// Signals the race in [_startPowerSyncSync] or applies the result directly if
+  /// the race has already finished.
+  void onBackgroundFetchComplete(int count) {
+    if (!mounted || state.syncComplete) return;
+    final completer = _hivePopulatedCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(); // interrupt the race
+    } else {
+      // Race is done but we're still stuck at "still connecting"
+      _applyHiveComplete();
+    }
+  }
+
+  void _applyHiveComplete() {
+    _preferencesService.saveLastSyncTime().then((_) {
+      if (!mounted) return;
+      state = state.copyWith(
+        isInitializing: false,
+        isSyncing: false,
+        syncComplete: true,
+        progress: 1.0,
+        currentStep: 'Using local data (PowerSync will sync in background)',
+        errorMessage: '',
+      );
+    });
+  }
+
   @override
   void dispose() {
     _syncStatusSubscription?.cancel();
+    final completer = _hivePopulatedCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(); // unblock any pending Future.any
+    }
     super.dispose();
   }
 }
 
 /// Provider for enhanced sync loading state
 final enhancedSyncLoadingProvider = StateNotifierProvider.autoDispose.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, IMUPowerSyncConnector connector, int sessionKey})>((ref, params) {
-  return EnhancedSyncLoadingNotifier(params.database, params.connector);
+  final notifier = EnhancedSyncLoadingNotifier(params.database, params.connector);
+
+  // Forward background REST client-fetch completion to the notifier so it can
+  // race against the PowerSync connection wait and navigate as soon as Hive has data.
+  ref.listen<AssignedClientsFetchState>(assignedClientsFetchProvider, (prev, next) {
+    if (!next.isFetching && next.fetchCount > 0 && next.lastFetchTime != null) {
+      notifier.onBackgroundFetchComplete(next.fetchCount);
+    }
+  });
+
+  return notifier;
 });
 
 /// Provider to prevent duplicate navigation
