@@ -32,6 +32,7 @@ class ClientApiService {
     String? touchpointStatus,
     String? visitStatus,
     bool? loanReleased,
+    String? province,
     List<String>? municipalityIds,
     List<String>? nextTouchpointNumbers,
   }) async {
@@ -73,6 +74,7 @@ class ClientApiService {
           if (touchpointStatus != null && touchpointStatus.isNotEmpty) 'touchpoint_status': touchpointStatus,
           if (visitStatus != null && visitStatus.isNotEmpty) 'visit_status': visitStatus,
           if (loanReleased == true) 'loan_released': 'true',
+          if (province != null && province.isNotEmpty) 'province': province,
           if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality': municipalityIds,
           if (nextTouchpointNumbers != null && nextTouchpointNumbers.isNotEmpty)
             'next_touchpoint_number': nextTouchpointNumbers,

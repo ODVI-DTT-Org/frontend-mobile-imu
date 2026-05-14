@@ -386,10 +386,14 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
     final clientApi = ref.watch(clientApiServiceProvider);
 
+    String? province;
     List<String>? municipalityIds;
-    if (locationFilter.hasFilter && locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
-      municipalityIds = locationFilter.municipalities!.toList();
-      debugPrint('onlineClientsProvider: Municipality filter: $municipalityIds');
+    if (locationFilter.hasFilter) {
+      province = locationFilter.province;
+      if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
+        municipalityIds = locationFilter.municipalities!.toList();
+      }
+      debugPrint('onlineClientsProvider: Location filter — province: $province, municipalities: $municipalityIds');
     }
 
     // Convert attribute filter to API parameters
@@ -416,6 +420,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       touchpointStatus: queryParams['touchpoint_status'],
       visitStatus: queryParams['visit_status'],
       loanReleased: queryParams['loan_released'] == 'true' ? true : null,
+      province: province,
       municipalityIds: municipalityIds,
       nextTouchpointNumbers: nextTouchpointNumbers,
     );
