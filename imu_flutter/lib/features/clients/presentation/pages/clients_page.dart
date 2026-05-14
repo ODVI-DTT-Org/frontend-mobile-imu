@@ -10,6 +10,7 @@ import '../../../../core/utils/debounce_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/api/my_day_api_service.dart';
 import '../../../../services/api/client_api_service.dart' show ClientsResponse;
+import '../../../../services/local_storage/hive_service.dart';
 import '../../../../services/api/itinerary_api_service.dart' show todayItineraryProvider;
 import '../../../../shared/providers/app_providers.dart' show
     assignedClientsProvider,
@@ -237,6 +238,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     final myDayApiService = ref.read(myDayApiServiceProvider);
 
     try {
+      await HiveService().saveClient(client.toJson());
       final success = await myDayApiService.addToMyDay(client.id!);
       if (success && mounted) {
         HapticUtils.success();
@@ -1251,6 +1253,7 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
 
     try {
       HapticUtils.lightImpact();
+      await HiveService().saveClient(client.toJson());
       final myDayApiService = ref.read(myDayApiServiceProvider);
 
       final success = await myDayApiService.addToMyDay(

@@ -285,9 +285,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
       // Newly added "All Clients" entries can reach My Day / Itinerary before
       // the PowerSync clients table or assigned-clients Hive bootstrap is fully
       // ready, which leaves the display query with no name fields to render.
-      debugPrint('[ClientSelector] Saving to Hive: id=${client.id} firstName=${client.firstName} lastName=${client.lastName} tab=$_clientFilter');
       await HiveService().saveClient(client.toJson());
-      debugPrint('[ClientSelector] Hive save done. cachedCount=${HiveService().cachedClientCount} hiveInit=${HiveService().isInitialized}');
 
       final repo = ref.read(itineraryRepositoryProvider);
       final userId = ref.read(currentUserIdProvider);

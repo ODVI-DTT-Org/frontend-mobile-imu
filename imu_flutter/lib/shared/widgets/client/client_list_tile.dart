@@ -83,14 +83,13 @@ class ClientListTile extends ConsumerWidget {
             : Colors.blue;
 
     // Role-based: can the user record the next touchpoint?
+    // With unlimited cyclic touchpoints, role eligibility depends only on type
+    // (Visit for caravan, Call for tele, both for admin/manager).
     bool canRecordNext = true;
-    // ignore: unnecessary_null_comparison
-    if (!isCompleted && nextNumber != null && userRole != null) {
-      final validNumbers = _validNumbers(userRole);
+    if (!isCompleted && nextType != null && userRole != null) {
       final validTypes = _validTypes(userRole);
-      // Convert nextType String to TouchpointType for validation
-      final nextTypeEnum = nextType?.toLowerCase() == 'call' ? TouchpointType.call : TouchpointType.visit;
-      canRecordNext = validNumbers.contains(nextNumber) && validTypes.contains(nextTypeEnum);
+      final nextTypeEnum = nextType.toLowerCase() == 'call' ? TouchpointType.call : TouchpointType.visit;
+      canRecordNext = validTypes.contains(nextTypeEnum);
     }
 
     final Color cardBg = client.loanReleased
@@ -299,13 +298,6 @@ class ClientListTile extends ConsumerWidget {
     );
 
     return card;
-  }
-
-  List<int> _validNumbers(UserRole role) {
-    if (role.isManager) return [1, 2, 3, 4, 5, 6, 7];
-    if (role == UserRole.caravan) return [1, 4, 7];
-    if (role == UserRole.tele) return [2, 3, 5, 6];
-    return [1, 2, 3, 4, 5, 6, 7];
   }
 
   List<TouchpointType> _validTypes(UserRole role) {
