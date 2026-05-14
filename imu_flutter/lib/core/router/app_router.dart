@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../config/app_config.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 // PIN SETUP/ENTRY DISABLED - Commenting out to focus on core authentication
@@ -338,6 +339,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Debug route (development only)
       GoRoute(
         path: '/debug',
+        redirect: (context, state) => AppConfig.showDevTools ? null : '/home',
         builder: (context, state) => const DebugDashboardPage(),
       ),
     ],

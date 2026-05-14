@@ -67,6 +67,14 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
       final String env = (kReleaseMode && envFromEnv == 'dev') ? 'prod' : envFromEnv;
 
       await AppConfig.initialize(environment: env);
+
+      // Silence all debugPrint output when DEBUG_MODE=false.
+      // This covers the ~900 raw debugPrint() calls scattered across service
+      // files without touching each call site.
+      if (!AppConfig.debugMode) {
+        debugPrint = (String? message, {int? wrapWidth}) {};
+      }
+
       await MapConfig.initialize(environment: env);
 
       // Initialize PostHog analytics if configured

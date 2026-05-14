@@ -123,11 +123,13 @@ class AppConfig {
       _posthogHost = dotenv.env['POSTHOG_HOST'] ?? 'https://us.i.posthog.com';
     }
 
-    debugPrint('AppConfig initialized:');
-    debugPrint('  Environment: $environment');
-    debugPrint('  Platform: ${kIsWeb ? 'web' : 'mobile'}');
-    debugPrint('  PowerSync URL: $_powerSyncUrl');
-    debugPrint('  Backend API: $_backendApiUrl');
+    if (_debugMode) {
+      debugPrint('AppConfig initialized:');
+      debugPrint('  Environment: $environment');
+      debugPrint('  Platform: ${kIsWeb ? 'web' : 'mobile'}');
+      debugPrint('  PowerSync URL: $_powerSyncUrl');
+      debugPrint('  Backend API: $_backendApiUrl');
+    }
   }
 
   // Getters
@@ -191,6 +193,10 @@ class AppConfig {
 
   /// Whether running in development environment
   static bool get isDevelopment => _debugMode;
+
+  /// Whether developer tools (debug dashboard, verbose logs) are visible.
+  /// Controlled by DEBUG_MODE in the loaded .env file.
+  static bool get showDevTools => _debugMode;
 
   /// Check if JWT secret is properly configured
   static bool get isJwtSecretConfigured => _jwtSecret.isNotEmpty && _jwtSecret.length >= 32;
