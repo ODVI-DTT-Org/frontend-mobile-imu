@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:powersync/powersync.dart' hide Column;
 import '../../services/api/background_sync_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/sync/powersync_service.dart' show powerSyncDatabaseProvider;
 import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
 import '../../core/utils/app_notification.dart';
