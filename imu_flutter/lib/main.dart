@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode, debugPrint;
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -73,6 +74,10 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
       // files without touching each call site.
       if (!AppConfig.debugMode) {
         debugPrint = (String? message, {int? wrapWidth}) {};
+        // Suppress PowerSync SDK FINE/WARNING logs (e.g. transient 500 on initial
+        // connect). The SDK uses the `logging` package independently of debugPrint.
+        hierarchicalLoggingEnabled = true;
+        Logger('PowerSync').level = Level.SEVERE;
       }
 
       await MapConfig.initialize(environment: env);

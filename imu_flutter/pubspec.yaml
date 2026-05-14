@@ -24,6 +24,7 @@ dependencies:
 
   # PowerSync - Offline-first sync engine
   powersync: ^1.15.1
+  logging: ^1.3.0
   # powersync_attachments_client: ^1.15.1 (temporarily unavailable on pub.dev)  # Package not available on pub.dev yet
 
   # UUID generation
