@@ -515,7 +515,7 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
          FROM itineraries i
          LEFT JOIN clients c ON c.id = i.client_id
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
-         ORDER BY datetime(i.created_at) DESC, i.scheduled_time ASC''',
+         ORDER BY datetime(i.created_at) DESC''',
       parameters: [userId, dateStr],
     )) {
       debugPrint('[ItineraryRepo] itineraryByDateProvider: ${rows.length} rows from PowerSync');
