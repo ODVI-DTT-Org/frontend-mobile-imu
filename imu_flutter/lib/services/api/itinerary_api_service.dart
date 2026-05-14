@@ -220,6 +220,33 @@ class ItineraryItem {
       scheduledDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
     }
 
+    // Parse touchpoint_summary to derive last (previous) touchpoint info
+    final summaryJson = row['touchpoint_summary'] as String?;
+    List<Map<String, dynamic>> touchpoints = [];
+    if (summaryJson != null && summaryJson.isNotEmpty && summaryJson != 'null') {
+      try {
+        final decoded = jsonDecode(summaryJson);
+        if (decoded is List) {
+          touchpoints = decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      } catch (_) {}
+    }
+
+    Map<String, dynamic>? lastTouchpoint;
+    if (touchpoints.isNotEmpty) {
+      touchpoints.sort((a, b) =>
+          ((b['touchpoint_number'] as num?)?.toInt() ?? 0)
+              .compareTo((a['touchpoint_number'] as num?)?.toInt() ?? 0));
+      lastTouchpoint = touchpoints.first;
+    }
+
+    DateTime? previousDate;
+    if (lastTouchpoint?['date'] != null) {
+      try {
+        previousDate = DateTime.parse(lastTouchpoint!['date'] as String);
+      } catch (_) {}
+    }
+
     // Derive next touchpoint from client data (backend-determined, no pattern)
     // Use next_touchpoint and next_touchpoint_number from enriched row
     final nextNum = row['next_touchpoint_number'] as int?;
@@ -256,6 +283,13 @@ class ItineraryItem {
           : null,
       nextTouchpointNumber: nextNum,
       nextTouchpointType: nextType,
+      productType: row['product_type'] as String?,
+      pensionType: row['pension_type'] as String?,
+      loanType: row['loan_type'] as String?,
+      previousTouchpointNumber: (lastTouchpoint?['touchpoint_number'] as num?)?.toInt(),
+      previousTouchpointReason: lastTouchpoint?['reason'] as String?,
+      previousTouchpointType: lastTouchpoint?['type'] as String?,
+      previousTouchpointDate: previousDate,
       loanReleased: _parseBool(row['loan_released']),
     );
   }

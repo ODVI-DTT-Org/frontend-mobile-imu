@@ -1325,6 +1325,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                                             visit.previousTouchpointNumber,
                                         lastTouchpointDate:
                                             visit.previousTouchpointDate,
+                                        productType: visit.productType,
+                                        pensionType: visit.pensionType,
                                         onTap: () => _onVisitTap(visit),
                                       ),
                                     ),
@@ -1360,6 +1362,8 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
                                 visit.previousTouchpointNumber,
                             lastTouchpointDate:
                                 visit.previousTouchpointDate,
+                            productType: visit.productType,
+                            pensionType: visit.pensionType,
                             onTap: () => _onVisitTap(visit),
                           ),
                         );

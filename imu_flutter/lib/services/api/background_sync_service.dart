@@ -402,6 +402,12 @@ class BackgroundSyncService extends ChangeNotifier {
     return false;
   }
 
+  /// Discard all pending uploads and refresh the displayed count
+  Future<void> clearPendingUploads() async {
+    await PowerSyncService.clearPendingUploads();
+    await _updatePendingCount();
+  }
+
   /// Update pending count from PowerSync CRUD queue
   Future<void> _updatePendingCount() async {
     try {

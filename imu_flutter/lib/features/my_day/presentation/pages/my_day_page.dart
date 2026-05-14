@@ -1357,6 +1357,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                                       lastTouchpointDate:
                                           client.previousTouchpointDate,
                                       scheduledTime: client.scheduledTime,
+                                      productType: client.productType,
+                                      pensionType: client.pensionType,
                                       onTap: () => _onClientTap(client),
                                     ),
                                   ),
@@ -1409,6 +1411,8 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
                               lastTouchpointDate:
                                   client.previousTouchpointDate,
                               scheduledTime: client.scheduledTime,
+                              productType: client.productType,
+                              pensionType: client.pensionType,
                               onTap: () => _onClientTap(client),
                             ),
                           ),

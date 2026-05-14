@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+String _formatTypeBadgeLabel(String raw) =>
+    raw.replaceAll('_', ' ').toUpperCase();
+
 /// Rich client card for Itinerary and My Day list views.
 ///
 /// Shows the client name, status badges, address, latest touchpoint, and an
@@ -16,6 +19,8 @@ class ClientCard extends StatelessWidget {
   final int? lastTouchpointNumber;
   final DateTime? lastTouchpointDate;
   final String? scheduledTime;
+  final String? productType;
+  final String? pensionType;
   final VoidCallback onTap;
 
   const ClientCard({
@@ -29,6 +34,8 @@ class ClientCard extends StatelessWidget {
     this.lastTouchpointNumber,
     this.lastTouchpointDate,
     this.scheduledTime,
+    this.productType,
+    this.pensionType,
     required this.onTap,
   });
 
@@ -77,6 +84,19 @@ class ClientCard extends StatelessWidget {
                         loanReleased: loanReleased,
                         isCompleted: isCompleted,
                       ),
+                      if (productType != null || pensionType != null) ...[
+                        const SizedBox(height: 5),
+                        Wrap(
+                          spacing: 5,
+                          runSpacing: 4,
+                          children: [
+                            if (productType != null && productType!.isNotEmpty)
+                              _CardTypeBadge(label: _formatTypeBadgeLabel(productType!)),
+                            if (pensionType != null && pensionType!.isNotEmpty)
+                              _CardTypeBadge(label: _formatTypeBadgeLabel(pensionType!)),
+                          ],
+                        ),
+                      ],
                       const Divider(height: 14, thickness: 0.5),
                       if (addressText != null && addressText.isNotEmpty) ...[
                         _IconRow(
@@ -298,6 +318,34 @@ class _TouchpointRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CardTypeBadge extends StatelessWidget {
+  final String label;
+
+  const _CardTypeBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    const c = Colors.blueGrey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: c.withOpacity(0.25)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: c.withOpacity(0.85),
+          letterSpacing: 0.3,
+        ),
+      ),
     );
   }
 }

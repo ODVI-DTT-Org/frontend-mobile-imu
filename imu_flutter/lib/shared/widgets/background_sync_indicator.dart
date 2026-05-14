@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:powersync/powersync.dart' hide Column;
 import '../../services/api/background_sync_service.dart';
-import '../../services/sync/powersync_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/logger.dart';
@@ -246,7 +245,7 @@ class _EnhancedBackgroundSyncSheetState extends ConsumerState<EnhancedBackground
       ),
     );
     if (confirmed == true && mounted) {
-      await PowerSyncService.clearPendingUploads();
+      await ref.read(backgroundSyncServiceProvider).clearPendingUploads();
       if (mounted) {
         AppNotification.showSuccess(context, 'Pending changes cancelled.');
         Navigator.pop(context);
