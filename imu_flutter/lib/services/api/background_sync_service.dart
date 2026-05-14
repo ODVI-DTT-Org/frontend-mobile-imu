@@ -137,8 +137,19 @@ class BackgroundSyncService extends ChangeNotifier {
   /// Start pending count check timer
   void _startPendingCheckTimer() {
     _pendingCheckTimer?.cancel();
-    _pendingCheckTimer = Timer.periodic(_pendingCheckInterval, (_) {
-      _updatePendingCount();
+    _pendingCheckTimer = Timer.periodic(_pendingCheckInterval, (_) async {
+      await _updatePendingCount();
+      // Auto-reconnect if PowerSync dropped while we're still authenticated and online.
+      // This recovers from token expiry or transient network blips without requiring
+      // an app restart or waiting up to 15 minutes for the periodic sync timer.
+      if (!PowerSyncService.isConnected && _isOnlineAndAuthenticated()) {
+        logDebug('BackgroundSyncService: PowerSync disconnected — attempting auto-reconnect');
+        try {
+          await _connectPowerSync();
+        } catch (e) {
+          logDebug('BackgroundSyncService: Auto-reconnect failed: $e');
+        }
+      }
     });
   }
 
