@@ -118,7 +118,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
       title: 'Record Touchpoint',
       clientName: client.fullName,
       pensionLabel: client.pensionType.toString(),
-      touchpointLabel: 'Touchpoint $touchpointNum of 7',
+      touchpointLabel: 'Touchpoint #$touchpointNum',
       submitLabel: 'Record Touchpoint',
       isFormValid: isFormValid,
       isSubmitting: isSubmitting.value,

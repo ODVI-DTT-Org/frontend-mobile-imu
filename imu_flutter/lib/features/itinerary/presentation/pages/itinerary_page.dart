@@ -37,6 +37,7 @@ import '../../../../features/record_forms/presentation/widgets/record_loan_relea
 import '../../../../features/touchpoints/presentation/widgets/touchpoint_form.dart';
 import '../../../../shared/widgets/previous_touchpoint_badge.dart';
 import '../../../../services/maps/map_service.dart';
+import '../../../../services/local_storage/hive_service.dart';
 
 class ItineraryPage extends ConsumerStatefulWidget {
   const ItineraryPage({super.key});
@@ -748,6 +749,26 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
       ),
     );
 
+    if (result == true) {
+      await _updateHiveAfterTouchpoint(fullClient.id!);
+      if (mounted) ref.invalidate(itineraryByDateProvider(_selectedDate));
+    }
+  }
+
+  Future<void> _updateHiveAfterTouchpoint(String clientId) async {
+    final cached = HiveService().getClient(clientId);
+    if (cached == null) return;
+    final updated = Map<String, dynamic>.from(cached);
+    final prevCount = (updated['touchpoint_number'] as int? ?? 0);
+    updated['touchpoint_number'] = prevCount + 1;
+    final raw = updated['touchpoint_status'];
+    if (raw is Map) {
+      final ts = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+      ts['canCreateTouchpoint'] = false;
+      ts['completedTouchpoints'] = prevCount + 1;
+      updated['touchpoint_status'] = ts;
+    }
+    await HiveService().saveClient(updated);
   }
 
   /// COMMENTED OUT for Unli Touchpoint - visit only functionality removed

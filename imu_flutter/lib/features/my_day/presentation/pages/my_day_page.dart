@@ -37,6 +37,7 @@ import '../../../record_forms/presentation/widgets/record_touchpoint_bottom_shee
 import '../../../record_forms/presentation/widgets/record_visit_bottom_sheet.dart';
 import '../../../record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
+import '../../../../services/local_storage/hive_service.dart';
 
 class MyDayPage extends ConsumerStatefulWidget {
   const MyDayPage({super.key});
@@ -680,9 +681,25 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     );
 
     if (result == true && mounted) {
-      // Refresh data
+      await _updateHiveAfterTouchpoint(fullClient.id!);
       await ref.read(myDayStateProvider.notifier).refresh();
     }
+  }
+
+  Future<void> _updateHiveAfterTouchpoint(String clientId) async {
+    final cached = HiveService().getClient(clientId);
+    if (cached == null) return;
+    final updated = Map<String, dynamic>.from(cached);
+    final prevCount = (updated['touchpoint_number'] as int? ?? 0);
+    updated['touchpoint_number'] = prevCount + 1;
+    final raw = updated['touchpoint_status'];
+    if (raw is Map) {
+      final ts = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+      ts['canCreateTouchpoint'] = false;
+      ts['completedTouchpoints'] = prevCount + 1;
+      updated['touchpoint_status'] = ts;
+    }
+    await HiveService().saveClient(updated);
   }
 
   /// COMMENTED OUT for Unli Touchpoint - visit only functionality removed
