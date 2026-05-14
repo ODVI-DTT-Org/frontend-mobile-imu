@@ -182,6 +182,7 @@ class Client {
   int get completedTouchpoints {
     // Backend now sends touchpointNumber as the COMPLETED count directly (0, 1, 2, ...)
     // No need to subtract 1 - this was changed in backend API
+    debugPrint('[Client.completedTouchpoints] id=$id touchpointNumber=$touchpointNumber touchpointStatus?.completedTouchpoints=${touchpointStatus?.completedTouchpoints}');
     return touchpointNumber >= 0 ? touchpointNumber : 0;
   }
 
