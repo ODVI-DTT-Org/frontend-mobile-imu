@@ -99,6 +99,25 @@ class ClientAttributeFilter {
       }
       if (!hasMatch) return false;
     }
+    if (touchpointDateFrom != null || touchpointDateTo != null) {
+      final source = client.touchpointSummary.isNotEmpty
+          ? client.touchpointSummary
+          : client.touchpoints;
+      if (source.isEmpty) return false;
+      final dateFrom = touchpointDateFrom != null
+          ? DateTime(touchpointDateFrom!.year, touchpointDateFrom!.month, touchpointDateFrom!.day)
+          : null;
+      final dateTo = touchpointDateTo != null
+          ? DateTime(touchpointDateTo!.year, touchpointDateTo!.month, touchpointDateTo!.day)
+          : null;
+      final hasMatch = source.any((tp) {
+        final tpDate = DateTime(tp.date.year, tp.date.month, tp.date.day);
+        if (dateFrom != null && tpDate.isBefore(dateFrom)) return false;
+        if (dateTo != null && tpDate.isAfter(dateTo)) return false;
+        return true;
+      });
+      if (!hasMatch) return false;
+    }
     return true;
   }
 

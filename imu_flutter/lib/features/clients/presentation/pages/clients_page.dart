@@ -328,15 +328,31 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
             : null;
         final meta = data is ClientsResponse ? data : null;
 
-        // Favorites are returned without upstream filtering — apply the
-        // attribute filter (visit-status, types, etc.) and then search
-        // client-side before pagination.
+        // Favorites are returned without upstream filtering — apply all active
+        // filters (attribute, location, touchpoint) client-side before pagination.
         var paginatedClients = clients;
         if (_viewMode == ClientViewMode.favorites) {
           final attributeFilter = ref.watch(clientAttributeFilterProvider);
+          final locationFilter = ref.watch(locationFilterProvider);
+          final touchpointFilter = ref.watch(touchpointFilterProvider);
+
           if (attributeFilter.hasFilter) {
             paginatedClients = paginatedClients
                 .where((client) => attributeFilter.matches(client))
+                .toList();
+          }
+          if (locationFilter.hasFilter) {
+            paginatedClients = paginatedClients.where((c) {
+              if (locationFilter.province != null && c.province != locationFilter.province) return false;
+              if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
+                if (!locationFilter.municipalities!.contains(c.municipality)) return false;
+              }
+              return true;
+            }).toList();
+          }
+          if (touchpointFilter.hasFilter) {
+            paginatedClients = paginatedClients
+                .where((client) => touchpointFilter.matches(client))
                 .toList();
           }
           if (_searchQuery.isNotEmpty) {
