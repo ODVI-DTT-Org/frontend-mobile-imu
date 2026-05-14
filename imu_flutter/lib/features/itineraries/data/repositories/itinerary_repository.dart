@@ -264,8 +264,8 @@ class ItineraryRepository {
       await db.execute(
         '''INSERT INTO itineraries (
           id, user_id, client_id, scheduled_date, scheduled_time,
-          status, priority, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+          status, priority, notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         [
           id,
           itinerary.caravanId,
@@ -275,6 +275,7 @@ class ItineraryRepository {
           itinerary.status ?? 'pending',
           itinerary.priority ?? 'normal',
           itinerary.notes,
+          now,
         ],
       );
 
