@@ -74,11 +74,17 @@ class _IMUAppWithSplashState extends ConsumerState<IMUAppWithSplash> {
       // files without touching each call site.
       if (!AppConfig.debugMode) {
         debugPrint = (String? message, {int? wrapWidth}) {};
-        // Suppress PowerSync SDK FINE/WARNING logs (e.g. transient 500 on initial
-        // connect). The SDK uses the `logging` package independently of debugPrint.
-        hierarchicalLoggingEnabled = true;
-        Logger('PowerSync').level = Level.SEVERE;
       }
+
+      // Always suppress PowerSync SDK internal FINE/WARNING logs.
+      // The SDK uses Dart's `logging` package independently of debugPrint,
+      // so the global override above does not affect it. These logs are
+      // PowerSync SDK internals (credential refresh chatter, transient 500
+      // cold-start on stream connect) — not app-level events. Our own
+      // [DEBUG]/[INFO]/[ERROR] logs are emitted via debugPrint and are
+      // unaffected. SEVERE (true fatal SDK errors) are still shown.
+      hierarchicalLoggingEnabled = true;
+      Logger('PowerSync').level = Level.SEVERE;
 
       await MapConfig.initialize(environment: env);
 
