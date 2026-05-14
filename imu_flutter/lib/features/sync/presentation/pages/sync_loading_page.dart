@@ -321,25 +321,12 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         progress: 0.2,
       );
 
-      // Step 2: Re-check for local data now that PowerSync SQLite is open.
-      // On subsequent logins the initial check can return false because
-      // PowerSync hasn't finished opening the DB file yet.
-      final hasDataNow = await _checkForLocalData();
-      if (hasDataNow) {
-        logDebug('[SyncLoadingPage] Local data found after connect — skipping full sync wait.');
-        await _countTableRows();
-        await _preferencesService.saveLastSyncTime();
-        state = state.copyWith(
-          isSyncing: false,
-          syncComplete: true,
-          currentStep: 'Sync complete!',
-          progress: 1.0,
-        );
-        return;
-      }
-
-      // Step 3: No local data — wait for full initial sync. Status listener is
-      // already attached from the top of this method.
+      // Step 2: Wait for full initial sync. This function is only reached when
+      // lastSync == null (first-ever login or after reinstall). We must wait for
+      // PowerSync to finish downloading ALL tables — not just clients. The old
+      // fast-path that checked _checkForLocalData() here caused a race: clients
+      // arrive in SQLite before itineraries, so we'd navigate home and My Day
+      // would show nothing even though the itinerary exists on the backend.
       await PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 60));
 
       // Persist the sync timestamp eagerly so a subsequent login can fast-track

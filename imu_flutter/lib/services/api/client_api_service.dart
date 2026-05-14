@@ -73,7 +73,7 @@ class ClientApiService {
           if (touchpointStatus != null && touchpointStatus.isNotEmpty) 'touchpoint_status': touchpointStatus,
           if (visitStatus != null && visitStatus.isNotEmpty) 'visit_status': visitStatus,
           if (loanReleased == true) 'loan_released': 'true',
-          if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality_ids': municipalityIds.join(','),
+          if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality': municipalityIds,
           if (nextTouchpointNumbers != null && nextTouchpointNumbers.isNotEmpty)
             'next_touchpoint_number': nextTouchpointNumbers,
         },

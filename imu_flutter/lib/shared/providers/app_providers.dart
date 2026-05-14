@@ -386,16 +386,10 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
     final clientApi = ref.watch(clientApiServiceProvider);
 
-    // Convert location filter to municipality IDs list
-    // Format: "PROVINCE-MUNICIPALITY" (e.g., "PANGASINAN-DAGUPAN CITY")
     List<String>? municipalityIds;
     if (locationFilter.hasFilter && locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
-      municipalityIds = locationFilter.municipalities!.map((municipality) {
-        // Create ID in format: PROVINCE-MUNICIPALITY
-        final province = locationFilter.province ?? '';
-        return '$province-$municipality';
-      }).toList();
-      debugPrint('onlineClientsProvider: Converted to municipality IDs: $municipalityIds');
+      municipalityIds = locationFilter.municipalities!.toList();
+      debugPrint('onlineClientsProvider: Municipality filter: $municipalityIds');
     }
 
     // Convert attribute filter to API parameters
