@@ -262,7 +262,7 @@ export function AddClientModal({ onClientAdded }: AddClientModalProps) {
               <Label htmlFor="clientType" className="text-xs text-gray-600">Client Type *</Label>
               <Select value={formData.clientType} onValueChange={(value) => handleInputChange('clientType', value)}>
                 <SelectTrigger className="mt-1 h-9 text-sm">
-                  <SelectValue />
+                  <SelectValue placeholder="Select client type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="POTENTIAL">Potential</SelectItem>

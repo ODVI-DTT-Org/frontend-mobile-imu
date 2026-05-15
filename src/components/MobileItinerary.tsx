@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
-import { Calendar, MapPin, Phone, Clock, User, X } from "lucide-react";
+import { Calendar, MapPin, Phone, Clock, User, X, Navigation, Clipboard, MessageSquare, Trash2, ChevronRight } from "lucide-react";
 import { MobileStatusBar } from "./MobileStatusBar";
 import { Badge } from "./ui/badge";
 import { Calendar as CalendarComponent } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
+import { RecordTouchpointModal } from "./RecordTouchpointModal";
 import { DataService, Visit, ClientDetails } from "../services/DataService";
 
 interface MobileItineraryProps {}
@@ -20,6 +22,10 @@ export function MobileItinerary({}: MobileItineraryProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isCalendarMode, setIsCalendarMode] = useState(false);
+  const [activeVisit, setActiveVisit] = useState<ScheduledVisit | null>(null);
+  const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [submittedVisitIds, setSubmittedVisitIds] = useState<Set<number>>(new Set());
 
   // Get all visits with client information
   const scheduledVisits = useMemo(() => {
@@ -203,12 +209,13 @@ export function MobileItinerary({}: MobileItineraryProps) {
   };
 
   // Get visits to display (either filtered visits or calendar mode visits)
+  // Bug 5 fix: filter out visits that have been submitted
   const visitsToDisplay = useMemo(() => {
-    if (isCalendarMode && selectedDate) {
-      return generateDummyVisitsForDate(selectedDate);
-    }
-    return filteredVisits;
-  }, [isCalendarMode, selectedDate, filteredVisits]);
+    const base = isCalendarMode && selectedDate
+      ? generateDummyVisitsForDate(selectedDate)
+      : filteredVisits;
+    return base.filter(v => !submittedVisitIds.has(v.VisitID));
+  }, [isCalendarMode, selectedDate, filteredVisits, submittedVisitIds]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -377,7 +384,11 @@ export function MobileItinerary({}: MobileItineraryProps) {
               const clientDetails = DataService.getClientDetails(visit.ClientID);
               
               return (
-                <div key={visit.VisitID} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div
+                  key={visit.VisitID}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm cursor-pointer active:bg-gray-50"
+                  onClick={() => { setActiveVisit(visit); setIsActionSheetOpen(true); }}
+                >
                   {/* Date and Status Header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
@@ -480,7 +491,94 @@ export function MobileItinerary({}: MobileItineraryProps) {
         )}
       </div>
 
+      {/* Record Touchpoint Modal — Bug 5: removes client from list on submit */}
+      <RecordTouchpointModal
+        isOpen={isRecordModalOpen}
+        onClose={() => setIsRecordModalOpen(false)}
+        onSubmit={(visitId) => {
+          setSubmittedVisitIds(prev => new Set(prev).add(visitId));
+          setIsRecordModalOpen(false);
+          setActiveVisit(null);
+        }}
+        visit={activeVisit}
+      />
 
+      {/* Action Bottom Sheet */}
+      <Sheet open={isActionSheetOpen} onOpenChange={setIsActionSheetOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8">
+          <SheetHeader className="px-4 pb-2">
+            <SheetTitle className="text-left text-base">
+              {activeVisit?.clientName}
+            </SheetTitle>
+            <p className="text-sm text-gray-500 text-left">{activeVisit?.Address}</p>
+          </SheetHeader>
+
+          <div className="flex flex-col">
+            {[
+              {
+                icon: <Clipboard className="w-5 h-5 text-blue-600" />,
+                label: 'Record Touchpoint',
+                onClick: () => { setIsActionSheetOpen(false); setIsRecordModalOpen(true); },
+              },
+              {
+                icon: <Navigation className="w-5 h-5 text-green-600" />,
+                label: 'Navigate',
+                onClick: () => {
+                  if (activeVisit?.Address) {
+                    window.open(
+                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeVisit.Address)}`,
+                      '_blank'
+                    );
+                  }
+                  setIsActionSheetOpen(false);
+                },
+              },
+              {
+                icon: <User className="w-5 h-5 text-purple-600" />,
+                label: 'View Client',
+                onClick: () => { setIsActionSheetOpen(false); },
+              },
+              {
+                icon: <Phone className="w-5 h-5 text-gray-600" />,
+                label: 'Call',
+                onClick: () => {
+                  if (activeVisit?.clientPhone) {
+                    window.open(`tel:${activeVisit.clientPhone}`);
+                  }
+                  setIsActionSheetOpen(false);
+                },
+              },
+              {
+                icon: <MessageSquare className="w-5 h-5 text-gray-600" />,
+                label: 'Message',
+                onClick: () => {
+                  if (activeVisit?.clientPhone) {
+                    window.open(`sms:${activeVisit.clientPhone}`);
+                  }
+                  setIsActionSheetOpen(false);
+                },
+              },
+              {
+                icon: <Trash2 className="w-5 h-5 text-red-500" />,
+                label: 'Remove from Itinerary',
+                danger: true,
+                onClick: () => { setIsActionSheetOpen(false); },
+              },
+            ].map((action) => (
+              <button
+                key={action.label}
+                onClick={action.onClick}
+                className={`flex items-center space-x-4 px-6 py-4 hover:bg-gray-50 active:bg-gray-100 text-left ${
+                  action.danger ? 'text-red-500' : 'text-black'
+                }`}
+              >
+                {action.icon}
+                <span className="text-sm">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

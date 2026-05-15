@@ -209,7 +209,7 @@ export function MobileClientDetail({ client, onBack, onNavigateToHome }: MobileC
               <Package className="w-4 h-4 text-gray-500" />
               <div className="flex items-center space-x-4 flex-1">
                 <span className="text-sm text-gray-600 w-16">Product</span>
-                <span className="text-sm text-black">{client.productType}</span>
+                <span className="text-sm text-black">{client.productType || <span className="text-gray-400">No product type</span>}</span>
               </div>
             </div>
 
@@ -217,7 +217,7 @@ export function MobileClientDetail({ client, onBack, onNavigateToHome }: MobileC
               <CreditCard className="w-4 h-4 text-gray-500" />
               <div className="flex items-center space-x-4 flex-1">
                 <span className="text-sm text-gray-600 w-16">Pension</span>
-                <span className="text-sm text-black">{client.pensionType}</span>
+                <span className="text-sm text-black">{client.pensionType || <span className="text-gray-400">No pension type</span>}</span>
               </div>
             </div>
 

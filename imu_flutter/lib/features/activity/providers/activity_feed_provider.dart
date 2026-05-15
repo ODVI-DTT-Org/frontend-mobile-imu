@@ -131,7 +131,7 @@ class ActivityFeedNotifier extends StateNotifier<ActivityFeedState> {
 }
 
 final activityFeedProvider =
-    StateNotifierProvider<ActivityFeedNotifier, ActivityFeedState>((ref) {
+    StateNotifierProvider.autoDispose<ActivityFeedNotifier, ActivityFeedState>((ref) {
   final repo = ref.watch(activityRepositoryProvider);
   return ActivityFeedNotifier(repo);
 });
