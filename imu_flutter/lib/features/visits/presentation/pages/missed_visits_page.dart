@@ -202,12 +202,12 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
             if (visit.source == MissedVisitSource.missedItinerary &&
                 visit.itineraryId != null) {
               // Cancel the existing missed itinerary and insert a new one atomically
-              await db.writeTransaction((tx) async {
-                await tx.execute(
+              await db.writeTransaction(() async {
+                await db.execute(
                   'UPDATE itineraries SET status = ?, updated_at = ? WHERE id = ?',
                   ['cancelled', now, visit.itineraryId],
                 );
-                await tx.execute(
+                await db.execute(
                   'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
                   [newId, userId, visit.clientId, dateStr, 'pending', now, now],
                 );
