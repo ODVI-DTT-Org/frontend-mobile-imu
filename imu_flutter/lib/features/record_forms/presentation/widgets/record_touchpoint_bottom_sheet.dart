@@ -72,7 +72,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           status: _cm.TouchpointStatus.fromApi(status.value!.apiValue),
           date: now,
           createdAt: now,
-          userId: '',
+          userId: ref.read(jwtAuthProvider).currentUser?.id ?? '',
           remarks: remarks.text.trim(),
           photoPath: null,
           audioPath: null,
