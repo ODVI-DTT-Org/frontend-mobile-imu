@@ -12,12 +12,6 @@ import '../../data/models/client_model.dart';
 import '../../../psgc/data/models/psgc_models.dart';
 import '../../../psgc/data/repositories/psgc_repository.dart';
 
-/// Add Client Page - Aligned with Database Schema
-///
-/// Uses direct columns instead of nested lists:
-/// - region, province, municipality, barangay (direct fields)
-/// - phone (single field instead of phoneNumbers list)
-/// - All fields match the database schema
 class AddClientPage extends ConsumerStatefulWidget {
   const AddClientPage({super.key});
 
@@ -26,9 +20,6 @@ class AddClientPage extends ConsumerStatefulWidget {
 }
 
 class _AddClientPageState extends ConsumerState<AddClientPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _scrollController = ScrollController();
-
   // Loading states
   bool _isLoading = true;
   bool _isSaving = false;
@@ -43,7 +34,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   final _agencyNameController = TextEditingController();
   final _departmentController = TextEditingController();
   final _positionController = TextEditingController();
-  final _employmentStatusController = TextEditingController();
   final _payrollDateController = TextEditingController();
   final _tenureController = TextEditingController();
   final _panController = TextEditingController();
@@ -75,14 +65,14 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   // Date picker
   DateTime? _birthDate;
 
-  // Section expansion states
-  final Map<String, bool> _expandedSections = {
-    'personal': true,
-    'contact': true,
-    'professional': false,
-    'product': false,
-    'notes': false,
-  };
+  // Wizard navigation
+  int _currentStep = 0;
+  final Set<int> _completedSteps = {};
+  final _step1Key = GlobalKey<FormState>();
+  final _step2Key = GlobalKey<FormState>();
+  final _step3Key = GlobalKey<FormState>();
+  final _step4Key = GlobalKey<FormState>();
+  final _step5Key = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -103,12 +93,10 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     _agencyNameController.dispose();
     _departmentController.dispose();
     _positionController.dispose();
-    _employmentStatusController.dispose();
     _payrollDateController.dispose();
     _tenureController.dispose();
     _panController.dispose();
     _remarksController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -116,7 +104,6 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Load PSGC regions
       final psgcRepository = ref.read(psgcRepositoryProvider);
       final regions = await psgcRepository.getRegions();
 
@@ -154,10 +141,12 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   }
 
   Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) {
+    final allValid = [_step1Key, _step2Key, _step3Key, _step4Key, _step5Key]
+        .every((key) => key.currentState?.validate() ?? false);
+    if (!allValid) {
       HapticUtils.error();
       if (mounted) {
-        AppNotification.showError(context, 'Please fix the errors before submitting');
+        AppNotification.showError(context, 'Please fill in all required fields');
       }
       return;
     }
@@ -191,9 +180,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         position: _positionController.text.trim().isEmpty
             ? null
             : _positionController.text.trim(),
-        employmentStatus: _employmentStatusController.text.trim().isEmpty
-            ? null
-            : _employmentStatusController.text.trim(),
+        employmentStatus: null,
         payrollDate: _payrollDateController.text.trim().isEmpty
             ? null
             : _payrollDateController.text.trim(),
@@ -228,7 +215,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
       debugPrint('[AddClientPage] Submitting new client');
 
-      // Duplicate check for non-manager roles (caravan/tele) before submitting for approval
+      // Duplicate check for non-manager roles before submitting for approval
       final role = ref.read(currentUserRoleProvider);
       if (!role.isManager) {
         final firstName = newClient.firstName?.toLowerCase() ?? '';
@@ -296,103 +283,62 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
 
   ProductType _parseProductType(String value) {
     switch (value) {
-      case 'BFP ACTIVE':
-        return ProductType.bfpActive;
-      case 'BFP PENSION':
-        return ProductType.bfpPension;
-      case 'PNP PENSION':
-        return ProductType.pnpPension;
-      case 'NAPOLCOM':
-        return ProductType.napolcom;
-      case 'BFP STP':
-        return ProductType.bfpStp;
-      default:
-        return ProductType.bfpActive;
+      case 'BFP ACTIVE': return ProductType.bfpActive;
+      case 'BFP PENSION': return ProductType.bfpPension;
+      case 'PNP PENSION': return ProductType.pnpPension;
+      case 'NAPOLCOM': return ProductType.napolcom;
+      case 'BFP STP': return ProductType.bfpStp;
+      default: return ProductType.bfpActive;
     }
   }
 
   PensionType _parsePensionType(String value) {
     switch (value) {
-      case 'PNP - RETIREE OPTIONAL':
-        return PensionType.pnpRetireeOptional;
-      case 'PNP - RETIREE COMPULSORY':
-        return PensionType.pnpRetireeCompulsory;
-      case 'PNP - RETIREE':
-        return PensionType.pnpRetiree;
-      case 'BFP - RETIREE':
-        return PensionType.bfpRetiree;
-      case 'BFP STP - RETIREE':
-        return PensionType.bfpStpRetiree;
-      case 'PNP - TRANSFEREE':
-        return PensionType.pnpTransferree;
-      case 'BFP - SURVIVOR':
-        return PensionType.bfpSurvivor;
-      case 'PNP - SURVIVOR':
-        return PensionType.pnpSurvivor;
-      case 'PNP - TPPD':
-        return PensionType.pnpTppd;
-      case 'BFP - TPPD':
-        return PensionType.bfpTppd;
-      case 'PNP - MINOR':
-        return PensionType.pnpMinor;
-      case 'BFP - MINOR':
-        return PensionType.bfpMinor;
-      case 'PNP - POSTHUMOUS MINOR':
-        return PensionType.pnpPosthumousMinor;
-      case 'PNP - POSTHUMOUS SPOUSE':
-        return PensionType.pnpPosthumousSpouse;
-      case 'OTHERS':
-        return PensionType.others;
-      default:
-        return PensionType.others;
+      case 'PNP - RETIREE OPTIONAL': return PensionType.pnpRetireeOptional;
+      case 'PNP - RETIREE COMPULSORY': return PensionType.pnpRetireeCompulsory;
+      case 'PNP - RETIREE': return PensionType.pnpRetiree;
+      case 'BFP - RETIREE': return PensionType.bfpRetiree;
+      case 'BFP STP - RETIREE': return PensionType.bfpStpRetiree;
+      case 'PNP - TRANSFEREE': return PensionType.pnpTransferree;
+      case 'BFP - SURVIVOR': return PensionType.bfpSurvivor;
+      case 'PNP - SURVIVOR': return PensionType.pnpSurvivor;
+      case 'PNP - TPPD': return PensionType.pnpTppd;
+      case 'BFP - TPPD': return PensionType.bfpTppd;
+      case 'PNP - MINOR': return PensionType.pnpMinor;
+      case 'BFP - MINOR': return PensionType.bfpMinor;
+      case 'PNP - POSTHUMOUS MINOR': return PensionType.pnpPosthumousMinor;
+      case 'PNP - POSTHUMOUS SPOUSE': return PensionType.pnpPosthumousSpouse;
+      case 'OTHERS': return PensionType.others;
+      default: return PensionType.others;
     }
   }
 
   MarketType _parseMarketType(String value) {
     switch (value) {
-      case 'VIRGIN':
-        return MarketType.virgin;
-      case 'EXISTING':
-        return MarketType.existing;
-      case 'FULLY PAID':
-        return MarketType.fullyPaid;
-      default:
-        return MarketType.virgin;
+      case 'VIRGIN': return MarketType.virgin;
+      case 'EXISTING': return MarketType.existing;
+      case 'FULLY PAID': return MarketType.fullyPaid;
+      default: return MarketType.virgin;
     }
   }
 
   ClientType _parseClientType(String value) {
     switch (value.toUpperCase()) {
-      case 'POTENTIAL':
-        return ClientType.potential;
-      case 'EXISTING':
-        return ClientType.existing;
-      default:
-        return ClientType.potential;
+      case 'POTENTIAL': return ClientType.potential;
+      case 'EXISTING': return ClientType.existing;
+      default: return ClientType.potential;
     }
   }
 
   LoanType? _parseLoanType(String? value) {
     if (value == null || value.isEmpty) return null;
     switch (value.toUpperCase()) {
-      case 'NEW':
-        return LoanType.newLoan;
-      case 'ADDITIONAL':
-        return LoanType.additional;
-      case 'RENEWAL':
-        return LoanType.renewal;
-      case 'PRETERM':
-        return LoanType.preterm;
-      default:
-        return null;
+      case 'NEW': return LoanType.newLoan;
+      case 'ADDITIONAL': return LoanType.additional;
+      case 'RENEWAL': return LoanType.renewal;
+      case 'PRETERM': return LoanType.preterm;
+      default: return null;
     }
-  }
-
-  void _toggleSection(String section) {
-    HapticUtils.lightImpact();
-    setState(() {
-      _expandedSections[section] = !_expandedSections[section]!;
-    });
   }
 
   void _showErrorDialog(String message, Object error) {
@@ -411,26 +357,714 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     );
   }
 
-  void _showSuccessSnackBar(String message) {
-    AppNotification.showSuccess(context, message);
+  void _showSuccessSnackBar(String message) => AppNotification.showSuccess(context, message);
+  void _showWarningSnackBar(String message) => AppNotification.showWarning(context, message);
+  void _showErrorSnackBar(String message) => AppNotification.showError(context, message);
+
+  // ── Wizard navigation ──────────────────────────────────────────────────────
+
+  List<GlobalKey<FormState>> get _stepKeys =>
+      [_step1Key, _step2Key, _step3Key, _step4Key, _step5Key];
+
+  void _goToStep(int step) {
+    HapticUtils.lightImpact();
+    setState(() => _currentStep = step);
   }
 
-  void _showWarningSnackBar(String message) {
-    AppNotification.showWarning(context, message);
+  void _nextStep() {
+    if (!_stepKeys[_currentStep].currentState!.validate()) {
+      HapticUtils.error();
+      return;
+    }
+    HapticUtils.lightImpact();
+    setState(() {
+      _completedSteps.add(_currentStep);
+      _currentStep++;
+    });
   }
 
-  void _showErrorSnackBar(String message) {
-    AppNotification.showError(context, message);
+  void _prevStep() {
+    HapticUtils.lightImpact();
+    setState(() => _currentStep--);
   }
+
+  // ── Shared UI ──────────────────────────────────────────────────────────────
+
+  Widget _buildStepPillsRow() {
+    const labels = ['👤 Personal', '📞 Contact', '📍 Location', '💼 Work', '💳 Product'];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          children: List.generate(5, (i) {
+            final isDone = _completedSteps.contains(i);
+            final isActive = _currentStep == i;
+            return GestureDetector(
+              onTap: () => _goToStep(i),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? const Color(0xFF6366F1)
+                      : isDone
+                          ? const Color(0xFFEDE9FE)
+                          : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isDone ? '✓ ${labels[i].substring(3)}' : labels[i],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isActive
+                        ? Colors.white
+                        : isDone
+                            ? const Color(0xFF5B21B6)
+                            : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepNavBar(String saveLabel) {
+    const nextLabels = ['Contact', 'Location', 'Work', 'Product'];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        children: [
+          if (_currentStep > 0) ...[
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _isSaving ? null : _prevStep,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('← Back', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          if (_currentStep < 4)
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _nextStep,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  'Next: ${nextLabels[_currentStep]} →',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          if (_currentStep == 4)
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _handleSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(saveLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Step content builders ──────────────────────────────────────────────────
+
+  Widget _buildStep1Personal() {
+    return Form(
+      key: _step1Key,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Personal Information',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _firstNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'First Name *',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _lastNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Last Name *',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _middleNameController,
+              decoration: const InputDecoration(
+                labelText: 'Middle Name',
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _birthDate ?? DateTime(1980),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _birthDate = picked);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Birth Date',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(LucideIcons.calendar, size: 20),
+                ),
+                child: Text(
+                  _birthDate != null
+                      ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
+                      : 'Select birth date',
+                  style: TextStyle(
+                    color: _birthDate != null ? Colors.black87 : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Client Type *',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _ClientTypeButton(
+                    label: 'Potential',
+                    isSelected: _clientType == 'POTENTIAL',
+                    colorScheme: Theme.of(context).colorScheme,
+                    onTap: () {
+                      HapticUtils.selectionClick();
+                      setState(() => _clientType = 'POTENTIAL');
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ClientTypeButton(
+                    label: 'Existing',
+                    isSelected: _clientType == 'EXISTING',
+                    colorScheme: Theme.of(context).colorScheme,
+                    onTap: () {
+                      HapticUtils.selectionClick();
+                      setState(() => _clientType = 'EXISTING');
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep2Contact() {
+    return Form(
+      key: _step2Key,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Contact Details',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number *',
+                hintText: '+63 912 345 6789',
+                prefixIcon: Icon(LucideIcons.phone),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.phone,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email Address',
+                hintText: 'email@example.com',
+                prefixIcon: Icon(LucideIcons.mail),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _facebookController,
+              decoration: const InputDecoration(
+                labelText: 'Facebook Profile',
+                hintText: 'Facebook profile URL or name',
+                prefixIcon: Icon(LucideIcons.facebook),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep3Location() {
+    return Form(
+      key: _step3Key,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Location',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<PsgcRegion>(
+              value: _selectedRegion,
+              decoration: InputDecoration(
+                labelText: 'Region *',
+                border: const OutlineInputBorder(),
+                suffixIcon: _regions.isEmpty
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : null,
+              ),
+              items: _regions
+                  .map((r) => DropdownMenuItem(value: r, child: Text(r.name)))
+                  .toList(),
+              onChanged: (region) async {
+                setState(() {
+                  _selectedRegion = region;
+                  _selectedProvince = null;
+                  _selectedMunicipality = null;
+                  _selectedBarangay = null;
+                  _provinces = [];
+                  _municipalities = [];
+                  _barangays = [];
+                  _isLoadingProvinces = region != null;
+                });
+                if (region != null) {
+                  try {
+                    final psgcRepository = ref.read(psgcRepositoryProvider);
+                    final provinces =
+                        await psgcRepository.getProvincesByRegion(region.name);
+                    if (mounted) {
+                      setState(() {
+                        _provinces = provinces;
+                        _isLoadingProvinces = false;
+                      });
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      setState(() => _isLoadingProvinces = false);
+                      _showErrorDialog('Failed to load provinces', e);
+                    }
+                  }
+                }
+              },
+              validator: (v) => v == null ? 'Required' : null,
+            ),
+            const SizedBox(height: 16),
+            IgnorePointer(
+              ignoring: _selectedRegion == null || _isLoadingProvinces,
+              child: DropdownButtonFormField<PsgcProvince>(
+                value: _selectedProvince,
+                decoration: InputDecoration(
+                  labelText: 'Province *',
+                  border: const OutlineInputBorder(),
+                  filled: _selectedRegion == null,
+                  fillColor: _selectedRegion == null ? Colors.grey.shade100 : null,
+                  hintText: _selectedRegion == null ? 'Select region first' : null,
+                  suffixIcon: _isLoadingProvinces
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : null,
+                ),
+                items: _provinces.isEmpty && _selectedRegion != null && !_isLoadingProvinces
+                    ? [const DropdownMenuItem<PsgcProvince>(
+                        value: null, enabled: false,
+                        child: Text('No provinces available',
+                            style: TextStyle(color: Colors.grey)))]
+                    : _provinces
+                        .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+                        .toList(),
+                onChanged: _selectedRegion == null
+                    ? null
+                    : (province) async {
+                        setState(() {
+                          _selectedProvince = province;
+                          _selectedMunicipality = null;
+                          _selectedBarangay = null;
+                          _municipalities = [];
+                          _barangays = [];
+                          _isLoadingMunicipalities = province != null;
+                        });
+                        if (province != null) {
+                          try {
+                            final psgcRepository = ref.read(psgcRepositoryProvider);
+                            final municipalities = await psgcRepository
+                                .getMunicipalitiesByProvince(province.name);
+                            if (mounted) {
+                              setState(() {
+                                _municipalities = municipalities;
+                                _isLoadingMunicipalities = false;
+                              });
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() => _isLoadingMunicipalities = false);
+                              _showErrorDialog('Failed to load municipalities', e);
+                            }
+                          }
+                        }
+                      },
+                validator: (v) => v == null ? 'Required' : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+            IgnorePointer(
+              ignoring: _selectedProvince == null || _isLoadingMunicipalities,
+              child: DropdownButtonFormField<PsgcMunicipality>(
+                value: _selectedMunicipality,
+                decoration: InputDecoration(
+                  labelText: 'Municipality / City *',
+                  border: const OutlineInputBorder(),
+                  filled: _selectedProvince == null,
+                  fillColor: _selectedProvince == null ? Colors.grey.shade100 : null,
+                  hintText: _selectedProvince == null ? 'Select province first' : null,
+                  suffixIcon: _isLoadingMunicipalities
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : null,
+                ),
+                items: _municipalities.isEmpty &&
+                        _selectedProvince != null &&
+                        !_isLoadingMunicipalities
+                    ? [const DropdownMenuItem<PsgcMunicipality>(
+                        value: null, enabled: false,
+                        child: Text('No municipalities available',
+                            style: TextStyle(color: Colors.grey)))]
+                    : _municipalities
+                        .map((m) =>
+                            DropdownMenuItem(value: m, child: Text(m.displayName)))
+                        .toList(),
+                onChanged: _selectedProvince == null
+                    ? null
+                    : (municipality) async {
+                        setState(() {
+                          _selectedMunicipality = municipality;
+                          _selectedBarangay = null;
+                          _barangays = [];
+                          _isLoadingBarangays = municipality != null;
+                        });
+                        if (municipality != null) {
+                          await _loadBarangays(municipality.name);
+                        }
+                      },
+                validator: (v) => v == null ? 'Required' : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+            IgnorePointer(
+              ignoring: _selectedMunicipality == null || _isLoadingBarangays,
+              child: DropdownButtonFormField<PsgcBarangay>(
+                value: _selectedBarangay,
+                decoration: InputDecoration(
+                  labelText: 'Barangay *',
+                  border: const OutlineInputBorder(),
+                  filled: _selectedMunicipality == null,
+                  fillColor:
+                      _selectedMunicipality == null ? Colors.grey.shade100 : null,
+                  hintText:
+                      _selectedMunicipality == null ? 'Select municipality first' : null,
+                  suffixIcon: _isLoadingBarangays
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : null,
+                ),
+                items: _barangays.isEmpty &&
+                        _selectedMunicipality != null &&
+                        !_isLoadingBarangays
+                    ? [const DropdownMenuItem<PsgcBarangay>(
+                        value: null, enabled: false,
+                        child: Text('No barangays available',
+                            style: TextStyle(color: Colors.grey)))]
+                    : _barangays
+                        .map((b) => DropdownMenuItem(
+                            value: b, child: Text(b.barangay ?? 'Unknown')))
+                        .toList(),
+                onChanged: _selectedMunicipality == null
+                    ? null
+                    : (barangay) {
+                        HapticUtils.lightImpact();
+                        setState(() => _selectedBarangay = barangay);
+                      },
+                validator: (v) => v == null ? 'Required' : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep4Work() {
+    return Form(
+      key: _step4Key,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Work & Employment',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _agencyNameController,
+              decoration: const InputDecoration(
+                labelText: 'Agency Name',
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _positionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Position',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _departmentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Department',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _panController,
+              decoration: const InputDecoration(
+                labelText: 'PAN (Pension Account No.)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _payrollDateController,
+                    decoration: const InputDecoration(
+                      labelText: 'Payroll Date',
+                      hintText: 'YYYY-MM-DD',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _tenureController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tenure (months)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep5ProductNotes() {
+    return Form(
+      key: _step5Key,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Product & Notes',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _productType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Product Type *',
+                border: OutlineInputBorder(),
+              ),
+              items: const ['BFP ACTIVE', 'BFP PENSION', 'BFP STP', 'NAPOLCOM', 'PNP PENSION']
+                  .map((t) => DropdownMenuItem(
+                      value: t, child: Text(t, style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  HapticUtils.lightImpact();
+                  setState(() => _productType = v);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _pensionType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Pension Type *',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                'PNP - RETIREE OPTIONAL', 'PNP - RETIREE COMPULSORY', 'PNP - RETIREE',
+                'BFP - RETIREE', 'BFP STP - RETIREE', 'PNP - TRANSFEREE',
+                'BFP - SURVIVOR', 'PNP - SURVIVOR', 'PNP - TPPD', 'BFP - TPPD',
+                'PNP - MINOR', 'BFP - MINOR', 'PNP - POSTHUMOUS MINOR',
+                'PNP - POSTHUMOUS SPOUSE', 'OTHERS',
+              ]
+                  .map((t) => DropdownMenuItem(
+                      value: t, child: Text(t, style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  HapticUtils.lightImpact();
+                  setState(() => _pensionType = v);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _marketType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Market Type *',
+                border: OutlineInputBorder(),
+              ),
+              items: const ['VIRGIN', 'EXISTING', 'FULLY PAID']
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  HapticUtils.lightImpact();
+                  setState(() => _marketType = v);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _loanType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Loan Type *',
+                border: OutlineInputBorder(),
+              ),
+              items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  HapticUtils.lightImpact();
+                  setState(() => _loanType = v);
+                }
+              },
+              validator: (v) => v == null ? 'Required' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _remarksController,
+              decoration: const InputDecoration(
+                labelText: 'Remarks / Notes',
+                hintText: 'Add any notes about this client...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 4,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: const Text('Add Client'),
-        ),
+        appBar: AppBar(title: const Text('Add Client')),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -444,822 +1078,30 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
       );
     }
 
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final role = ref.watch(currentUserRoleProvider);
     final saveLabel = role == UserRole.admin ? 'Save Client' : 'Submit for Approval';
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Add Client'),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Personal Section
-            _buildSectionHeader(
-              title: 'Personal',
-              icon: LucideIcons.user,
-              sectionKey: 'personal',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildPersonalSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Contact Section (phone/email/facebook + location)
-            _buildSectionHeader(
-              title: 'Contact',
-              icon: LucideIcons.phone,
-              sectionKey: 'contact',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildContactSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Professional Section
-            _buildSectionHeader(
-              title: 'Professional',
-              icon: LucideIcons.briefcase,
-              sectionKey: 'professional',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildProfessionalSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Product Section
-            _buildSectionHeader(
-              title: 'Product',
-              icon: LucideIcons.creditCard,
-              sectionKey: 'product',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildProductSection(colorScheme),
-
-            const SizedBox(height: 24),
-
-            // Notes Section
-            _buildSectionHeader(
-              title: 'Notes',
-              icon: LucideIcons.messageSquare,
-              sectionKey: 'notes',
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            _buildNotesSection(colorScheme),
-
-            const SizedBox(height: 32),
-
-            // Cancel + Save button row
-            Row(
+      appBar: AppBar(title: const Text('Add Client')),
+      body: Column(
+        children: [
+          _buildStepPillsRow(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentStep,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isSaving ? null : () => context.pop(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            saveLabel,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                ),
+                _buildStep1Personal(),
+                _buildStep2Contact(),
+                _buildStep3Location(),
+                _buildStep4Work(),
+                _buildStep5ProductNotes(),
               ],
             ),
-
-            const SizedBox(height: 16),
-          ],
-        ),
+          ),
+          _buildStepNavBar(saveLabel),
+        ],
       ),
-    );
-  }
-
-  Widget _buildSectionHeader({
-    required String title,
-    required IconData icon,
-    required String sectionKey,
-    required Color color,
-  }) {
-    final isExpanded = _expandedSections[sectionKey]!;
-    return InkWell(
-      onTap: () => _toggleSection(sectionKey),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ),
-            Icon(
-              isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
-              color: color,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPersonalSection(ColorScheme colorScheme) {
-    if (!_expandedSections['personal']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: _firstNameController,
-                decoration: const InputDecoration(
-                  labelText: 'First Name *',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                validator: (value) =>
-                    value?.trim().isEmpty == true ? 'Required' : null,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _middleNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Middle Name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: _lastNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Last Name *',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                validator: (value) =>
-                    value?.trim().isEmpty == true ? 'Required' : null,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _birthDate ?? DateTime.now(),
-              firstDate: DateTime(1900),
-              lastDate: DateTime.now(),
-            );
-            if (picked != null) {
-              setState(() => _birthDate = picked);
-            }
-          },
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'Birth Date',
-              border: OutlineInputBorder(),
-              isDense: true,
-              suffixIcon: Icon(LucideIcons.calendar, size: 20),
-            ),
-            baseStyle: TextStyle(
-              fontSize: 16,
-              color: _birthDate != null ? Colors.black : Colors.grey,
-            ),
-            child: Text(
-              _birthDate != null
-                  ? '${_birthDate!.month}/${_birthDate!.day}/${_birthDate!.year}'
-                  : 'Select birth date',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContactSection(ColorScheme colorScheme) {
-    if (!_expandedSections['contact']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _phoneController,
-          decoration: const InputDecoration(
-            labelText: 'Phone Number',
-            hintText: '+63 912 345 6789',
-            prefixIcon: Icon(LucideIcons.phone),
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 16),
-
-        TextFormField(
-          controller: _emailController,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            hintText: 'email@example.com',
-            prefixIcon: Icon(LucideIcons.mail),
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 16),
-
-        TextFormField(
-          controller: _facebookController,
-          decoration: const InputDecoration(
-            labelText: 'Facebook Profile',
-            hintText: 'Facebook profile URL',
-            prefixIcon: Icon(LucideIcons.facebook),
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Location fields (merged from old Location section)
-        DropdownButtonFormField<PsgcRegion>(
-          value: _selectedRegion,
-          decoration: InputDecoration(
-            labelText: 'Region *',
-            border: const OutlineInputBorder(),
-            isDense: true,
-            suffixIcon: _regions.isEmpty
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-          ),
-          items: _regions.map((region) {
-            return DropdownMenuItem<PsgcRegion>(
-              value: region,
-              child: Text(region.name),
-            );
-          }).toList(),
-          onChanged: (region) async {
-            setState(() {
-              _selectedRegion = region;
-              _selectedProvince = null;
-              _selectedMunicipality = null;
-              _selectedBarangay = null;
-              _provinces = [];
-              _municipalities = [];
-              _barangays = [];
-              _isLoadingProvinces = region != null;
-            });
-
-            if (region != null) {
-              try {
-                final psgcRepository = ref.read(psgcRepositoryProvider);
-                final provinces = await psgcRepository.getProvincesByRegion(region.name);
-                if (mounted) {
-                  setState(() {
-                    _provinces = provinces;
-                    _isLoadingProvinces = false;
-                  });
-                }
-              } catch (e) {
-                if (mounted) {
-                  setState(() => _isLoadingProvinces = false);
-                }
-                if (mounted) {
-                  _showErrorDialog('Failed to load provinces', e);
-                }
-              }
-            }
-          },
-          validator: (value) => value == null ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-
-        IgnorePointer(
-          ignoring: _selectedRegion == null || _isLoadingProvinces,
-          child: DropdownButtonFormField<PsgcProvince>(
-            value: _selectedProvince,
-            decoration: InputDecoration(
-              labelText: 'Province *',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: _selectedRegion == null,
-              fillColor: _selectedRegion == null ? Colors.grey.shade100 : null,
-              suffixIcon: _isLoadingProvinces
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-              hintText: _selectedRegion == null ? 'Select region first' : null,
-            ),
-            items: _provinces.isEmpty && _selectedRegion != null && !_isLoadingProvinces
-                ? [
-                    const DropdownMenuItem<PsgcProvince>(
-                      value: null,
-                      enabled: false,
-                      child: Text('No provinces available', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ]
-                : _provinces.map((province) {
-                    return DropdownMenuItem<PsgcProvince>(
-                      value: province,
-                      child: Text(province.name),
-                    );
-                  }).toList(),
-            onChanged: _selectedRegion == null
-                ? null
-                : (province) async {
-                    setState(() {
-                      _selectedProvince = province;
-                      _selectedMunicipality = null;
-                      _selectedBarangay = null;
-                      _municipalities = [];
-                      _barangays = [];
-                      _isLoadingMunicipalities = province != null;
-                    });
-
-                    if (province != null) {
-                      try {
-                        final psgcRepository = ref.read(psgcRepositoryProvider);
-                        final municipalities = await psgcRepository.getMunicipalitiesByProvince(province.name);
-                        if (mounted) {
-                          setState(() {
-                            _municipalities = municipalities;
-                            _isLoadingMunicipalities = false;
-                          });
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          setState(() => _isLoadingMunicipalities = false);
-                        }
-                        if (mounted) {
-                          _showErrorDialog('Failed to load municipalities', e);
-                        }
-                      }
-                    }
-                  },
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        IgnorePointer(
-          ignoring: _selectedProvince == null || _isLoadingMunicipalities,
-          child: DropdownButtonFormField<PsgcMunicipality>(
-            value: _selectedMunicipality,
-            decoration: InputDecoration(
-              labelText: 'Municipality/City *',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: _selectedProvince == null,
-              fillColor: _selectedProvince == null ? Colors.grey.shade100 : null,
-              suffixIcon: _isLoadingMunicipalities
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-              hintText: _selectedProvince == null ? 'Select province first' : null,
-            ),
-            items: _municipalities.isEmpty && _selectedProvince != null && !_isLoadingMunicipalities
-                ? [
-                    const DropdownMenuItem<PsgcMunicipality>(
-                      value: null,
-                      enabled: false,
-                      child: Text('No municipalities available', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ]
-                : _municipalities.map((municipality) {
-                    return DropdownMenuItem<PsgcMunicipality>(
-                      value: municipality,
-                      child: Text(municipality.displayName),
-                    );
-                  }).toList(),
-            onChanged: _selectedProvince == null
-                ? null
-                : (municipality) async {
-                    setState(() {
-                      _selectedMunicipality = municipality;
-                      _selectedBarangay = null;
-                      _barangays = [];
-                      _isLoadingBarangays = municipality != null;
-                    });
-
-                    if (municipality != null) {
-                      await _loadBarangays(municipality.name);
-                    }
-                  },
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        IgnorePointer(
-          ignoring: _selectedMunicipality == null || _isLoadingBarangays,
-          child: DropdownButtonFormField<PsgcBarangay>(
-            value: _selectedBarangay,
-            decoration: InputDecoration(
-              labelText: 'Barangay *',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              filled: _selectedMunicipality == null,
-              fillColor: _selectedMunicipality == null ? Colors.grey.shade100 : null,
-              suffixIcon: _isLoadingBarangays
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-              hintText: _selectedMunicipality == null ? 'Select municipality first' : null,
-            ),
-            items: _barangays.isEmpty && _selectedMunicipality != null && !_isLoadingBarangays
-                ? [
-                    const DropdownMenuItem<PsgcBarangay>(
-                      value: null,
-                      enabled: false,
-                      child: Text('No barangays available', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ]
-                : _barangays.map((barangay) {
-                    return DropdownMenuItem<PsgcBarangay>(
-                      value: barangay,
-                      child: Text(barangay.barangay ?? 'Unknown'),
-                    );
-                  }).toList(),
-            onChanged: _selectedMunicipality == null
-                ? null
-                : (barangay) {
-                    HapticUtils.lightImpact();
-                    setState(() {
-                      _selectedBarangay = barangay;
-                    });
-                  },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfessionalSection(ColorScheme colorScheme) {
-    if (!_expandedSections['professional']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _agencyNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Agency Name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _departmentController,
-                decoration: const InputDecoration(
-                  labelText: 'Department',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _positionController,
-                decoration: const InputDecoration(
-                  labelText: 'Position',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _employmentStatusController,
-                decoration: const InputDecoration(
-                  labelText: 'Employment Status',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _payrollDateController,
-                decoration: const InputDecoration(
-                  labelText: 'Payroll Date',
-                  hintText: 'YYYY-MM-DD',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _tenureController,
-                decoration: const InputDecoration(
-                  labelText: 'Tenure (months)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProductSection(ColorScheme colorScheme) {
-    if (!_expandedSections['product']!) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Client Type (moved from Personal)
-        const Text(
-          'Client Type',
-          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _ClientTypeButton(
-                label: 'Potential',
-                isSelected: _clientType == 'POTENTIAL',
-                colorScheme: colorScheme,
-                onTap: () {
-                  HapticUtils.selectionClick();
-                  setState(() => _clientType = 'POTENTIAL');
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ClientTypeButton(
-                label: 'Existing',
-                isSelected: _clientType == 'EXISTING',
-                colorScheme: colorScheme,
-                onTap: () {
-                  HapticUtils.selectionClick();
-                  setState(() => _clientType = 'EXISTING');
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Product Type',
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _productType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                    ),
-                    items: const [
-                      'BFP ACTIVE',
-                      'BFP PENSION',
-                      'BFP STP',
-                      'NAPOLCOM',
-                      'PNP PENSION',
-                    ]
-                        .map((type) => DropdownMenuItem(value: type, child: Text(type, style: TextStyle(fontSize: 12))))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        HapticUtils.lightImpact();
-                        setState(() => _productType = value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Pension Type',
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _pensionType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                    ),
-                    items: const [
-                      'PNP - RETIREE OPTIONAL',
-                      'PNP - RETIREE COMPULSORY',
-                      'PNP - RETIREE',
-                      'BFP - RETIREE',
-                      'BFP STP - RETIREE',
-                      'PNP - TRANSFEREE',
-                      'BFP - SURVIVOR',
-                      'PNP - SURVIVOR',
-                      'PNP - TPPD',
-                      'BFP - TPPD',
-                      'PNP - MINOR',
-                      'BFP - MINOR',
-                      'PNP - POSTHUMOUS MINOR',
-                      'PNP - POSTHUMOUS SPOUSE',
-                      'OTHERS',
-                    ]
-                        .map((type) => DropdownMenuItem(value: type, child: Text(type, style: TextStyle(fontSize: 12))))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        HapticUtils.lightImpact();
-                        setState(() => _pensionType = value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _marketType,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Market Type',
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          ),
-          items: const [
-            'VIRGIN',
-            'EXISTING',
-            'FULLY PAID',
-          ]
-              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-              .toList(),
-          onChanged: (value) {
-            if (value != null) {
-              HapticUtils.lightImpact();
-              setState(() => _marketType = value);
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _loanType,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Loan Type',
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          ),
-          items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
-              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-              .toList(),
-          onChanged: (value) {
-            if (value != null) {
-              HapticUtils.lightImpact();
-              setState(() => _loanType = value);
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _panController,
-          decoration: const InputDecoration(
-            labelText: 'PAN',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNotesSection(ColorScheme colorScheme) {
-    if (!_expandedSections['notes']!) return const SizedBox.shrink();
-
-    return TextFormField(
-      controller: _remarksController,
-      decoration: const InputDecoration(
-        labelText: 'Remarks',
-        hintText: 'Additional notes about this client...',
-        border: OutlineInputBorder(),
-      ),
-      maxLines: 4,
     );
   }
 }
