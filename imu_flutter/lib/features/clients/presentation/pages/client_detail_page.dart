@@ -1303,6 +1303,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                         _buildBadge(client.clientType.name, _getClientTypeColor(client.clientType)),
                         if (client.productTypeDisplay.isNotEmpty)
                           _buildBadge(client.productTypeDisplay, _getProductTypeColor(client.productType)),
+                        if (client.pensionType != PensionType.others && client.pensionTypeDisplay.isNotEmpty)
+                          _buildBadge(client.pensionTypeDisplay, _getPensionTypeColor(client.pensionType)),
                         if (client.isStarred)
                           const Icon(Icons.star, size: 16, color: Colors.amber),
                       ],
@@ -1528,6 +1530,35 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         return Colors.purple;
       case ProductType.bfpStp:
         return Colors.teal;
+    }
+  }
+
+  Color _getPensionTypeColor(PensionType type) {
+    switch (type) {
+      case PensionType.pnpRetireeOptional:
+      case PensionType.pnpRetireeCompulsory:
+      case PensionType.pnpRetiree:
+        return const Color(0xFF0D47A1);
+      case PensionType.bfpRetiree:
+      case PensionType.bfpStpRetiree:
+        return const Color(0xFFB71C1C);
+      case PensionType.pnpTransferree:
+        return const Color(0xFF1565C0);
+      case PensionType.bfpSurvivor:
+        return const Color(0xFFC62828);
+      case PensionType.pnpSurvivor:
+        return const Color(0xFF1976D2);
+      case PensionType.pnpTppd:
+      case PensionType.bfpTppd:
+        return const Color(0xFF6A1B9A);
+      case PensionType.pnpMinor:
+      case PensionType.pnpPosthumousMinor:
+      case PensionType.pnpPosthumousSpouse:
+        return const Color(0xFF1E88E5);
+      case PensionType.bfpMinor:
+        return const Color(0xFFE53935);
+      case PensionType.others:
+        return Colors.grey;
     }
   }
 

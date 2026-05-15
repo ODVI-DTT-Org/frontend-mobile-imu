@@ -6,12 +6,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
-import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/missed_visit_model.dart';
 import '../../../../services/sync/powersync_service.dart';
+import '../../../../services/api/missed_visits_api_service.dart';
+import '../../../../shared/providers/app_providers.dart';
 
-import '../../../../features/clients/data/models/client_model.dart';
 class MissedVisitsPage extends ConsumerStatefulWidget {
   const MissedVisitsPage({super.key});
 
@@ -20,15 +20,100 @@ class MissedVisitsPage extends ConsumerStatefulWidget {
 }
 
 class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
+  final _scrollController = ScrollController();
+
+  List<MissedVisit> _items = [];
+  Map<MissedVisitPriority, int> _counts = {};
+  MissedVisitPriority? _selectedFilter;
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoading = false;
+  bool _isInitialLoad = true;
+  int _total = 0;
+
+  static const _limit = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    _fetchPage(reset: true);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        _hasMore &&
+        !_isLoading) {
+      _fetchPage();
+    }
+  }
+
+  Future<void> _fetchPage({bool reset = false}) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    final nextPage = reset ? 1 : _page + 1;
+    try {
+      final api = ref.read(missedVisitsApiServiceProvider);
+      final response = await api.fetchMissedVisits(
+        page: nextPage,
+        limit: _limit,
+        priority: _selectedFilter,
+      );
+
+      if (mounted) {
+        setState(() {
+          if (reset) {
+            _items = response.items;
+          } else {
+            _items = [..._items, ...response.items];
+          }
+          _page = response.page;
+          _hasMore = response.hasMore;
+          _total = response.total;
+          _counts = response.counts;
+          _isLoading = false;
+          _isInitialLoad = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialLoad = false;
+        });
+        AppNotification.showError(context, 'Failed to load missed visits');
+      }
+    }
+  }
+
+  void _setFilter(MissedVisitPriority? filter) {
+    if (_selectedFilter == filter) return;
+    HapticUtils.lightImpact();
+    setState(() {
+      _selectedFilter = filter;
+      _items = [];
+      _page = 1;
+      _hasMore = true;
+      _isInitialLoad = true;
+    });
+    _fetchPage(reset: true);
+  }
+
+  int get _allCount =>
+      (_counts[MissedVisitPriority.high] ?? 0) +
+      (_counts[MissedVisitPriority.medium] ?? 0) +
+      (_counts[MissedVisitPriority.low] ?? 0);
+
   @override
   Widget build(BuildContext context) {
-    final missedVisits = ref.watch(filteredMissedVisitsProvider);
-    final allMissedVisits = ref.watch(missedVisitsProvider);
-    final selectedFilter = ref.watch(missedVisitsFilterProvider);
-    final counts = ref.watch(missedVisitsCountProvider);
-    final streamAsync = ref.watch(missedItinerariesStreamProvider);
-    final isLoading = streamAsync.isLoading;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -36,11 +121,11 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
           icon: const Icon(LucideIcons.arrowLeft),
           onPressed: () => context.go('/home'),
         ),
-        title: Text('Missed Visits (${allMissedVisits.length})'),
+        title: Text('Missed Visits ($_total)'),
       ),
       body: Column(
         children: [
-          // Filter Chips
+          // Filter chips
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -55,45 +140,33 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
                 children: [
                   _FilterChip(
                     label: 'All',
-                    count: allMissedVisits.length,
-                    isSelected: selectedFilter == null,
-                    onTap: () {
-                      HapticUtils.lightImpact();
-                      ref.read(missedVisitsFilterProvider.notifier).state = null;
-                    },
+                    count: _allCount,
+                    isSelected: _selectedFilter == null,
+                    onTap: () => _setFilter(null),
                   ),
                   const SizedBox(width: 8),
                   _FilterChip(
                     label: 'High',
-                    count: counts[MissedVisitPriority.high] ?? 0,
-                    isSelected: selectedFilter == MissedVisitPriority.high,
+                    count: _counts[MissedVisitPriority.high] ?? 0,
+                    isSelected: _selectedFilter == MissedVisitPriority.high,
                     color: const Color(0xFFEF4444),
-                    onTap: () {
-                      HapticUtils.lightImpact();
-                      ref.read(missedVisitsFilterProvider.notifier).state = MissedVisitPriority.high;
-                    },
+                    onTap: () => _setFilter(MissedVisitPriority.high),
                   ),
                   const SizedBox(width: 8),
                   _FilterChip(
                     label: 'Medium',
-                    count: counts[MissedVisitPriority.medium] ?? 0,
-                    isSelected: selectedFilter == MissedVisitPriority.medium,
+                    count: _counts[MissedVisitPriority.medium] ?? 0,
+                    isSelected: _selectedFilter == MissedVisitPriority.medium,
                     color: const Color(0xFFF59E0B),
-                    onTap: () {
-                      HapticUtils.lightImpact();
-                      ref.read(missedVisitsFilterProvider.notifier).state = MissedVisitPriority.medium;
-                    },
+                    onTap: () => _setFilter(MissedVisitPriority.medium),
                   ),
                   const SizedBox(width: 8),
                   _FilterChip(
                     label: 'Low',
-                    count: counts[MissedVisitPriority.low] ?? 0,
-                    isSelected: selectedFilter == MissedVisitPriority.low,
+                    count: _counts[MissedVisitPriority.low] ?? 0,
+                    isSelected: _selectedFilter == MissedVisitPriority.low,
                     color: const Color(0xFF3B82F6),
-                    onTap: () {
-                      HapticUtils.lightImpact();
-                      ref.read(missedVisitsFilterProvider.notifier).state = MissedVisitPriority.low;
-                    },
+                    onTap: () => _setFilter(MissedVisitPriority.low),
                   ),
                 ],
               ),
@@ -102,20 +175,30 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
 
           // List
           Expanded(
-            child: isLoading
+            child: _isInitialLoad
                 ? _buildSkeleton()
-                : missedVisits.isEmpty
+                : _items.isEmpty
                     ? _EmptyState()
-                    : ListView.builder(
-                        itemCount: missedVisits.length,
-                        itemBuilder: (context, index) {
-                          return _MissedVisitCard(
-                            missedVisit: missedVisits[index],
-                            onCall: () => _handleCall(missedVisits[index]),
-                            onReschedule: () => _handleReschedule(missedVisits[index]),
-                            onTap: () => _handleTap(missedVisits[index]),
-                          );
-                        },
+                    : RefreshIndicator(
+                        onRefresh: () => _fetchPage(reset: true),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          itemCount: _items.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _items.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            return _MissedVisitCard(
+                              missedVisit: _items[index],
+                              onCall: () => _handleCall(_items[index]),
+                              onReschedule: () => _handleReschedule(_items[index]),
+                              onTap: () => _handleTap(_items[index]),
+                            );
+                          },
+                        ),
                       ),
           ),
         ],
@@ -201,7 +284,6 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
 
             if (visit.source == MissedVisitSource.missedItinerary &&
                 visit.itineraryId != null) {
-              // Cancel the existing missed itinerary and insert a new one atomically
               await db.writeTransaction((tx) async {
                 await tx.execute(
                   'UPDATE itineraries SET status = ?, updated_at = ? WHERE id = ?',
@@ -213,7 +295,6 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
                 );
               });
             } else {
-              // Overdue client — just schedule a new itinerary
               await db.execute(
                 'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [newId, userId, visit.clientId, dateStr, 'pending', now, now],
@@ -232,6 +313,8 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
             context,
             'Rescheduled ${visit.clientName} to ${_formatDate(date)}',
           );
+          // Refresh the list to reflect the rescheduled item being removed
+          _fetchPage(reset: true);
         }
       }
     });
