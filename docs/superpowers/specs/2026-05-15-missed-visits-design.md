@@ -31,7 +31,7 @@ PowerSync (reactive stream)
   └─ itineraries WHERE scheduled_date < today
       AND status IN ('pending', 'in_progress')
       AND user_id = currentUser
-  → MissedVisit(source: missedItinerary)
+  → raw rows enriched from Hive cache → MissedVisit(source: missedItinerary)
 
 Hive cache (API-backed, all assigned clients — not paginated)
   └─ clients WHERE last_touchpoint_or_enrolled > 7 days ago
@@ -44,6 +44,10 @@ Hive cache (API-backed, all assigned clients — not paginated)
 Both merged → missedVisitsProvider → filtered/counted → UI
 ```
 
+### PowerSync schema notes
+
+The `clients` table IS synced by PowerSync and includes `first_name`, `last_name`, `middle_name`, `phone`, and `loan_released`. However, `next_touchpoint`, `touchpoint_number`, and `touchpoint_summary` are **not** in the PowerSync schema — they only exist in the Hive cache. The SQL JOIN is therefore limited to available fields; touchpoint-specific data is enriched from Hive in the provider layer.
+
 ---
 
 ## Data Layer
@@ -54,10 +58,9 @@ Both merged → missedVisitsProvider → filtered/counted → UI
 Stream<List<Map<String, dynamic>>> watchMissedItineraries(String userId) {
   return PowerSyncService.database.asStream().asyncExpand((db) =>
     db.watch('''
-      SELECT i.id, i.client_id, i.scheduled_date, i.status,
+      SELECT i.id, i.client_id, i.scheduled_date, i.status, i.created_at,
              c.first_name, c.last_name, c.middle_name,
-             c.next_touchpoint, c.touchpoint_number,
-             c.touchpoint_summary, c.loan_released, c.phone
+             c.phone, c.loan_released
       FROM itineraries i
       LEFT JOIN clients c ON c.id = i.client_id
       WHERE i.user_id = ?
@@ -71,22 +74,23 @@ Stream<List<Map<String, dynamic>>> watchMissedItineraries(String userId) {
 
 Reactive: entries disappear automatically when an itinerary is completed or cancelled.
 
+Touchpoint enrichment (`touchpointNumber`, `touchpointType`) is done in the provider by looking up each `client_id` in the Hive cache. If the client is not found in Hive, use `touchpointNumber = 1` and `touchpointType = TouchpointType.visit` as safe defaults.
+
 ### Overdue client computation
 
 Read directly from `HiveService().getAllClients()` filtered through `filterAssignedClientCache()` — all clients, not the paginated `assignedClientsProvider`.
 
-Before iterating clients, fetch two Sets in a single bulk query each:
+Before iterating clients, fetch one Set via a bulk query:
 
 ```sql
--- Set A: client IDs already covered by a missed itinerary (from missedItinerariesStreamProvider)
--- (built from the stream's current value, no extra query needed)
-
 -- Set B: client IDs that already have a future pending itinerary
 SELECT DISTINCT client_id FROM itineraries
 WHERE user_id = ?
   AND DATE(scheduled_date) >= DATE('now', 'localtime')
   AND status IN ('pending', 'in_progress')
 ```
+
+Set A (client IDs covered by missed itineraries) comes from the stream's current value — no extra query needed.
 
 Then for each client:
 
@@ -95,7 +99,7 @@ Then for each client:
 3. Skip if `client.id` is in Set A (already a missed itinerary entry)
 4. Skip if `client.id` is in Set B (future itinerary already scheduled)
 5. Compute `lastActivity`:
-   - `touchpointSummary.isNotEmpty` → last entry's `date`
+   - `touchpointSummary.isNotEmpty` → use `.reduce((a, b) => a.date.isAfter(b.date) ? a : b).date` (not `.last` — list order is not guaranteed)
    - Otherwise → `client.createdAt`
 6. Skip if `DateTime.now().difference(lastActivity).inDays <= 7`
 
@@ -123,11 +127,23 @@ Replace the current single `missedVisitsProvider` with:
 
 | Provider | Type | Source |
 |---|---|---|
-| `missedItinerariesStreamProvider` | `StreamProvider` | PowerSync `watchMissedItineraries()` |
-| `overdueClientsProvider` | `Provider` | Full Hive cache |
-| `missedVisitsProvider` | `Provider` | Merges both, deduplicates by `clientId` |
+| `missedItinerariesStreamProvider` | `StreamProvider<List<Map<String, dynamic>>>` | PowerSync `watchMissedItineraries()` |
+| `overdueClientsProvider` | `Provider<List<MissedVisit>>` | Full Hive cache + future itinerary exclusion set |
+| `missedVisitsProvider` | `Provider<List<MissedVisit>>` | Merges both, deduplicates by `clientId` |
 | `filteredMissedVisitsProvider` | `Provider` | Priority chip filter — unchanged |
 | `missedVisitsCountProvider` | `Provider` | Counts per priority — unchanged |
+
+### Reactivity design
+
+`missedItinerariesStreamProvider` is a `StreamProvider` — Riverpod rebuilds its dependents on every new stream event (automatic).
+
+`overdueClientsProvider` reads from Hive, which is not a reactive stream. It must also `ref.watch(syncServiceProvider)` so that a sync-status change (e.g. sync completion) triggers a recompute. This is the same pattern used by `assignedClientsProvider`.
+
+`missedVisitsProvider` is a plain `Provider` that:
+1. Reads `missedItinerariesStreamProvider` via `ref.watch(...).valueOrNull ?? []`
+2. Reads `overdueClientsProvider` via `ref.watch(...)`
+3. Deduplicates by `clientId` (itinerary entries win)
+4. Sorts: high priority first, then by `daysOverdue` descending
 
 ---
 
@@ -137,8 +153,20 @@ Current bug: inserts with status `'scheduled'` (not a valid enum value) and neve
 
 **New behaviour:**
 
-- **`source == missedItinerary`**: cancel the existing record (`UPDATE itineraries SET status = 'cancelled'`), then insert a new one with `status = 'pending'` for the chosen date.
-- **`source == overdueClient`**: insert a new itinerary with `status = 'pending'`. No old record to cancel.
+- **`source == missedItinerary`**: cancel the existing record, then insert a new one for the chosen date — wrapped in `db.writeTransaction()` for atomicity:
+  ```dart
+  await db.writeTransaction(() async {
+    await db.execute(
+      'UPDATE itineraries SET status = ?, updated_at = ? WHERE id = ?',
+      ['cancelled', now, visit.itineraryId],
+    );
+    await db.execute(
+      'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [uuid, userId, visit.clientId, dateStr, 'pending', now, now],
+    );
+  });
+  ```
+- **`source == overdueClient`**: insert a new itinerary with `status = 'pending'`. No old record to cancel — no transaction needed.
 
 Both use PowerSync `db.execute()` for automatic sync.
 
