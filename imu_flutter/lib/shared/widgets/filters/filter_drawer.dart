@@ -105,13 +105,19 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
                         showOthers: false,
                       ),
                       const SizedBox(height: 20),
-                      // 3. Date Range (paired with visit status)
+                      // 3. Recently Visited
+                      _RecentlyVisitedSection(
+                        draftFilter: _draftAttrs,
+                        onChanged: (f) => setState(() => _draftAttrs = f),
+                      ),
+                      const SizedBox(height: 20),
+                      // 4. Date Range (paired with visit status)
                       DateRangeSection(
                         draftFilter: _draftAttrs,
                         onChanged: (f) => setState(() => _draftAttrs = f),
                       ),
                       const SizedBox(height: 20),
-                      // 4. Other attributes — Client Type, Market Type, Pension Type, Product Type, Loan Type
+                      // 5. Other attributes — Client Type, Market Type, Pension Type, Product Type, Loan Type
                       optionsAsync.when(
                         data: (options) => AttributeChipsSection(
                           draftFilter: _draftAttrs,
@@ -164,6 +170,72 @@ class _FilterDrawerState extends ConsumerState<FilterDrawer> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RecentlyVisitedSection extends StatelessWidget {
+  final ClientAttributeFilter draftFilter;
+  final void Function(ClientAttributeFilter) onChanged;
+
+  const _RecentlyVisitedSection({
+    required this.draftFilter,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = draftFilter.recentlyVisitedDays;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Recently Visited',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [7, 14, 30].map((days) {
+            final isSelected = selected == days;
+            return GestureDetector(
+              onTap: () => onChanged(
+                draftFilter.copyWith(
+                  recentlyVisitedDays: isSelected ? null : days,
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey[350]!,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Last $days days',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

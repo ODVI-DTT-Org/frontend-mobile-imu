@@ -104,6 +104,14 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
     ),);
   }
 
+  void setRecentlyVisited(int days) {
+    updateFilter(state.copyWith(recentlyVisitedDays: days));
+  }
+
+  void clearRecentlyVisited() {
+    updateFilter(state.copyWith(recentlyVisitedDays: null));
+  }
+
   void clear() {
     state = const ClientAttributeFilter(
       touchpointReasons: null,

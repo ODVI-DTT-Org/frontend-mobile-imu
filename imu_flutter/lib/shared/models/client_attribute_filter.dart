@@ -12,6 +12,7 @@ class ClientAttributeFilter {
   final List<String>? touchpointReasons;
   final DateTime? touchpointDateFrom;
   final DateTime? touchpointDateTo;
+  final int? recentlyVisitedDays;
 
   const ClientAttributeFilter({
     this.clientTypes,
@@ -23,6 +24,7 @@ class ClientAttributeFilter {
     this.touchpointReasons,
     this.touchpointDateFrom,
     this.touchpointDateTo,
+    this.recentlyVisitedDays,
   });
 
   bool get hasFilter =>
@@ -34,7 +36,8 @@ class ClientAttributeFilter {
       (touchpointStatuses?.isNotEmpty ?? false) ||
       (touchpointReasons?.isNotEmpty ?? false) ||
       (touchpointDateFrom != null) ||
-      (touchpointDateTo != null);
+      (touchpointDateTo != null) ||
+      (recentlyVisitedDays != null);
 
   int get activeFilterCount {
     return (clientTypes?.length ?? 0) +
@@ -44,7 +47,8 @@ class ClientAttributeFilter {
         (loanTypes?.length ?? 0) +
         (touchpointStatuses?.length ?? 0) +
         (touchpointReasons?.length ?? 0) +
-        ((touchpointDateFrom != null || touchpointDateTo != null) ? 1 : 0);
+        ((touchpointDateFrom != null || touchpointDateTo != null) ? 1 : 0) +
+        (recentlyVisitedDays != null ? 1 : 0);
   }
 
   static ClientAttributeFilter none() => const ClientAttributeFilter(
@@ -118,6 +122,14 @@ class ClientAttributeFilter {
       });
       if (!hasMatch) return false;
     }
+    if (recentlyVisitedDays != null) {
+      final cutoff = DateTime.now().subtract(Duration(days: recentlyVisitedDays!));
+      final source = client.touchpointSummary.isNotEmpty
+          ? client.touchpointSummary
+          : client.touchpoints;
+      if (source.isEmpty) return false;
+      if (!source.any((tp) => !tp.date.isBefore(cutoff))) return false;
+    }
     return true;
   }
 
@@ -161,6 +173,9 @@ class ClientAttributeFilter {
     if (touchpointDateTo != null) {
       params['touchpoint_date_to'] = DateFormat('yyyy-MM-dd').format(touchpointDateTo!);
     }
+    if (recentlyVisitedDays != null) {
+      params['recently_visited_days'] = recentlyVisitedDays!.toString();
+    }
     return params;
   }
 
@@ -176,6 +191,7 @@ class ClientAttributeFilter {
     Object? touchpointReasons = _absent,
     Object? touchpointDateFrom = _absent,
     Object? touchpointDateTo = _absent,
+    Object? recentlyVisitedDays = _absent,
   }) {
     return ClientAttributeFilter(
       clientTypes: identical(clientTypes, _absent) ? this.clientTypes : clientTypes as List<String>?,
@@ -187,6 +203,7 @@ class ClientAttributeFilter {
       touchpointReasons: identical(touchpointReasons, _absent) ? this.touchpointReasons : touchpointReasons as List<String>?,
       touchpointDateFrom: identical(touchpointDateFrom, _absent) ? this.touchpointDateFrom : touchpointDateFrom as DateTime?,
       touchpointDateTo: identical(touchpointDateTo, _absent) ? this.touchpointDateTo : touchpointDateTo as DateTime?,
+      recentlyVisitedDays: identical(recentlyVisitedDays, _absent) ? this.recentlyVisitedDays : recentlyVisitedDays as int?,
     );
   }
 
@@ -203,7 +220,8 @@ class ClientAttributeFilter {
         listEq.equals(other.touchpointStatuses, touchpointStatuses) &&
         listEq.equals(other.touchpointReasons, touchpointReasons) &&
         other.touchpointDateFrom == touchpointDateFrom &&
-        other.touchpointDateTo == touchpointDateTo;
+        other.touchpointDateTo == touchpointDateTo &&
+        other.recentlyVisitedDays == recentlyVisitedDays;
   }
 
   @override
@@ -217,6 +235,7 @@ class ClientAttributeFilter {
         Object.hashAll(touchpointReasons ?? []),
         touchpointDateFrom,
         touchpointDateTo,
+        recentlyVisitedDays,
       );
 
   @override
@@ -224,5 +243,6 @@ class ClientAttributeFilter {
       'ClientAttributeFilter(clientTypes: $clientTypes, marketTypes: $marketTypes, '
       'pensionTypes: $pensionTypes, productTypes: $productTypes, loanTypes: $loanTypes, '
       'touchpointStatuses: $touchpointStatuses, touchpointReasons: $touchpointReasons, '
-      'touchpointDateFrom: $touchpointDateFrom, touchpointDateTo: $touchpointDateTo)';
+      'touchpointDateFrom: $touchpointDateFrom, touchpointDateTo: $touchpointDateTo, '
+      'recentlyVisitedDays: $recentlyVisitedDays)';
 }

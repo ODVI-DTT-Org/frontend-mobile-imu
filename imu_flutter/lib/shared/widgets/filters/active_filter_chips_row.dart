@@ -64,6 +64,17 @@ class ActiveFilterChipsRow extends ConsumerWidget {
       ),);
     }
 
+    // Recently visited chip
+    if (attrs.recentlyVisitedDays != null) {
+      chips.add(_ActiveChip(
+        label: 'Visited last ${attrs.recentlyVisitedDays}d',
+        icon: LucideIcons.clock,
+        onRemove: () {
+          ref.read(clientAttributeFilterProvider.notifier).clearRecentlyVisited();
+        },
+      ),);
+    }
+
     // Date range chip
     if (attrs.touchpointDateFrom != null || attrs.touchpointDateTo != null) {
       chips.add(_ActiveChip(

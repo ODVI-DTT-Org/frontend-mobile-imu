@@ -236,16 +236,40 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         if (firstName.isNotEmpty && lastName.isNotEmpty) {
           final db = await PowerSyncService.database;
           final matches = await db.getAll(
-            'SELECT id FROM clients WHERE LOWER(first_name) = ? AND LOWER(last_name) = ? LIMIT 1',
+            'SELECT id, first_name, last_name FROM clients WHERE LOWER(first_name) = ? AND LOWER(last_name) = ?',
             [firstName, lastName],
           );
           if (matches.isNotEmpty && mounted) {
-            final confirmed = await showDialog<bool>(
+            final result = await showDialog<dynamic>(
               context: context,
               builder: (ctx) => AlertDialog(
                 title: const Text('Possible Duplicate'),
-                content: Text(
-                  'A client named "${newClient.firstName} ${newClient.lastName}" already exists. Are you sure this is a different person?',
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'A client named "${newClient.firstName} ${newClient.lastName}" already exists. Are you sure this is a different person?',
+                    ),
+                    const SizedBox(height: 12),
+                    ...matches.map((m) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${m['first_name']} ${m['last_name']}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(m['id'] as String),
+                            child: const Text('View Details'),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
                 ),
                 actions: [
                   TextButton(
@@ -259,7 +283,12 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                 ],
               ),
             );
-            if (confirmed != true) {
+            if (result is String) {
+              setState(() => _isSaving = false);
+              if (mounted) context.push('/clients/$result');
+              return;
+            }
+            if (result != true) {
               setState(() => _isSaving = false);
               return;
             }
