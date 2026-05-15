@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import 'services/quick_actions/quick_actions_service.dart';
 // import 'services/auth/session_service.dart';
 import 'shared/widgets/loading_widget.dart';
 import 'shared/providers/app_providers.dart';
+import 'services/geofencing/geofencing_service.dart';
 
 class IMUApp extends ConsumerStatefulWidget {
   const IMUApp({super.key});
@@ -30,12 +33,25 @@ class _IMUAppState extends ConsumerState<IMUApp> with WidgetsBindingObserver {
     _initializeQuickActions();
     // _startSessionMonitoring(); // SESSION MONITORING DISABLED
     _initializeBackgroundSync();
+    _initializeGeofencing();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _initializeGeofencing() {
+    if (kIsWeb || !Platform.isAndroid) return;
+    // Reading the FutureProvider kicks off GeofencingService.init().
+    // The provider is anchored to the root ProviderScope so the service
+    // stays alive for the full app lifetime.
+    ref.read(geofencingServiceProvider.future).then((_) {
+      debugPrint('IMUApp: GeofencingService started');
+    }).catchError((Object e) {
+      debugPrint('IMUApp: GeofencingService init skipped: $e');
+    });
   }
 
   /// Initialize background sync service
