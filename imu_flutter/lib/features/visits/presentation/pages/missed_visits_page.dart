@@ -8,6 +8,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../data/models/missed_visit_model.dart';
+import '../../../../features/clients/data/models/client_model.dart' show TouchpointType;
 import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/api/missed_visits_api_service.dart';
 import '../../../../shared/providers/app_providers.dart';
