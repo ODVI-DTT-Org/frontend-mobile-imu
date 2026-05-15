@@ -46,7 +46,7 @@ Both merged → missedVisitsProvider → filtered/counted → UI
 
 ### PowerSync schema notes
 
-The `clients` table IS synced by PowerSync and includes `first_name`, `last_name`, `middle_name`, `phone`, and `loan_released`. However, `next_touchpoint`, `touchpoint_number`, and `touchpoint_summary` are **not** in the PowerSync schema — they only exist in the Hive cache. The SQL JOIN is therefore limited to available fields; touchpoint-specific data is enriched from Hive in the provider layer.
+The ACTIVE schema (inline in `powersync_service.dart`, not the stale `powersync_schema_v2.dart`) includes all needed fields on `clients`: `first_name`, `last_name`, `middle_name`, `phone`, `loan_released`, `touchpoint_number` (integer), `next_touchpoint` (text), and `touchpoint_summary` (text — JSON array). The full JOIN query works without any Hive enrichment for Set A.
 
 ---
 
@@ -60,7 +60,8 @@ Stream<List<Map<String, dynamic>>> watchMissedItineraries(String userId) {
     db.watch('''
       SELECT i.id, i.client_id, i.scheduled_date, i.status, i.created_at,
              c.first_name, c.last_name, c.middle_name,
-             c.phone, c.loan_released
+             c.next_touchpoint, c.touchpoint_number,
+             c.loan_released, c.phone
       FROM itineraries i
       LEFT JOIN clients c ON c.id = i.client_id
       WHERE i.user_id = ?
@@ -72,9 +73,7 @@ Stream<List<Map<String, dynamic>>> watchMissedItineraries(String userId) {
 }
 ```
 
-Reactive: entries disappear automatically when an itinerary is completed or cancelled.
-
-Touchpoint enrichment (`touchpointNumber`, `touchpointType`) is done in the provider by looking up each `client_id` in the Hive cache. If the client is not found in Hive, use `touchpointNumber = 1` and `touchpointType = TouchpointType.visit` as safe defaults.
+Reactive: entries disappear automatically when an itinerary is completed or cancelled. No Hive enrichment needed for Set A — all required fields are available in the PowerSync SQLite JOIN.
 
 ### Overdue client computation
 
