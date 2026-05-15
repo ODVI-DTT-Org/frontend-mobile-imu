@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'services/quick_actions/quick_actions_service.dart';
+import 'services/geofencing/geofencing_service.dart';
 // SESSION/PIN MONITORING DISABLED - Commenting out to focus on core authentication
 // import 'services/auth/session_service.dart';
 import 'shared/widgets/loading_widget.dart';
@@ -30,6 +33,7 @@ class _IMUAppState extends ConsumerState<IMUApp> with WidgetsBindingObserver {
     _initializeQuickActions();
     // _startSessionMonitoring(); // SESSION MONITORING DISABLED
     _initializeBackgroundSync();
+    _initializeGeofencing();
   }
 
   @override
@@ -123,6 +127,21 @@ class _IMUAppState extends ConsumerState<IMUApp> with WidgetsBindingObserver {
   //     });
   //   }
   // }
+
+  void _initializeGeofencing() {
+    // Android-only, foreground-only proximity notifications
+    if (kIsWeb || !Platform.isAndroid) return;
+
+    Future.microtask(() async {
+      try {
+        final service = ref.read(geofencingServiceProvider);
+        await service.init();
+        debugPrint('IMUApp: GeofencingService initialized');
+      } catch (e) {
+        debugPrint('IMUApp: GeofencingService init failed: $e');
+      }
+    });
+  }
 
   Future<void> _initializeQuickActions() async {
     try {
