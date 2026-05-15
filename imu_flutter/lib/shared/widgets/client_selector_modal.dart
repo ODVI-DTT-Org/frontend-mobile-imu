@@ -9,6 +9,7 @@ import '../../core/utils/debounce_utils.dart';
 import '../../core/models/user_role.dart';
 import '../../features/clients/data/models/client_model.dart' show Client;
 import '../../features/itineraries/data/repositories/itinerary_repository.dart';
+import '../../services/sync/powersync_service.dart';
 import '../../services/api/api_exception.dart';
 import '../../services/api/client_api_service.dart' show ClientsResponse;
 import '../../services/local_storage/hive_service.dart';
@@ -97,6 +98,7 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   Set<String> _addingClientIds = {};
   Set<String> _addedClientIds = {};
   Set<String> _scheduledClientIds = {};
+  StreamSubscription? _scheduledIdsSubscription;
 
   // Pagination state
   final int _itemsPerPage = 10;
@@ -106,14 +108,39 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    Future.microtask(_loadScheduledClientIds);
+    _startWatchingScheduledIds();
   }
 
   @override
   void dispose() {
+    _scheduledIdsSubscription?.cancel();
     _searchController.dispose();
     _searchDebounce.dispose();
     super.dispose();
+  }
+
+  // Bug 10 fix: use db.watch() so _scheduledClientIds updates reactively
+  // when itinerary rows are removed/completed, instead of a one-shot microtask.
+  void _startWatchingScheduledIds() {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    final date = widget.selectedDate;
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+    _scheduledIdsSubscription = PowerSyncService.database.asStream()
+        .asyncExpand((db) => db.watch(
+              "SELECT client_id FROM itineraries WHERE user_id = ? AND DATE(scheduled_date) = ? AND status IN ('pending', 'in_progress')",
+              parameters: [userId, dateStr],
+            ))
+        .listen((rows) {
+      if (!mounted) return;
+      setState(() {
+        _scheduledClientIds = rows.map((r) => r['client_id'] as String).toSet();
+      });
+    }, onError: (_) {
+      if (!mounted) return;
+      setState(() => _scheduledClientIds = {});
+    });
   }
 
   void _onSearchChanged() {
@@ -207,24 +234,6 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     _applyClientFilter();
   }
 
-  Future<void> _loadScheduledClientIds() async {
-    final userId = ref.read(currentUserIdProvider);
-    if (userId == null) return;
-
-    try {
-      final repo = ref.read(itineraryRepositoryProvider);
-      final scheduledIds = await repo.getClientIdsByDate(userId, widget.selectedDate);
-      if (!mounted) return;
-      setState(() {
-        _scheduledClientIds = scheduledIds;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _scheduledClientIds = {};
-      });
-    }
-  }
 
   int _totalPages(ClientsResponse meta) {
     return meta.totalPages;

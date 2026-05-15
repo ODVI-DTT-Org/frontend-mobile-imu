@@ -349,7 +349,7 @@ class ItineraryRepository {
     try {
       final db = await PowerSyncService.database;
       final rows = await db.getAll(
-        "SELECT client_id FROM itineraries WHERE user_id = ? AND DATE(scheduled_date) = ? AND status != 'cancelled'",
+        "SELECT client_id FROM itineraries WHERE user_id = ? AND DATE(scheduled_date) = ? AND status IN ('pending', 'in_progress')",
         [userId, dateStr],
       );
       return rows.map((r) => r['client_id'] as String).toSet();

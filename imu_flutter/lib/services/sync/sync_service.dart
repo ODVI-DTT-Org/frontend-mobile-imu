@@ -37,6 +37,7 @@ class SyncService extends ChangeNotifier {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   StreamSubscription? _syncStatusSubscription;
+  Timer? _pendingCountTimer;
   SyncStatusEnum _status = SyncStatusEnum.idle;
   DateTime? _lastSyncTime;
   String? _lastSyncError;
@@ -74,6 +75,12 @@ class SyncService extends ChangeNotifier {
     // Update pending count
     await _updatePendingCount();
 
+    // Periodic refresh so the badge clears after PowerSync finishes uploading
+    _pendingCountTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _updatePendingCount(),
+    );
+
     logDebug('SyncService initialized');
   }
 
@@ -100,6 +107,7 @@ class SyncService extends ChangeNotifier {
   void dispose() {
     _connectivitySubscription?.cancel();
     _syncStatusSubscription?.cancel();
+    _pendingCountTimer?.cancel();
     super.dispose();
   }
 
@@ -131,6 +139,9 @@ class SyncService extends ChangeNotifier {
     } else {
       _status = SyncStatusEnum.offline;
     }
+    // Bug 9 fix: refresh pending count whenever PowerSync fires a status event
+    // so the badge clears as soon as uploads complete
+    _updatePendingCount();
     notifyListeners();
   }
 

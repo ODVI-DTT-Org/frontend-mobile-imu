@@ -237,7 +237,7 @@ export function AddClientPage({ onBack, onClientAdded }: AddClientPageProps) {
               <Label htmlFor="clientType">Client Type *</Label>
               <Select value={formData.clientType} onValueChange={(value) => handleInputChange('clientType', value)}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue />
+                  <SelectValue placeholder="Select client type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="POTENTIAL">Potential</SelectItem>

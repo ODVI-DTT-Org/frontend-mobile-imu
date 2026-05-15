@@ -78,68 +78,6 @@ class ActivityRepository {
     }).toList();
   }
 
-  Future<List<ActivityItem>> fetchVisits(DateTime from, DateTime to) async {
-    debugPrint('[ACTIVITY][repo] fetchVisits userId=$userId from=$from to=$to');
-    final pending = await _pendingIds('visits');
-    final rows = await PowerSyncService.query(
-      """
-      SELECT v.id, v.created_at,
-             c.first_name || ' ' || c.last_name AS client_name
-      FROM visits v
-      LEFT JOIN clients c ON c.id = v.client_id
-      WHERE v.user_id = ?
-        AND datetime(v.created_at) BETWEEN datetime(?) AND datetime(?)
-      ORDER BY v.created_at DESC
-      """,
-      [userId, from.toIso8601String(), to.toIso8601String()],
-    );
-
-    debugPrint('[ACTIVITY][repo] fetchVisits — ${rows.length} rows');
-    return rows.map((r) {
-      final id = r['id'] as String;
-      return ActivityItem(
-        id: id,
-        type: ActivityType.visit,
-        subtype: ActivitySubtype.visit,
-        clientName: r['client_name'] as String?,
-        detail: null,
-        status: pending.contains(id) ? ActivityStatus.syncing : ActivityStatus.completed,
-        createdAt: DateTime.parse(r['created_at'] as String),
-      );
-    }).toList();
-  }
-
-  Future<List<ActivityItem>> fetchCalls(DateTime from, DateTime to) async {
-    debugPrint('[ACTIVITY][repo] fetchCalls userId=$userId from=$from to=$to');
-    final pending = await _pendingIds('calls');
-    final rows = await PowerSyncService.query(
-      """
-      SELECT ca.id, ca.created_at,
-             c.first_name || ' ' || c.last_name AS client_name
-      FROM calls ca
-      LEFT JOIN clients c ON c.id = ca.client_id
-      WHERE ca.user_id = ?
-        AND datetime(ca.created_at) BETWEEN datetime(?) AND datetime(?)
-      ORDER BY ca.created_at DESC
-      """,
-      [userId, from.toIso8601String(), to.toIso8601String()],
-    );
-
-    debugPrint('[ACTIVITY][repo] fetchCalls — ${rows.length} rows');
-    return rows.map((r) {
-      final id = r['id'] as String;
-      return ActivityItem(
-        id: id,
-        type: ActivityType.call,
-        subtype: ActivitySubtype.call,
-        clientName: r['client_name'] as String?,
-        detail: null,
-        status: pending.contains(id) ? ActivityStatus.syncing : ActivityStatus.completed,
-        createdAt: DateTime.parse(r['created_at'] as String),
-      );
-    }).toList();
-  }
-
   Future<List<ActivityItem>> fetchApprovals(DateTime from, DateTime to) async {
     debugPrint('[ACTIVITY][repo] fetchApprovals userId=$userId from=$from to=$to');
     final rows = await PowerSyncService.query(
@@ -184,12 +122,6 @@ class ActivityRepository {
     if (typeFilter == null || typeFilter == ActivityType.touchpoint) {
       futures.add(fetchTouchpoints(from, to));
     }
-    if (typeFilter == null || typeFilter == ActivityType.visit) {
-      futures.add(fetchVisits(from, to));
-    }
-    if (typeFilter == null || typeFilter == ActivityType.call) {
-      futures.add(fetchCalls(from, to));
-    }
     if (typeFilter == null || typeFilter == ActivityType.approval) {
       futures.add(fetchApprovals(from, to));
     }
@@ -201,7 +133,7 @@ class ActivityRepository {
   }
 }
 
-final activityRepositoryProvider = Provider<ActivityRepository>((ref) {
+final activityRepositoryProvider = Provider.autoDispose<ActivityRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider) ?? '';
   debugPrint('[ACTIVITY][repo] activityRepositoryProvider — userId="$userId"');
   return ActivityRepository(userId: userId);
