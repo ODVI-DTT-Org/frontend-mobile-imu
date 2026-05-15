@@ -47,6 +47,9 @@ enum TouchpointReason {
 
   static List<TouchpointReason> get visitReasons =>
       values.where((r) => r != TouchpointReason.newReleaseLoan).toList();
+
+  static List<TouchpointReason> get callReasons =>
+      values.where((r) => r != TouchpointReason.newReleaseLoan).toList();
 }
 
 enum TouchpointStatus {

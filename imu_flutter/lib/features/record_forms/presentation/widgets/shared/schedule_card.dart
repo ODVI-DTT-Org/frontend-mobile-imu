@@ -13,6 +13,7 @@ class ScheduleCard extends StatelessWidget {
   final void Function(String) onOdometerArrivalChanged;
   final void Function(String) onOdometerDepartureChanged;
   final bool showErrors;
+  final bool showOdometer;
 
   const ScheduleCard({
     super.key,
@@ -25,6 +26,7 @@ class ScheduleCard extends StatelessWidget {
     required this.onOdometerArrivalChanged,
     required this.onOdometerDepartureChanged,
     required this.showErrors,
+    this.showOdometer = true,
   });
 
   String _formatTime(TimeOfDay t) {
@@ -61,28 +63,30 @@ class ScheduleCard extends StatelessWidget {
               ),
             ),
           ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-              child: _OdometerField(
-                label: 'Odo Arrival',
-                value: odometerArrival,
-                showError:
-                    showErrors && (odometerArrival == null || odometerArrival!.isEmpty),
-                onChanged: onOdometerArrivalChanged,
+          if (showOdometer) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: _OdometerField(
+                  label: 'Odo Arrival',
+                  value: odometerArrival,
+                  showError:
+                      showErrors && (odometerArrival == null || odometerArrival!.isEmpty),
+                  onChanged: onOdometerArrivalChanged,
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _OdometerField(
-                label: 'Odo Departure',
-                value: odometerDeparture,
-                showError:
-                    showErrors && (odometerDeparture == null || odometerDeparture!.isEmpty),
-                onChanged: onOdometerDepartureChanged,
+              const SizedBox(width: 10),
+              Expanded(
+                child: _OdometerField(
+                  label: 'Odo Departure',
+                  value: odometerDeparture,
+                  showError:
+                      showErrors && (odometerDeparture == null || odometerDeparture!.isEmpty),
+                  onChanged: onOdometerDepartureChanged,
+                ),
               ),
-            ),
-          ]),
+            ]),
+          ],
         ],
       ),
     );

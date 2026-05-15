@@ -542,6 +542,7 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
          FROM itineraries i
          LEFT JOIN clients c ON c.id = i.client_id
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
+           AND i.status NOT IN ('cancelled', 'completed')
          ORDER BY datetime(i.created_at) DESC''',
       parameters: [userId, dateStr],
     )) {

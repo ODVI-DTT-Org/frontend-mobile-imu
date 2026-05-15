@@ -39,16 +39,18 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
     // Rebuild when remarks text changes
     useListenable(remarks);
 
+    final isCall = client.nextTouchpointType == TouchpointType.call;
+
     final isFormValid = timeIn.value != null &&
         timeOut.value != null &&
-        (odometerArrival.value?.isNotEmpty ?? false) &&
-        (odometerDeparture.value?.isNotEmpty ?? false) &&
+        (isCall || (odometerArrival.value?.isNotEmpty ?? false)) &&
+        (isCall || (odometerDeparture.value?.isNotEmpty ?? false)) &&
         gpsData.value != null &&
         !gpsFailed.value &&
         reason.value != null &&
         status.value != null &&
         remarks.text.trim().isNotEmpty &&
-        photoPath.value != null;
+        (isCall || photoPath.value != null);
 
     Future<void> handleSubmit() async {
       submitAttempted.value = true;
@@ -143,6 +145,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           timeOut: timeOut.value,
           odometerArrival: odometerArrival.value,
           odometerDeparture: odometerDeparture.value,
+          showOdometer: !isCall,
           showErrors: submitAttempted.value,
           onTimeInChanged: (t) {
             timeIn.value = t;
@@ -169,7 +172,9 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           locked: false,
           reason: reason.value,
           status: status.value,
-          availableReasons: TouchpointReason.visitReasons,
+          availableReasons: isCall
+              ? TouchpointReason.callReasons
+              : TouchpointReason.visitReasons,
           availableStatuses: [
             TouchpointStatus.interested,
             TouchpointStatus.undecided,
@@ -182,11 +187,12 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           showErrors: submitAttempted.value,
         ),
         NotesCard(controller: remarks, showError: submitAttempted.value),
-        PhotoCard(
-          photoPath: photoPath.value,
-          onPhotoTaken: (path) => photoPath.value = path,
-          showError: submitAttempted.value,
-        ),
+        if (!isCall)
+          PhotoCard(
+            photoPath: photoPath.value,
+            onPhotoTaken: (path) => photoPath.value = path,
+            showError: submitAttempted.value,
+          ),
       ],
     );
   }

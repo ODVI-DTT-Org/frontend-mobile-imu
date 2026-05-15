@@ -482,8 +482,8 @@ class PowerSyncService {
   static Future<int> get pendingUploadCount async {
     if (_database == null) return 0;
     try {
-      final batch = await _database!.getCrudBatch();
-      return batch?.crud.length ?? 0;
+      final result = await _database!.get('SELECT COUNT(*) as count FROM ps_crud');
+      return (result['count'] as int?) ?? 0;
     } catch (e) {
       logError('Failed to get pending upload count', e);
       return 0;
