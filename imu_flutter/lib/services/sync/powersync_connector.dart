@@ -267,6 +267,14 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
               options: Options(headers: headers),
             );
           }
+        } else if (op.op == UpdateType.patch) {
+          final visitData = Map<String, dynamic>.from(data)
+            ..remove('_local_photo_path');
+          await _httpClient.put(
+            '$_apiUrl/visits/${op.id}',
+            data: visitData,
+            options: Options(headers: headers),
+          );
         }
 
       case 'calls':
@@ -275,6 +283,12 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
           await _httpClient.post(
             '$_apiUrl/calls',
             data: callData,
+            options: Options(headers: headers),
+          );
+        } else if (op.op == UpdateType.patch) {
+          await _httpClient.put(
+            '$_apiUrl/calls/${op.id}',
+            data: data,
             options: Options(headers: headers),
           );
         } else if (op.op == UpdateType.delete) {
