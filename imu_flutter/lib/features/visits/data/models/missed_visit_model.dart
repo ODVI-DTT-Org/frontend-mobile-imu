@@ -1,5 +1,8 @@
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
+/// Whether this missed visit comes from a PowerSync itinerary or Hive overdue computation
+enum MissedVisitSource { missedItinerary, overdueClient }
+
 /// Represents a missed/overdue client visit
 class MissedVisit {
   final String id;
@@ -11,6 +14,8 @@ class MissedVisit {
   final DateTime createdAt;
   final String? primaryPhone;
   final String? primaryAddress;
+  final MissedVisitSource source;
+  final String? itineraryId;
 
   MissedVisit({
     required this.id,
@@ -22,6 +27,8 @@ class MissedVisit {
     required this.createdAt,
     this.primaryPhone,
     this.primaryAddress,
+    this.source = MissedVisitSource.overdueClient,
+    this.itineraryId,
   });
 
   /// Calculate days overdue
@@ -42,7 +49,6 @@ class MissedVisit {
     if (touchpointNumber >= 1 && touchpointNumber <= ordinals.length) {
       return ordinals[touchpointNumber - 1];
     }
-    // For touchpoints beyond our list, use pattern: 11th, 12th, 13th, etc.
     final lastTwo = touchpointNumber % 100;
     if (lastTwo >= 11 && lastTwo <= 13) return '${touchpointNumber}th';
     switch (touchpointNumber % 10) {
@@ -68,6 +74,8 @@ class MissedVisit {
     'createdAt': createdAt.toIso8601String(),
     'primaryPhone': primaryPhone,
     'primaryAddress': primaryAddress,
+    'source': source.name,
+    'itineraryId': itineraryId,
   };
 
   factory MissedVisit.fromJson(Map<String, dynamic> json) {
@@ -88,6 +96,11 @@ class MissedVisit {
           : DateTime.now(),
       primaryPhone: json['primaryPhone'],
       primaryAddress: json['primaryAddress'],
+      source: MissedVisitSource.values.firstWhere(
+        (e) => e.name == json['source'],
+        orElse: () => MissedVisitSource.overdueClient,
+      ),
+      itineraryId: json['itineraryId'],
     );
   }
 }
