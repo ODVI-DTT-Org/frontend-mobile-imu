@@ -193,16 +193,15 @@ class Client {
 
   /// Display product type - shows raw value if available, otherwise enum value
   String get productTypeDisplay {
-    if (productTypeRaw != null && productTypeRaw!.isNotEmpty) {
-      // Check if raw value matches known enum
-      final rawLower = productTypeRaw!.toLowerCase();
-      final enumMatch = ProductType.values.any((e) => e.name.toLowerCase() == rawLower);
-      if (!enumMatch) {
-        // Raw value is unknown, return it as-is
-        return productTypeRaw!;
-      }
+    if (productTypeRaw == null || productTypeRaw!.isEmpty) return '';
+    final rawLower = productTypeRaw!.toLowerCase();
+    final stripped = rawLower.replaceAll(RegExp(r'[_\s\-]'), '');
+    final enumMatch = ProductType.values.any(
+      (e) => e.name.toLowerCase() == rawLower || e.name.toLowerCase() == stripped,
+    );
+    if (!enumMatch) {
+      return productTypeRaw!.toUpperCase().replaceAll('_', ' ');
     }
-    // Use enum value
     return switch (productType) {
       ProductType.bfpActive => 'BFP ACTIVE',
       ProductType.bfpPension => 'BFP PENSION',

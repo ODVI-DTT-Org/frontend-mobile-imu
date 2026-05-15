@@ -1301,7 +1301,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                       spacing: 6,
                       children: [
                         _buildBadge(client.clientType.name, _getClientTypeColor(client.clientType)),
-                        _buildBadge(client.productType.name, _getProductTypeColor(client.productType)),
+                        if (client.productTypeDisplay.isNotEmpty)
+                          _buildBadge(client.productTypeDisplay, _getProductTypeColor(client.productType)),
                         if (client.isStarred)
                           const Icon(Icons.star, size: 16, color: Colors.amber),
                       ],
