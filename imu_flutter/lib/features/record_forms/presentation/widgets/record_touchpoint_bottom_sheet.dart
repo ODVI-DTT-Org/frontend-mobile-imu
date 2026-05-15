@@ -12,7 +12,8 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/no
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/photo_card.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/unified_action_bottom_sheet.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart'
-    show touchpointCreationServiceProvider;
+    show touchpointCreationServiceProvider, jwtAuthProvider;
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/core/utils/app_notification.dart';
 
 class RecordTouchpointBottomSheet extends HookConsumerWidget {
@@ -66,7 +67,7 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           id: '',
           clientId: client.id!,
           touchpointNumber: client.nextTouchpointNumber ?? (client.touchpointNumber + 1),
-          type: TouchpointType.visit,
+          type: client.nextTouchpointType ?? TouchpointType.visit,
           reason: _cm.TouchpointReason.fromApi(reason.value!.apiValue),
           status: _cm.TouchpointStatus.fromApi(status.value!.apiValue),
           date: now,
@@ -97,6 +98,19 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           longitude: gps.lng,
           address: gps.address,
         );
+
+        // Mark today's itinerary as completed so My Day / Itinerary updates immediately
+        try {
+          final db = await PowerSyncService.database;
+          final userId = ref.read(jwtAuthProvider).currentUser?.id ?? '';
+          if (userId.isNotEmpty) {
+            final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+            await db.execute(
+              'UPDATE itineraries SET status = ?, updated_at = ? WHERE client_id = ? AND user_id = ? AND DATE(scheduled_date) = ? AND status NOT IN (?, ?)',
+              ['completed', now.toIso8601String(), client.id!, userId, dateStr, 'cancelled', 'completed'],
+            );
+          }
+        } catch (_) {}
 
         if (context.mounted) {
           AppNotification.showSuccess(context, 'Touchpoint recorded successfully');

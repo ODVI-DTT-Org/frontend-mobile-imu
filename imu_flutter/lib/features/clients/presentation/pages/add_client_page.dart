@@ -7,6 +7,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
+import '../../../../services/sync/powersync_service.dart';
 import '../../data/models/client_model.dart';
 import '../../../psgc/data/models/psgc_models.dart';
 import '../../../psgc/data/repositories/psgc_repository.dart';
@@ -226,6 +227,45 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
       );
 
       debugPrint('[AddClientPage] Submitting new client');
+
+      // Duplicate check for non-manager roles (caravan/tele) before submitting for approval
+      final role = ref.read(currentUserRoleProvider);
+      if (!role.isManager) {
+        final firstName = newClient.firstName?.toLowerCase() ?? '';
+        final lastName = newClient.lastName?.toLowerCase() ?? '';
+        if (firstName.isNotEmpty && lastName.isNotEmpty) {
+          final db = await PowerSyncService.database;
+          final matches = await db.getAll(
+            'SELECT id FROM clients WHERE LOWER(first_name) = ? AND LOWER(last_name) = ? LIMIT 1',
+            [firstName, lastName],
+          );
+          if (matches.isNotEmpty && mounted) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Possible Duplicate'),
+                content: Text(
+                  'A client named "${newClient.firstName} ${newClient.lastName}" already exists. Are you sure this is a different person?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Submit Anyway'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) {
+              setState(() => _isSaving = false);
+              return;
+            }
+          }
+        }
+      }
 
       final mutationService = ref.read(clientMutationServiceProvider);
       final result = await mutationService.createClient(newClient);

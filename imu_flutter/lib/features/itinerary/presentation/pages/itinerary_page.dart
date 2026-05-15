@@ -1058,8 +1058,14 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
         showToast('Unable to open navigation. Please install Google Maps.');
       }
     } else if (visit.address != null && visit.address!.isNotEmpty) {
-      // Fallback to showing address if no coordinates
-      showToast('Address: ${visit.address}');
+      final mapService = MapService();
+      final success = await mapService.openGoogleMapsNavigationByAddress(
+        visit.address!,
+        label: visit.clientName,
+      );
+      if (!success && mounted) {
+        showToast('Unable to open navigation. Please install Google Maps.');
+      }
     } else {
       showToast('No address or coordinates available for this client.');
     }

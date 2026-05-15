@@ -136,6 +136,13 @@ class ActivityItem {
     }
   }
 
+  bool get isToday {
+    final now = DateTime.now();
+    return createdAt.year == now.year &&
+        createdAt.month == now.month &&
+        createdAt.day == now.day;
+  }
+
   /// Cached formatted time string for display.
   /// Computed once per instance and reused.
   late final String formattedTime = _computeFormattedTime();

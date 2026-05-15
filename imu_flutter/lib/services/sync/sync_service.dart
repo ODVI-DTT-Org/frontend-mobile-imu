@@ -42,6 +42,7 @@ class SyncService extends ChangeNotifier {
   DateTime? _lastSyncTime;
   String? _lastSyncError;
   int _pendingCount = 0;
+  bool _wasUploading = false;
 
   SyncService(this._ref);
 
@@ -143,6 +144,15 @@ class SyncService extends ChangeNotifier {
     // so the badge clears as soon as uploads complete
     _updatePendingCount();
     notifyListeners();
+
+    // Refresh pending count when upload activity ends so the badge clears promptly
+    if (status.connected) {
+      final isUploading = status.uploading;
+      if (_wasUploading && !isUploading) {
+        _updatePendingCount();
+      }
+      _wasUploading = isUploading;
+    }
   }
 
   /// Update pending count

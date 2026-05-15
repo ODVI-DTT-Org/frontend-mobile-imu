@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../app.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/offline_banner.dart';
@@ -38,6 +37,7 @@ import '../../../record_forms/presentation/widgets/record_visit_bottom_sheet.dar
 import '../../../record_forms/presentation/widgets/record_loan_release_bottom_sheet.dart';
 import '../../../touchpoints/presentation/widgets/touchpoint_form.dart';
 import '../../../../services/local_storage/hive_service.dart';
+import '../../../../services/maps/map_service.dart';
 
 class MyDayPage extends ConsumerStatefulWidget {
   const MyDayPage({super.key});
@@ -793,7 +793,7 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
   Future<void> _navigateToClient(MyDayClient client) async {
     HapticUtils.lightImpact();
 
-    final address = client.location;
+    final address = (client.location?.isNotEmpty == true ? client.location : client.address);
     if (address == null || address.isEmpty) {
       if (mounted) {
         showToast('No address available for this client');
@@ -802,23 +802,13 @@ class _MyDayPageState extends ConsumerState<MyDayPage> {
     }
 
     try {
-      // Open Google Maps with the address
-      final Uri mapUri = Uri(
-        scheme: 'https',
-        host: 'www.google.com',
-        path: '/maps/search/',
-        queryParameters: {
-          'api': '1',
-          'query': address,
-        },
+      final mapService = MapService();
+      final success = await mapService.openGoogleMapsNavigationByAddress(
+        address,
+        label: client.fullName,
       );
-
-      if (await canLaunchUrl(mapUri)) {
-        await launchUrl(mapUri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          showToast('Could not open maps application');
-        }
+      if (!success && mounted) {
+        showToast('Could not open maps application');
       }
     } catch (e) {
       if (mounted) {

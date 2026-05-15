@@ -38,6 +38,31 @@ class MapService {
     return false;
   }
 
+  /// Open Google Maps for navigation by address string
+  Future<bool> openGoogleMapsNavigationByAddress(
+    String address, {
+    String? label,
+  }) async {
+    final encodedAddress = Uri.encodeComponent(address);
+
+    final uri = Uri.parse('google.navigation:q=$encodedAddress&mode=d');
+
+    if (await canLaunchUrl(uri)) {
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+
+    // Fallback to web URL
+    final webUri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$encodedAddress',
+    );
+
+    if (await canLaunchUrl(webUri)) {
+      return await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
+
+    return false;
+  }
+
   /// Open Apple Maps (iOS only)
   Future<bool> openAppleMaps({
     required double latitude,

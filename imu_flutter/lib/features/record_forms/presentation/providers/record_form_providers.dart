@@ -7,7 +7,9 @@ import 'package:imu_flutter/services/gps/gps_capture_service.dart';
 import 'package:imu_flutter/services/location/enhanced_location_provider.dart';
 import 'package:imu_flutter/services/api/touchpoint_api_service.dart';
 import 'package:imu_flutter/services/api/my_day_api_service.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart' show Client;
+import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserIdProvider;
 
 // Touchpoint Form State
 class TouchpointFormState {
@@ -174,10 +176,10 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
 
       // Submit to API using completeVisit endpoint
       final myDayApiService = _ref.read(myDayApiServiceProvider);
-      final result = await myDayApiService.completeVisit(
+      await myDayApiService.completeVisit(
         clientId: state.data.client.id!,
         touchpointNumber: state.touchpointNumber!,
-        type: 'Visit',
+        type: state.data.client.nextTouchpointType?.apiValue ?? 'Visit',
         reason: updatedData.reason?.apiValue ?? 'INTERESTED',
         status: updatedData.status?.apiValue,
         address: updatedData.gpsAddress,
@@ -195,6 +197,20 @@ class TouchpointFormNotifier extends StateNotifier<TouchpointFormState> {
         isSubmitting: false,
         successMessage: 'Touchpoint #${state.touchpointNumber} recorded',
       );
+
+      // Mark today's itinerary as completed so My Day / Itinerary updates immediately
+      try {
+        final db = await PowerSyncService.database;
+        final userId = _ref.read(currentUserIdProvider) ?? '';
+        if (userId.isNotEmpty && state.data.client.id != null) {
+          final now = DateTime.now();
+          final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+          await db.execute(
+            'UPDATE itineraries SET status = ?, updated_at = ? WHERE client_id = ? AND user_id = ? AND DATE(scheduled_date) = ? AND status NOT IN (?, ?)',
+            ['completed', now.toIso8601String(), state.data.client.id!, userId, dateStr, 'cancelled', 'completed'],
+          );
+        }
+      } catch (_) {}
 
       return true;
     } catch (e) {

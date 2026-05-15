@@ -388,6 +388,11 @@ class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
     // Watch touchpoint counts for badges
     final touchpointCountsAsync = ref.watch(clientTouchpointCountsProvider);
 
+    // Refresh scheduled IDs whenever itineraries for the selected date change
+    ref.listen(itineraryByDateProvider(widget.selectedDate), (_, __) {
+      _loadScheduledClientIds();
+    });
+
     // Watch keyboard height changes to trigger rebuilds when keyboard appears/disappears
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 

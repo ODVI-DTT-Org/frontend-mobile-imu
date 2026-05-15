@@ -139,9 +139,10 @@ class ActivityPage extends ConsumerWidget {
       cursor++;
       final items = grouped[section]!;
       if (index < cursor + items.length) {
+        final item = items[index - cursor];
         return ActivityCard(
-          item: items[index - cursor],
-          onTap: () => ActivityDetailDialog.show(context, item: items[index - cursor]),
+          item: item,
+          onTap: () => ActivityDetailDialog.show(context, item: item),
         );
       }
       cursor += items.length;
@@ -149,7 +150,7 @@ class ActivityPage extends ConsumerWidget {
     return _buildLoadMore(state, notifier);
   }
 
-  int _totalItemCount(
+int _totalItemCount(
     Map<String, List<ActivityItem>> grouped,
     bool hasMore,
   ) {

@@ -12,13 +12,14 @@ import 'package:imu_flutter/core/models/user_role.dart';
 
 class ActivityDetailDialog extends ConsumerStatefulWidget {
   final ActivityItem item;
+  final VoidCallback? onEdit;
 
-  const ActivityDetailDialog({super.key, required this.item});
+  const ActivityDetailDialog({super.key, required this.item, this.onEdit});
 
-  static Future<void> show(BuildContext context, {required ActivityItem item}) {
+  static Future<void> show(BuildContext context, {required ActivityItem item, VoidCallback? onEdit}) {
     return showDialog(
       context: context,
-      builder: (context) => ActivityDetailDialog(item: item),
+      builder: (context) => ActivityDetailDialog(item: item, onEdit: onEdit),
     );
   }
 
