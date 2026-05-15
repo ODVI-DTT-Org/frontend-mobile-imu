@@ -723,8 +723,7 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
     final nextType = nextTypeString == 'call' ? TouchpointType.call : TouchpointType.visit;
 
     if (userRole == null ||
-        !isValidTouchpointNumberForRole(nextNumber, userRole) ||
-        (nextTypeString != null && !isValidTouchpointTypeForRole(nextType, userRole))) {
+        !isValidTouchpointNumberForRole(nextNumber, userRole)) {
       if (mounted) {
         showDialog(
           context: context,
