@@ -389,6 +389,32 @@ class ItineraryRepository {
       return 0;
     }
   }
+
+  /// Stream past-due itineraries for the current user.
+  /// Reacts to changes in both the itineraries and clients tables.
+  Stream<List<Map<String, dynamic>>> watchMissedItineraries(String userId) async* {
+    try {
+      final db = await PowerSyncService.database;
+      await for (final rows in db.watch(
+        '''SELECT i.id, i.client_id, i.scheduled_date, i.status, i.created_at,
+                  c.first_name, c.last_name, c.middle_name,
+                  c.next_touchpoint, c.touchpoint_number,
+                  c.loan_released, c.phone
+           FROM itineraries i
+           LEFT JOIN clients c ON c.id = i.client_id
+           WHERE i.user_id = ?
+             AND DATE(i.scheduled_date) < DATE('now', 'localtime')
+             AND i.status IN ('pending', 'in_progress')
+           ORDER BY i.scheduled_date ASC''',
+        parameters: [userId],
+      )) {
+        yield rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      }
+    } catch (e) {
+      logError('watchMissedItineraries error', e);
+      yield [];
+    }
+  }
 }
 
 /// Provider for itinerary repository

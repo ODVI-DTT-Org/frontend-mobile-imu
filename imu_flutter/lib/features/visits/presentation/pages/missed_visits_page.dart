@@ -26,6 +26,8 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
     final allMissedVisits = ref.watch(missedVisitsProvider);
     final selectedFilter = ref.watch(missedVisitsFilterProvider);
     final counts = ref.watch(missedVisitsCountProvider);
+    final streamAsync = ref.watch(missedItinerariesStreamProvider);
+    final isLoading = streamAsync.isLoading;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -100,21 +102,58 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
 
           // List
           Expanded(
-            child: missedVisits.isEmpty
-                ? _EmptyState()
-                : ListView.builder(
-                    itemCount: missedVisits.length,
-                    itemBuilder: (context, index) {
-                      return _MissedVisitCard(
-                        missedVisit: missedVisits[index],
-                        onCall: () => _handleCall(missedVisits[index]),
-                        onReschedule: () => _handleReschedule(missedVisits[index]),
-                        onTap: () => _handleTap(missedVisits[index]),
-                      );
-                    },
-                  ),
+            child: isLoading
+                ? _buildSkeleton()
+                : missedVisits.isEmpty
+                    ? _EmptyState()
+                    : ListView.builder(
+                        itemCount: missedVisits.length,
+                        itemBuilder: (context, index) {
+                          return _MissedVisitCard(
+                            missedVisit: missedVisits[index],
+                            onCall: () => _handleCall(missedVisits[index]),
+                            onReschedule: () => _handleReschedule(missedVisits[index]),
+                            onTap: () => _handleTap(missedVisits[index]),
+                          );
+                        },
+                      ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      itemCount: 5,
+      itemBuilder: (context, _) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(height: 14, width: 160, color: Colors.grey[200]),
+                  const SizedBox(height: 8),
+                  Container(height: 12, width: 100, color: Colors.grey[200]),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -158,10 +197,28 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
             final dateStr =
                 '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
             final now = DateTime.now().toIso8601String();
-            await db.execute(
-              'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [const Uuid().v4(), userId, visit.clientId, dateStr, 'scheduled', now, now],
-            );
+            final newId = const Uuid().v4();
+
+            if (visit.source == MissedVisitSource.missedItinerary &&
+                visit.itineraryId != null) {
+              // Cancel the existing missed itinerary and insert a new one atomically
+              await db.writeTransaction(() async {
+                await db.execute(
+                  'UPDATE itineraries SET status = ?, updated_at = ? WHERE id = ?',
+                  ['cancelled', now, visit.itineraryId],
+                );
+                await db.execute(
+                  'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  [newId, userId, visit.clientId, dateStr, 'pending', now, now],
+                );
+              });
+            } else {
+              // Overdue client — just schedule a new itinerary
+              await db.execute(
+                'INSERT INTO itineraries (id, user_id, client_id, scheduled_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [newId, userId, visit.clientId, dateStr, 'pending', now, now],
+              );
+            }
           },
           onError: (e) {
             if (mounted) {
@@ -189,6 +246,12 @@ class _MissedVisitsPageState extends ConsumerState<MissedVisitsPage> {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
+}
+
+String _formatShortDate(DateTime date) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${months[date.month - 1]} ${date.day}';
 }
 
 class _FilterChip extends StatelessWidget {
@@ -368,7 +431,9 @@ class _MissedVisitCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${missedVisit.daysOverdue} days overdue',
+                    missedVisit.source == MissedVisitSource.missedItinerary
+                        ? 'Scheduled ${_formatShortDate(missedVisit.scheduledDate)}'
+                        : 'Last touched ${missedVisit.daysOverdue} days ago',
                     style: TextStyle(
                       fontSize: 12,
                       color: priorityColor,

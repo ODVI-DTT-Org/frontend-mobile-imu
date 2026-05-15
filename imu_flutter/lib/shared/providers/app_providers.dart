@@ -115,6 +115,8 @@ import '../../services/touchpoint/touchpoint_creation_service.dart';
 import '../../services/visit/visit_creation_service.dart';
 import '../../services/release/release_creation_service.dart';
 import '../../services/release/pending_release_service.dart';
+import '../../features/itineraries/data/repositories/itinerary_repository.dart'
+    show itineraryRepositoryProvider;
 
 export '../../services/release/pending_release_service.dart' show pendingReleaseServiceProvider, PendingReleaseService, PendingFlushResult;
 import '../../services/client/client_mutation_service.dart';
@@ -823,68 +825,151 @@ final missedVisitsFilterProvider = StateProvider<MissedVisitPriority?>((ref) {
   return null; // null means show all
 });
 
-/// Compute missed visits from clients and touchpoints
-final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
-  final clientsAsync = ref.watch(assignedClientsProvider);
+/// Stream of past-due itineraries from PowerSync.
+/// Reactive — updates automatically when itineraries or clients change.
+final missedItinerariesStreamProvider =
+    StreamProvider<List<MissedVisit>>((ref) async* {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) {
+    yield [];
+    return;
+  }
+  final repo = ref.read(itineraryRepositoryProvider);
+  yield* repo.watchMissedItineraries(userId).map((rows) {
+    return rows.map((row) {
+      final firstName = (row['first_name'] as String?) ?? '';
+      final lastName = (row['last_name'] as String?) ?? '';
+      final middleName = (row['middle_name'] as String?) ?? '';
+      final clientName = [firstName, middleName, lastName]
+          .where((s) => s.isNotEmpty)
+          .join(' ');
+      final touchpointNum = (row['touchpoint_number'] as int?) ?? 0;
+      final nextTouchpointStr =
+          (row['next_touchpoint'] as String?)?.toLowerCase();
+      final touchpointType = nextTouchpointStr == 'call'
+          ? TouchpointType.call
+          : TouchpointType.visit;
+      final scheduledDate = row['scheduled_date'] != null
+          ? DateTime.tryParse(row['scheduled_date'] as String) ??
+              DateTime.now()
+          : DateTime.now();
+      final createdAt = row['created_at'] != null
+          ? DateTime.tryParse(row['created_at'] as String) ?? DateTime.now()
+          : DateTime.now();
+      return MissedVisit(
+        id: row['id'] as String,
+        clientId: row['client_id'] as String,
+        clientName: clientName,
+        touchpointNumber: touchpointNum + 1,
+        touchpointType: touchpointType,
+        scheduledDate: scheduledDate,
+        createdAt: createdAt,
+        primaryPhone: row['phone'] as String?,
+        source: MissedVisitSource.missedItinerary,
+        itineraryId: row['id'] as String,
+      );
+    }).toList();
+  });
+});
 
-  return clientsAsync.when(
-    data: (response) {
-      final missedVisits = <MissedVisit>[];
+/// Overdue clients from Hive cache that have no future or missed itinerary.
+/// Watches syncServiceProvider so it recomputes after a sync completes.
+final overdueClientsProvider =
+    FutureProvider<List<MissedVisit>>((ref) async {
+  // Re-evaluate whenever sync state changes (catches post-sync cache refresh)
+  ref.watch(syncServiceProvider);
 
-      for (final client in response.items) {
-        // Get the next expected touchpoint
-        // touchpointNumber is now the completed count, so next = completed + 1
-        final nextTouchpointNum = client.touchpointNumber + 1;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return [];
 
-        // Use client.nextTouchpoint directly (String from API, no strict pattern)
-        final nextType = client.nextTouchpoint?.toLowerCase();
-        if (nextType == null) continue;
+  // Full assigned-client cache — not paginated
+  final hive = HiveService();
+  final rawClients = filterAssignedClientCache(hive.getAllClients());
+  final clients = rawClients.map((json) => Client.fromJson(json)).toList();
 
-        // Determine scheduled date based on last touchpoint or client creation
-        DateTime scheduledDate;
-        if (client.touchpointSummary.isNotEmpty) {
-          final lastTouchpoint = client.touchpointSummary.last;
-          // Schedule next touchpoint 3 days after last one
-          scheduledDate = lastTouchpoint.date.add(const Duration(days: 3));
-        } else {
-          // If no touchpoints, check if client was created more than 3 days ago
-          scheduledDate = (client.createdAt ?? DateTime.now()).add(const Duration(days: 3));
-        }
-
-        // Check if overdue
-        if (DateTime.now().isAfter(scheduledDate)) {
-          final primaryPhone = client.phone;
-          final primaryAddress = client.fullAddress;
-
-          if (client.id == null) continue; // Skip clients without ID
-          // Convert String to TouchpointType for MissedVisit model
-          final touchpointTypeEnum = nextType == 'call' ? TouchpointType.call : TouchpointType.visit;
-          missedVisits.add(MissedVisit(
-            id: '${client.id}_$nextTouchpointNum',
-            clientId: client.id!,
-            clientName: client.fullName,
-            touchpointNumber: nextTouchpointNum,
-            touchpointType: touchpointTypeEnum,
-            scheduledDate: scheduledDate,
-            createdAt: DateTime.now(),
-            primaryPhone: primaryPhone,
-            primaryAddress: primaryAddress,
-          ));
-        }
-      }
-
-      // Sort by priority (high first) then by days overdue
-      missedVisits.sort((a, b) {
-        final priorityCompare = b.priority.index.compareTo(a.priority.index);
-        if (priorityCompare != 0) return priorityCompare;
-        return b.daysOverdue.compareTo(a.daysOverdue);
-      });
-
-      return missedVisits;
-    },
-    loading: () => [],
-    error: (_, __) => [],
+  // Fetch future-scheduled itinerary client IDs to exclude (Set B)
+  final db = await PowerSyncService.database;
+  final futureRows = await db.getAll(
+    '''SELECT DISTINCT client_id FROM itineraries
+       WHERE user_id = ?
+         AND DATE(scheduled_date) >= DATE('now', 'localtime')
+         AND status IN ('pending', 'in_progress')''',
+    [userId],
   );
+  final futureClientIds =
+      futureRows.map((r) => r['client_id'] as String).toSet();
+
+  // Client IDs already covered by missed itineraries (Set A)
+  final missedClientIds =
+      (ref.read(missedItinerariesStreamProvider).valueOrNull ?? [])
+          .map((v) => v.clientId)
+          .toSet();
+
+  final now = DateTime.now();
+  final result = <MissedVisit>[];
+
+  for (final client in clients) {
+    if (client.id == null) continue;
+    if (client.loanReleased) continue;
+    if (client.nextTouchpoint == null) continue;
+    if (missedClientIds.contains(client.id)) continue;
+    if (futureClientIds.contains(client.id)) continue;
+
+    DateTime lastActivity;
+    if (client.touchpointSummary.isNotEmpty) {
+      lastActivity = client.touchpointSummary
+          .reduce((a, b) => a.date.isAfter(b.date) ? a : b)
+          .date;
+    } else {
+      lastActivity = client.createdAt ?? now;
+    }
+
+    if (now.difference(lastActivity).inDays <= 7) continue;
+
+    final nextTouchpointNum = client.touchpointNumber + 1;
+    final touchpointTypeEnum =
+        client.nextTouchpoint?.toLowerCase() == 'call'
+            ? TouchpointType.call
+            : TouchpointType.visit;
+
+    result.add(MissedVisit(
+      id: '${client.id}_$nextTouchpointNum',
+      clientId: client.id!,
+      clientName: client.fullName,
+      touchpointNumber: nextTouchpointNum,
+      touchpointType: touchpointTypeEnum,
+      scheduledDate: lastActivity.add(const Duration(days: 7)),
+      createdAt: now,
+      primaryPhone: client.phone,
+      primaryAddress: client.fullAddress,
+      source: MissedVisitSource.overdueClient,
+    ));
+  }
+
+  return result;
+});
+
+/// Merged missed visits: PowerSync missed itineraries + Hive overdue clients.
+/// Missed itinerary entries take precedence when clientId overlaps.
+final missedVisitsProvider = Provider<List<MissedVisit>>((ref) {
+  final itineraryVisits =
+      ref.watch(missedItinerariesStreamProvider).valueOrNull ?? [];
+  final overdueVisits =
+      ref.watch(overdueClientsProvider).valueOrNull ?? [];
+
+  final seenClientIds = itineraryVisits.map((v) => v.clientId).toSet();
+  final merged = [
+    ...itineraryVisits,
+    ...overdueVisits.where((v) => !seenClientIds.contains(v.clientId)),
+  ];
+
+  merged.sort((a, b) {
+    final priorityCompare = b.priority.index.compareTo(a.priority.index);
+    if (priorityCompare != 0) return priorityCompare;
+    return b.daysOverdue.compareTo(a.daysOverdue);
+  });
+
+  return merged;
 });
 
 /// Filtered missed visits by priority
