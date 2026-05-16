@@ -111,14 +111,26 @@ class GeofencingService {
       final lng = position.longitude;
 
       final rows = await db.getAll(
-        '''SELECT id, first_name, last_name, middle_name,
-                  full_address, latitude, longitude
-           FROM clients
-           WHERE latitude  IS NOT NULL
-             AND longitude IS NOT NULL
-             AND (loan_released IS NULL OR loan_released = 0)
-             AND latitude  BETWEEN ? AND ?
-             AND longitude BETWEEN ? AND ?''',
+        '''SELECT c.id, c.first_name, c.last_name, c.middle_name,
+                  c.full_address, a.latitude, a.longitude
+           FROM clients c
+           JOIN addresses a ON a.client_id = c.id
+                           AND a.is_primary = 1
+                           AND a.latitude  IS NOT NULL
+                           AND a.longitude IS NOT NULL
+                           AND a.deleted_at IS NULL
+           WHERE (c.loan_released IS NULL OR c.loan_released = 0)
+             AND a.latitude  BETWEEN ? AND ?
+             AND a.longitude BETWEEN ? AND ?
+             AND c.psgc_id IS NOT NULL
+             AND EXISTS (
+               SELECT 1
+               FROM user_locations ul
+               JOIN psgc p ON p.province = ul.province
+                           AND p.mun_city = ul.municipality
+               WHERE p.id = c.psgc_id
+                 AND ul.deleted_at IS NULL
+             )''',
         [
           lat - _kBoundingBoxDelta,
           lat + _kBoundingBoxDelta,
