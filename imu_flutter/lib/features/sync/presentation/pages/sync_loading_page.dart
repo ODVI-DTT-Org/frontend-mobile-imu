@@ -52,6 +52,7 @@ class EnhancedSyncLoadingState {
   final String currentStep;
   final String errorMessage;
   final List<TableSyncStatus> tableStatus;
+  final TableSyncStatus clientsFetchStatus;
 
   const EnhancedSyncLoadingState({
     this.isInitializing = true,
@@ -62,6 +63,7 @@ class EnhancedSyncLoadingState {
     this.currentStep = 'Initializing PowerSync...',
     this.errorMessage = '',
     this.tableStatus = const [],
+    this.clientsFetchStatus = const TableSyncStatus(tableName: 'Assigned Clients'),
   });
 
   EnhancedSyncLoadingState copyWith({
@@ -73,6 +75,7 @@ class EnhancedSyncLoadingState {
     String? currentStep,
     String? errorMessage,
     List<TableSyncStatus>? tableStatus,
+    TableSyncStatus? clientsFetchStatus,
   }) {
     return EnhancedSyncLoadingState(
       isInitializing: isInitializing ?? this.isInitializing,
@@ -83,6 +86,7 @@ class EnhancedSyncLoadingState {
       currentStep: currentStep ?? this.currentStep,
       errorMessage: errorMessage ?? this.errorMessage,
       tableStatus: tableStatus ?? this.tableStatus,
+      clientsFetchStatus: clientsFetchStatus ?? this.clientsFetchStatus,
     );
   }
 }
@@ -532,11 +536,31 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     state = state.copyWith(tableStatus: updatedTableStatus);
   }
 
+  /// Called by the provider listener when the background REST client sync starts.
+  void onBackgroundFetchStart() {
+    if (!mounted) return;
+    state = state.copyWith(
+      clientsFetchStatus: const TableSyncStatus(
+        tableName: 'Assigned Clients',
+        isLoading: true,
+      ),
+    );
+  }
+
   /// Called by the provider listener when the background REST client sync completes.
   /// Signals the race in [_startPowerSyncSync] or applies the result directly if
   /// the race has already finished.
   void onBackgroundFetchComplete(int count) {
-    if (!mounted || state.syncComplete) return;
+    if (!mounted) return;
+    // Always update the fetch status display regardless of sync completion.
+    state = state.copyWith(
+      clientsFetchStatus: TableSyncStatus(
+        tableName: 'Assigned Clients',
+        isLoaded: true,
+        rowCount: count,
+      ),
+    );
+    if (state.syncComplete) return;
     final completer = _hivePopulatedCompleter;
     if (completer != null && !completer.isCompleted) {
       completer.complete(); // interrupt the race
@@ -576,9 +600,12 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
 final enhancedSyncLoadingProvider = StateNotifierProvider.autoDispose.family<EnhancedSyncLoadingNotifier, EnhancedSyncLoadingState, ({PowerSyncDatabase database, IMUPowerSyncConnector connector, int sessionKey})>((ref, params) {
   final notifier = EnhancedSyncLoadingNotifier(params.database, params.connector);
 
-  // Forward background REST client-fetch completion to the notifier so it can
-  // race against the PowerSync connection wait and navigate as soon as Hive has data.
+  // Forward background REST client-fetch state to the notifier so it can
+  // race against the PowerSync connection wait and show live fetch status.
   ref.listen<AssignedClientsFetchState>(assignedClientsFetchProvider, (prev, next) {
+    if (next.isFetching && !(prev?.isFetching ?? false)) {
+      notifier.onBackgroundFetchStart();
+    }
     if (!next.isFetching && next.fetchCount > 0 && next.lastFetchTime != null) {
       notifier.onBackgroundFetchComplete(next.fetchCount);
     }
@@ -893,13 +920,82 @@ class _SyncLoadingPageState extends ConsumerState<SyncLoadingPage> {
       child: ListView.separated(
         shrinkWrap: true,
         padding: const EdgeInsets.all(16),
-        itemCount: syncState.tableStatus.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
+        // +1 for the pinned REST fetch row at index 0
+        itemCount: syncState.tableStatus.length + 1,
+        separatorBuilder: (context, index) => Divider(
+          height: index == 0 ? 16 : 1,
+          thickness: index == 0 ? 1 : null,
+        ),
         itemBuilder: (context, index) {
-          final tableStatus = syncState.tableStatus[index];
-          return _buildTableStatusItem(context, tableStatus);
+          if (index == 0) {
+            return _buildClientsFetchItem(context, syncState.clientsFetchStatus);
+          }
+          return _buildTableStatusItem(context, syncState.tableStatus[index - 1]);
         },
       ),
+    );
+  }
+
+  Widget _buildClientsFetchItem(BuildContext context, TableSyncStatus status) {
+    final IconData icon;
+    final Color iconColor;
+
+    if (status.isLoading) {
+      icon = Icons.cloud_download;
+      iconColor = Colors.orange[700]!;
+    } else if (status.isLoaded) {
+      icon = Icons.cloud_done;
+      iconColor = Colors.green[700]!;
+    } else {
+      icon = Icons.cloud_outlined;
+      iconColor = Colors.grey[300]!;
+    }
+
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: iconColor),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Assigned Clients',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                'REST API',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        ),
+        if (status.isLoading)
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (status.isLoaded)
+          Text(
+            '${status.rowCount} loaded',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          )
+        else
+          Text(
+            'Waiting...',
+            style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+          ),
+      ],
     );
   }
 
