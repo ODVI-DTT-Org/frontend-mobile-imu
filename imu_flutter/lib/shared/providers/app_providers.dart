@@ -86,7 +86,6 @@ export '../models/client_filter_options.dart' show ClientFilterOptions;
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../../services/search/fuzzy_search_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import '../../features/clients/data/models/client_model.dart';
@@ -437,12 +436,14 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   }
 });
 
-/// Assigned clients — reads from Hive cache, applies filters/search/pagination locally.
-/// Cache is populated on login via REST API (fetchAllAssignedClients).
-List<Map<String, dynamic>> filterAssignedClientCache(List<Map<String, dynamic>> rawClients) {
-  return rawClients.where((client) => client['_cache_source'] == 'assigned').toList();
-}
-
+/// Assigned clients — queries PowerSync SQLite directly with SQL filters and
+/// LIMIT/OFFSET pagination. No full Hive load; only the requested page is
+/// transferred from the DB to Dart memory.
+///
+/// Simple filters (location, type, search) run entirely in SQL.
+/// Complex filters that touch the touchpoint_summary JSON column or need
+/// next_touchpoint_number (not in the PowerSync schema) are applied in Dart
+/// on the SQL-reduced result set rather than on all 5k+ clients.
 final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final searchQuery = ref.watch(assignedClientSearchQueryProvider);
   final page = ref.watch(assignedClientPageProvider);
@@ -450,73 +451,116 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final attributeFilter = ref.watch(clientAttributeFilterProvider);
   final touchpointFilter = ref.watch(touchpointFilterProvider);
 
-  debugPrint('=== ASSIGNED CLIENTS FETCH ===');
-  debugPrint('Search query: "$searchQuery", Page: $page');
+  final db = await PowerSyncService.database;
 
-  // Load from Hive cache (populated on login from REST API)
-  final hiveService = HiveService();
-  var rawClients = filterAssignedClientCache(hiveService.getAllClients());
+  // ── Build SQL WHERE conditions ────────────────────────────────────────────
+  final conditions = <String>['deleted_at IS NULL'];
+  final params = <Object?>[];
 
-  var cachedClients = rawClients.map((json) => Client.fromJson(json)).toList();
-
-  debugPrint('assignedClientsProvider: Got ${cachedClients.length} clients from Hive cache');
-
-  // Apply location filter locally if needed
-  if (locationFilter.hasFilter) {
-    debugPrint('assignedClientsProvider: Applying location filter locally - province: ${locationFilter.province}, municipalities: ${locationFilter.municipalities}');
-    cachedClients = cachedClients.where((c) {
-      // Check if client's province matches filter
-      if (locationFilter.province != null && c.province != locationFilter.province) {
-        return false;
-      }
-      // Check if client's municipality matches filter (if specified)
-      if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
-        if (!locationFilter.municipalities!.contains(c.municipality)) {
-          return false;
-        }
-      }
-      return true;
-    }).toList();
-    debugPrint('assignedClientsProvider: After location filter - ${cachedClients.length} clients');
+  // Location
+  if (locationFilter.province != null) {
+    conditions.add('province = ?');
+    params.add(locationFilter.province);
+  }
+  if (locationFilter.municipalities?.isNotEmpty == true) {
+    final ph = locationFilter.municipalities!.map((_) => '?').join(', ');
+    conditions.add('municipality IN ($ph)');
+    params.addAll(locationFilter.municipalities!);
   }
 
-  // Apply attribute filter locally if needed
-  if (attributeFilter.hasFilter) {
-    debugPrint('assignedClientsProvider: Applying attribute filter locally - ${attributeFilter.toQueryParams()}');
-    cachedClients = cachedClients.where((client) => attributeFilter.matches(client)).toList();
-    debugPrint('assignedClientsProvider: After attribute filter - ${cachedClients.length} clients');
+  // Attribute type filters — OR within a category, AND across categories.
+  // Mirrors ClientAttributeFilter.matches() case-insensitive logic.
+  void addUpperIn(String col, List<String>? values) {
+    if (values == null || values.isEmpty) return;
+    final ph = values.map((_) => '?').join(', ');
+    conditions.add('UPPER($col) IN ($ph)');
+    params.addAll(values.map((v) => v.toUpperCase()));
   }
+  addUpperIn('client_type', attributeFilter.clientTypes);
+  addUpperIn('market_type', attributeFilter.marketTypes);
+  addUpperIn('pension_type', attributeFilter.pensionTypes);
+  addUpperIn('product_type', attributeFilter.productTypes);
+  addUpperIn('loan_type', attributeFilter.loanTypes);
 
-  // Apply touchpoint filter locally
-  if (touchpointFilter.hasFilter) {
-    cachedClients = cachedClients
-        .where((client) => touchpointFilter.matches(client))
-        .toList();
-    debugPrint('assignedClientsProvider: After touchpoint filter - ${cachedClients.length} clients');
-  }
-
-  // Apply fuzzy search filter locally if needed
+  // Text search — AND across words, LIKE match on name / agency fields.
   if (searchQuery.isNotEmpty) {
-    debugPrint('assignedClientsProvider: Applying fuzzy search for query: "$searchQuery"');
-    final fuzzyService = FuzzySearchService(cachedClients);
-    cachedClients = fuzzyService.searchByName(searchQuery);
-    debugPrint('assignedClientsProvider: After fuzzy search filter - ${cachedClients.length} clients');
+    final words = searchQuery.trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length >= 2)
+        .toList();
+    for (final word in words) {
+      conditions.add(
+        '(first_name LIKE ? OR last_name LIKE ? OR middle_name LIKE ? OR agency_name LIKE ?)',
+      );
+      final pct = '%$word%';
+      params.addAll([pct, pct, pct, pct]);
+    }
   }
 
-  // Calculate pagination locally
-  const itemsPerPage = 10;
-  final totalItems = cachedClients.length;
-  final totalPages = (totalItems / itemsPerPage).ceil();
-  final startIndex = (page - 1) * itemsPerPage;
-  final endIndex = (startIndex + itemsPerPage).clamp(0, totalItems);
-  final paginatedClients = cachedClients.sublist(startIndex, endIndex);
+  final where = conditions.join(' AND ');
 
-  debugPrint('assignedClientsProvider: Showing ${paginatedClients.length} of $totalItems clients (page $page of $totalPages) from cache');
+  // ── Detect complex filters needing Dart post-processing ──────────────────
+  // touchpointStatuses / date range / recentlyVisited use the touchpoint_summary
+  // JSON column which SQLite can't easily query.
+  // touchpointFilter uses next_touchpoint_number which is absent from the schema.
+  final hasComplexFilter = touchpointFilter.hasFilter ||
+      attributeFilter.touchpointStatuses?.isNotEmpty == true ||
+      attributeFilter.touchpointDateFrom != null ||
+      attributeFilter.touchpointDateTo != null ||
+      attributeFilter.recentlyVisitedDays != null;
 
-  // Return cached data immediately
-  debugPrint('=== ASSIGNED CLIENTS FETCH COMPLETE ===');
+  const itemsPerPage = 20;
+
+  if (hasComplexFilter) {
+    // Fetch all SQL-filtered rows (type/location/search already applied),
+    // then apply the complex Dart predicates on the smaller result set.
+    final rows = await db.getAll(
+      'SELECT * FROM clients WHERE $where ORDER BY first_name, last_name',
+      params,
+    );
+    var clients = rows.map((r) => Client.fromRow(r)).toList();
+
+    if (attributeFilter.touchpointStatuses?.isNotEmpty == true ||
+        attributeFilter.touchpointDateFrom != null ||
+        attributeFilter.touchpointDateTo != null ||
+        attributeFilter.recentlyVisitedDays != null) {
+      clients = clients.where((c) => attributeFilter.matches(c)).toList();
+    }
+    if (touchpointFilter.hasFilter) {
+      clients = clients.where((c) => touchpointFilter.matches(c)).toList();
+    }
+
+    final totalItems = clients.length;
+    final totalPages = (totalItems / itemsPerPage).ceil().clamp(1, 9999);
+    final offset = ((page - 1) * itemsPerPage).clamp(0, totalItems);
+    final end = (offset + itemsPerPage).clamp(0, totalItems);
+
+    return ClientsResponse(
+      items: clients.sublist(offset, end),
+      page: page,
+      perPage: itemsPerPage,
+      totalItems: totalItems,
+      totalPages: totalPages,
+    );
+  }
+
+  // ── Fast path: SQL pagination only ───────────────────────────────────────
+  final offset = (page - 1) * itemsPerPage;
+
+  final countRows = await db.getAll(
+    'SELECT COUNT(*) as cnt FROM clients WHERE $where',
+    params,
+  );
+  final totalItems = (countRows.first['cnt'] as int?) ?? 0;
+  final totalPages = (totalItems / itemsPerPage).ceil().clamp(1, 9999);
+
+  final rows = await db.getAll(
+    'SELECT * FROM clients WHERE $where ORDER BY first_name, last_name LIMIT ? OFFSET ?',
+    [...params, itemsPerPage, offset],
+  );
+
   return ClientsResponse(
-    items: paginatedClients,
+    items: rows.map((r) => Client.fromRow(r)).toList(),
     page: page,
     perPage: itemsPerPage,
     totalItems: totalItems,
@@ -882,13 +926,19 @@ final overdueClientsProvider =
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return [];
 
-  // Full assigned-client cache — not paginated
-  final hive = HiveService();
-  final rawClients = filterAssignedClientCache(hive.getAllClients());
-  final clients = rawClients.map((json) => Client.fromJson(json)).toList();
+  final db = await PowerSyncService.database;
+
+  // Load all non-released clients with a next touchpoint — SQL pre-filter
+  // reduces the set before the Dart overdue check below.
+  final clientRows = await db.getAll(
+    '''SELECT * FROM clients
+       WHERE deleted_at IS NULL
+         AND (loan_released IS NULL OR loan_released = 0)
+         AND next_touchpoint IS NOT NULL''',
+  );
+  final clients = clientRows.map((r) => Client.fromRow(r)).toList();
 
   // Fetch future-scheduled itinerary client IDs to exclude (Set B)
-  final db = await PowerSyncService.database;
   final futureRows = await db.getAll(
     '''SELECT DISTINCT client_id FROM itineraries
        WHERE user_id = ?

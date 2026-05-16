@@ -183,6 +183,14 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     if (lastSync != null) {
       final syncAge = DateTime.now().difference(lastSync);
       logDebug('[SyncLoadingPage] Last sync ${syncAge.inMinutes} min ago — skipping wait, going straight to home.');
+
+      // Pre-warm the SQLite connection pool so the first client query after
+      // navigation is instant rather than paying the cold-open cost on the
+      // main thread when the user taps Clients or the FAB.
+      unawaited(PowerSyncService.database.then(
+        (db) => db.getAll('SELECT COUNT(*) FROM clients LIMIT 1'),
+      ).catchError((_) {}));
+
       state = state.copyWith(
         isInitializing: false,
         isSyncing: false,
