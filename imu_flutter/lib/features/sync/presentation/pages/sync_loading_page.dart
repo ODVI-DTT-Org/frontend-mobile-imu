@@ -112,6 +112,8 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   final SyncPreferencesService _preferencesService;
 
   StreamSubscription? _syncStatusSubscription;
+  Timer? _tableCountTimer;
+  bool _wasDownloading = false;
 
   /// Completer used to race `_waitForConnection` against background Hive population.
   /// Completed by [onBackgroundFetchComplete] when the REST client sync finishes.
@@ -412,14 +414,29 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         _hasSeenSyncActivity = true;
       }
 
+      // Start/stop the periodic live-count timer as download state changes.
+      if (isDownloading && !_wasDownloading) {
+        _startTableCountTimer();
+      } else if (!isDownloading && _wasDownloading) {
+        _stopTableCountTimer();
+      }
+      _wasDownloading = isDownloading;
+
       String stepMessage;
       double progress;
       if (isDownloading) {
-        stepMessage = 'Downloading data from server...';
-        progress = 0.3;
+        final downloadProgress = status.downloadProgress;
+        final fraction = downloadProgress?.downloadedFraction ?? 0.0;
+        final downloadedOps = downloadProgress?.downloadedOperations ?? 0;
+        final totalOps = downloadProgress?.totalOperations ?? 0;
+        // 0.0–0.20 is reserved for the connect phase; map [0,1] → [0.20, 0.95].
+        progress = 0.20 + (fraction * 0.75);
+        stepMessage = totalOps > 0
+            ? 'Downloading $downloadedOps of $totalOps records...'
+            : 'Downloading data from server...';
       } else if (isUploading) {
         stepMessage = 'Uploading local changes...';
-        progress = 0.7;
+        progress = 0.97;
       } else if (isIdleConnected) {
         stepMessage = 'Sync complete!';
         progress = 1.0;
@@ -465,6 +482,22 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
         errorMessage: shouldRecoverComplete ? '' : state.errorMessage,
       );
     });
+  }
+
+  void _startTableCountTimer() {
+    _tableCountTimer?.cancel();
+    _tableCountTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) {
+        _tableCountTimer?.cancel();
+        return;
+      }
+      _countTableRows();
+    });
+  }
+
+  void _stopTableCountTimer() {
+    _tableCountTimer?.cancel();
+    _tableCountTimer = null;
   }
 
   Future<void> _countTableRows() async {
@@ -530,6 +563,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
   @override
   void dispose() {
     _syncStatusSubscription?.cancel();
+    _tableCountTimer?.cancel();
     final completer = _hivePopulatedCompleter;
     if (completer != null && !completer.isCompleted) {
       completer.complete(); // unblock any pending Future.any
