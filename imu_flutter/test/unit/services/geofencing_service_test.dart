@@ -109,7 +109,8 @@ void main() {
         agentLng: _agentLng,
         clientRows: [
           _row(id: 'client-a'),
-          _row(id: 'client-b', lat: _nearLat + 0.001, lng: _nearLng),
+          // _nearLat - 0.001 ≈ agentLat + 0.00215 ≈ 239m (inside fence)
+          _row(id: 'client-b', lat: _nearLat - 0.001, lng: _nearLng),
         ],
       );
 
@@ -120,6 +121,68 @@ void main() {
             any(),
             payload: any(named: 'payload'),
           )).called(2);
+    });
+  });
+
+  // Area scoping is enforced at the SQL layer in _onPositionUpdate via an
+  // EXISTS subquery joining user_locations → psgc → clients.psgc_id.
+  // processNearbyClients receives only rows that already passed that filter.
+  // These tests document the expected downstream behaviour for both outcomes.
+  group('processNearbyClients — area scoping (SQL-enforced)', () {
+    test('fires for client returned by area-scoped SQL', () async {
+      // Simulates SQL returning one row that passed the municipality filter.
+      await service.processNearbyClients(
+        agentLat: _agentLat,
+        agentLng: _agentLng,
+        clientRows: [_row()],
+      );
+
+      verify(() => mockPlugin.show(
+            any(),
+            any(),
+            any(),
+            any(),
+            payload: any(named: 'payload'),
+          )).called(1);
+    });
+
+    test('fires no notification when SQL returns empty (all outside assigned area)', () async {
+      // Simulates SQL returning zero rows because the EXISTS area filter
+      // excluded every nearby client.
+      await service.processNearbyClients(
+        agentLat: _agentLat,
+        agentLng: _agentLng,
+        clientRows: const [],
+      );
+
+      verifyNever(() => mockPlugin.show(
+            any(),
+            any(),
+            any(),
+            any(),
+            payload: any(named: 'payload'),
+          ));
+    });
+
+    test('fires only for in-fence client when area filter passes multiple rows', () async {
+      // Area filter passes both rows; distance check then eliminates the far one.
+      // Verifies per-row independence: one fires, one does not.
+      await service.processNearbyClients(
+        agentLat: _agentLat,
+        agentLng: _agentLng,
+        clientRows: [
+          _row(id: 'near', lat: _nearLat, lng: _nearLng),
+          _row(id: 'far', lat: _farLat, lng: _farLng),
+        ],
+      );
+
+      verify(() => mockPlugin.show(
+            any(),
+            any(),
+            any(),
+            any(),
+            payload: any(named: 'payload'),
+          )).called(1);
     });
   });
 
