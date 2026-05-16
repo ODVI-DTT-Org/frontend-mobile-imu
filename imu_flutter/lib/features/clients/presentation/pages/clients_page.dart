@@ -1139,22 +1139,29 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     final todayItineraryAsync = ref.watch(todayItineraryProvider);
     final today = DateTime.now();
 
-    // Optimistic: already scheduled in this session
-    bool isInMyDay = _scheduledTodayIds.contains(client.id);
-    if (!isInMyDay) {
-      todayItineraryAsync.when(
-        data: (items) {
-          isInMyDay = items.any((item) =>
-            item.clientId == client.id &&
-            item.scheduledDate.year == today.year &&
-            item.scheduledDate.month == today.month &&
-            item.scheduledDate.day == today.day
-          );
-        },
-        loading: () {},  // keep optimistic value, don't flip to false while reloading
-        error: (_, __) => isInMyDay = false,
-      );
-    }
+    // Provider is authoritative when loaded; optimistic set only bridges loading gaps.
+    bool isInMyDay = false;
+    todayItineraryAsync.when(
+      data: (items) {
+        isInMyDay = items.any((item) =>
+          item.clientId == client.id &&
+          item.scheduledDate.year == today.year &&
+          item.scheduledDate.month == today.month &&
+          item.scheduledDate.day == today.day
+        );
+        // Keep optimistic set in sync so future loading gaps are accurate.
+        if (isInMyDay) {
+          _scheduledTodayIds.add(client.id!);
+        } else {
+          _scheduledTodayIds.remove(client.id);
+        }
+      },
+      loading: () {
+        // While reloading, fall back to optimistic set to prevent button flicker.
+        isInMyDay = _scheduledTodayIds.contains(client.id);
+      },
+      error: (_, __) => isInMyDay = false,
+    );
 
     // Build action buttons
     final actionButtons = [
