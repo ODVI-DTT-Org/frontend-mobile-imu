@@ -80,7 +80,7 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
                   c.loan_released
            FROM itineraries i
            LEFT JOIN clients c ON c.id = i.client_id
-           WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status != 'cancelled'
+           WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status NOT IN ('cancelled', 'completed')
            ORDER BY datetime(i.created_at) DESC""",
         parameters: [userId, dateStr],
       )) {
