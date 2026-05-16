@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/app_notification.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -22,20 +24,40 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Future<void> _handleReset() async {
-    if (_usernameController.text.isEmpty) {
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) {
       AppNotification.showWarning(context, 'Please enter your username');
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Simulate reset request
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
+      await dio.post('/auth/request-password-reset', data: {'username': username});
 
-    setState(() {
-      _isLoading = false;
-      _isSent = true;
-    });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isSent = true;
+        });
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        final message = e.response?.data?['message'] as String? ?? 'Failed to submit request. Please try again.';
+        AppNotification.showError(context, message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppNotification.showError(context, 'Failed to submit request. Please try again.');
+      }
+    }
   }
 
   @override

@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/auth/session_service.dart';
@@ -765,7 +767,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Change Password'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -783,7 +785,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               controller: newPasswordController,
               obscureText: true,
               decoration: const InputDecoration(
-                labelText: 'New Password',
+                labelText: 'New Password (min. 8 characters)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -800,35 +802,68 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (newPasswordController.text == confirmPasswordController.text &&
-                  newPasswordController.text.length >= 6) {
-                HapticUtils.success();
-                Navigator.pop(context);
+              final currentPassword = currentPasswordController.text;
+              final newPassword = newPasswordController.text;
+              final confirmPassword = confirmPasswordController.text;
 
-                await LoadingHelper.withLoading(
-                  ref: ref,
-                  message: 'Changing password...',
-                  operation: () async {
-                    // Simulate API call for password change
-                    await Future.delayed(const Duration(milliseconds: 500));
-                  },
-                  onError: (e) {
-                    if (mounted) {
-                      AppNotification.showError(context, 'Failed to change password');
+              if (newPassword != confirmPassword) {
+                AppNotification.showError(context, 'New passwords do not match');
+                return;
+              }
+              if (newPassword.length < 8) {
+                AppNotification.showError(context, 'New password must be at least 8 characters');
+                return;
+              }
+              if (currentPassword.isEmpty) {
+                AppNotification.showError(context, 'Please enter your current password');
+                return;
+              }
+
+              Navigator.pop(dialogContext);
+
+              await LoadingHelper.withLoading(
+                ref: ref,
+                message: 'Changing password...',
+                operation: () async {
+                  final token = ref.read(jwtAuthProvider).accessToken;
+                  if (token == null) throw Exception('Not authenticated');
+
+                  final dio = Dio(BaseOptions(
+                    baseUrl: AppConfig.apiBaseUrl,
+                    connectTimeout: const Duration(seconds: 15),
+                    receiveTimeout: const Duration(seconds: 15),
+                  ));
+
+                  await dio.post(
+                    '/auth/change-password',
+                    data: {
+                      'currentPassword': currentPassword,
+                      'newPassword': newPassword,
+                    },
+                    options: Options(
+                      headers: {'Authorization': 'Bearer $token'},
+                    ),
+                  );
+                },
+                onError: (e) {
+                  if (mounted) {
+                    String message = 'Failed to change password';
+                    if (e is DioException) {
+                      message = e.response?.data?['message'] as String? ?? message;
                     }
-                  },
-                );
+                    AppNotification.showError(context, message);
+                  }
+                },
+              );
 
-                if (mounted) {
-                  AppNotification.showSuccess(context, 'Password changed successfully');
-                }
-              } else {
-                AppNotification.showError(context, 'Passwords do not match or too short');
+              if (mounted) {
+                HapticUtils.success();
+                AppNotification.showSuccess(context, 'Password changed successfully');
               }
             },
             child: const Text('Change Password'),
