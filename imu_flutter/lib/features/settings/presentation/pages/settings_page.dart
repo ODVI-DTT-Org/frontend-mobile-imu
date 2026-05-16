@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/app_notification.dart';
 import '../../../../services/auth/session_service.dart';
@@ -9,6 +10,7 @@ import '../../../../services/sync/powersync_service.dart';
 import '../../../../services/sync/sync_preferences_service.dart';
 import '../../../../services/sync/sync_service.dart';
 import '../../../../services/api/background_sync_service.dart';
+import '../../../../services/geofencing/geofencing_service.dart';
 import '../../../../shared/providers/app_providers.dart';
 import '../../../../shared/utils/loading_helper.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
@@ -327,6 +329,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   },
                 ),
                 fallback: const SizedBox.shrink(), // Hide for non-admin users
+              ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: LucideIcons.mapPin,
+                title: 'Test Geofencing',
+                subtitle: 'Fire a test proximity notification',
+                onTap: () {
+                  HapticUtils.lightImpact();
+                  _showGeofencingTestDialog();
+                },
               ),
               _buildDivider(),
             ]),
@@ -1224,6 +1236,157 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() {
       _powerSyncLogs.add(message);
     });
+  }
+
+  void _showGeofencingTestDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String status = '';
+        bool isFiring = false;
+        bool isClearing = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(LucideIcons.mapPin, color: Color(0xFF0F172A)),
+                SizedBox(width: 12),
+                Text('Geofencing Debug'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Test proximity notifications without being near a real client.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: isFiring
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            isFiring = true;
+                            status = '';
+                          });
+                          try {
+                            final service = ref.read(geofencingServiceProvider);
+                            await service.init();
+                            await service.processNearbyClients(
+                              agentLat: 14.5995,
+                              agentLng: 120.9842,
+                              clientRows: [
+                                {
+                                  'id': 'debug-test-client',
+                                  'first_name': 'Test',
+                                  'middle_name': '',
+                                  'last_name': 'Client',
+                                  'full_address': 'Debug Address, Manila',
+                                  'latitude': 14.6015,
+                                  'longitude': 120.9842,
+                                }
+                              ],
+                            );
+                            setDialogState(() {
+                              isFiring = false;
+                              status = '✅ Notification fired — check your notification shade';
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              isFiring = false;
+                              status = '❌ Error: $e';
+                            });
+                          }
+                        },
+                  icon: isFiring
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(LucideIcons.bell),
+                  label: const Text('Fire Test Notification'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: isClearing
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            isClearing = true;
+                            status = '';
+                          });
+                          try {
+                            final prefs = await SharedPreferences.getInstance();
+                            final keys = prefs
+                                .getKeys()
+                                .where((k) => k.startsWith('geofence_cooldown_'))
+                                .toList();
+                            for (final k in keys) {
+                              await prefs.remove(k);
+                            }
+                            setDialogState(() {
+                              isClearing = false;
+                              status =
+                                  '✅ Cleared ${keys.length} cooldown${keys.length == 1 ? '' : 's'}';
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              isClearing = false;
+                              status = '❌ Clear failed: $e';
+                            });
+                          }
+                        },
+                  icon: isClearing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(LucideIcons.trash2),
+                  label: const Text('Clear All Cooldowns'),
+                ),
+                if (status.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: status.startsWith('✅')
+                          ? const Color(0xFF22C55E).withOpacity(0.1)
+                          : const Color(0xFFEF4444).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: status.startsWith('✅')
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFFEF4444),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _runPowerSyncTests(StateSetter setDialogState) async {
