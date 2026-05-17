@@ -1873,9 +1873,8 @@ class _QuickActionsSection extends ConsumerWidget {
               _QuickActionButton(
                 icon: LucideIcons.clipboardList,
                 label: 'Record Touchpoint',
-                onTap: isLoanReleased ? null : onRecordTouchpoint,
+                onTap: onRecordTouchpoint,
                 isPrimary: true,
-                isLoanReleased: isLoanReleased,
               ),
               // REMOVED: Duplicate "Record Visit" button - functionality already covered by "Record Touchpoint"
               // All touchpoint recordings are marked as visits, so this button was redundant

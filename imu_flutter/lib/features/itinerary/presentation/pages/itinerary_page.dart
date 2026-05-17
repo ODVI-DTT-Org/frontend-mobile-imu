@@ -566,7 +566,6 @@ class _ItineraryPageState extends ConsumerState<ItineraryPage> {
             title: 'Record Touchpoint',
             description: 'Create touchpoint + visit',
             value: 'touchpoint',
-            isDisabled: !canRecordTouchpoint,
             isLoanReleased: visit.loanReleased,
           ),
           // COMMENTED OUT for Unli Touchpoint - visit only functionality removed
