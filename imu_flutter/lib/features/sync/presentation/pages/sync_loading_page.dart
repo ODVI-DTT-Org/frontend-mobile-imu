@@ -258,17 +258,24 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     // recovery branch in [_listenToSyncStatus].
     _listenToSyncStatus();
 
+    final syncFlowStart = DateTime.now();
+    logDebug('[SyncFlow] ⏱️ Full sync flow starting at $syncFlowStart');
+
     try {
       if (!PowerSyncService.isConnected) {
         logDebug('[SyncLoadingPage] PowerSync not connected yet — starting connection from sync page.');
         try {
           await PowerSyncService.connect(_powerSyncConnector);
+          logDebug('[SyncFlow] ⏱️ connect() done (${DateTime.now().difference(syncFlowStart).inMilliseconds}ms)');
         } catch (e) {
           // Keep the existing wait/status flow alive after a failed connect
           // attempt. This mirrors the startup path where PowerSync may still
           // recover after an initial failure without blocking app login.
           logWarning('[SyncLoadingPage] Initial connect attempt from sync page failed: $e');
+          logDebug('[SyncFlow] ⏱️ connect() threw after ${DateTime.now().difference(syncFlowStart).inMilliseconds}ms — error type: ${e.runtimeType}');
         }
+      } else {
+        logDebug('[SyncFlow] PowerSync already connected — skipping connect()');
       }
 
       // Step 1: Wait for PowerSync to connect — race against background Hive population.
@@ -293,6 +300,8 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
       } finally {
         _hivePopulatedCompleter = null;
       }
+
+      logDebug('[SyncFlow] ⏱️ Race winner: $raceWinner (${DateTime.now().difference(syncFlowStart).inMilliseconds}ms elapsed)');
 
       if (raceWinner != 'connected') {
         // Hive signal or timeout — check whether local data is now available.
@@ -348,7 +357,9 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
       // fast-path that checked _checkForLocalData() here caused a race: clients
       // arrive in SQLite before itineraries, so we'd navigate home and My Day
       // would show nothing even though the itinerary exists on the backend.
+      logDebug('[SyncFlow] ⏱️ Starting waitForInitialSync (${DateTime.now().difference(syncFlowStart).inMilliseconds}ms elapsed)');
       await PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 60));
+      logDebug('[SyncFlow] ⏱️ waitForInitialSync complete (${DateTime.now().difference(syncFlowStart).inMilliseconds}ms elapsed)');
 
       // Persist the sync timestamp eagerly so a subsequent login can fast-track
       // even if the widget is disposed before the trailing state writes below.
@@ -392,6 +403,7 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     });
 
     subscription = _powerSyncDb.statusStream.listen((status) {
+      logDebug('[WaitForConn] status: connected=${status.connected} downloading=${status.downloading} anyError=${status.anyError}');
       if (status.connected) {
         timer.cancel();
         subscription?.cancel();
@@ -415,6 +427,19 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     _syncStatusSubscription?.cancel();
     _syncStatusSubscription = _powerSyncDb.statusStream.listen((status) {
       if (!mounted) return;
+
+      // Log every PowerSync status event — critical for diagnosing the 10% sync failure.
+      // anyError/downloadError/uploadError are the fields the SDK sets on failure.
+      logDebug('[SyncStatus] connected=${status.connected} downloading=${status.downloading} uploading=${status.uploading} hasSynced=${status.hasSynced} lastSyncedAt=${status.lastSyncedAt}');
+      if (status.anyError != null) {
+        logError('[SyncStatus] ⚠️ anyError: ${status.anyError}');
+      }
+      if (status.downloadError != null) {
+        logError('[SyncStatus] ⚠️ downloadError: ${status.downloadError}');
+      }
+      if (status.uploadError != null) {
+        logError('[SyncStatus] ⚠️ uploadError: ${status.uploadError}');
+      }
 
       final isConnected = status.connected;
       final isDownloading = status.downloading;

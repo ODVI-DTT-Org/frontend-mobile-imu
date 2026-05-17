@@ -313,11 +313,13 @@ class PowerSyncService {
       final db = await database;
       logDebug('[PowerSync Connect] Database instance created');
 
+      final connectStart = DateTime.now();
       await db.connect(connector: connector);
+      final connectMs = DateTime.now().difference(connectStart).inMilliseconds;
       _currentConnector = connector;
       _isConnected = true;
       _isConnecting = false;
-      logDebug('✅ [PowerSync Connect] Connected to PowerSync successfully');
+      logDebug('✅ [PowerSync Connect] Connected to PowerSync in ${connectMs}ms');
       await debugLocalSyncState();
     } catch (e, stackTrace) {
       _isConnecting = false;
@@ -445,6 +447,16 @@ class PowerSyncService {
     }
 
     subscription = db.statusStream.listen((status) {
+      logDebug('[InitialSync] event: connected=${status.connected} downloading=${status.downloading} uploading=${status.uploading} seenDownloading=$seenDownloading hasSynced=${status.hasSynced} lastSyncedAt=${status.lastSyncedAt}');
+      if (status.anyError != null) {
+        logError('[InitialSync] ⚠️ anyError: ${status.anyError}');
+      }
+      if (status.downloadError != null) {
+        logError('[InitialSync] ⚠️ downloadError: ${status.downloadError}');
+      }
+      if (status.uploadError != null) {
+        logError('[InitialSync] ⚠️ uploadError: ${status.uploadError}');
+      }
       if (status.downloading) {
         seenDownloading = true;
         nothingToSyncTimer?.cancel();

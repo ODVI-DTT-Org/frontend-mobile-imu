@@ -38,28 +38,32 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
   /// Fetch PowerSync authentication credentials
   @override
   Future<PowerSyncCredentials?> fetchCredentials() async {
+    final fetchStart = DateTime.now();
+    logDebug('[FetchCreds] ⏱️ fetchCredentials() called at $fetchStart');
     try {
       // Get the current access token from JWT auth service
       final accessToken = _authService.accessToken;
 
+      // Log full auth state — critical for diagnosing the 10% sync failure
+      logDebug('[FetchCreds] Auth state: hasToken=${accessToken != null} tokenLen=${accessToken?.length} needsRefresh=${_authService.needsRefresh} isAuthenticated=${_authService.isAuthenticated} isValid=${_authService.currentUser?.isValid} tokenExpiry=${_authService.currentUser?.expiresAt} timeUntilExpiry=${_authService.timeUntilExpiry}');
+
       if (accessToken == null) {
-        logDebug('No access token - user needs to login');
+        logDebug('[FetchCreds] No access token — user needs to login');
         return null;
       }
 
-      logDebug('JWT token available, length: ${accessToken.length}');
-
       // Check if token needs refresh (only if not already expired)
       if (_authService.needsRefresh && _authService.currentUser?.isValid == true) {
-        logDebug('Token needs refresh, refreshing...');
+        logDebug('[FetchCreds] Token needs refresh — calling refreshTokens()');
         try {
+          final refreshStart = DateTime.now();
           await _authService.refreshTokens();
-          logDebug('Token refreshed successfully for PowerSync');
+          logDebug('[FetchCreds] Token refreshed in ${DateTime.now().difference(refreshStart).inMilliseconds}ms');
         } catch (e) {
-          logWarning('Failed to refresh token for PowerSync, using existing token: $e');
+          logWarning('[FetchCreds] Token refresh failed (${e.runtimeType}): $e — will try with existing token');
           // Continue with existing token if it's still valid
           if (!_authService.isAuthenticated) {
-            logError('Cannot fetch credentials - no valid token');
+            logError('[FetchCreds] Cannot fetch credentials — no valid token after refresh failure');
             return null;
           }
         }
@@ -67,23 +71,26 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
 
       // Check if we have a valid token after refresh attempt
       if (!_authService.isAuthenticated) {
-        logError('Cannot fetch credentials - token is invalid');
+        logError('[FetchCreds] Cannot fetch credentials — token is invalid after refresh check');
         return null;
       }
 
       // Fetch PowerSync-specific token from backend
       // PowerSync requires a token with 'user_id' claim that the SDK extracts
-      logDebug('Fetching PowerSync token from backend...');
+      final currentToken = _authService.accessToken ?? accessToken;
+      logDebug('[FetchCreds] Fetching PowerSync token from backend: $_apiUrl/powersync/token');
 
+      final tokenFetchStart = DateTime.now();
       final response = await _httpClient.get(
         '$_apiUrl/powersync/token',
         options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
+          headers: {'Authorization': 'Bearer $currentToken'},
         ),
       );
+      logDebug('[FetchCreds] Backend response: ${response.statusCode} in ${DateTime.now().difference(tokenFetchStart).inMilliseconds}ms');
 
       if (response.statusCode != 200) {
-        logError('Failed to fetch PowerSync token: ${response.statusCode}');
+        logError('[FetchCreds] ❌ Non-200 response: ${response.statusCode} body=${response.data}');
         return null;
       }
 
@@ -94,15 +101,12 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
       final expiresAt = data['expiresAt'] as int?;
 
       if (powerSyncToken == null || endpoint == null || userId == null) {
-        logError('Invalid PowerSync token response: missing required fields');
+        logError('[FetchCreds] ❌ Invalid response — missing fields: token=${powerSyncToken != null} endpoint=${endpoint != null} userId=${userId != null} responseKeys=${data.keys.toList()}');
         return null;
       }
 
-      logDebug('PowerSync credentials fetched successfully');
-      logDebug('Creating PowerSyncCredentials with endpoint: $endpoint, userId: $userId');
-      logDebug('PowerSync token length: ${powerSyncToken.length}');
-      logDebug('PowerSync token prefix: ${powerSyncToken.substring(0, 20)}...');
-      logDebug('PowerSync expiresAt: ${expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : "null"}');
+      logDebug('[FetchCreds] ✅ Credentials fetched in ${DateTime.now().difference(fetchStart).inMilliseconds}ms total');
+      logDebug('[FetchCreds] endpoint=$endpoint userId=$userId tokenLen=${powerSyncToken.length} tokenPrefix=${powerSyncToken.substring(0, 20)}... expiresAt=${expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : "null"}');
 
       // Return credentials with proper userId and expiresAt
       return PowerSyncCredentials(
@@ -111,8 +115,14 @@ class IMUPowerSyncConnector extends PowerSyncBackendConnector {
         userId: userId,
         expiresAt: expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt) : null,
       );
+    } on DioException catch (e) {
+      logError('[FetchCreds] ❌ DioException after ${DateTime.now().difference(fetchStart).inMilliseconds}ms: type=${e.type} status=${e.response?.statusCode} message=${e.message}');
+      if (e.response != null) {
+        logError('[FetchCreds] ❌ Response body: ${e.response!.data}');
+      }
+      return null;
     } catch (e) {
-      logError('Failed to fetch PowerSync credentials', e);
+      logError('[FetchCreds] ❌ Exception after ${DateTime.now().difference(fetchStart).inMilliseconds}ms: type=${e.runtimeType} detail=$e');
       return null;
     }
   }
