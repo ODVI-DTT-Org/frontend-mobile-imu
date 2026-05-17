@@ -343,9 +343,11 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
           }
           if (locationFilter.hasFilter) {
             paginatedClients = paginatedClients.where((c) {
-              if (locationFilter.province != null && c.province != locationFilter.province) return false;
+              if (locationFilter.province != null &&
+                  c.province?.toUpperCase() != locationFilter.province!.toUpperCase()) return false;
               if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
-                if (!locationFilter.municipalities!.contains(c.municipality)) return false;
+                final muns = locationFilter.municipalities!.map((m) => m.toUpperCase()).toSet();
+                if (!muns.contains(c.municipality?.toUpperCase())) return false;
               }
               return true;
             }).toList();

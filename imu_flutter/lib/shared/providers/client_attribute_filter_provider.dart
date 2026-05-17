@@ -113,11 +113,7 @@ class ClientAttributeFilterNotifier extends StateNotifier<ClientAttributeFilter>
   }
 
   void clear() {
-    state = const ClientAttributeFilter(
-      touchpointReasons: null,
-      touchpointDateFrom: null,
-      touchpointDateTo: null,
-    );
+    state = ClientAttributeFilter.none();
     _prefs.clearAttributeFilters();
   }
 

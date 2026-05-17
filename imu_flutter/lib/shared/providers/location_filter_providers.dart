@@ -38,10 +38,11 @@ class LocationFilterNotifier extends StateNotifier<LocationFilter> {
     _persistFilter(newFilter);
   }
 
-  /// Set province and persist
+  /// Set province and persist — clears municipalities since they belong to the old province
   void setProvince(String? province) {
-    state = state.copyWith(province: province);
+    state = LocationFilter(province: province);
     _prefs.setProvince(province);
+    _prefs.setMunicipalities([]);
   }
 
   /// Set municipalities and persist

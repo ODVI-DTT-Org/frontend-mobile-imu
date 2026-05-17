@@ -11,13 +11,15 @@ class LocationFilter {
 
   static LocationFilter none() => const LocationFilter();
 
+  static const _absent = Object();
+
   LocationFilter copyWith({
-    String? province,
-    List<String>? municipalities,
+    Object? province = _absent,
+    Object? municipalities = _absent,
   }) {
     return LocationFilter(
-      province: province ?? this.province,
-      municipalities: municipalities ?? this.municipalities,
+      province: identical(province, _absent) ? this.province : province as String?,
+      municipalities: identical(municipalities, _absent) ? this.municipalities : municipalities as List<String>?,
     );
   }
 
