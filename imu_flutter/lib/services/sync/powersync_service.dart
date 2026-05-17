@@ -227,6 +227,15 @@ const Schema _powerSyncSchema = Schema([
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
+  Table('notifications', [
+    Column.text('user_id'),
+    Column.text('type'),
+    Column.text('title'),
+    Column.text('body'),
+    Column.text('data'),
+    Column.text('read_at'),
+    Column.text('created_at'),
+  ]),
   // PowerSync automatically adds 'id' column - do not define it explicitly
   Table('client_favorites', [
     Column.text('user_id'),
@@ -557,6 +566,7 @@ class PowerSyncService {
       'targets',
       'attendance',
       'approvals',
+      'notifications',
     ];
     logDebug('========== LOCAL SYNC STATE ==========');
     for (final table in tables) {
