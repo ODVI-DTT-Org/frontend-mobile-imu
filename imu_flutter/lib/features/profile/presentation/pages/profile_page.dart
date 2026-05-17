@@ -49,7 +49,7 @@ class ProfilePage extends ConsumerWidget {
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (dialogContext) {
         bool showCurrent = false;
@@ -190,11 +190,7 @@ class ProfilePage extends ConsumerWidget {
           ),
         );
       },
-    ).then((_) {
-      currentPasswordController.dispose();
-      newPasswordController.dispose();
-      confirmPasswordController.dispose();
-    });
+    );
   }
 
   void _handleLogout(BuildContext context, WidgetRef ref) {

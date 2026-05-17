@@ -893,11 +893,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         );
       },
-    ).then((_) {
-      currentPasswordController.dispose();
-      newPasswordController.dispose();
-      confirmPasswordController.dispose();
-    });
+    );
   }
 
   void _showStorageDialog() {
