@@ -755,110 +755,149 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Change Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Current Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'New Password (min. 8 characters)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Confirm New Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final currentPassword = currentPasswordController.text;
-              final newPassword = newPasswordController.text;
-              final confirmPassword = confirmPasswordController.text;
+      builder: (dialogContext) {
+        bool showCurrent = false;
+        bool showNew = false;
+        bool showConfirm = false;
+        bool isSubmitting = false;
 
-              if (newPassword != confirmPassword) {
-                AppNotification.showError(context, 'New passwords do not match');
-                return;
-              }
-              if (newPassword.length < 8) {
-                AppNotification.showError(context, 'New password must be at least 8 characters');
-                return;
-              }
-              if (currentPassword.isEmpty) {
-                AppNotification.showError(context, 'Please enter your current password');
-                return;
-              }
-
-              Navigator.pop(dialogContext);
-
-              await LoadingHelper.withLoading(
-                ref: ref,
-                message: 'Changing password...',
-                operation: () async {
-                  final token = ref.read(jwtAuthProvider).accessToken;
-                  if (token == null) throw Exception('Not authenticated');
-
-                  final dio = Dio(BaseOptions(
-                    baseUrl: AppConfig.apiBaseUrl,
-                    connectTimeout: const Duration(seconds: 15),
-                    receiveTimeout: const Duration(seconds: 15),
-                  ));
-
-                  await dio.post(
-                    '/auth/change-password',
-                    data: {
-                      'currentPassword': currentPassword,
-                      'newPassword': newPassword,
-                    },
-                    options: Options(
-                      headers: {'Authorization': 'Bearer $token'},
+        return StatefulBuilder(
+          builder: (_, setState) => AlertDialog(
+            title: const Text('Change Password'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentPasswordController,
+                  obscureText: !showCurrent,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(showCurrent ? LucideIcons.eyeOff : LucideIcons.eye, size: 18),
+                      onPressed: () => setState(() => showCurrent = !showCurrent),
                     ),
-                  );
-                },
-                onError: (e) {
-                  if (mounted) {
-                    String message = 'Failed to change password';
-                    if (e is DioException) {
-                      message = e.response?.data?['message'] as String? ?? message;
-                    }
-                    AppNotification.showError(context, message);
-                  }
-                },
-              );
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: !showNew,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'New Password (min. 8 characters)',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(showNew ? LucideIcons.eyeOff : LucideIcons.eye, size: 18),
+                      onPressed: () => setState(() => showNew = !showNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: !showConfirm,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(showConfirm ? LucideIcons.eyeOff : LucideIcons.eye, size: 18),
+                      onPressed: () => setState(() => showConfirm = !showConfirm),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        final currentPassword = currentPasswordController.text.trim();
+                        final newPassword = newPasswordController.text;
+                        final confirmPassword = confirmPasswordController.text;
 
-              if (mounted) {
-                HapticUtils.success();
-                AppNotification.showSuccess(context, 'Password changed successfully');
-              }
-            },
-            child: const Text('Change Password'),
+                        if (currentPassword.isEmpty) {
+                          AppNotification.showError(context, 'Please enter your current password');
+                          return;
+                        }
+                        if (newPassword.length < 8) {
+                          AppNotification.showError(context, 'New password must be at least 8 characters');
+                          return;
+                        }
+                        if (newPassword != confirmPassword) {
+                          AppNotification.showError(context, 'New passwords do not match');
+                          return;
+                        }
+
+                        setState(() => isSubmitting = true);
+                        bool success = false;
+                        try {
+                          final token = ref.read(jwtAuthProvider).accessToken;
+                          if (token == null) throw Exception('Not authenticated');
+
+                          final dio = Dio(BaseOptions(
+                            baseUrl: AppConfig.apiBaseUrl,
+                            connectTimeout: const Duration(seconds: 15),
+                            receiveTimeout: const Duration(seconds: 15),
+                          ));
+                          await dio.post(
+                            '/auth/change-password',
+                            data: {
+                              'currentPassword': currentPassword,
+                              'newPassword': newPassword,
+                            },
+                            options: Options(
+                              headers: {'Authorization': 'Bearer $token'},
+                            ),
+                          );
+                          success = true;
+                        } on DioException catch (e) {
+                          if (mounted) {
+                            final message = e.response?.data?['message'] as String?
+                                ?? 'Failed to change password';
+                            AppNotification.showError(context, message);
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            AppNotification.showError(context, 'Failed to change password');
+                          }
+                        } finally {
+                          if (dialogContext.mounted) {
+                            setState(() => isSubmitting = false);
+                          }
+                        }
+
+                        if (success) {
+                          if (dialogContext.mounted) Navigator.pop(dialogContext);
+                          if (mounted) {
+                            HapticUtils.success();
+                            AppNotification.showSuccess(context, 'Password changed successfully');
+                          }
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Change Password'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      },
+    ).then((_) {
+      currentPasswordController.dispose();
+      newPasswordController.dispose();
+      confirmPasswordController.dispose();
+    });
   }
 
   void _showStorageDialog() {
