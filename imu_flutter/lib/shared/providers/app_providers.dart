@@ -631,7 +631,7 @@ final assignedMunicipalitiesProvider = FutureProvider<List<String>>((ref) async 
   final areaFilterService = ref.watch(areaFilterServiceProvider);
   final locations = await areaFilterService.fetchUserLocations(token, userId);
 
-  return locations.map((l) => l.municipalityId).toSet().toList();
+  return locations.map((l) => l.municipality).toSet().toList();
 });
 
 /// Selected client ID
