@@ -163,16 +163,23 @@ class EnhancedSyncLoadingNotifier extends StateNotifier<EnhancedSyncLoadingState
     final hasLocalData = await _checkForLocalData();
 
     if (hasLocalData) {
-      logDebug('[SyncLoadingPage] ✅ Local data found! Skipping PowerSync connection, using local data.');
+      logDebug('[SyncLoadingPage] ✅ Local data found! Navigating immediately; starting PowerSync in background.');
       state = state.copyWith(
         isInitializing: false,
         isSyncing: false,
-        isConnected: false,  // Not connected, but we have local data
+        isConnected: false,
         syncComplete: true,
         progress: 1.0,
         currentStep: 'Using local data (PowerSync will sync in background)',
       );
-      // Navigation handled by widget
+      // Start PowerSync in the background so SQLite is populated for
+      // assignedClientsProvider (which queries SQLite, not Hive).
+      // Errors are swallowed — the Hive fallback in the provider covers the gap.
+      if (!PowerSyncService.isConnected) {
+        unawaited(PowerSyncService.connect(_powerSyncConnector).catchError(
+          (e) => logWarning('[SyncLoadingPage] Background PowerSync connect failed: $e'),
+        ));
+      }
       return;
     }
 

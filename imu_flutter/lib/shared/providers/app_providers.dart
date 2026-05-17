@@ -128,6 +128,7 @@ import '../models/client_attribute_filter.dart';
 import 'location_filter_providers.dart' show locationFilterProvider;
 import 'client_attribute_filter_provider.dart' show clientAttributeFilterProvider;
 import 'touchpoint_filter_provider.dart' show touchpointFilterProvider;
+import '../models/touchpoint_filter.dart' show TouchpointFilter;
 import '../../features/visits/data/models/visit_model.dart';
 import '../../features/visits/data/repositories/visit_repository.dart';
 import '../../features/attendance/data/repositories/attendance_repository.dart';
@@ -437,6 +438,74 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   }
 });
 
+/// Hive fallback for [assignedClientsProvider].
+///
+/// Used when PowerSync SQLite has no clients yet (e.g. the sync loading page
+/// skipped PowerSync because Hive already had cached data) OR when the
+/// municipality assignments API was unreachable so [effectiveMunicipalities]
+/// came back empty. The Hive cache already contains only the user's assigned
+/// clients, so no territory filter is re-applied here; only the user-applied
+/// location sub-filter, search, and attribute/touchpoint predicates are run.
+ClientsResponse _buildHiveFallback({
+  required HiveService hive,
+  required LocationFilter locationFilter,
+  required String searchQuery,
+  required ClientAttributeFilter attributeFilter,
+  required TouchpointFilter touchpointFilter,
+  required int page,
+  required int itemsPerPage,
+}) {
+  var clients = hive.getAllClients()
+      .map((json) => Client.fromJson(json))
+      .where((c) => c.deletedAt == null)
+      .toList();
+
+  // Apply user-selected location sub-filter (Hive is already territory-scoped).
+  if (locationFilter.municipalities?.isNotEmpty == true) {
+    final upper = locationFilter.municipalities!.map((m) => m.toUpperCase()).toSet();
+    clients = clients
+        .where((c) => c.municipality != null && upper.contains(c.municipality!.toUpperCase()))
+        .toList();
+  }
+  if (locationFilter.province != null) {
+    final p = locationFilter.province!.toUpperCase();
+    clients = clients.where((c) => c.province?.toUpperCase() == p).toList();
+  }
+
+  // Text search — AND across words, LIKE on name/agency fields (mirrors SQL path).
+  if (searchQuery.isNotEmpty) {
+    final words = searchQuery.trim().split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
+    for (final word in words) {
+      final q = word.toLowerCase();
+      clients = clients.where((c) =>
+        c.firstName.toLowerCase().contains(q) ||
+        c.lastName.toLowerCase().contains(q) ||
+        (c.middleName?.toLowerCase().contains(q) ?? false) ||
+        (c.agencyName?.toLowerCase().contains(q) ?? false)
+      ).toList();
+    }
+  }
+
+  // attributeFilter.matches() covers type chips, touchpoint statuses, date
+  // ranges, and recentlyVisitedDays — all in one pass.
+  clients = clients.where((c) => attributeFilter.matches(c)).toList();
+  if (touchpointFilter.hasFilter) {
+    clients = clients.where((c) => touchpointFilter.matches(c)).toList();
+  }
+
+  final totalItems = clients.length;
+  final totalPages = (totalItems / itemsPerPage).ceil().clamp(1, 9999);
+  final offset = ((page - 1) * itemsPerPage).clamp(0, totalItems);
+  final end = (offset + itemsPerPage).clamp(0, totalItems);
+  return ClientsResponse(
+    items: clients.sublist(offset, end),
+    page: page,
+    perPage: itemsPerPage,
+    totalItems: totalItems,
+    totalPages: totalPages,
+  );
+}
+
 /// Assigned clients — queries PowerSync SQLite directly with SQL filters and
 /// LIMIT/OFFSET pagination. No full Hive load; only the requested page is
 /// transferred from the DB to Dart memory.
@@ -471,17 +540,43 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   const itemsPerPage = 20;
 
   // If user has no territory assignment (or filter produces empty set), bail.
+  // Before returning empty, try Hive — the assignments API may have been
+  // unreachable and the AreaFilterService cache not yet seeded.
   if (effectiveMunicipalities.isEmpty) {
+    final hive = HiveService();
+    if (hive.cachedClientCount > 0) {
+      return _buildHiveFallback(
+        hive: hive, locationFilter: locationFilter,
+        searchQuery: searchQuery, attributeFilter: attributeFilter,
+        touchpointFilter: touchpointFilter, page: page, itemsPerPage: itemsPerPage,
+      );
+    }
     return ClientsResponse(
-      items: [],
-      page: page,
-      perPage: itemsPerPage,
-      totalItems: 0,
-      totalPages: 1,
+      items: [], page: page, perPage: itemsPerPage, totalItems: 0, totalPages: 1,
     );
   }
 
   final db = await PowerSyncService.database;
+
+  // ── Hive fallback when PowerSync SQLite is not yet populated ─────────────
+  // The sync loading page fast-tracks to home when Hive has data, skipping
+  // the PowerSync wait. The clients table may be empty on that first visit.
+  // Read from Hive so the user sees their assigned clients immediately while
+  // PowerSync populates SQLite in the background.
+  {
+    final psRows = await db.getAll('SELECT COUNT(*) as cnt FROM clients LIMIT 1');
+    final psCount = (psRows.first['cnt'] as int?) ?? 0;
+    if (psCount == 0) {
+      final hive = HiveService();
+      if (hive.cachedClientCount > 0) {
+        return _buildHiveFallback(
+          hive: hive, locationFilter: locationFilter,
+          searchQuery: searchQuery, attributeFilter: attributeFilter,
+          touchpointFilter: touchpointFilter, page: page, itemsPerPage: itemsPerPage,
+        );
+      }
+    }
+  }
 
   // ── Build SQL WHERE conditions ────────────────────────────────────────────
   final conditions = <String>['deleted_at IS NULL'];
