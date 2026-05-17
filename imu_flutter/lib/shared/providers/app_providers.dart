@@ -451,21 +451,50 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   final attributeFilter = ref.watch(clientAttributeFilterProvider);
   final touchpointFilter = ref.watch(touchpointFilterProvider);
 
+  // Resolve user's territory municipalities before touching the DB.
+  final assignedMunicipalities =
+      await ref.watch(assignedMunicipalitiesProvider.future);
+
+  // Compute effective municipality filter: intersection of user territory and
+  // any user-applied location filter; if the user filtered by municipality we
+  // narrow to that subset, otherwise all assigned municipalities are the base.
+  final List<String> effectiveMunicipalities;
+  if (locationFilter.municipalities?.isNotEmpty == true) {
+    effectiveMunicipalities = assignedMunicipalities
+        .where((m) => locationFilter.municipalities!.contains(m))
+        .toList();
+  } else {
+    effectiveMunicipalities = assignedMunicipalities;
+  }
+
+  const itemsPerPage = 20;
+
+  // If user has no territory assignment (or filter produces empty set), bail.
+  if (effectiveMunicipalities.isEmpty) {
+    return ClientsResponse(
+      items: [],
+      page: page,
+      perPage: itemsPerPage,
+      totalItems: 0,
+      totalPages: 1,
+    );
+  }
+
   final db = await PowerSyncService.database;
 
   // ── Build SQL WHERE conditions ────────────────────────────────────────────
   final conditions = <String>['deleted_at IS NULL'];
   final params = <Object?>[];
 
-  // Location
+  // Base territory filter — always applied on the Assigned tab.
+  final mPh = effectiveMunicipalities.map((_) => '?').join(', ');
+  conditions.add('municipality IN ($mPh)');
+  params.addAll(effectiveMunicipalities);
+
+  // Location (province only — municipality already handled above)
   if (locationFilter.province != null) {
     conditions.add('province = ?');
     params.add(locationFilter.province);
-  }
-  if (locationFilter.municipalities?.isNotEmpty == true) {
-    final ph = locationFilter.municipalities!.map((_) => '?').join(', ');
-    conditions.add('municipality IN ($ph)');
-    params.addAll(locationFilter.municipalities!);
   }
 
   // Attribute type filters — OR within a category, AND across categories.
@@ -508,8 +537,6 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       attributeFilter.touchpointDateFrom != null ||
       attributeFilter.touchpointDateTo != null ||
       attributeFilter.recentlyVisitedDays != null;
-
-  const itemsPerPage = 20;
 
   if (hasComplexFilter) {
     // Fetch all SQL-filtered rows (type/location/search already applied),

@@ -1143,18 +1143,18 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
     bool isInMyDay = false;
     todayItineraryAsync.when(
       data: (items) {
-        isInMyDay = items.any((item) =>
+        final inApi = items.any((item) =>
           item.clientId == client.id &&
           item.scheduledDate.year == today.year &&
           item.scheduledDate.month == today.month &&
           item.scheduledDate.day == today.day
         );
-        // Keep optimistic set in sync so future loading gaps are accurate.
-        if (isInMyDay) {
-          _scheduledTodayIds.add(client.id!);
-        } else {
-          _scheduledTodayIds.remove(client.id);
-        }
+        // Merge API result with optimistic set: once a client is added it
+        // stays disabled until the widget is disposed, preventing a re-enable
+        // race if the provider refresh completes before the backend write
+        // is visible in the list response.
+        if (inApi) _scheduledTodayIds.add(client.id!);
+        isInMyDay = inApi || _scheduledTodayIds.contains(client.id);
       },
       loading: () {
         // While reloading, fall back to optimistic set to prevent button flicker.
