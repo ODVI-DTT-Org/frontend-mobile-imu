@@ -21,6 +21,8 @@ class ClientCard extends StatelessWidget {
   final String? scheduledTime;
   final String? productType;
   final String? pensionType;
+  final String? lastTouchpointStatus;
+  final String? lastTouchpointReason;
   final VoidCallback onTap;
 
   const ClientCard({
@@ -36,6 +38,8 @@ class ClientCard extends StatelessWidget {
     this.scheduledTime,
     this.productType,
     this.pensionType,
+    this.lastTouchpointStatus,
+    this.lastTouchpointReason,
     required this.onTap,
   });
 
@@ -95,6 +99,13 @@ class ClientCard extends StatelessWidget {
                             if (pensionType != null && pensionType!.isNotEmpty)
                               _CardTypeBadge(label: _formatTypeBadgeLabel(pensionType!)),
                           ],
+                        ),
+                      ],
+                      if (lastTouchpointStatus != null && lastTouchpointStatus!.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        _TouchpointStatusBadge(
+                          status: lastTouchpointStatus!,
+                          reason: lastTouchpointReason,
                         ),
                       ],
                       const Divider(height: 14, thickness: 0.5),
@@ -345,6 +356,68 @@ class _CardTypeBadge extends StatelessWidget {
           color: c.withOpacity(0.85),
           letterSpacing: 0.3,
         ),
+      ),
+    );
+  }
+}
+
+class _TouchpointStatusBadge extends StatelessWidget {
+  final String status;
+  final String? reason;
+
+  const _TouchpointStatusBadge({required this.status, this.reason});
+
+  Color get _color {
+    switch (status.toLowerCase()) {
+      case 'interested': return Colors.green;
+      case 'undecided': return Colors.orange;
+      case 'not interested': return Colors.red;
+      case 'completed': return Colors.blue;
+      case 'follow-up needed': return Colors.purple;
+      default: return Colors.grey;
+    }
+  }
+
+  IconData get _icon {
+    switch (status.toLowerCase()) {
+      case 'interested': return LucideIcons.thumbsUp;
+      case 'undecided': return LucideIcons.helpCircle;
+      case 'not interested': return LucideIcons.thumbsDown;
+      case 'completed': return LucideIcons.checkCircle;
+      case 'follow-up needed': return LucideIcons.refreshCw;
+      default: return LucideIcons.clock;
+    }
+  }
+
+  String get _label {
+    if (reason != null && reason!.isNotEmpty) return '$reason · $status';
+    return status;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              _label,
+              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

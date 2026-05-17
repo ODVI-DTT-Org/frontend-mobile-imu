@@ -6,6 +6,7 @@ import '../../../features/clients/data/providers/client_favorites_provider.dart'
 import '../../../core/models/user_role.dart';
 import '../../../shared/providers/app_providers.dart' show currentUserRoleProvider;
 import '../../../core/utils/app_notification.dart';
+import 'touchpoint_status_badge.dart';
 
 /// Unified client list tile used across Clients Page and Client Selector Modal.
 ///
@@ -257,6 +258,8 @@ class ClientListTile extends ConsumerWidget {
                     ],
                   ),
                 ),
+              const SizedBox(height: 4),
+              TouchpointStatusBadge(client: client),
               const SizedBox(height: 6),
 
               // Row 4: Address

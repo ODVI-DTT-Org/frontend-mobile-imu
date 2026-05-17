@@ -39,6 +39,7 @@ class ItineraryItem {
 
   // Previous touchpoint info
   final int? previousTouchpointNumber; // Last completed touchpoint number
+  final String? previousTouchpointStatus; // Last completed touchpoint status (Interested, Undecided, etc.)
   final String? previousTouchpointReason; // Last completed touchpoint reason
   final String? previousTouchpointType; // Last completed touchpoint type (visit/call)
   final DateTime? previousTouchpointDate; // Last completed touchpoint date
@@ -69,6 +70,7 @@ class ItineraryItem {
     this.nextTouchpointNumber,
     this.nextTouchpointType,
     this.previousTouchpointNumber,
+    this.previousTouchpointStatus,
     this.previousTouchpointReason,
     this.previousTouchpointType,
     this.previousTouchpointDate,
@@ -191,6 +193,7 @@ class ItineraryItem {
       pensionType: pensionType,
       loanType: loanType,
       previousTouchpointNumber: validatedPreviousNumber,
+      previousTouchpointStatus: json['previous_touchpoint_status'],
       previousTouchpointReason: json['previous_touchpoint_reason'],
       previousTouchpointType: json['previous_touchpoint_type'],
       previousTouchpointDate: json['previous_touchpoint_date'] != null
@@ -287,6 +290,7 @@ class ItineraryItem {
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,
       previousTouchpointNumber: (lastTouchpoint?['touchpoint_number'] as num?)?.toInt(),
+      previousTouchpointStatus: lastTouchpoint?['status'] as String?,
       previousTouchpointReason: lastTouchpoint?['reason'] as String?,
       previousTouchpointType: lastTouchpoint?['type'] as String?,
       previousTouchpointDate: previousDate,
@@ -343,6 +347,7 @@ class ItineraryItem {
     String? pensionType,
     String? loanType,
     int? previousTouchpointNumber,
+    String? previousTouchpointStatus,
     String? previousTouchpointReason,
     String? previousTouchpointType,
     DateTime? previousTouchpointDate,
@@ -369,6 +374,7 @@ class ItineraryItem {
       pensionType: pensionType ?? this.pensionType,
       loanType: loanType ?? this.loanType,
       previousTouchpointNumber: previousTouchpointNumber ?? this.previousTouchpointNumber,
+      previousTouchpointStatus: previousTouchpointStatus ?? this.previousTouchpointStatus,
       previousTouchpointReason: previousTouchpointReason ?? this.previousTouchpointReason,
       previousTouchpointType: previousTouchpointType ?? this.previousTouchpointType,
       previousTouchpointDate: previousTouchpointDate ?? this.previousTouchpointDate,
