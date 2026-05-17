@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import '../../features/activity/presentation/widgets/edit_touchpoint_bottom_sheet.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../services/api/client_api_service.dart';
 
@@ -402,8 +403,11 @@ class _TouchpointHistoryDialogState
                     padding: const EdgeInsets.all(16),
                     itemCount: touchpoints.length,
                     itemBuilder: (context, index) {
+                      final tp = touchpoints[index];
                       return _TouchpointHistoryItem(
-                          touchpoint: touchpoints[index]);
+                        touchpoint: tp,
+                        onEdit: () => _handleEdit(context, tp),
+                      );
                     },
                   );
                 },
@@ -413,6 +417,21 @@ class _TouchpointHistoryDialogState
         ),
       ),
     );
+  }
+
+  Future<void> _handleEdit(BuildContext context, Touchpoint touchpoint) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => EditTouchpointBottomSheet(
+        touchpointId: touchpoint.id,
+        clientName: widget.clientName,
+      ),
+    );
+    if (result == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<List<Touchpoint>> _loadClientTouchpoints() async {
@@ -570,8 +589,11 @@ class _TouchpointHistoryBottomSheetState
                   padding: const EdgeInsets.all(16),
                   itemCount: touchpoints.length,
                   itemBuilder: (context, index) {
+                    final tp = touchpoints[index];
                     return _TouchpointHistoryItem(
-                        touchpoint: touchpoints[index]);
+                      touchpoint: tp,
+                      onEdit: () => _handleEdit(context, tp),
+                    );
                   },
                 );
               },
@@ -580,6 +602,21 @@ class _TouchpointHistoryBottomSheetState
         ],
       ),
     );
+  }
+
+  Future<void> _handleEdit(BuildContext context, Touchpoint touchpoint) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => EditTouchpointBottomSheet(
+        touchpointId: touchpoint.id,
+        clientName: widget.clientName,
+      ),
+    );
+    if (result == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<List<Touchpoint>> _loadClientTouchpoints() async {
@@ -597,8 +634,12 @@ class _TouchpointHistoryBottomSheetState
 
 class _TouchpointHistoryItem extends StatelessWidget {
   final Touchpoint touchpoint;
+  final VoidCallback? onEdit;
 
-  const _TouchpointHistoryItem({required this.touchpoint});
+  const _TouchpointHistoryItem({
+    required this.touchpoint,
+    this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -722,26 +763,54 @@ class _TouchpointHistoryItem extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // View Details button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => showTouchpointDetails(context, touchpoint),
-              icon: const Icon(LucideIcons.eye, size: 14),
-              label: const Text('View Details'),
-              style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                foregroundColor: isVisit ? Colors.blue[700] : Colors.green[700],
-                side: BorderSide(
-                  color: isVisit ? Colors.blue[200]! : Colors.green[200]!,
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => showTouchpointDetails(context, touchpoint),
+                  icon: const Icon(LucideIcons.eye, size: 14),
+                  label: const Text('View Details'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    foregroundColor:
+                        isVisit ? Colors.blue[700] : Colors.green[700],
+                    side: BorderSide(
+                      color:
+                          isVisit ? Colors.blue[200]! : Colors.green[200]!,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (onEdit != null && isVisit && _isToday(touchpoint.date)) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(LucideIcons.pencil, size: 14),
+                    label: const Text('Edit'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      foregroundColor: Colors.orange[700],
+                      side: BorderSide(color: Colors.orange[200]!),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
     );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   Color _getStatusColor(TouchpointStatus status) {
