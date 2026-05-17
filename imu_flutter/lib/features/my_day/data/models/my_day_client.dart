@@ -255,6 +255,7 @@ class MyDayClient {
     'next_touchpoint_type': nextTouchpointType,
     'assigned_by_name': assignedByName,
     'previous_touchpoint_number': previousTouchpointNumber,
+    'previous_touchpoint_status': previousTouchpointStatus,
     'previous_touchpoint_reason': previousTouchpointReason,
     'previous_touchpoint_type': previousTouchpointType,
     'previous_touchpoint_date': previousTouchpointDate?.toIso8601String(),
@@ -347,6 +348,7 @@ class MyDayClient {
           other.nextTouchpointType == nextTouchpointType &&
           other.assignedByName == assignedByName &&
           other.previousTouchpointNumber == previousTouchpointNumber &&
+          other.previousTouchpointStatus == previousTouchpointStatus &&
           other.previousTouchpointReason == previousTouchpointReason &&
           other.previousTouchpointType == previousTouchpointType &&
           other.previousTouchpointDate == previousTouchpointDate &&
@@ -374,6 +376,7 @@ class MyDayClient {
         nextTouchpointType,
         assignedByName,
         previousTouchpointNumber,
+        previousTouchpointStatus,
         previousTouchpointReason,
         previousTouchpointType,
         previousTouchpointDate,
