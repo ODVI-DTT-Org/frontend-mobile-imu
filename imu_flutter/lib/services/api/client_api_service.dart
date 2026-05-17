@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import 'package:imu_flutter/services/api/api_exception.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
@@ -37,7 +38,19 @@ class ClientApiService {
     List<String>? nextTouchpointNumbers,
     String? touchpointDateFrom,
     String? touchpointDateTo,
+    int? recentlyVisitedDays,
   }) async {
+    // Translate relative "N days" window into an absolute cutoff date understood
+    // by the backend's existing touchpoint_date_from filter.  If an explicit
+    // touchpointDateFrom is also set, keep whichever is more restrictive (later).
+    if (recentlyVisitedDays != null) {
+      final cutoff = DateTime.now().subtract(Duration(days: recentlyVisitedDays));
+      final cutoffStr = DateFormat('yyyy-MM-dd').format(cutoff);
+      if (touchpointDateFrom == null || cutoffStr.compareTo(touchpointDateFrom) > 0) {
+        touchpointDateFrom = cutoffStr;
+      }
+    }
+
     try {
       debugPrint('[CLIENT-API] Fetching clients from REST API...');
       debugPrint('[CLIENT-API] page=$page, perPage=$perPage, search=$search');

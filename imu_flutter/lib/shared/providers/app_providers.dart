@@ -426,6 +426,7 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       nextTouchpointNumbers: nextTouchpointNumbers,
       touchpointDateFrom: queryParams['touchpoint_date_from'],
       touchpointDateTo: queryParams['touchpoint_date_to'],
+      recentlyVisitedDays: attributeFilter.recentlyVisitedDays,
     );
 
     debugPrint('onlineClientsProvider: Got ${response.items.length} clients from API (page ${response.page} of ${response.totalPages}, total: ${response.totalItems})');
