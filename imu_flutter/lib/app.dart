@@ -8,6 +8,8 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'services/quick_actions/quick_actions_service.dart';
 import 'services/geofencing/geofencing_service.dart';
+import 'services/fcm_service.dart';
+import 'services/auth/auth_service.dart' show AuthState;
 // SESSION/PIN MONITORING DISABLED - Commenting out to focus on core authentication
 // import 'services/auth/session_service.dart';
 import 'shared/widgets/loading_widget.dart';
@@ -165,6 +167,17 @@ class _IMUAppState extends ConsumerState<IMUApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+
+    // Initialize FCM once the user is authenticated
+    ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+      final wasAuth = previous?.isAuthenticated ?? false;
+      if (!wasAuth && next.isAuthenticated) {
+        FcmService.initialize(ref);
+      }
+      if (wasAuth && !next.isAuthenticated) {
+        FcmService.unregisterToken(ref);
+      }
+    });
     final isLoadingVisible = ref.watch(isLoadingOverlayVisibleProvider);
     final loadingMessage = ref.watch(loadingMessageProvider);
 

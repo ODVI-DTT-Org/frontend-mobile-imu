@@ -34,6 +34,25 @@ class NotificationsApiService {
       options: Options(headers: _authHeaders),
     );
   }
+
+  Future<void> registerDeviceToken({
+    required String token,
+    required String platform,
+  }) async {
+    await _dio.post(
+      '/notifications/device-token',
+      data: {'token': token, 'platform': platform},
+      options: Options(headers: _authHeaders),
+    );
+  }
+
+  Future<void> unregisterDeviceToken({required String token}) async {
+    await _dio.delete(
+      '/notifications/device-token',
+      data: {'token': token},
+      options: Options(headers: _authHeaders),
+    );
+  }
 }
 
 final notificationsApiServiceProvider = Provider<NotificationsApiService>((ref) {
