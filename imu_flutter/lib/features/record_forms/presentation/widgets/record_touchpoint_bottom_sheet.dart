@@ -12,7 +12,8 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/no
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/photo_card.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/unified_action_bottom_sheet.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart'
-    show touchpointCreationServiceProvider, jwtAuthProvider;
+    show touchpointCreationServiceProvider, jwtAuthProvider, currentUserRoleProvider;
+import 'package:imu_flutter/core/models/user_role.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/core/utils/app_notification.dart';
 
@@ -67,7 +68,9 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           id: '',
           clientId: client.id!,
           touchpointNumber: client.nextTouchpointNumber ?? (client.touchpointNumber + 1),
-          type: client.nextTouchpointType ?? TouchpointType.visit,
+          type: ref.read(currentUserRoleProvider) == UserRole.tele
+              ? TouchpointType.call
+              : TouchpointType.visit,
           reason: _cm.TouchpointReason.fromApi(reason.value!.apiValue),
           status: _cm.TouchpointStatus.fromApi(status.value!.apiValue),
           date: now,
