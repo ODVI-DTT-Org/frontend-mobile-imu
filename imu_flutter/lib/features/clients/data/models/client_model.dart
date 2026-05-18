@@ -15,7 +15,7 @@ class Client {
   // Legacy PCNICMS fields
   final String? extName; // Extension name (Jr., Sr., etc.)
   final String? fullname; // Full name (legacy computed field)
-  // fullAddress removed - using getter instead
+  final String? tableFullAddress; // full_address column from clients table
   final String? dob; // Date of birth as text (legacy)
 
   final String? agencyName;
@@ -90,7 +90,7 @@ class Client {
     required this.lastName,
     this.extName,
     this.fullname,
-    // fullAddress removed - using getter instead
+    this.tableFullAddress,
     this.dob,
     this.agencyName,
     this.department,
@@ -160,13 +160,15 @@ class Client {
   }
 
   String get fullAddress {
-    // Prefer specific address from addresses list
+    // 1. Client table's own full_address column (most specific)
+    if (tableFullAddress != null && tableFullAddress!.isNotEmpty) return tableFullAddress!;
+    // 2. Primary address from addresses list
     if (addresses.isNotEmpty) {
       final primary = addresses.firstWhere((a) => a.isPrimary, orElse: () => addresses.first);
       final specific = primary.fullAddress;
       if (specific.isNotEmpty) return specific;
     }
-    // Fall back to PSGC fields on the client record
+    // 3. PSGC fields on the client record
     final parts = <String>[];
     if (province != null && province!.isNotEmpty) parts.add(province!);
     if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
@@ -365,7 +367,7 @@ class Client {
     String? lastName,
     String? extName,
     String? fullname,
-    // fullAddress removed - using getter instead
+    String? tableFullAddress,
     String? dob,
     String? agencyName,
     String? department,
@@ -427,7 +429,7 @@ class Client {
       lastName: lastName ?? this.lastName,
       extName: extName ?? this.extName,
       fullname: fullname ?? this.fullname,
-      // fullAddress removed - using getter instead
+      tableFullAddress: tableFullAddress ?? this.tableFullAddress,
       dob: dob ?? this.dob,
       agencyName: agencyName ?? this.agencyName,
       department: department ?? this.department,
@@ -690,7 +692,7 @@ class Client {
       // Legacy PCNICMS fields
       extName: json['extName'] ?? json['ext_name'],
       fullname: json['fullname'] ?? json['full_name'],
-      // fullAddress removed - using getter instead
+      tableFullAddress: json['full_address'] as String?,
       dob: json['dob'],
       // Standard fields
       agencyName: json['agencyName'] ?? json['agency_name'],
@@ -786,7 +788,7 @@ class Client {
       // Legacy PCNICMS fields
       extName: row['ext_name'] as String?,
       fullname: row['fullname'] as String?,
-      // fullAddress removed - using getter instead
+      tableFullAddress: row['full_address'] as String?,
       dob: row['dob'] as String?,
       // Standard fields
       birthDate: row['birth_date'] != null ? DateTime.parse(row['birth_date'] as String) : null,
