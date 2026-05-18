@@ -25,32 +25,37 @@ class FcmService {
     if (!Platform.isAndroid && !Platform.isIOS) return;
 
     try {
+      debugPrint('[FCM] Calling Firebase.initializeApp()...');
       await Firebase.initializeApp();
+      debugPrint('[FCM] Firebase.initializeApp() done');
+
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
       final messaging = FirebaseMessaging.instance;
 
-      // Request permission (badge only — no alert/sound; PowerSync delivers content)
+      debugPrint('[FCM] Requesting permission...');
       await messaging.requestPermission(alert: false, badge: true, sound: false);
+      debugPrint('[FCM] Permission requested');
 
+      debugPrint('[FCM] Getting token...');
       _token = await messaging.getToken();
+      debugPrint('[FCM] Token: $_token');
+
       if (_token != null) await _registerToken(ref, _token!);
 
-      // Refresh token whenever FCM rotates it
       messaging.onTokenRefresh.listen((newToken) {
         _token = newToken;
         _registerToken(ref, newToken);
       });
 
-      // Foreground data-only messages — PowerSync live query handles the update.
       FirebaseMessaging.onMessage.listen((_) {
         debugPrint('[FCM] Foreground sync trigger received — PowerSync will re-query');
       });
 
       _initialized = true;
       debugPrint('[FCM] Initialized. Token: $_token');
-    } catch (e) {
-      debugPrint('[FCM] Initialization failed: $e');
+    } catch (e, st) {
+      debugPrint('[FCM] Initialization failed: $e\n$st');
     }
   }
 

@@ -171,7 +171,9 @@ class _IMUAppState extends ConsumerState<IMUApp> with WidgetsBindingObserver {
     // Initialize FCM once the user is authenticated
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
       final wasAuth = previous?.isAuthenticated ?? false;
+      debugPrint('[FCM-TRIGGER] authState changed: wasAuth=$wasAuth → isAuth=${next.isAuthenticated}');
       if (!wasAuth && next.isAuthenticated) {
+        debugPrint('[FCM-TRIGGER] Calling FcmService.initialize()');
         FcmService.initialize(ref);
       }
       if (wasAuth && !next.isAuthenticated) {
