@@ -127,7 +127,10 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
             odometerArrival.value = v;
             final arrival = double.tryParse(v);
             if (arrival != null) {
-              odometerDeparture.value = (arrival + 5).toStringAsFixed(0);
+              final departed = arrival + 5;
+              odometerDeparture.value = departed == departed.truncateToDouble()
+                  ? departed.toInt().toString()
+                  : departed.toString();
             }
           },
           onOdometerDepartureChanged: (v) => odometerDeparture.value = v,

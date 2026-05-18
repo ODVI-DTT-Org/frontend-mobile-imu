@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
 import 'package:imu_flutter/features/activity/providers/activity_feed_provider.dart';
+import 'package:imu_flutter/services/api/approvals_api_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvider;
 import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserRoleProvider;
 import 'package:imu_flutter/core/models/user_role.dart';
@@ -36,7 +37,11 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
   @override
   void initState() {
     super.initState();
-    _reasonCtrl = TextEditingController(text: _extractReason(widget.item.detail));
+    // For loan releases, detail IS the UDI number; for touchpoints, extract from format
+    final initialReason = widget.item.subtype == ActivitySubtype.loanRelease
+        ? (widget.item.detail ?? '')
+        : _extractReason(widget.item.detail);
+    _reasonCtrl = TextEditingController(text: initialReason);
     _remarksCtrl = TextEditingController();
   }
 
@@ -54,35 +59,58 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
     return idx >= 0 ? detail.substring(idx + 3) : '';
   }
 
+  bool _isLoanRelease() => widget.item.subtype == ActivitySubtype.loanRelease;
+
   bool _canEdit() {
-    if (widget.item.type != ActivityType.touchpoint) return false;
+    final item = widget.item;
     final role = ref.read(currentUserRoleProvider);
-    if (role == UserRole.admin ||
+    final isManager = role == UserRole.admin ||
         role == UserRole.areaManager ||
-        role == UserRole.assistantAreaManager) return true;
-    // Caravan/Tele: only same-day edits
-    final now = DateTime.now();
-    final created = widget.item.createdAt;
-    return created.year == now.year &&
-        created.month == now.month &&
-        created.day == now.day;
+        role == UserRole.assistantAreaManager;
+
+    if (item.type == ActivityType.touchpoint) {
+      if (isManager) return true;
+      // Caravan/Tele: only same-day edits
+      final now = DateTime.now();
+      final created = item.createdAt;
+      return created.year == now.year &&
+          created.month == now.month &&
+          created.day == now.day;
+    }
+
+    // Loan release: editable while pending and within 1 day
+    if (_isLoanRelease() && item.status == ActivityStatus.pending) {
+      if (isManager) return true;
+      final hoursSinceCreation = DateTime.now().difference(item.createdAt).inHours;
+      return hoursSinceCreation <= 24;
+    }
+
+    return false;
   }
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
     try {
-      final jwtAuth = ref.read(jwtAuthProvider);
-      final token = jwtAuth.accessToken;
-      final dio = Dio(BaseOptions(baseUrl: AppConfig.postgresApiUrl));
-      await dio.patch(
-        '/visits',
-        queryParameters: {'touchpoint_id': widget.item.id},
-        data: {
-          if (_reasonCtrl.text.isNotEmpty) 'reason': _reasonCtrl.text.trim(),
-          if (_remarksCtrl.text.isNotEmpty) 'remarks': _remarksCtrl.text.trim(),
-        },
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+      if (_isLoanRelease()) {
+        await ref.read(approvalsApiServiceProvider).ownerEditLoanRelease(
+          approvalId: widget.item.id,
+          udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
+          remarks: _remarksCtrl.text.trim().isNotEmpty ? _remarksCtrl.text.trim() : null,
+        );
+      } else {
+        final jwtAuth = ref.read(jwtAuthProvider);
+        final token = jwtAuth.accessToken;
+        final dio = Dio(BaseOptions(baseUrl: AppConfig.postgresApiUrl));
+        await dio.patch(
+          '/visits',
+          queryParameters: {'touchpoint_id': widget.item.id},
+          data: {
+            if (_reasonCtrl.text.isNotEmpty) 'reason': _reasonCtrl.text.trim(),
+            if (_remarksCtrl.text.isNotEmpty) 'remarks': _remarksCtrl.text.trim(),
+          },
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
+        );
+      }
       ref.read(activityFeedProvider.notifier).refresh();
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -195,7 +223,10 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
             // Edit form or read-only detail
             if (_isEditMode) ...[
               const SizedBox(height: 16),
-              const Text('Reason', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              Text(
+                _isLoanRelease() ? 'UDI Number' : 'Reason',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
               const SizedBox(height: 4),
               TextField(
                 controller: _reasonCtrl,

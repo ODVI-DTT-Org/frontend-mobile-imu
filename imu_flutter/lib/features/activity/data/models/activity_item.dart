@@ -48,6 +48,7 @@ enum ActivitySubtype {
         return ActivitySubtype.phoneEdit;
       case 'phone_delete':
         return ActivitySubtype.phoneDelete;
+      case 'udi':
       case 'loan_release':
       case 'loan_release_v2':
         return ActivitySubtype.loanRelease;

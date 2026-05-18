@@ -82,7 +82,7 @@ class ActivityRepository {
     debugPrint('[ACTIVITY][repo] fetchApprovals userId=$userId from=$from to=$to');
     final rows = await PowerSyncService.query(
       """
-      SELECT a.id, a.type, a.status, a.reason, a.created_at,
+      SELECT a.id, a.type, a.status, a.reason, a.udi_number, a.created_at,
              c.first_name || ' ' || c.last_name AS client_name
       FROM approvals a
       LEFT JOIN clients c ON c.id = a.client_id
@@ -98,12 +98,17 @@ class ActivityRepository {
       final type = r['type'] as String? ?? 'client';
       final reason = r['reason'] as String?;
       final statusStr = r['status'] as String? ?? 'pending';
+      final subtype = ActivitySubtype.fromApproval(type: type, reason: reason);
+      final udiNumber = r['udi_number'] as String?;
+      final detail = subtype == ActivitySubtype.loanRelease && udiNumber != null
+          ? udiNumber
+          : reason;
       return ActivityItem(
         id: r['id'] as String,
         type: ActivityType.approval,
-        subtype: ActivitySubtype.fromApproval(type: type, reason: reason),
+        subtype: subtype,
         clientName: r['client_name'] as String?,
-        detail: reason,
+        detail: detail,
         status: statusFromApproval(statusStr),
         createdAt: DateTime.parse(r['created_at'] as String),
       );

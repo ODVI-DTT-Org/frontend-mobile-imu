@@ -367,6 +367,33 @@ class ApprovalsApiService {
     }
   }
 
+  /// Owner self-edit for a pending loan release approval (within 24 hours)
+  Future<void> ownerEditLoanRelease({
+    required String approvalId,
+    String? udiNumber,
+    String? remarks,
+  }) async {
+    final token = _authService.accessToken;
+    if (token == null) throw Exception('Not authenticated');
+
+    final data = <String, dynamic>{};
+    if (udiNumber != null) data['udi_number'] = udiNumber;
+    if (remarks != null) data['remarks'] = remarks;
+
+    final response = await _dio.patch(
+      '/approvals/$approvalId/owner-edit',
+      data: data,
+      options: Options(headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update loan release: ${response.statusCode}');
+    }
+  }
+
   /// Submit a new client for approval (non-admin users)
   Future<void> submitClientCreation({
     required Map<String, dynamic> clientData,

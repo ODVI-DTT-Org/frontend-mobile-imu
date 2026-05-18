@@ -43,7 +43,7 @@ class OdometerField extends HookWidget {
       ),
       child: TextField(
         controller: controller,
-        keyboardType: TextInputType.number,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(

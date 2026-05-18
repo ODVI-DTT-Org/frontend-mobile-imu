@@ -36,10 +36,12 @@ class TimeOdometerPanel extends StatelessWidget {
 
   String _formatOdometer(String? value) {
     if (value == null || value.isEmpty) return '';
-    // Format with comma for thousands
-    final number = int.tryParse(value);
+    final number = double.tryParse(value);
     if (number == null) return value;
-    return NumberFormat.decimalPattern().format(number);
+    // Show decimals only when present
+    return number == number.truncateToDouble()
+        ? NumberFormat.decimalPattern().format(number.toInt())
+        : NumberFormat('#,##0.##').format(number);
   }
 
   @override
@@ -218,9 +220,9 @@ class TimeOdometerPanel extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: TextEditingController(text: displayValue)..selection = TextSelection.fromPosition(TextPosition(offset: displayValue.length)),
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
                   ],
                   onChanged: (newValue) {
                     // Strip commas for the actual value
