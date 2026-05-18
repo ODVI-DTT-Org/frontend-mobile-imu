@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../providers/notification_provider.dart';
 import '../../../../services/api/notifications_api_service.dart';
+import '../../../../services/sync/powersync_service.dart';
 import '../../../../core/utils/app_notification.dart';
 
 class NotificationsPage extends ConsumerWidget {
@@ -12,6 +13,10 @@ class NotificationsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncNotifications = ref.watch(notificationsStreamProvider);
+
+    Future<void> handleRefresh() async {
+      await PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 10));
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -48,32 +53,45 @@ class NotificationsPage extends ConsumerWidget {
       body: asyncNotifications.when(
         data: (notifications) {
           if (notifications.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(LucideIcons.bellOff, size: 48, color: Color(0xFFCBD5E1)),
-                  SizedBox(height: 12),
-                  Text(
-                    'No notifications yet',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Color(0xFF94A3B8),
+            return RefreshIndicator(
+              onRefresh: handleRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.bellOff, size: 48, color: Color(0xFFCBD5E1)),
+                        SizedBox(height: 12),
+                        Text(
+                          'No notifications yet',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             );
           }
-          return ListView.separated(
-            itemCount: notifications.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
-            itemBuilder: (context, index) {
-              return _NotificationTile(
-                notification: notifications[index],
-                onTap: () => _handleTap(context, ref, notifications[index]),
-              );
-            },
+          return RefreshIndicator(
+            onRefresh: handleRefresh,
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: notifications.length,
+              separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
+              itemBuilder: (context, index) {
+                return _NotificationTile(
+                  notification: notifications[index],
+                  onTap: () => _handleTap(context, ref, notifications[index]),
+                );
+              },
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

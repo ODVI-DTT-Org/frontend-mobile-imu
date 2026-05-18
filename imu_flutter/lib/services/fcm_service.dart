@@ -2,14 +2,19 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api/notifications_api_service.dart';
 
+const _kChannelId = 'imu_notifications';
+const _kChannelName = 'IMU Notifications';
+
+final _flnp = FlutterLocalNotificationsPlugin();
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // App is in background/terminated — PowerSync auto-syncs on resume.
-  // The OS delivers a heads-up notification if the message has a notification
-  // payload; for data-only messages (our case) the app wakes silently.
+  // App is background/terminated — OS auto-shows notification when FCM message
+  // includes a notification payload. Nothing extra needed here.
   debugPrint('[FCM] Background message: ${message.messageId}');
 }
 
@@ -31,10 +36,23 @@ class FcmService {
 
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+      // Set up local notifications for foreground display
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      await _flnp.initialize(const InitializationSettings(android: androidInit));
+      if (Platform.isAndroid) {
+        await _flnp
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(const AndroidNotificationChannel(
+              _kChannelId,
+              _kChannelName,
+              importance: Importance.high,
+            ));
+      }
+
       final messaging = FirebaseMessaging.instance;
 
       debugPrint('[FCM] Requesting permission...');
-      await messaging.requestPermission(alert: false, badge: true, sound: false);
+      await messaging.requestPermission(alert: true, badge: true, sound: true);
       debugPrint('[FCM] Permission requested');
 
       debugPrint('[FCM] Getting token...');
@@ -48,8 +66,24 @@ class FcmService {
         _registerToken(ref, newToken);
       });
 
-      FirebaseMessaging.onMessage.listen((_) {
-        debugPrint('[FCM] Foreground sync trigger received — PowerSync will re-query');
+      // Show local notification when FCM arrives while app is in foreground
+      FirebaseMessaging.onMessage.listen((message) {
+        debugPrint('[FCM] Foreground message received — PowerSync will re-query');
+        final notification = message.notification;
+        if (notification == null) return;
+        _flnp.show(
+          message.hashCode,
+          notification.title,
+          notification.body,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _kChannelId,
+              _kChannelName,
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+          ),
+        );
       });
 
       _initialized = true;
