@@ -11,6 +11,7 @@ import '../../../../shared/providers/app_providers.dart' hide assignedMunicipali
 import '../../../../shared/providers/filter_providers.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
+import '../../../notifications/providers/notification_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -64,17 +65,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isTablet ? 48 : 35,
-            vertical: 24,
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 24),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isTablet ? 48 : 35,
+                vertical: 24,
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 24),
 
-              // Greeting - Centered per Figma design
-              Text(
+                  // Greeting - Centered per Figma design
+                  Text(
                 _getGreeting(),
                 style: TextStyle(
                   fontSize: isTablet ? 28 : 20,
@@ -95,6 +98,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               _buildDeveloperOptions(context),
             ],
           ),
+        ),
+            // Bell icon — top-right overlay
+            Positioned(
+              top: 8,
+              right: isTablet ? 48 : 16,
+              child: _NotificationBell(),
+            ),
+          ],
         ),
       ),
     );
@@ -541,6 +552,54 @@ class _DeveloperOptionsSheetState extends ConsumerState<_DeveloperOptionsSheet> 
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadNotificationCountProvider);
+    return GestureDetector(
+      onTap: () => context.push('/notifications'),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(LucideIcons.bell, size: 20, color: Color(0xFF0F172A)),
+          ),
+          if (unread > 0)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDC2626),
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                child: Text(
+                  unread > 99 ? '99+' : '$unread',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

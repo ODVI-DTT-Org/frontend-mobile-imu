@@ -28,6 +28,7 @@ import '../../features/calculator/presentation/pages/loan_calculator_page.dart';
 import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/activity/presentation/pages/activity_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/record_forms/presentation/widgets/record_touchpoint_form.dart';
 import '../../features/record_forms/presentation/widgets/record_visit_only_form.dart';
 import '../../features/record_forms/presentation/widgets/release_loan_form.dart';
@@ -334,6 +335,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/activity',
         builder: (context, state) => const ActivityPage(),
+      ),
+
+      // Notifications
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsPage(),
       ),
 
       // Debug route (development only)
