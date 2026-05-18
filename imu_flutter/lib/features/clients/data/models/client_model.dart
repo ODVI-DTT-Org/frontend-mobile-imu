@@ -160,6 +160,13 @@ class Client {
   }
 
   String get fullAddress {
+    // Prefer specific address from addresses list
+    if (addresses.isNotEmpty) {
+      final primary = addresses.firstWhere((a) => a.isPrimary, orElse: () => addresses.first);
+      final specific = primary.fullAddress;
+      if (specific.isNotEmpty) return specific;
+    }
+    // Fall back to PSGC fields on the client record
     final parts = <String>[];
     if (province != null && province!.isNotEmpty) parts.add(province!);
     if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
@@ -305,8 +312,7 @@ class Client {
   /// Get primary address with fallback to legacy fields
   addr.Address? get primaryAddress {
     if (addresses.isNotEmpty) {
-      final primary = addresses.where((a) => a.isPrimary).firstOrNull;
-      if (primary != null) return primary;
+      return addresses.firstWhere((a) => a.isPrimary, orElse: () => addresses.first);
     }
     // Fallback to legacy fields
     if (region != null || province != null || municipality != null || barangay != null) {
