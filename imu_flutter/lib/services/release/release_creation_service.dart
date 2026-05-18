@@ -85,53 +85,32 @@ class ReleaseCreationService {
       return ReleaseSubmitOutcome.queued;
     }
 
-    if (_role == UserRole.admin) {
-      // Admin: direct release (no approval needed)
-      debugPrint('ReleaseCreationService: Admin role — direct release');
-      await _releaseApi.createCompleteLoanRelease(
-        clientId: clientId,
-        timeIn: timeIn,
-        timeOut: timeOut,
-        odometerArrival: odometerArrival,
-        odometerDeparture: odometerDeparture,
-        productType: productType,
-        loanType: loanType,
-        udiNumber: int.tryParse(udiNumber),
-        remarks: remarks,
-        photoPath: photoPath,
-        latitude: latitude,
-        longitude: longitude,
-        address: address,
-      );
-    } else {
-      // Caravan/Tele: submit for approval via POST /approvals/loan-release-v2
-      debugPrint('ReleaseCreationService: ${_role.apiValue} role — submitting approval request');
+    // All roles submit for approval via POST /approvals/loan-release-v2
+    debugPrint('ReleaseCreationService: ${_role.apiValue} role — submitting approval request');
 
-      // Upload photo first to get a URL
-      String? photoUrl;
-      if (photoPath != null && photoPath.isNotEmpty) {
-        final file = File(photoPath);
-        final uploadResult = await _uploadApi.uploadPhoto(file);
-        photoUrl = uploadResult?.url;
-        debugPrint('ReleaseCreationService: Photo uploaded: $photoUrl');
-      }
-
-      await _approvalsApi.submitLoanReleaseV2(
-        clientId: clientId,
-        udiNumber: udiNumber,
-        productType: productType,
-        loanType: loanType,
-        timeIn: timeIn,
-        timeOut: timeOut,
-        odometerIn: odometerArrival,
-        odometerOut: odometerDeparture,
-        latitude: latitude,
-        longitude: longitude,
-        address: address,
-        photoUrl: photoUrl,
-        remarks: remarks,
-      );
+    String? photoUrl;
+    if (photoPath != null && photoPath.isNotEmpty) {
+      final file = File(photoPath);
+      final uploadResult = await _uploadApi.uploadPhoto(file);
+      photoUrl = uploadResult?.url;
+      debugPrint('ReleaseCreationService: Photo uploaded: $photoUrl');
     }
+
+    await _approvalsApi.submitLoanReleaseV2(
+      clientId: clientId,
+      udiNumber: udiNumber,
+      productType: productType,
+      loanType: loanType,
+      timeIn: timeIn,
+      timeOut: timeOut,
+      odometerIn: odometerArrival,
+      odometerOut: odometerDeparture,
+      latitude: latitude,
+      longitude: longitude,
+      address: address,
+      photoUrl: photoUrl,
+      remarks: remarks,
+    );
     return ReleaseSubmitOutcome.submitted;
   }
 }
