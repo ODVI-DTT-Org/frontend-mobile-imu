@@ -87,10 +87,9 @@ dependencies:
   # Local Notifications
   flutter_local_notifications: ^17.0.0
 
-  # Firebase (temporarily disabled for web compatibility)
-  # firebase_core: ^2.24.2
-  # firebase_crashlytics: ^3.4.8
-  # firebase_messaging: ^14.7.8
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.8
 
   # Haptic feedback (using built-in HapticFeedback instead)
   # flutter_vibrate: ^1.4.0 - requires Dart SDK ^3.10.4
