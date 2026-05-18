@@ -64,20 +64,30 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _NotificationBell(),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 48 : 35,
-                vertical: 24,
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 48 : 35,
+            vertical: 24,
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 24),
 
-                  // Greeting - Centered per Figma design
-                  Text(
+              // Greeting - Centered per Figma design
+              Text(
                 _getGreeting(),
                 style: TextStyle(
                   fontSize: isTablet ? 28 : 20,
@@ -98,14 +108,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               _buildDeveloperOptions(context),
             ],
           ),
-        ),
-            // Bell icon — top-right overlay
-            Positioned(
-              top: 8,
-              right: isTablet ? 48 : 16,
-              child: _NotificationBell(),
-            ),
-          ],
         ),
       ),
     );
@@ -563,36 +565,28 @@ class _NotificationBell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(unreadNotificationCountProvider);
-    return GestureDetector(
-      onTap: () => context.push('/notifications'),
-      child: Stack(
+    return IconButton(
+      onPressed: () => context.push('/notifications'),
+      icon: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(LucideIcons.bell, size: 20, color: Color(0xFF0F172A)),
-          ),
+          const Icon(LucideIcons.bell, size: 22, color: Color(0xFF0F172A)),
           if (unread > 0)
             Positioned(
-              right: -2,
-              top: -2,
+              right: -4,
+              top: -4,
               child: Container(
                 padding: const EdgeInsets.all(2),
                 decoration: const BoxDecoration(
                   color: Color(0xFFDC2626),
                   shape: BoxShape.circle,
                 ),
-                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Text(
                   unread > 99 ? '99+' : '$unread',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
