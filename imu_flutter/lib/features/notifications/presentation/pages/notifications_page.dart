@@ -15,7 +15,14 @@ class NotificationsPage extends ConsumerWidget {
     final asyncNotifications = ref.watch(notificationsStreamProvider);
 
     Future<void> handleRefresh() async {
-      await PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 10));
+      // Always show the spinner for at least 1.2s so the user sees feedback.
+      // waitForInitialSync waits for any in-progress sync to finish; PowerSync
+      // is reactive so new server data arrives automatically via the stream.
+      await Future.wait([
+        Future.delayed(const Duration(milliseconds: 1200)),
+        PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 8))
+            .catchError((_) {}),
+      ]);
     }
 
     return Scaffold(
