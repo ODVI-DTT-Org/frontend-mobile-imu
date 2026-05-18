@@ -101,6 +101,15 @@ void showTouchpointDetails(BuildContext context, Touchpoint touchpoint) {
 
                   // Location (simplified - address only)
                   _buildLocationSection(touchpoint),
+                  if (touchpoint.phoneNumber != null && touchpoint.phoneNumber!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildDetailRow(
+                      'Phone Dialed',
+                      touchpoint.phoneNumber!,
+                      LucideIcons.phone,
+                      Colors.grey[700]!,
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Remarks
@@ -756,6 +765,38 @@ class _TouchpointHistoryItem extends StatelessWidget {
                           color: Colors.grey[700],
                         ),
                       ),
+                    // Address (Visit) or Phone (Call)
+                    if (touchpoint.address != null && touchpoint.address!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(LucideIcons.mapPin, size: 12, color: Colors.grey[500]),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              touchpoint.address!,
+                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (touchpoint.phoneNumber != null && touchpoint.phoneNumber!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(LucideIcons.phone, size: 12, color: Colors.grey[500]),
+                          const SizedBox(width: 4),
+                          Text(
+                            touchpoint.phoneNumber!,
+                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

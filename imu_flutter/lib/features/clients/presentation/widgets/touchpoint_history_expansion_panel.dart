@@ -270,6 +270,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                         _tpDetailRow(LucideIcons.mapPin, 'Departure Location', tp.timeOutGpsAddress!),
                       if (tp.address != null)
                         _tpDetailRow(LucideIcons.home, 'Address', tp.address!),
+                      if (tp.phoneNumber != null)
+                        _tpDetailRow(LucideIcons.phone, 'Phone Dialed', tp.phoneNumber!),
                       if (tp.odometerArrival != null)
                         _tpDetailRow(LucideIcons.gauge, 'Odometer (Arrival)', tp.odometerArrival!),
                       if (tp.odometerDeparture != null)

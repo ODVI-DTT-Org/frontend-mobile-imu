@@ -1053,6 +1053,7 @@ class Touchpoint {
   final String? rejectionReason;
   final DateTime? updatedAt;
   final String? source; // e.g. "CMS" for legacy imported records
+  final String? phoneNumber; // Phone number dialed (for Call touchpoints)
 
   final DateTime createdAt;
 
@@ -1090,6 +1091,7 @@ class Touchpoint {
     this.rejectionReason,
     this.updatedAt,
     this.source,
+    this.phoneNumber,
     required this.createdAt,
   });
 
@@ -1147,6 +1149,7 @@ class Touchpoint {
     String? rejectionReason,
     DateTime? updatedAt,
     String? source,
+    String? phoneNumber,
     DateTime? createdAt,
   }) {
     return Touchpoint(
@@ -1183,6 +1186,7 @@ class Touchpoint {
       rejectionReason: rejectionReason ?? this.rejectionReason,
       updatedAt: updatedAt ?? this.updatedAt,
       source: source ?? this.source,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1223,6 +1227,7 @@ class Touchpoint {
     'rejection_reason': rejectionReason,
     'updated_at': updatedAt?.toIso8601String(),
     'source': source,
+    'phone_number': phoneNumber,
     'created_at': createdAt?.toIso8601String(),
   };
 
@@ -1351,6 +1356,7 @@ class Touchpoint {
       rejectionReason: getValue<String>('rejection_reason', 'rejectionReason'),
       updatedAt: parseDateTime(getValue<String>('updated_at', 'updatedAt')),
       source: getValue<String>('source', 'source') ?? nested_s('source'),
+      phoneNumber: getValue<String>('phone_number', 'phoneNumber') ?? nested_s('phone_number'),
       createdAt: parseDateTime(getValue<String>('created_at', 'createdAt')) ?? DateTime.now(),
     );
   }
@@ -1422,6 +1428,7 @@ class Touchpoint {
       timeOutGpsLat: row['time_out_gps_lat'] as double?,
       timeOutGpsLng: row['time_out_gps_lng'] as double?,
       timeOutGpsAddress: row['time_out_gps_address'] as String?,
+      phoneNumber: row['phone_number'] as String?,
       createdAt: parseDateTime(row['created_at']) ?? DateTime.now(),
     );
   }
