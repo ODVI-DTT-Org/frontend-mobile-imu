@@ -42,6 +42,8 @@ const Schema _powerSyncSchema = Schema([
     Column.text('loan_released_at'),
     Column.text('udi'),
     Column.text('full_address'),
+    Column.real('latitude'),
+    Column.real('longitude'),
     // Touchpoint summary fields - NEW (denormalized from backend)
     Column.text('touchpoint_summary'), // JSON array of touchpoint history
     Column.integer('touchpoint_number'), // Completed touchpoint count (unlimited)

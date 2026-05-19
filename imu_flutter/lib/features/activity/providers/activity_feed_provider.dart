@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
 import 'package:imu_flutter/features/activity/data/repositories/activity_repository.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 
 class ActivityFeedState {
   static const int pageSize = 200;
@@ -133,5 +134,18 @@ class ActivityFeedNotifier extends StateNotifier<ActivityFeedState> {
 final activityFeedProvider =
     StateNotifierProvider.autoDispose<ActivityFeedNotifier, ActivityFeedState>((ref) {
   final repo = ref.watch(activityRepositoryProvider);
-  return ActivityFeedNotifier(repo);
+  final notifier = ActivityFeedNotifier(repo);
+
+  // Re-load when a PowerSync download cycle completes so historical data
+  // that arrived after the initial load() call becomes visible without
+  // requiring a manual pull-to-refresh.
+  ref.listen<AsyncValue<SyncStatus>>(syncStatusProvider, (prev, next) {
+    final wasDownloading = prev?.value?.downloading ?? false;
+    final isNowIdle = !(next.value?.downloading ?? false);
+    if (wasDownloading && isNowIdle) {
+      notifier.load();
+    }
+  });
+
+  return notifier;
 });

@@ -1299,12 +1299,28 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                     // Badges
                     Wrap(
                       spacing: 6,
+                      runSpacing: 4,
                       children: [
-                        _buildBadge(client.clientType.name, _getClientTypeColor(client.clientType)),
-                        if (client.productTypeDisplay.isNotEmpty)
-                          _buildBadge(client.productTypeDisplay, _getProductTypeColor(client.productType)),
-                        if (client.pensionType != PensionType.others && client.pensionTypeDisplay.isNotEmpty)
-                          _buildBadge(client.pensionTypeDisplay, _getPensionTypeColor(client.pensionType)),
+                        _buildBadge(
+                          client.clientType.name.isNotEmpty ? client.clientType.name : 'No Client Type',
+                          client.clientType.name.isNotEmpty ? _getClientTypeColor(client.clientType) : Colors.grey.shade400,
+                        ),
+                        _buildBadge(
+                          client.marketTypeDisplay?.isNotEmpty == true ? client.marketTypeDisplay! : 'No Market Type',
+                          client.marketType != null ? _getMarketTypeColor(client.marketType!) : Colors.grey.shade400,
+                        ),
+                        _buildBadge(
+                          client.productTypeDisplay.isNotEmpty ? client.productTypeDisplay : 'No Product Type',
+                          client.productTypeDisplay.isNotEmpty ? _getProductTypeColor(client.productType) : Colors.grey.shade400,
+                        ),
+                        _buildBadge(
+                          client.pensionType != PensionType.others && client.pensionTypeDisplay.isNotEmpty
+                              ? client.pensionTypeDisplay
+                              : 'No Pension Type',
+                          client.pensionType != PensionType.others && client.pensionTypeDisplay.isNotEmpty
+                              ? _getPensionTypeColor(client.pensionType)
+                              : Colors.grey.shade400,
+                        ),
                         if (client.isStarred)
                           const Icon(Icons.star, size: 16, color: Colors.amber),
                       ],
@@ -1515,6 +1531,16 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         return Colors.green;
       case ClientType.virgin:
         return Colors.purple;
+    }
+  }
+
+  Color _getMarketTypeColor(MarketType type) {
+    switch (type) {
+      case MarketType.bfpActive:   return Colors.red;
+      case MarketType.bfpPension:  return Colors.orange;
+      case MarketType.virgin:      return Colors.purple;
+      case MarketType.existing:    return Colors.green;
+      case MarketType.fullyPaid:   return Colors.teal;
     }
   }
 
