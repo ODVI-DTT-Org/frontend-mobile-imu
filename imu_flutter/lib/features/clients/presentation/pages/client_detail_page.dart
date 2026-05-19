@@ -1321,6 +1321,15 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                               ? _getPensionTypeColor(client.pensionType)
                               : Colors.grey.shade400,
                         ),
+                        if (client.loanReleased)
+                          _buildBadge(
+                            client.loanTypeDisplay?.isNotEmpty == true
+                                ? client.loanTypeDisplay!
+                                : 'No Loan Type',
+                            client.loanType != null
+                                ? _getLoanTypeColor(client.loanType!)
+                                : Colors.grey.shade400,
+                          ),
                         if (client.isStarred)
                           const Icon(Icons.star, size: 16, color: Colors.amber),
                       ],
@@ -1584,6 +1593,19 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         return const Color(0xFFE53935);
       case PensionType.others:
         return Colors.grey;
+    }
+  }
+
+  Color _getLoanTypeColor(LoanType type) {
+    switch (type) {
+      case LoanType.newLoan:
+        return const Color(0xFF2563EB);
+      case LoanType.additional:
+        return const Color(0xFF7C3AED);
+      case LoanType.renewal:
+        return const Color(0xFF059669);
+      case LoanType.preterm:
+        return const Color(0xFFDC2626);
     }
   }
 
