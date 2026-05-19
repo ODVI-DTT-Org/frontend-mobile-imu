@@ -22,6 +22,7 @@ import '../../../../shared/providers/app_providers.dart' show
     powerSyncDatabaseProvider,
     clientByIdProvider,
     clientTouchpointsProvider,
+    succeededLocalClientTouchpointsProvider,
     clientApiServiceProvider;
 import '../../../../core/models/user_role.dart';
 import '../../../../services/client/client_mutation_service.dart' show ClientMutationResult;
@@ -30,6 +31,7 @@ import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart' hide Address, PhoneNumber;
+import '../../../clients/data/repositories/touchpoint_history_repository.dart';
 import '../../../clients/data/models/address_model.dart';
 import '../../../clients/data/models/phone_number_model.dart';
 import '../../../clients/data/repositories/address_repository.dart' show AddressRepository;
@@ -891,8 +893,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     HapticUtils.lightImpact();
 
-    // Use client.nextTouchpoint directly (String from API, no strict pattern)
-    final nextTypeString = _client!.nextTouchpoint?.toLowerCase();
+    final nextTypeString =
+        (_client!.nextTouchpoint ?? _client!.touchpointStatus?.nextTouchpointType)?.toLowerCase();
     // Prefer backend-calculated nextTouchpointNumber; fall back to touchpointNumber+1
     // (touchpointNumber is the completed count, so +1 gives the next step number)
     final tp = _client!.touchpointNumber;
@@ -1314,10 +1316,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                           client.productTypeDisplay.isNotEmpty ? _getProductTypeColor(client.productType) : Colors.grey.shade400,
                         ),
                         _buildBadge(
-                          client.pensionType != PensionType.others && client.pensionTypeDisplay.isNotEmpty
+                          client.pensionTypeDisplay.isNotEmpty
                               ? client.pensionTypeDisplay
                               : 'No Pension Type',
-                          client.pensionType != PensionType.others && client.pensionTypeDisplay.isNotEmpty
+                          client.pensionTypeDisplay.isNotEmpty
                               ? _getPensionTypeColor(client.pensionType)
                               : Colors.grey.shade400,
                         ),
@@ -1405,8 +1407,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     // Role must match the next touchpoint type:
     // caravan → Visit only (1, 4, 7); tele → Call only (2, 3, 5, 6); managers → any
-    // Use client.nextTouchpoint directly (String from API, no strict pattern)
-    final nextTypeString = client.nextTouchpoint?.toLowerCase();
+    final nextTypeString =
+        (client.nextTouchpoint ?? client.touchpointStatus?.nextTouchpointType)?.toLowerCase();
     final nextType = nextTypeString == 'call' ? TouchpointType.call : TouchpointType.visit;
     final roleCanRecordTouchpoint = userRole == null ? false
         : userRole.isManager ? true
@@ -1591,12 +1593,11 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
   Widget _buildTouchpointProgressBadge() {
     final client = _client!;
     final completedCount = client.completedTouchpoints;
-    // Use client.nextTouchpoint directly (String from API, no strict pattern)
-    final nextType = client.nextTouchpoint?.toLowerCase();
+    final nextType = (client.nextTouchpoint ?? client.touchpointStatus?.nextTouchpointType)?.toLowerCase();
 
     final badgeText = nextType != null
         ? '$completedCount • $nextType'
-        : '$completedCount';
+        : '$completedCount completed';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1648,6 +1649,13 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       data: (client) {
         // Update local state for methods that need it
         _client = client;
+        final succeededLocalTouchpoints = ref
+            .watch(succeededLocalClientTouchpointsProvider(widget.clientId))
+            .valueOrNull ?? const <Touchpoint>[];
+        final touchpointHistory = mergeTouchpointHistory(
+          summary: _client!.touchpointSummary,
+          succeededLocal: succeededLocalTouchpoints,
+        );
 
         return Scaffold(
       backgroundColor: Colors.white,
@@ -1804,7 +1812,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
                   // 3. Touchpoint History
                   TouchpointHistoryExpansionPanel(
                     client: _client!,
-                    touchpoints: _client!.touchpointSummary,
+                    touchpoints: touchpointHistory,
                   ),
 
                   const SizedBox(height: 100), // Bottom padding
@@ -1857,9 +1865,8 @@ class _QuickActionsSection extends ConsumerWidget {
     // Fallback to true for backward compatibility with cached data
     final canRecordTouchpoint = client?.touchpointStatus?.canCreateTouchpoint ?? true;
 
-    // Role must match next touchpoint type
-    // Use client.nextTouchpoint directly (String from API, no strict pattern)
-    final nextTypeString = client?.nextTouchpoint?.toLowerCase();
+    final nextTypeString =
+        (client?.nextTouchpoint ?? client?.touchpointStatus?.nextTouchpointType)?.toLowerCase();
     final roleCanRecordTouchpoint = userRole == null ? false
         : userRole.isManager ? true
         : userRole == UserRole.caravan ? nextTypeString == 'visit'
@@ -2413,5 +2420,3 @@ class _TouchpointHistoryItem extends StatelessWidget {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }
-
-

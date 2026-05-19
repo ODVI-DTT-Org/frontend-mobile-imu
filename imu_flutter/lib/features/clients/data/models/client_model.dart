@@ -224,15 +224,31 @@ class Client {
   String get pensionTypeDisplay {
     if (pensionTypeRaw != null && pensionTypeRaw!.isNotEmpty) {
       // Check if raw value matches known enum
-      final rawLower = pensionTypeRaw!.toLowerCase();
-      final enumMatch = PensionType.values.any((e) => e.name.toLowerCase() == rawLower);
+      final rawNormalized = _normalizeEnumToken(pensionTypeRaw);
+      final enumMatch = PensionType.values.any((e) => _normalizeEnumToken(e.name) == rawNormalized);
       if (!enumMatch) {
         // Raw value is unknown, return it as-is
         return pensionTypeRaw!;
       }
     }
     // Use enum value
-    return pensionType.name.toUpperCase();
+    return switch (pensionType) {
+      PensionType.pnpRetireeOptional => 'PNP - RETIREE OPTIONAL',
+      PensionType.pnpRetireeCompulsory => 'PNP - RETIREE COMPULSORY',
+      PensionType.pnpRetiree => 'PNP - RETIREE',
+      PensionType.bfpRetiree => 'BFP - RETIREE',
+      PensionType.bfpStpRetiree => 'BFP STP - RETIREE',
+      PensionType.pnpTransferree => 'PNP - TRANSFEREE',
+      PensionType.bfpSurvivor => 'BFP - SURVIVOR',
+      PensionType.pnpSurvivor => 'PNP - SURVIVOR',
+      PensionType.pnpTppd => 'PNP - TPPD',
+      PensionType.bfpTppd => 'BFP - TPPD',
+      PensionType.pnpMinor => 'PNP - MINOR',
+      PensionType.bfpMinor => 'BFP - MINOR',
+      PensionType.pnpPosthumousMinor => 'PNP - POSTHUMOUS MINOR',
+      PensionType.pnpPosthumousSpouse => 'PNP - POSTHUMOUS SPOUSE',
+      PensionType.others => pensionTypeRaw?.isNotEmpty == true ? pensionTypeRaw! : 'OTHERS',
+    };
   }
 
   /// Display loan type - shows raw value if available, otherwise enum value
@@ -296,7 +312,7 @@ class Client {
   /// Get the next touchpoint type as TouchpointType enum
   /// Returns null if no next touchpoint (client completed all touchpoints)
   TouchpointType? get nextTouchpointType {
-    final nextTypeString = nextTouchpoint?.toLowerCase();
+    final nextTypeString = (nextTouchpoint ?? touchpointStatus?.nextTouchpointType)?.toLowerCase();
     if (nextTypeString == null) return null;
     if (nextTypeString == 'call') return TouchpointType.call;
     if (nextTypeString == 'visit') return TouchpointType.visit;
@@ -586,6 +602,10 @@ class Client {
     return null;
   }
 
+  static String _normalizeEnumToken(dynamic value) {
+    return value.toString().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
   /// Parse ClientType from string, return null if unknown (no default)
   static ClientType _parseClientType(dynamic value) {
     if (value == null) return ClientType.potential;
@@ -628,11 +648,10 @@ class Client {
   /// Parse PensionType from string, return null if unknown (no default)
   static PensionType _parsePensionType(dynamic value) {
     if (value == null) return PensionType.others;
-    final str = value.toString().toLowerCase();
-    final stripped = str.replaceAll('_', '');
+    final normalized = _normalizeEnumToken(value);
     try {
       return PensionType.values.firstWhere(
-        (e) => e.name.toLowerCase() == str || e.name.toLowerCase() == stripped,
+        (e) => _normalizeEnumToken(e.name) == normalized,
       );
     } catch (_) {
       return PensionType.others;
@@ -747,7 +766,8 @@ class Client {
       touchpoints: (json['touchpoints'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       touchpointSummary: (json['touchpoint_summary'] as List?)?.map((t) => Touchpoint.fromJson(t)).toList() ?? [],
       touchpointNumber: json['touchpoint_number'] as int? ?? 1,
-      nextTouchpoint: json['next_touchpoint'] as String?,
+      nextTouchpoint: (json['next_touchpoint'] ??
+          (json['touchpoint_status'] as Map<String, dynamic>?)?['next_touchpoint_type']) as String?,
       nextTouchpointNumber: (json['nextTouchpointNumber'] ?? json['next_touchpoint_number']) as int?
           ?? (json['touchpoint_status'] as Map<String, dynamic>?)?['next_touchpoint_number'] as int?,
       touchpointStatus: json['touchpoint_status'] != null
@@ -836,7 +856,7 @@ class Client {
       udi: row['udi'] as String?,
       touchpointSummary: _parseTouchpointSummary(row['touchpoint_summary']),
       touchpointNumber: row['touchpoint_number'] as int? ?? 1,
-      nextTouchpoint: row['next_touchpoint'] as String?,
+      nextTouchpoint: (row['next_touchpoint'] ?? row['next_touchpoint_type']) as String?,
       nextTouchpointNumber: row['next_touchpoint_number'] as int?,
       touchpointStatus: row['touchpoint_status'] != null
           ? ClientTouchpointStatus.fromRow(row)

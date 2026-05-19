@@ -25,7 +25,7 @@ class TouchpointProgressBadge extends StatelessWidget {
     final completedCount = _displayedCount;
 
     // Use client's nextTouchpoint field directly (no pattern enforcement)
-    final nextTouchpoint = client.nextTouchpoint;
+    final nextTouchpoint = client.nextTouchpoint ?? client.touchpointStatus?.nextTouchpointType;
 
     if (nextTouchpoint != null) {
       final isCall = nextTouchpoint.toLowerCase() == 'call';
@@ -41,9 +41,9 @@ class TouchpointProgressBadge extends StatelessWidget {
       );
     }
 
-    // Fallback: just show count without type
+    // Fallback: keep the badge descriptive even when the backend has no next type.
     return _buildBadge(
-      label: '$completedCount',
+      label: '$completedCount completed',
       color: Colors.blue,
       icon: LucideIcons.mapPin,
       context: context,

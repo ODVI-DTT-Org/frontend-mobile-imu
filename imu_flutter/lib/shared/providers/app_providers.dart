@@ -133,6 +133,7 @@ import '../../features/visits/data/models/visit_model.dart';
 import '../../features/visits/data/repositories/visit_repository.dart';
 import '../../features/attendance/data/repositories/attendance_repository.dart';
 import '../../features/clients/data/repositories/client_repository.dart';
+import '../../features/clients/data/repositories/touchpoint_history_repository.dart';
 import '../../features/groups/data/models/group_model.dart';
 import '../../features/groups/data/repositories/group_repository.dart';
 import '../../features/targets/data/repositories/target_repository.dart';
@@ -766,6 +767,22 @@ final clientTouchpointsProvider = FutureProvider<List<Touchpoint>>((ref) async {
   // Fallback: PowerSync SQLite
   final client = await ref.watch(clientRepositoryProvider).getClient(clientId);
   return client?.touchpointSummary ?? [];
+});
+
+final touchpointHistoryRepositoryProvider = Provider<TouchpointHistoryRepository>((ref) {
+  return TouchpointHistoryRepository();
+});
+
+/// Local touchpoints whose PowerSync CRUD operations have already drained.
+///
+/// Newly-recorded rows are intentionally excluded while they remain in
+/// `ps_crud`; once background sync succeeds, the queue row is removed and this
+/// stream emits immediately, bridging the delay before the denormalized client
+/// summary is downloaded.
+final succeededLocalClientTouchpointsProvider =
+    StreamProvider.family<List<Touchpoint>, String>((ref, clientId) {
+  final repository = ref.watch(touchpointHistoryRepositoryProvider);
+  return repository.watchSucceededLocalTouchpoints(clientId);
 });
 
 /// Touchpoint counts for multiple clients from PowerSync (with API fallback)
