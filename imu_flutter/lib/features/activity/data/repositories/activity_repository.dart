@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
+import 'package:imu_flutter/services/api/release_api_service.dart';
 import 'package:imu_flutter/services/release/pending_release_service.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart';
@@ -8,10 +9,14 @@ import 'package:imu_flutter/shared/providers/app_providers.dart';
 class ActivityRepository {
   final String userId;
   final PendingReleaseService? pendingReleaseService;
+  final ReleaseApiService? releaseApiService;
+  final bool isOnline;
 
   const ActivityRepository({
     required this.userId,
     this.pendingReleaseService,
+    this.releaseApiService,
+    this.isOnline = true,
   });
 
   // ── Static helpers (used in tests) ──────────────────────────────────────
@@ -28,6 +33,69 @@ class ActivityRepository {
       case 'rejected': return ActivityStatus.rejected;
       default:         return ActivityStatus.pending;
     }
+  }
+
+  static ActivityStatus statusFromRelease(String status) {
+    switch (status) {
+      case 'approved': return ActivityStatus.approved;
+      case 'disbursed':
+      case 'completed': return ActivityStatus.completed;
+      case 'rejected': return ActivityStatus.rejected;
+      default: return ActivityStatus.pending;
+    }
+  }
+
+  static String? _stringValue(Map<String, dynamic> row, String key) {
+    final value = row[key];
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static Map<String, dynamic> touchpointMetadataFromRow(Map<String, dynamic> r) {
+    final tpType = _stringValue(r, 'type') ?? 'Visit';
+    final isCall = tpType == 'Call';
+    final reason = _stringValue(r, isCall ? 'call_reason' : 'visit_reason') ??
+        _stringValue(r, 'touchpoint_notes') ??
+        _stringValue(r, 'reason');
+    final notes = _stringValue(r, isCall ? 'call_notes' : 'visit_notes') ??
+        _stringValue(r, 'touchpoint_notes');
+
+    return {
+      'touchpointNumber': r['touchpoint_number'],
+      'touchpointType': tpType,
+      'date': _stringValue(r, 'date'),
+      'reason': reason,
+      'status': _stringValue(r, isCall ? 'call_status' : 'visit_status') ??
+          _stringValue(r, 'status'),
+      'notes': notes,
+      'timeIn': _stringValue(r, 'time_in'),
+      'timeOut': _stringValue(r, 'time_out'),
+      'odometerArrival': _stringValue(r, 'odometer_arrival'),
+      'odometerDeparture': _stringValue(r, 'odometer_departure'),
+      'phoneNumber': _stringValue(r, 'phone_number'),
+      'dialTime': _stringValue(r, 'dial_time'),
+      'duration': r['duration'],
+      'address': _stringValue(r, 'visit_address') ?? _stringValue(r, 'address'),
+      'latitude': r['visit_latitude'] ?? r['latitude'],
+      'longitude': r['visit_longitude'] ?? r['longitude'],
+      'photoUrl': _stringValue(r, isCall ? 'call_photo_url' : 'photo_url'),
+      'visitId': _stringValue(r, 'visit_id'),
+      'callId': _stringValue(r, 'call_id'),
+    }..removeWhere((_, value) => value == null || value == '');
+  }
+
+  static Map<String, dynamic> approvalMetadataFromRow(Map<String, dynamic> r) {
+    return {
+      'approvalType': _stringValue(r, 'type'),
+      'reason': _stringValue(r, 'reason'),
+      'notes': _stringValue(r, 'notes'),
+      'udiNumber': _stringValue(r, 'udi_number'),
+      'updatedUdi': _stringValue(r, 'updated_udi'),
+      'approvedAt': _stringValue(r, 'approved_at'),
+      'rejectedAt': _stringValue(r, 'rejected_at'),
+      'rejectionReason': _stringValue(r, 'rejection_reason'),
+    }..removeWhere((_, value) => value == null || value == '');
   }
 
   static ActivityItem activityFromPendingRelease(
@@ -48,6 +116,38 @@ class ActivityRepository {
       createdAt: queuedAt,
       source: ActivitySource.pendingReleaseQueue,
       metadata: Map<String, dynamic>.from(data),
+    );
+  }
+
+  static ActivityItem activityFromRelease(
+    Map<String, dynamic> data, {
+    String? clientName,
+    Map<String, dynamic> visitMetadata = const {},
+  }) {
+    final createdAt = DateTime.tryParse('${data['created_at'] ?? ''}') ??
+        DateTime.now();
+    final udiNumber = data['udi_number']?.toString();
+    final metadata = <String, dynamic>{
+      'clientId': _stringValue(data, 'client_id'),
+      'visitId': _stringValue(data, 'visit_id'),
+      'productType': _stringValue(data, 'product_type'),
+      'loanType': _stringValue(data, 'loan_type'),
+      'udiNumber': udiNumber,
+      'remarks': _stringValue(data, 'remarks'),
+      'approvalNotes': _stringValue(data, 'approval_notes'),
+      'approvedAt': _stringValue(data, 'approved_at'),
+      ...visitMetadata,
+    }..removeWhere((_, value) => value == null || value == '');
+
+    return ActivityItem(
+      id: data['id'] as String,
+      type: ActivityType.approval,
+      subtype: ActivitySubtype.loanRelease,
+      clientName: clientName,
+      detail: udiNumber,
+      status: statusFromRelease(_stringValue(data, 'status') ?? 'completed'),
+      createdAt: createdAt,
+      metadata: metadata,
     );
   }
 
@@ -75,10 +175,20 @@ class ActivityRepository {
     final pending = await _pendingIds('touchpoints');
     final rows = await PowerSyncService.query(
       """
-      SELECT t.id, t.type, t.notes AS reason, t.touchpoint_number, t.created_at,
-             c.first_name || ' ' || c.last_name AS client_name
+      SELECT t.id, t.type, t.notes AS touchpoint_notes, t.touchpoint_number,
+             t.date, t.status, t.next_visit_date, t.visit_id, t.call_id,
+             t.latitude, t.longitude, t.address, t.created_at,
+             c.first_name || ' ' || c.last_name AS client_name,
+             v.reason AS visit_reason, v.notes AS visit_notes, v.status AS visit_status,
+             v.time_in, v.time_out, v.odometer_arrival, v.odometer_departure,
+             v.photo_url, v.address AS visit_address, v.latitude AS visit_latitude,
+             v.longitude AS visit_longitude,
+             ca.reason AS call_reason, ca.notes AS call_notes, ca.status AS call_status,
+             ca.phone_number, ca.dial_time, ca.duration, ca.photo_url AS call_photo_url
       FROM touchpoints t
       LEFT JOIN clients c ON c.id = t.client_id
+      LEFT JOIN visits v ON v.id = t.visit_id
+      LEFT JOIN calls ca ON ca.id = t.call_id
       WHERE t.user_id = ?
         AND datetime(t.created_at) BETWEEN datetime(?) AND datetime(?)
       ORDER BY t.created_at DESC
@@ -91,7 +201,8 @@ class ActivityRepository {
       final id = r['id'] as String;
       final tpNum = r['touchpoint_number'] as int? ?? 0;
       final tpType = r['type'] as String? ?? 'Visit';
-      final reason = r['reason'] as String? ?? '';
+      final metadata = touchpointMetadataFromRow(r);
+      final reason = metadata['reason'] as String? ?? '';
       return ActivityItem(
         id: id,
         type: ActivityType.touchpoint,
@@ -100,6 +211,7 @@ class ActivityRepository {
         detail: 'Touchpoint #$tpNum • $tpType${reason.isNotEmpty ? ' — $reason' : ''}',
         status: pending.contains(id) ? ActivityStatus.syncing : ActivityStatus.completed,
         createdAt: DateTime.parse(r['created_at'] as String),
+        metadata: metadata,
       );
     }).toList();
   }
@@ -108,7 +220,9 @@ class ActivityRepository {
     debugPrint('[ACTIVITY][repo] fetchApprovals userId=$userId from=$from to=$to');
     final rows = await PowerSyncService.query(
       """
-      SELECT a.id, a.type, a.status, a.reason, a.udi_number, a.created_at,
+      SELECT a.id, a.type, a.status, a.reason, a.notes, a.udi_number,
+             a.updated_udi, a.approved_at, a.rejected_at, a.rejection_reason,
+             a.created_at,
              c.first_name || ' ' || c.last_name AS client_name
       FROM approvals a
       LEFT JOIN clients c ON c.id = a.client_id
@@ -137,8 +251,42 @@ class ActivityRepository {
         detail: detail,
         status: statusFromApproval(statusStr),
         createdAt: DateTime.parse(r['created_at'] as String),
+        metadata: approvalMetadataFromRow(r),
       );
     }).toList();
+  }
+
+  Future<Map<String, dynamic>> _visitMetadata(String? visitId) async {
+    if (visitId == null || visitId.isEmpty) return const {};
+    try {
+      final rows = await PowerSyncService.query(
+        """
+        SELECT time_in, time_out, odometer_arrival, odometer_departure,
+               notes, reason, status, address, latitude, longitude, photo_url
+        FROM visits
+        WHERE id = ?
+        LIMIT 1
+        """,
+        [visitId],
+      );
+      if (rows.isEmpty) return const {};
+      final row = rows.first;
+      return {
+        'timeIn': _stringValue(row, 'time_in'),
+        'timeOut': _stringValue(row, 'time_out'),
+        'odometerArrival': _stringValue(row, 'odometer_arrival'),
+        'odometerDeparture': _stringValue(row, 'odometer_departure'),
+        'reason': _stringValue(row, 'reason'),
+        'notes': _stringValue(row, 'notes'),
+        'status': _stringValue(row, 'status'),
+        'address': _stringValue(row, 'address'),
+        'latitude': row['latitude'],
+        'longitude': row['longitude'],
+        'photoUrl': _stringValue(row, 'photo_url'),
+      }..removeWhere((_, value) => value == null || value == '');
+    } catch (_) {
+      return const {};
+    }
   }
 
   Future<String?> _clientName(String clientId) async {
@@ -182,6 +330,31 @@ class ActivityRepository {
     return items;
   }
 
+  Future<List<ActivityItem>> fetchCompletedLoanReleases(DateTime from, DateTime to) async {
+    final service = releaseApiService;
+    if (service == null || !isOnline) return const [];
+
+    try {
+      final rows = await service.fetchReleases(from: from, to: to);
+      final items = <ActivityItem>[];
+      for (final row in rows) {
+        final status = _stringValue(row, 'status') ?? '';
+        if (status == 'pending') continue;
+        final clientId = _stringValue(row, 'client_id');
+        final visitId = _stringValue(row, 'visit_id');
+        items.add(activityFromRelease(
+          row,
+          clientName: clientId != null ? await _clientName(clientId) : null,
+          visitMetadata: await _visitMetadata(visitId),
+        ));
+      }
+      return items;
+    } catch (e) {
+      debugPrint('[ACTIVITY][repo] fetchCompletedLoanReleases failed: $e');
+      return const [];
+    }
+  }
+
   /// Fetch all activity types merged and sorted by createdAt DESC.
   /// Pass [typeFilter] to restrict to one type.
   Future<List<ActivityItem>> fetchAll({
@@ -197,6 +370,7 @@ class ActivityRepository {
     if (typeFilter == null || typeFilter == ActivityType.approval) {
       futures.add(fetchApprovals(from, to));
       futures.add(fetchPendingLoanReleases(from, to));
+      futures.add(fetchCompletedLoanReleases(from, to));
     }
 
     final results = await Future.wait(futures);
@@ -212,5 +386,7 @@ final activityRepositoryProvider = Provider.autoDispose<ActivityRepository>((ref
   return ActivityRepository(
     userId: userId,
     pendingReleaseService: ref.watch(pendingReleaseServiceProvider),
+    releaseApiService: ref.watch(releaseApiServiceProvider),
+    isOnline: ref.watch(isOnlineProvider),
   );
 });

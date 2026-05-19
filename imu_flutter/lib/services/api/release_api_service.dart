@@ -23,6 +23,50 @@ class ReleaseApiService {
         )),
         _authService = authService ?? JwtAuthService();
 
+  /// Fetch the current user's loan releases.
+  Future<List<Map<String, dynamic>>> fetchReleases({
+    DateTime? from,
+    DateTime? to,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      final token = _authService.accessToken;
+      if (token == null) {
+        throw ApiException(message: 'Not authenticated');
+      }
+
+      final response = await _dio.get(
+        '${AppConfig.postgresApiUrl}/releases',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+        },
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      final data = response.data;
+      final rows = data is List
+          ? data.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList()
+          : <Map<String, dynamic>>[];
+
+      return rows.where((row) {
+        final createdAt = DateTime.tryParse('${row['created_at'] ?? ''}');
+        if (createdAt == null) return true;
+        if (from != null && createdAt.isBefore(from)) return false;
+        if (to != null && createdAt.isAfter(to)) return false;
+        return true;
+      }).toList();
+    } on DioException catch (e) {
+      debugPrint('ReleaseApiService: fetchReleases error - ${e.message}');
+      throw ApiException(
+        message: 'Failed to fetch releases',
+        statusCode: e.response?.statusCode,
+        originalError: e,
+      );
+    }
+  }
+
   /// Create a loan release record
   ///
   /// Parameters:

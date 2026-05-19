@@ -44,7 +44,10 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
         : _extractReason(widget.item.detail);
     _reasonCtrl = TextEditingController(text: initialReason);
     _remarksCtrl = TextEditingController(
-      text: widget.item.metadata['remarks'] as String? ?? '',
+      text: (widget.item.metadata['remarks'] as String?) ??
+          (widget.item.metadata['approvalNotes'] as String?) ??
+          (widget.item.metadata['notes'] as String?) ??
+          '',
     );
   }
 
@@ -141,12 +144,13 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 640),
         padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Header
             Row(
               children: [
@@ -266,10 +270,8 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
                   hintText: 'Optional notes...',
                 ),
               ),
-            ] else if (item.detail != null && item.detail!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _DetailRow(icon: LucideIcons.alignLeft, label: 'Details', value: item.detail!),
-            ],
+            ] else
+              ..._buildReadOnlyDetails(item),
 
             const SizedBox(height: 16),
             _DetailRow(icon: LucideIcons.tag, label: 'Type', value: _getTypeLabel(item.type)),
@@ -320,10 +322,110 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
                   child: const Text('Close'),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildReadOnlyDetails(ActivityItem item) {
+    final rows = <Widget>[];
+    void add({
+      required IconData icon,
+      required String label,
+      String? value,
+    }) {
+      final text = value?.trim();
+      if (text == null || text.isEmpty) return;
+      rows
+        ..add(const SizedBox(height: 16))
+        ..add(_DetailRow(icon: icon, label: label, value: text));
+    }
+
+    if (item.subtype == ActivitySubtype.loanRelease) {
+      add(icon: LucideIcons.hash, label: 'UDI Number', value: _metaText('udiNumber') ?? item.detail);
+      add(icon: LucideIcons.hash, label: 'Updated UDI', value: _metaText('updatedUdi'));
+      add(icon: Icons.inventory_2_outlined, label: 'Product Type', value: _metaText('productType'));
+      add(icon: LucideIcons.fileText, label: 'Loan Type', value: _metaText('loanType'));
+      add(icon: LucideIcons.alignLeft, label: 'Reason', value: _metaText('reason'));
+      add(icon: LucideIcons.alignLeft, label: 'Remarks', value: _metaText('remarks'));
+      add(icon: LucideIcons.alignLeft, label: 'Notes', value: _metaText('notes'));
+      add(icon: LucideIcons.alignLeft, label: 'Approval Notes', value: _metaText('approvalNotes'));
+      add(icon: LucideIcons.clock, label: 'Time In', value: _metaText('timeIn'));
+      add(icon: LucideIcons.clock, label: 'Time Out', value: _metaText('timeOut'));
+      add(icon: Icons.speed, label: 'Odometer Arrival', value: _metaText('odometerArrival'));
+      add(icon: Icons.speed, label: 'Odometer Departure', value: _metaText('odometerDeparture'));
+      add(icon: LucideIcons.mapPin, label: 'Location', value: _locationText());
+      add(icon: LucideIcons.image, label: 'Photo', value: _photoText());
+      add(icon: Icons.event_available_outlined, label: 'Approved At', value: _metaText('approvedAt'));
+      if (rows.isEmpty) add(icon: LucideIcons.alignLeft, label: 'Details', value: item.detail);
+      return rows;
+    }
+
+    if (item.type == ActivityType.touchpoint) {
+      add(icon: LucideIcons.hash, label: 'Touchpoint', value: _touchpointNumberText());
+      add(icon: Icons.format_list_bulleted, label: 'Touchpoint Type', value: _metaText('touchpointType'));
+      add(icon: LucideIcons.calendar, label: 'Date', value: _metaText('date'));
+      add(icon: LucideIcons.alignLeft, label: 'Reason', value: _metaText('reason'));
+      add(icon: LucideIcons.alignLeft, label: 'Remarks', value: _metaText('notes'));
+      add(icon: LucideIcons.activity, label: 'Status', value: _metaText('status'));
+      add(icon: LucideIcons.clock, label: 'Time In', value: _metaText('timeIn'));
+      add(icon: LucideIcons.clock, label: 'Time Out', value: _metaText('timeOut'));
+      add(icon: Icons.speed, label: 'Odometer Arrival', value: _metaText('odometerArrival'));
+      add(icon: Icons.speed, label: 'Odometer Departure', value: _metaText('odometerDeparture'));
+      add(icon: LucideIcons.phone, label: 'Phone Number', value: _metaText('phoneNumber'));
+      add(icon: LucideIcons.phoneCall, label: 'Dial Time', value: _metaText('dialTime'));
+      add(icon: Icons.timer_outlined, label: 'Duration', value: _durationText());
+      add(icon: LucideIcons.mapPin, label: 'Location', value: _locationText());
+      add(icon: LucideIcons.image, label: 'Photo', value: _photoText());
+      if (rows.isEmpty) add(icon: LucideIcons.alignLeft, label: 'Details', value: item.detail);
+      return rows;
+    }
+
+    add(icon: LucideIcons.alignLeft, label: 'Details', value: item.detail);
+    return rows;
+  }
+
+  String? _metaText(String key) {
+    final value = widget.item.metadata[key];
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  String? _touchpointNumberText() {
+    final number = _metaText('touchpointNumber');
+    return number == null ? null : '#$number';
+  }
+
+  String? _durationText() {
+    final duration = widget.item.metadata['duration'];
+    if (duration == null) return null;
+    final seconds = int.tryParse(duration.toString());
+    if (seconds == null) return duration.toString();
+    if (seconds < 60) return '${seconds}s';
+    final minutes = seconds ~/ 60;
+    final remainder = seconds % 60;
+    return remainder == 0 ? '${minutes}m' : '${minutes}m ${remainder}s';
+  }
+
+  String? _locationText() {
+    final address = _metaText('address');
+    final latitude = _metaText('latitude');
+    final longitude = _metaText('longitude');
+    if (address != null && latitude != null && longitude != null) {
+      return '$address ($latitude, $longitude)';
+    }
+    if (address != null) return address;
+    if (latitude != null && longitude != null) return '$latitude, $longitude';
+    return null;
+  }
+
+  String? _photoText() {
+    final value = _metaText('photoUrl') ?? _metaText('photoPath');
+    if (value == null) return null;
+    return value;
   }
 
   String _formatDateTime(DateTime dt) => DateFormat('MMM d, yyyy • h:mm a').format(dt);
