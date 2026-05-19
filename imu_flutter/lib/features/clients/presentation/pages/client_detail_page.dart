@@ -1589,23 +1589,19 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Widget _buildTouchpointProgressBadge() {
     final client = _client!;
-    final completedCount = client.completedTouchpoints;
-    final nextType = (client.nextTouchpoint ?? client.touchpointStatus?.nextTouchpointType)?.toLowerCase();
-
-    final badgeText = nextType != null
-        ? '$completedCount • $nextType'
-        : '$completedCount completed';
+    final latestType = client.latestProgressTouchpointType?.toLowerCase();
+    final badgeText = client.touchpointProgressDisplay;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.blue[50],
+        color: latestType == 'call' ? Colors.orange[50] : Colors.blue[50],
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         badgeText,
         style: TextStyle(
-          color: Colors.blue[700],
+          color: latestType == 'call' ? Colors.orange[700] : Colors.blue[700],
           fontWeight: FontWeight.w500,
           fontSize: 12,
         ),

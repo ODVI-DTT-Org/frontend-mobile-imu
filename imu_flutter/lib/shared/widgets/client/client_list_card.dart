@@ -246,10 +246,8 @@ class ClientListCard extends ConsumerWidget {
       (role == UserRole.tele   && nextTpType == 'visit')
     );
 
-    final latestTouchpoint = effectiveTouchpoints.isNotEmpty
-        ? effectiveTouchpoints.last
-        : null;
-    final isFirstTime = effectiveTouchpoints.isEmpty;
+    final latestTouchpoint = Client.latestProgressTouchpointFrom(effectiveTouchpoints);
+    final isFirstTime = latestTouchpoint == null;
 
     // Check if client is in today's itinerary
     final todayItineraryAsync = ref.watch(todayItineraryProvider);
@@ -392,7 +390,7 @@ class ClientListCard extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              latestTouchpoint.ordinal,
+                              latestTouchpoint.progressLabel,
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -711,10 +709,8 @@ class ClientListCard extends ConsumerWidget {
   }
 
   String _getTouchpointSummary(Touchpoint touchpoint) {
-    final ordinal = touchpoint.ordinal;
-    final type = touchpoint.type == TouchpointType.visit ? 'Visit' : 'Call';
     final timeAgo = _getTimeAgo(touchpoint.date);
-    return '$ordinal $type - $timeAgo';
+    return '${touchpoint.progressLabel} - $timeAgo';
   }
 
   Color _getPriorityColor(String priority) {

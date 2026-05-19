@@ -45,19 +45,12 @@ class ClientListTile extends ConsumerWidget {
 
     final addressText = client.displayAddress;
 
-    // Touchpoint progress — show completed count (no limit on touchpoints)
-    final nextNumber = client.touchpointNumber >= 0 ? client.touchpointNumber : null;
-    // Use client.nextTouchpoint directly (String from API, no strict pattern)
+    // Touchpoint progress — show latest completed touchpoint number and type.
+    final progressType = client.latestProgressTouchpointType;
     final nextType = client.nextTouchpoint;
-    final completedCount = client.completedTouchpoints;
-    String touchpointInfo;
-    if (nextType != null) {
-      touchpointInfo = '$completedCount • ${nextType.toLowerCase()}';
-    } else {
-      touchpointInfo = '$completedCount';
-    }
+    final touchpointInfo = client.touchpointProgressDisplay;
 
-    final isCall = nextType?.toLowerCase() == 'call';
+    final isCall = progressType?.toLowerCase() == 'call';
 
     // Check if client has completed all touchpoints (no next type)
     final isCompleted = nextType == null;

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../features/clients/data/models/client_model.dart';
 
-/// Badge showing touchpoint progress in format "X • Type"
-/// Examples: "2 • Call", "3 • Visit", "10 • Visit"
+/// Badge showing latest touchpoint progress in format "X - Type"
+/// Examples: "2 - Call", "3 - Visit", "10 - Visit"
 /// No limit on number of touchpoints - shows actual count
 class TouchpointProgressBadge extends StatelessWidget {
   final Client client;
@@ -17,35 +17,18 @@ class TouchpointProgressBadge extends StatelessWidget {
     this.touchpointCount,
   });
 
-  /// Internal getter that uses provided count or falls back to client.completedTouchpoints
-  int get _displayedCount => touchpointCount ?? client.completedTouchpoints;
-
   @override
   Widget build(BuildContext context) {
-    final completedCount = _displayedCount;
+    final touchpointType = client.latestProgressTouchpointType;
+    final display = touchpointCount != null
+        ? '$touchpointCount'
+        : client.touchpointProgressDisplay;
+    final isCall = touchpointType?.toLowerCase() == 'call';
 
-    // Use client's nextTouchpoint field directly (no pattern enforcement)
-    final nextTouchpoint = client.nextTouchpoint ?? client.touchpointStatus?.nextTouchpointType;
-
-    if (nextTouchpoint != null) {
-      final isCall = nextTouchpoint.toLowerCase() == 'call';
-      return _buildBadge(
-        label: '$completedCount • ${nextTouchpoint.toLowerCase()}',
-        color: isCall
-            ? Colors.orange
-            : Colors.blue,
-        icon: isCall
-            ? LucideIcons.phone
-            : LucideIcons.mapPin,
-        context: context,
-      );
-    }
-
-    // Fallback: keep the badge descriptive even when the backend has no next type.
     return _buildBadge(
-      label: '$completedCount completed',
-      color: Colors.blue,
-      icon: LucideIcons.mapPin,
+      label: display,
+      color: isCall ? Colors.orange : Colors.blue,
+      icon: isCall ? LucideIcons.phone : LucideIcons.mapPin,
       context: context,
     );
   }

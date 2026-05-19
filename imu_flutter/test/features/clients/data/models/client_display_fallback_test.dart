@@ -42,6 +42,65 @@ void main() {
       expect(client.nextTouchpointDisplay, '5 • call');
     });
 
+    test('touchpoint progress display uses latest non-loan-release summary item', () {
+      final client = Client.fromJson({
+        'id': 'client-1',
+        'first_name': 'Juan',
+        'last_name': 'Dela Cruz',
+        'client_type': 'potential',
+        'product_type': 'PNP PENSION',
+        'pension_type': 'PNP - RETIREE OPTIONAL',
+        'touchpoint_number': 5,
+        'next_touchpoint': 'Call',
+        'touchpoint_summary': [
+          {
+            'id': 'touchpoint-1',
+            'type': 'Visit',
+            'number': 1,
+            'reason': 'DISAPPROVED',
+            'date': '2026-05-15T00:00:00.000Z',
+          },
+          {
+            'id': 'touchpoint-4',
+            'type': 'Visit',
+            'number': 4,
+            'reason': 'FOR_ADA_COMPLIANCE',
+            'date': '2026-05-19T00:00:00.000Z',
+          },
+          {
+            'id': 'touchpoint-5',
+            'type': 'Visit',
+            'number': 5,
+            'reason': 'Loan Release',
+            'status': 'Completed',
+            'date': '2026-05-19T00:00:00.000Z',
+          },
+        ],
+        'created_at': '2026-05-19T00:00:00.000Z',
+      });
+
+      expect(client.latestProgressTouchpoint?.touchpointNumber, 4);
+      expect(client.latestProgressTouchpoint?.type, TouchpointType.visit);
+      expect(client.touchpointProgressDisplay, '4 - Visit');
+    });
+
+    test('touchpoint progress display never falls back to next touchpoint type', () {
+      final client = Client.fromJson({
+        'id': 'client-1',
+        'first_name': 'Juan',
+        'last_name': 'Dela Cruz',
+        'client_type': 'potential',
+        'product_type': 'PNP PENSION',
+        'pension_type': 'PNP - RETIREE OPTIONAL',
+        'touchpoint_number': 4,
+        'next_touchpoint': 'Call',
+        'created_at': '2026-05-19T00:00:00.000Z',
+      });
+
+      expect(client.latestProgressTouchpointType, isNull);
+      expect(client.touchpointProgressDisplay, '4');
+    });
+
     test('uses full address then client location before address records', () {
       final fromFullAddress = Client.fromJson({
         'id': 'client-1',

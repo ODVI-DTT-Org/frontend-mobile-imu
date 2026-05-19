@@ -205,6 +205,36 @@ class Client {
     return touchpointNumber >= 0 ? touchpointNumber : 0;
   }
 
+  Touchpoint? get latestProgressTouchpoint {
+    return latestProgressTouchpointFrom(touchpointSummary);
+  }
+
+  String get touchpointProgressDisplay {
+    final latest = latestProgressTouchpoint;
+    if (latest != null) {
+      return '${latest.touchpointNumber} - ${latest.type.apiValue}';
+    }
+
+    final count = completedTouchpoints;
+    return '$count';
+  }
+
+  String? get latestProgressTouchpointType {
+    return latestProgressTouchpoint?.type.apiValue;
+  }
+
+  static Touchpoint? latestProgressTouchpointFrom(List<Touchpoint> touchpoints) {
+    final progressTouchpoints = touchpoints
+        .where((touchpoint) => !touchpoint.isLoanReleaseTouchpoint)
+        .toList();
+    if (progressTouchpoints.isEmpty) return null;
+
+    progressTouchpoints.sort(
+      (a, b) => a.touchpointNumber.compareTo(b.touchpointNumber),
+    );
+    return progressTouchpoints.last;
+  }
+
   // Next touchpoint display
   String get nextTouchpointDisplay {
     final nextNum = nextTouchpointNumber ?? (touchpointNumber >= 0 ? touchpointNumber + 1 : null);
@@ -1139,6 +1169,16 @@ class Touchpoint {
 
   // Legacy getter for backward compatibility
   String? get agentId => userId;
+
+  bool get isLoanReleaseTouchpoint {
+    final normalizedReason = (reasonRaw ?? reason.apiValue)
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[_\s-]+'), '');
+    return normalizedReason == 'loanrelease';
+  }
+
+  String get progressLabel => '$touchpointNumber - ${type.apiValue}';
 
   String get ordinal {
     const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
