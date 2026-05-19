@@ -21,6 +21,8 @@ class ProfilePage extends ConsumerWidget {
       case UserRole.areaManager:
       case UserRole.assistantAreaManager:
         return const Color(0xFF3B82F6);
+      case UserRole.teamLeader:
+        return const Color(0xFF8B5CF6);
       case UserRole.caravan:
         return const Color(0xFF22C55E);
       case UserRole.tele:
@@ -36,6 +38,8 @@ class ProfilePage extends ConsumerWidget {
         return 'Area Manager';
       case UserRole.assistantAreaManager:
         return 'Assistant Area Manager';
+      case UserRole.teamLeader:
+        return 'Team Leader';
       case UserRole.caravan:
         return 'Caravan';
       case UserRole.tele:

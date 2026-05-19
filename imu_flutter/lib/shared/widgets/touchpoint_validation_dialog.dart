@@ -30,6 +30,8 @@ class TouchpointValidationDialog extends ConsumerWidget {
           return 'Area Manager';
         case UserRole.assistantAreaManager:
           return 'Assistant Area Manager';
+        case UserRole.teamLeader:
+          return 'Team Leader';
         case UserRole.caravan:
           return 'Caravan';
         case UserRole.tele:
@@ -40,6 +42,7 @@ class TouchpointValidationDialog extends ConsumerWidget {
     String getAllowedTypes() {
       switch (userRole) {
         case UserRole.caravan:
+        case UserRole.teamLeader:
           return 'Visit (numbers 1, 4, 7)';
         case UserRole.tele:
           return 'Call (numbers 2, 3, 5, 6)';

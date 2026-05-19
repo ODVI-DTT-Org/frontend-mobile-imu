@@ -1,9 +1,10 @@
 /// User roles for the IMU mobile app.
 ///
-/// Mobile app supports: Admin, Area Manager, Assistant Area Manager, Caravan, Tele.
+/// Mobile app supports: Admin, Area Manager, Assistant Area Manager, Team Leader, Caravan, Tele.
 /// - Admin: Full system access
 /// - Area Manager: Can manage assigned area and create all touchpoint types
 /// - Assistant Area Manager: Can manage assigned area and create all touchpoint types
+/// - Team Leader: Field team leader - can create Visit touchpoints
 /// - Caravan: Field agent - can only create Visit touchpoints (1, 4, 7)
 /// - Tele: Telemarketer - can only create Call touchpoints (2, 3, 5, 6)
 enum UserRole {
@@ -15,6 +16,9 @@ enum UserRole {
 
   /// Can manage assigned area and create all touchpoint types
   assistantAreaManager('assistant_area_manager'),
+
+  /// Field team leader - can create Visit touchpoints
+  teamLeader('team_leader'),
 
   /// Field agent - can only create Visit touchpoints (1, 4, 7)
   caravan('caravan'),
@@ -37,6 +41,8 @@ enum UserRole {
         return 'Area Manager';
       case UserRole.assistantAreaManager:
         return 'Assistant Area Manager';
+      case UserRole.teamLeader:
+        return 'Team Leader';
       case UserRole.caravan:
         return 'Caravan';
       case UserRole.tele:
@@ -50,12 +56,13 @@ enum UserRole {
   }
 
   /// Can this role create Visit touchpoints?
-  /// Admin, managers, and caravan can create visits.
+  /// Admin, managers, team leaders, and caravan can create visits.
   bool get canCreateVisitTouchpoints {
     switch (this) {
       case UserRole.admin:
       case UserRole.areaManager:
       case UserRole.assistantAreaManager:
+      case UserRole.teamLeader:
       case UserRole.caravan:
         return true;
       case UserRole.tele:
@@ -72,6 +79,7 @@ enum UserRole {
       case UserRole.assistantAreaManager:
       case UserRole.tele:
         return true;
+      case UserRole.teamLeader:
       case UserRole.caravan:
         return false;
     }
@@ -84,6 +92,7 @@ enum UserRole {
       case UserRole.areaManager:
       case UserRole.assistantAreaManager:
         return true;
+      case UserRole.teamLeader:
       case UserRole.caravan:
       case UserRole.tele:
         return false;
