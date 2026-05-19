@@ -1227,7 +1227,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
               value: _loanType,
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Loan Type *',
+                labelText: 'Loan Type',
                 border: OutlineInputBorder(),
               ),
               items: const ['NEW', 'ADDITIONAL', 'RENEWAL', 'PRETERM']
@@ -1236,7 +1236,6 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
               onChanged: (v) {
                 if (v != null) { HapticUtils.lightImpact(); setState(() => _loanType = v); }
               },
-              validator: (v) => v == null ? 'Required' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
