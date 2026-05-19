@@ -32,14 +32,6 @@ String? resolveAddressDisplay({
   final direct = cleanAddressPart(fullAddress);
   if (direct != null) return direct;
 
-  final clientLocation = joinAddressParts([
-    region,
-    province,
-    municipality,
-    barangay,
-  ]);
-  if (clientLocation != null) return clientLocation;
-
   final addressLookup = joinAddressParts([
     addressStreet,
     addressBarangay,
@@ -47,6 +39,14 @@ String? resolveAddressDisplay({
     addressProvince,
   ]);
   if (addressLookup != null) return addressLookup;
+
+  final clientLocation = joinAddressParts([
+    region,
+    province,
+    municipality,
+    barangay,
+  ]);
+  if (clientLocation != null) return clientLocation;
 
   return cleanAddressPart(fallbackAddress);
 }

@@ -111,12 +111,27 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
           );
         }
       } else {
+        // For touchpoints: get visit_id from the touchpoint record, then update via visits endpoint
+        final db = await PowerSyncService.database;
+        final rows = await db.getAll(
+          'SELECT visit_id FROM touchpoints WHERE id = ?',
+          [widget.item.id],
+        );
+
+        if (rows.isEmpty) {
+          throw Exception('Touchpoint not found');
+        }
+
+        final visitId = rows.first['visit_id'] as String?;
+        if (visitId == null) {
+          throw Exception('Visit ID not found for this touchpoint');
+        }
+
         final jwtAuth = ref.read(jwtAuthProvider);
         final token = jwtAuth.accessToken;
         final dio = Dio(BaseOptions(baseUrl: AppConfig.postgresApiUrl));
         await dio.patch(
-          '/visits',
-          queryParameters: {'touchpoint_id': widget.item.id},
+          '/visits/$visitId',
           data: {
             if (_reasonCtrl.text.isNotEmpty) 'reason': _reasonCtrl.text.trim(),
             if (_remarksCtrl.text.isNotEmpty) 'remarks': _remarksCtrl.text.trim(),
