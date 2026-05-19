@@ -6,6 +6,8 @@ enum ActivityType { approval, touchpoint, visit, call }
 
 enum ActivityStatus { pending, syncing, completed, approved, rejected, failed }
 
+enum ActivitySource { powerSync, pendingReleaseQueue }
+
 enum ActivitySubtype {
   // Approvals
   clientCreate,
@@ -66,6 +68,8 @@ class ActivityItem {
   final String? detail;
   final ActivityStatus status;
   final DateTime createdAt;
+  final ActivitySource source;
+  final Map<String, dynamic> metadata;
 
   ActivityItem({
     required this.id,
@@ -75,6 +79,8 @@ class ActivityItem {
     this.detail,
     required this.status,
     required this.createdAt,
+    this.source = ActivitySource.powerSync,
+    this.metadata = const {},
   });
 
   String get displayTitle {

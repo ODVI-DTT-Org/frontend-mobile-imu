@@ -77,6 +77,24 @@ class PendingReleaseService {
         .toList();
   }
 
+  Future<void> update({
+    required String id,
+    String? udiNumber,
+    String? remarks,
+  }) async {
+    final box = await _box();
+    final raw = box.get(id);
+    if (raw == null) {
+      throw StateError('Pending release not found: $id');
+    }
+
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    if (udiNumber != null) data['udiNumber'] = udiNumber;
+    if (remarks != null) data['remarks'] = remarks;
+    data['updatedAt'] = DateTime.now().toIso8601String();
+    await box.put(id, jsonEncode(data));
+  }
+
   /// Try to upload everything in the queue using [resolveService] to obtain a
   /// configured [ReleaseCreationService] for each entry's role. Items that
   /// succeed are removed; permanent failures (4xx other than 401) are dropped

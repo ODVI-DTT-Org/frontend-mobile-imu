@@ -7,6 +7,7 @@ import 'package:imu_flutter/features/activity/providers/activity_feed_provider.d
 import 'package:imu_flutter/features/activity/presentation/widgets/activity_card.dart';
 import 'package:imu_flutter/features/activity/presentation/widgets/activity_filter_sheet.dart';
 import 'package:imu_flutter/features/activity/presentation/widgets/activity_detail_dialog.dart';
+import 'package:imu_flutter/features/activity/presentation/widgets/edit_touchpoint_bottom_sheet.dart';
 
 class ActivityPage extends ConsumerWidget {
   const ActivityPage({super.key});
@@ -142,7 +143,7 @@ class ActivityPage extends ConsumerWidget {
         final item = items[index - cursor];
         return ActivityCard(
           item: item,
-          onTap: () => ActivityDetailDialog.show(context, item: item),
+          onTap: () => _showActivityDetail(context, item, notifier),
         );
       }
       cursor += items.length;
@@ -150,7 +151,41 @@ class ActivityPage extends ConsumerWidget {
     return _buildLoadMore(state, notifier);
   }
 
-int _totalItemCount(
+  void _showActivityDetail(
+    BuildContext context,
+    ActivityItem item,
+    ActivityFeedNotifier notifier,
+  ) {
+    ActivityDetailDialog.show(
+      context,
+      item: item,
+      onEdit: item.type == ActivityType.touchpoint
+          ? () => _showEditTouchpoint(context, item, notifier)
+          : null,
+    );
+  }
+
+  Future<void> _showEditTouchpoint(
+    BuildContext context,
+    ActivityItem item,
+    ActivityFeedNotifier notifier,
+  ) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => EditTouchpointBottomSheet(
+        touchpointId: item.id,
+        clientName: item.clientName ?? 'Client',
+      ),
+    );
+
+    if (result == true) {
+      await notifier.refresh();
+    }
+  }
+
+  int _totalItemCount(
     Map<String, List<ActivityItem>> grouped,
     bool hasMore,
   ) {

@@ -1,13 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
+import 'package:imu_flutter/services/release/pending_release_service.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart';
 
 class ActivityRepository {
   final String userId;
+  final PendingReleaseService? pendingReleaseService;
 
-  const ActivityRepository({required this.userId});
+  const ActivityRepository({
+    required this.userId,
+    this.pendingReleaseService,
+  });
 
   // ── Static helpers (used in tests) ──────────────────────────────────────
 
@@ -23,6 +28,27 @@ class ActivityRepository {
       case 'rejected': return ActivityStatus.rejected;
       default:         return ActivityStatus.pending;
     }
+  }
+
+  static ActivityItem activityFromPendingRelease(
+    Map<String, dynamic> data, {
+    String? clientName,
+  }) {
+    final queuedAt = DateTime.tryParse(data['queuedAt'] as String? ?? '') ??
+        DateTime.now();
+    final udiNumber = data['udiNumber'] as String?;
+
+    return ActivityItem(
+      id: data['id'] as String,
+      type: ActivityType.approval,
+      subtype: ActivitySubtype.loanRelease,
+      clientName: clientName,
+      detail: udiNumber,
+      status: ActivityStatus.pending,
+      createdAt: queuedAt,
+      source: ActivitySource.pendingReleaseQueue,
+      metadata: Map<String, dynamic>.from(data),
+    );
   }
 
   // ── PowerSync pending upload IDs ─────────────────────────────────────────
@@ -115,6 +141,47 @@ class ActivityRepository {
     }).toList();
   }
 
+  Future<String?> _clientName(String clientId) async {
+    try {
+      final rows = await PowerSyncService.query(
+        'SELECT first_name, last_name FROM clients WHERE id = ? LIMIT 1',
+        [clientId],
+      );
+      if (rows.isEmpty) return null;
+      final firstName = rows.first['first_name'] as String? ?? '';
+      final lastName = rows.first['last_name'] as String? ?? '';
+      final fullName = '$firstName $lastName'.trim();
+      return fullName.isEmpty ? null : fullName;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<ActivityItem>> fetchPendingLoanReleases(DateTime from, DateTime to) async {
+    final service = pendingReleaseService;
+    if (service == null) return const [];
+
+    final queued = await service.peekAll();
+    final items = <ActivityItem>[];
+
+    for (final data in queued) {
+      final queuedAt = DateTime.tryParse(data['queuedAt'] as String? ?? '');
+      if (queuedAt == null ||
+          queuedAt.isBefore(from) ||
+          queuedAt.isAfter(to)) {
+        continue;
+      }
+
+      final clientId = data['clientId'] as String?;
+      items.add(activityFromPendingRelease(
+        data,
+        clientName: clientId != null ? await _clientName(clientId) : null,
+      ));
+    }
+
+    return items;
+  }
+
   /// Fetch all activity types merged and sorted by createdAt DESC.
   /// Pass [typeFilter] to restrict to one type.
   Future<List<ActivityItem>> fetchAll({
@@ -129,6 +196,7 @@ class ActivityRepository {
     }
     if (typeFilter == null || typeFilter == ActivityType.approval) {
       futures.add(fetchApprovals(from, to));
+      futures.add(fetchPendingLoanReleases(from, to));
     }
 
     final results = await Future.wait(futures);
@@ -141,5 +209,8 @@ class ActivityRepository {
 final activityRepositoryProvider = Provider.autoDispose<ActivityRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider) ?? '';
   debugPrint('[ACTIVITY][repo] activityRepositoryProvider — userId="$userId"');
-  return ActivityRepository(userId: userId);
+  return ActivityRepository(
+    userId: userId,
+    pendingReleaseService: ref.watch(pendingReleaseServiceProvider),
+  );
 });

@@ -10,6 +10,7 @@ import 'package:imu_flutter/services/api/approvals_api_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvider;
 import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserRoleProvider;
 import 'package:imu_flutter/core/models/user_role.dart';
+import 'package:imu_flutter/services/release/pending_release_service.dart';
 
 class ActivityDetailDialog extends ConsumerStatefulWidget {
   final ActivityItem item;
@@ -42,7 +43,9 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
         ? (widget.item.detail ?? '')
         : _extractReason(widget.item.detail);
     _reasonCtrl = TextEditingController(text: initialReason);
-    _remarksCtrl = TextEditingController();
+    _remarksCtrl = TextEditingController(
+      text: widget.item.metadata['remarks'] as String? ?? '',
+    );
   }
 
   @override
@@ -80,7 +83,6 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
 
     // Loan release: editable while pending and within 1 day
     if (_isLoanRelease() && item.status == ActivityStatus.pending) {
-      if (isManager) return true;
       final hoursSinceCreation = DateTime.now().difference(item.createdAt).inHours;
       return hoursSinceCreation <= 24;
     }
@@ -92,11 +94,19 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
     setState(() => _isSaving = true);
     try {
       if (_isLoanRelease()) {
-        await ref.read(approvalsApiServiceProvider).ownerEditLoanRelease(
-          approvalId: widget.item.id,
-          udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
-          remarks: _remarksCtrl.text.trim().isNotEmpty ? _remarksCtrl.text.trim() : null,
-        );
+        if (widget.item.source == ActivitySource.pendingReleaseQueue) {
+          await ref.read(pendingReleaseServiceProvider).update(
+            id: widget.item.id,
+            udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
+            remarks: _remarksCtrl.text.trim(),
+          );
+        } else {
+          await ref.read(approvalsApiServiceProvider).ownerEditLoanRelease(
+            approvalId: widget.item.id,
+            udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
+            remarks: _remarksCtrl.text.trim().isNotEmpty ? _remarksCtrl.text.trim() : null,
+          );
+        }
       } else {
         final jwtAuth = ref.read(jwtAuthProvider);
         final token = jwtAuth.accessToken;
@@ -174,7 +184,14 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
                   IconButton(
                     icon: const Icon(LucideIcons.pencil, size: 18),
                     tooltip: 'Edit',
-                    onPressed: () => setState(() => _isEditMode = true),
+                    onPressed: () {
+                      if (widget.onEdit != null) {
+                        Navigator.pop(context);
+                        widget.onEdit!();
+                        return;
+                      }
+                      setState(() => _isEditMode = true);
+                    },
                   ),
                 IconButton(
                   icon: const Icon(Icons.close),
