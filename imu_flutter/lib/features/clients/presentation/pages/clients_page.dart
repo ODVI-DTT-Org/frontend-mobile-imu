@@ -60,7 +60,7 @@ class ClientsPage extends ConsumerStatefulWidget {
 
 class _ClientsPageState extends ConsumerState<ClientsPage> {
   final _searchController = TextEditingController();
-  final _searchDebounce = Debounce(milliseconds: 300);
+  final _searchDebounce = Debounce(milliseconds: 800);
   String _searchQuery = '';
   ClientViewMode _viewMode = ClientViewMode.assigned;
 

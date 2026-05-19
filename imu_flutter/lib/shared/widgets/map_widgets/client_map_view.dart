@@ -46,7 +46,7 @@ class _ClientMapViewState extends ConsumerState<ClientMapView> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   final TextEditingController _searchController = TextEditingController();
-  final _searchDebounce = Debounce(milliseconds: 300);
+  final _searchDebounce = Debounce(milliseconds: 800);
 
   MapViewMode _currentMode = MapViewMode.allClients;
   MapFilters _filters = const MapFilters();

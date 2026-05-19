@@ -92,7 +92,7 @@ bool shouldDisableClientAddAction({
 
 class _ClientSelectorModalState extends ConsumerState<ClientSelectorModal> {
   final _searchController = TextEditingController();
-  final _searchDebounce = Debounce(milliseconds: 300);
+  final _searchDebounce = Debounce(milliseconds: 800);
   String _searchQuery = '';
   String _clientFilter = 'assigned'; // 'assigned' or 'all'
   Set<String> _addingClientIds = {};
