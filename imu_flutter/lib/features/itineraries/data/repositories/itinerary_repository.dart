@@ -442,8 +442,25 @@ Map<String, dynamic> enrichItineraryRowFromHive(Map<String, dynamic> row) {
   enriched['first_name'] = cached['firstName'] ?? cached['first_name'];
   enriched['last_name'] = cached['lastName'] ?? cached['last_name'];
   enriched['middle_name'] = cached['middleName'] ?? cached['middle_name'];
+  enriched['full_address'] = cached['fullAddress'] ?? cached['full_address'];
+  enriched['region'] = cached['region'];
   enriched['municipality'] = cached['municipality'];
   enriched['province'] = cached['province'];
+  enriched['barangay'] = cached['barangay'];
+  final addresses = cached['addresses'];
+  if (addresses is List && addresses.isNotEmpty) {
+    final addressMaps = addresses.whereType<Map>().toList();
+    if (addressMaps.isNotEmpty) {
+      final primary = addressMaps.firstWhere(
+        (address) => address['is_primary'] == true || address['isPrimary'] == true,
+        orElse: () => addressMaps.first,
+      );
+      enriched['address_street'] = primary['street'] ?? primary['streetAddress'];
+      enriched['address_barangay'] = primary['barangay'];
+      enriched['address_city'] = primary['city'] ?? primary['municipality'];
+      enriched['address_province'] = primary['province'];
+    }
+  }
   enriched['product_type'] = cached['productType'] ?? cached['product_type'];
   enriched['pension_type'] = cached['pensionType'] ?? cached['pension_type'];
   enriched['loan_type'] = cached['loanType'] ?? cached['loan_type'];
@@ -471,8 +488,15 @@ int _itineraryDisplayRowScore(Map<String, dynamic> row) {
     'first_name',
     'last_name',
     'middle_name',
+    'full_address',
+    'region',
     'municipality',
     'province',
+    'barangay',
+    'address_street',
+    'address_barangay',
+    'address_city',
+    'address_province',
     'product_type',
     'pension_type',
     'loan_type',
@@ -535,12 +559,22 @@ final itineraryByDateProvider = StreamProvider.family<List<ItineraryItem>, DateT
       // table directly — Hive enrichment used to be the only source and
       // would silently leave it null when the client wasn't cached.
       '''SELECT i.*, c.first_name, c.last_name, c.middle_name,
-                c.municipality, c.province,
+                c.full_address, c.region, c.province, c.municipality, c.barangay,
+                a.street AS address_street,
+                a.barangay AS address_barangay,
+                a.city AS address_city,
+                a.province AS address_province,
                 c.product_type, c.pension_type, c.loan_type,
                 c.touchpoint_summary, c.touchpoint_number, c.next_touchpoint,
                 c.loan_released
          FROM itineraries i
          LEFT JOIN clients c ON c.id = i.client_id
+         LEFT JOIN addresses a ON a.id = (
+           SELECT a2.id FROM addresses a2
+           WHERE a2.client_id = i.client_id
+           ORDER BY a2.is_primary DESC, datetime(a2.created_at) ASC
+           LIMIT 1
+         )
          WHERE i.user_id = ? AND DATE(i.scheduled_date) = ?
            AND i.status NOT IN ('cancelled', 'completed')
          ORDER BY datetime(i.created_at) DESC''',

@@ -43,22 +43,7 @@ class ClientListTile extends ConsumerWidget {
     final isStarred = favorites.ids.contains(client.id ?? '');
     final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
 
-    // Address — prefer primary from addresses list, fall back to client fields
-    String addressText = '';
-    if (client.addresses.isNotEmpty) {
-      final primary = client.addresses.firstWhere(
-        (a) => a.isPrimary,
-        orElse: () => client.addresses.first,
-      );
-      addressText = [
-        if (primary.barangay != null && primary.barangay!.isNotEmpty) primary.barangay,
-        if (primary.municipality != null && primary.municipality!.isNotEmpty) primary.municipality,
-        if (primary.province != null && primary.province!.isNotEmpty) primary.province,
-      ].join(', ');
-    }
-    if (addressText.isEmpty) {
-      addressText = client.fullAddress;
-    }
+    final addressText = client.displayAddress;
 
     // Touchpoint progress — show completed count (no limit on touchpoints)
     final nextNumber = client.touchpointNumber >= 0 ? client.touchpointNumber : null;
@@ -263,24 +248,23 @@ class ClientListTile extends ConsumerWidget {
               const SizedBox(height: 6),
 
               // Row 4: Address
-              if (addressText.isNotEmpty)
-                Row(
-                  children: [
-                    Icon(LucideIcons.mapPin, size: 13, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        addressText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Icon(LucideIcons.mapPin, size: 13, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      addressText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
 
               // Row 5: Action buttons
               if (actions != null && actions!.isNotEmpty) ...[

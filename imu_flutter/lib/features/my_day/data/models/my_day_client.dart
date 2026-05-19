@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import '../../../../shared/utils/address_display.dart';
 
 /// Client model for My Day list display
 class MyDayClient {
@@ -129,8 +130,38 @@ class MyDayClient {
       productType: (json['client'] as Map<String, dynamic>?)?['product_type'] as String?,
       pensionType: (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?,
       loanType: (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?,
-      address: (json['client'] as Map<String, dynamic>?)?['full_address'] as String?
-          ?? json['address'] as String?,
+      address: () {
+        final client = json['client'] as Map<String, dynamic>?;
+        Map<String, dynamic>? firstAddress;
+        final addresses = client?['addresses'];
+        if (addresses is List && addresses.isNotEmpty) {
+          firstAddress = addresses.first as Map<String, dynamic>;
+        }
+        return resolveAddressDisplay(
+          fullAddress: client?['full_address'],
+          region: client?['region'] ?? client?['psgc_region'],
+          province: client?['province'] ?? client?['psgc_province'],
+          municipality: client?['municipality'] ?? client?['municipality_id'],
+          barangay: client?['barangay'] ?? client?['psgc_barangay'],
+          addressStreet: firstAddress?['street'],
+          addressBarangay: firstAddress?['barangay'],
+          addressCity: firstAddress?['city'],
+          addressProvince: firstAddress?['province'],
+          fallbackAddress: resolveAddressDisplay(
+                fullAddress: json['full_address'],
+                region: json['region'] ?? json['psgc_region'],
+                province: json['province'] ?? json['psgc_province'],
+                municipality: json['municipality'] ?? json['municipality_id'],
+                barangay: json['barangay'] ?? json['psgc_barangay'],
+                addressStreet: json['address_street'],
+                addressBarangay: json['address_barangay'],
+                addressCity: json['address_city'],
+                addressProvince: json['address_province'],
+                fallbackAddress: json['address'],
+              ) ??
+              json['address'],
+        );
+      }(),
       loanReleased: _parseBool((json['client'] as Map<String, dynamic>?)?['loan_released']),
     );
   }
@@ -187,14 +218,6 @@ class MyDayClient {
       } catch (_) {}
     }
 
-    final municipality = row['municipality'] as String?;
-    final province = row['province'] as String?;
-    final addressParts = [
-      if (municipality != null && municipality.isNotEmpty) municipality,
-      if (province != null && province.isNotEmpty) province,
-    ];
-    final addressStr = addressParts.isEmpty ? null : addressParts.join(', ');
-
     return MyDayClient(
       id: row['id'] as String,
       clientId: clientId,
@@ -220,7 +243,7 @@ class MyDayClient {
       productType: row['product_type'] as String?,
       pensionType: row['pension_type'] as String?,
       loanType: row['loan_type'] as String?,
-      address: addressStr,
+      address: resolveAddressDisplayFromRow(row),
       loanReleased: _parseBool(row['loan_released']),
     );
   }

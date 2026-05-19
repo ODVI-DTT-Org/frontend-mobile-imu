@@ -13,6 +13,7 @@ import '../../../core/models/user_role.dart';
 import '../../../services/api/itinerary_api_service.dart';
 import '../../../features/clients/data/providers/client_favorites_provider.dart';
 import '../../../core/utils/app_notification.dart';
+import '../../../shared/utils/address_display.dart';
 
 /// Reusable client card widget for My Day and Itinerary pages.
 ///
@@ -223,7 +224,7 @@ class ClientListCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Use override parameters if provided, otherwise use client properties
     final effectiveFullName = overrideFullName ?? client.fullName;
-    final effectiveFullAddress = overrideFullAddress ?? client.fullAddress;
+    final effectiveFullAddress = cleanAddressPart(overrideFullAddress) ?? client.displayAddress;
     final effectiveTouchpoints = overrideTouchpoints ?? client.touchpointSummary;
     final effectiveLoanReleased = overrideLoanReleased ?? client.loanReleased;
     final effectiveUdi = overrideUdi ?? client.udi;
@@ -508,7 +509,7 @@ class ClientListCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            effectiveFullAddress ?? 'No address',
+                            effectiveFullAddress,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,

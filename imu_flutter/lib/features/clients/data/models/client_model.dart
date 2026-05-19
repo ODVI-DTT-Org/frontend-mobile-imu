@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'address_model.dart' as addr;
 import 'phone_number_model.dart' as ph;
+import '../../../../shared/utils/address_display.dart';
 
 /// Client data model for IMU app
 /// Aligned with database schema - uses direct columns instead of nested lists
@@ -160,21 +161,33 @@ class Client {
   }
 
   String get fullAddress {
-    // 1. Client table's own full_address column (most specific)
-    if (tableFullAddress != null && tableFullAddress!.isNotEmpty) return tableFullAddress!;
-    // 2. Primary address from addresses list
-    if (addresses.isNotEmpty) {
-      final primary = addresses.firstWhere((a) => a.isPrimary, orElse: () => addresses.first);
-      final specific = primary.fullAddress;
-      if (specific.isNotEmpty) return specific;
-    }
-    // 3. PSGC fields on the client record
-    final parts = <String>[];
-    if (province != null && province!.isNotEmpty) parts.add(province!);
-    if (municipality != null && municipality!.isNotEmpty) parts.add(municipality!);
-    if (barangay != null && barangay!.isNotEmpty) parts.add(barangay!);
-    if (region != null && region!.isNotEmpty) parts.add(region!);
-    return parts.join(', ');
+    final primary = primaryAddress;
+    return resolveAddressDisplay(
+      fullAddress: tableFullAddress,
+      region: region,
+      province: province,
+      municipality: municipality,
+      barangay: barangay,
+      addressStreet: primary?.streetAddress,
+      addressBarangay: primary?.barangay,
+      addressCity: primary?.municipality,
+      addressProvince: primary?.province,
+    ) ?? '';
+  }
+
+  String get displayAddress {
+    final primary = primaryAddress;
+    return resolveAddressDisplayOrFallback(
+      fullAddress: tableFullAddress,
+      region: region,
+      province: province,
+      municipality: municipality,
+      barangay: barangay,
+      addressStreet: primary?.streetAddress,
+      addressBarangay: primary?.barangay,
+      addressCity: primary?.municipality,
+      addressProvince: primary?.province,
+    );
   }
 
   int get age {
@@ -508,6 +521,7 @@ class Client {
       'firstName': firstName,
       'middleName': middleName,
       'lastName': lastName,
+      'full_address': tableFullAddress,
       'agencyName': agencyName,
       'department': department,
       'position': position,

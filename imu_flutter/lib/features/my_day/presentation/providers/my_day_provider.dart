@@ -74,12 +74,22 @@ class MyDayNotifier extends StateNotifier<MyDayState> {
       final db = await PowerSyncService.database;
       await for (final rows in db.watch(
         """SELECT i.*, c.first_name, c.last_name, c.middle_name,
-                  c.municipality, c.province,
+                  c.full_address, c.region, c.province, c.municipality, c.barangay,
+                  a.street AS address_street,
+                  a.barangay AS address_barangay,
+                  a.city AS address_city,
+                  a.province AS address_province,
                   c.product_type, c.pension_type, c.loan_type,
                   c.touchpoint_summary, c.touchpoint_number, c.next_touchpoint,
                   c.loan_released
            FROM itineraries i
            LEFT JOIN clients c ON c.id = i.client_id
+           LEFT JOIN addresses a ON a.id = (
+             SELECT a2.id FROM addresses a2
+             WHERE a2.client_id = i.client_id
+             ORDER BY a2.is_primary DESC, datetime(a2.created_at) ASC
+             LIMIT 1
+           )
            WHERE i.user_id = ? AND DATE(i.scheduled_date) = ? AND i.status NOT IN ('cancelled', 'completed')
            ORDER BY datetime(i.created_at) DESC""",
         parameters: [userId, dateStr],

@@ -8,6 +8,7 @@ import 'package:imu_flutter/services/auth/jwt_auth_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
 import 'package:imu_flutter/services/error_logging_helper.dart';
+import 'package:imu_flutter/shared/utils/address_display.dart';
 
 /// Itinerary item model for scheduled visits
 class ItineraryItem {
@@ -102,19 +103,39 @@ class ItineraryItem {
     String? loanType;
     if (json['expand'] != null && json['expand']['client_id'] != null) {
       final client = json['expand']['client_id'] as Map<String, dynamic>;
-      // Build full address from addresses array if available
+      Map<String, dynamic>? firstAddress;
       if (client['addresses'] != null && client['addresses'] is List && (client['addresses'] as List).isNotEmpty) {
-        final firstAddress = (client['addresses'] as List).first as Map<String, dynamic>;
-        address = _buildFullAddress(firstAddress);
-      } else {
-        address = client['address'] as String?;
+        firstAddress = (client['addresses'] as List).first as Map<String, dynamic>;
       }
+      address = resolveAddressDisplay(
+        fullAddress: client['full_address'],
+        region: client['region'] ?? client['psgc_region'],
+        province: client['province'] ?? client['psgc_province'],
+        municipality: client['municipality'] ?? client['municipality_id'],
+        barangay: client['barangay'] ?? client['psgc_barangay'],
+        addressStreet: firstAddress?['street'],
+        addressBarangay: firstAddress?['barangay'],
+        addressCity: firstAddress?['city'],
+        addressProvince: firstAddress?['province'],
+        fallbackAddress: client['address'],
+      );
       productType = client['product_type'] as String?;
       pensionType = client['pension_type'] as String?;
       loanType = client['loan_type'] as String?;
     }
     if (address == null) {
-      address = json['address'] as String?;
+      address = resolveAddressDisplay(
+        fullAddress: json['full_address'],
+        region: json['region'] ?? json['psgc_region'],
+        province: json['province'] ?? json['psgc_province'],
+        municipality: json['municipality'] ?? json['municipality_id'],
+        barangay: json['barangay'] ?? json['psgc_barangay'],
+        addressStreet: json['address_street'],
+        addressBarangay: json['address_barangay'],
+        addressCity: json['address_city'],
+        addressProvince: json['address_province'],
+        fallbackAddress: json['address'],
+      );
     }
     productType ??= (json['client'] as Map<String, dynamic>?)?['product_type'] as String?;
     pensionType ??= (json['client'] as Map<String, dynamic>?)?['pension_type'] as String?;
@@ -266,16 +287,7 @@ class ItineraryItem {
       touchpointNumber: nextNum,
       touchpointType: nextType,
       notes: row['notes'] as String?,
-      address: () {
-        final parts = <String>[];
-        final barangay = row['barangay'] as String?;
-        if (barangay != null && barangay.isNotEmpty) parts.add('Brgy. $barangay');
-        final municipality = row['municipality'] as String?;
-        if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
-        final province = row['province'] as String?;
-        if (province != null && province.isNotEmpty) parts.add(province);
-        return parts.isEmpty ? null : parts.join(', ');
-      }(),
+      address: resolveAddressDisplayFromRow(row),
       latitude: null,
       longitude: null,
       createdAt: row['created_at'] != null
@@ -381,19 +393,6 @@ class ItineraryItem {
     );
   }
 
-  /// Build full address from address map (street, barangay, municipality, province)
-  static String _buildFullAddress(Map<String, dynamic> address) {
-    final parts = <String>[];
-    final street = address['street'] as String?;
-    if (street != null && street.isNotEmpty) parts.add(street);
-    final barangay = address['barangay'] as String?;
-    if (barangay != null && barangay.isNotEmpty) parts.add('Brgy. $barangay');
-    final municipality = address['city'] as String?;
-    if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
-    final province = address['province'] as String?;
-    if (province != null && province.isNotEmpty) parts.add(province);
-    return parts.join(', ');
-  }
 }
 
 /// Itinerary API service

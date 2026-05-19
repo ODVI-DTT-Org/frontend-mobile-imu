@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../utils/address_display.dart';
 
 String _formatTypeBadgeLabel(String raw) =>
     raw.replaceAll('_', ' ').toUpperCase();
@@ -52,7 +53,7 @@ class ClientCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final addressText = address?.trim();
+    final addressText = cleanAddressPart(address) ?? noAddressAvailableText;
     final scheduledTimeText = scheduledTime?.trim();
 
     return GestureDetector(
@@ -109,13 +110,11 @@ class ClientCard extends StatelessWidget {
                         ),
                       ],
                       const Divider(height: 14, thickness: 0.5),
-                      if (addressText != null && addressText.isNotEmpty) ...[
-                        _IconRow(
-                          icon: LucideIcons.mapPin,
-                          text: addressText,
-                        ),
-                        const SizedBox(height: 5),
-                      ],
+                      _IconRow(
+                        icon: LucideIcons.mapPin,
+                        text: addressText,
+                      ),
+                      const SizedBox(height: 5),
                       _TouchpointRow(
                         type: lastTouchpointType,
                         number: lastTouchpointNumber,

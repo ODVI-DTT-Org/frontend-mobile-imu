@@ -72,6 +72,45 @@ void main() {
       row['client_id'] = null;
       expect(() => MyDayClient.fromPowerSync(row), throwsArgumentError);
     });
+
+    test('uses full address then location then address lookup', () {
+      final fullAddressClient = MyDayClient.fromPowerSync({
+        ...baseRow(),
+        'full_address': 'Stored Full Address',
+        'region': 'Region X',
+        'province': 'Province X',
+        'municipality': 'Municipality X',
+        'barangay': 'Barangay X',
+        'address_street': 'Street X',
+      });
+
+      expect(fullAddressClient.address, 'Stored Full Address');
+
+      final locationClient = MyDayClient.fromPowerSync({
+        ...baseRow(),
+        'id': 'itin-2',
+        'region': 'Region X',
+        'province': 'Province X',
+        'municipality': 'Municipality X',
+        'barangay': 'Barangay X',
+        'address_street': 'Street X',
+        'address_city': 'City Y',
+        'address_province': 'Province Y',
+      });
+
+      expect(locationClient.address, 'Region X, Province X, Municipality X, Barangay X');
+
+      final addressLookupClient = MyDayClient.fromPowerSync({
+        ...baseRow(),
+        'id': 'itin-3',
+        'address_street': 'Street X',
+        'address_barangay': 'Barangay Y',
+        'address_city': 'City Y',
+        'address_province': 'Province Y',
+      });
+
+      expect(addressLookupClient.address, 'Street X, Barangay Y, City Y, Province Y');
+    });
   });
 
   group('MyDayClient.fromJson', () {

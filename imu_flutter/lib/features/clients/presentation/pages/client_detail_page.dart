@@ -344,7 +344,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
     // Include client's legacy address fields if not already represented
     final addresses = List<Address>.from(tableAddresses);
-    final legacyFull = client.fullAddress ?? '';
+    final legacyFull = client.fullAddress;
     if (legacyFull.isNotEmpty) {
       final alreadyListed = addresses.any((a) => a.fullAddress == legacyFull);
       if (!alreadyListed) {
@@ -956,7 +956,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
       touchpointNumber: nextNumber,
       touchpointType: nextTypeString == 'visit' ? 'Visit' : 'Call',
       clientName: _client!.fullName,
-      address: _client!.addresses.isNotEmpty ? _client!.addresses.first.fullAddress : null,
+      address: _client!.fullAddress.isNotEmpty ? _client!.fullAddress : null,
     );
 
     if (result != null) {
@@ -1245,9 +1245,7 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
 
   Widget _buildHeroCard() {
     final client = _client!;
-    final primaryAddress = client.addresses.isNotEmpty
-        ? client.addresses.first
-        : null;
+    final addressText = client.displayAddress;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1368,26 +1366,25 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
               if (client.isStarred)
                 const Icon(Icons.star, size: 16, color: Colors.amber),
               const SizedBox(width: 8),
-              if (primaryAddress != null)
-                Expanded(
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.mapPin, size: 14, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          '${primaryAddress.municipality}, ${primaryAddress.province}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.mapPin, size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        addressText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         ],
