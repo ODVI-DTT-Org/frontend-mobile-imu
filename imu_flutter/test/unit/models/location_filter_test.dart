@@ -7,6 +7,8 @@ void main() {
       final filter = LocationFilter.none();
       expect(filter.province, isNull);
       expect(filter.municipalities, isNull);
+      expect(filter.barangays, isNull);
+      expect(filter.addressQuery, isNull);
       expect(filter.hasFilter, isFalse);
     });
 
@@ -62,6 +64,39 @@ void main() {
     test('toQueryParams should return province and multiple municipalities as comma-separated', () {
       final filter = LocationFilter(province: 'Pangasinan', municipalities: ['Dagupan', 'Urdaneta']);
       expect(filter.toQueryParams(), {'province': 'Pangasinan', 'municipality': 'Dagupan,Urdaneta'});
+    });
+
+    test('toQueryParams should include barangay and address search filters', () {
+      final filter = LocationFilter(
+        province: 'Negros Occidental',
+        municipalities: ['City of Bacolod'],
+        barangays: ['Alangilan', 'Estefania'],
+        addressQuery: 'Capitol Hills',
+      );
+
+      expect(filter.toQueryParams(), {
+        'province': 'Negros Occidental',
+        'municipality': 'City of Bacolod',
+        'barangay': 'Alangilan,Estefania',
+        'address_search': 'Capitol Hills',
+      });
+    });
+
+    test('matchesClientAddress matches full address and location fields case-insensitively', () {
+      final filter = LocationFilter(addressQuery: 'alangilan bacolod');
+
+      expect(filter.matchesClientAddress(
+        fullAddress: 'LOT 10 BLK 10 CAPITOL HILLS',
+        province: 'Negros Occidental',
+        municipality: 'City of Bacolod',
+        barangay: 'Alangilan',
+      ), isTrue);
+      expect(filter.matchesClientAddress(
+        fullAddress: 'Other Address',
+        province: 'Cebu',
+        municipality: 'Cebu City',
+        barangay: 'Lahug',
+      ), isFalse);
     });
 
     test('getDisplayLabel should return province only', () {

@@ -8,6 +8,8 @@ class FilterPreferencesService {
   static const String _keyAssignedOnly = 'filter_assigned_only';
   static const String _keyProvince = 'filter_province';
   static const String _keyMunicipalities = 'filter_municipalities'; // Changed to support list
+  static const String _keyBarangays = 'filter_barangays';
+  static const String _keyAddressQuery = 'filter_address_query';
 
   // Client attribute filter keys
   static const String _keyClientType = 'filter_client_type';
@@ -88,6 +90,43 @@ class FilterPreferencesService {
       await _prefs?.remove(_keyMunicipalities);
     } else {
       await _prefs?.setString(_keyMunicipalities, json.encode(value));
+    }
+  }
+
+  /// Barangay Filter (supports multiple barangays)
+  List<String> getBarangays() {
+    final jsonString = _prefs?.getString(_keyBarangays);
+    if (jsonString == null || jsonString.isEmpty) {
+      return [];
+    }
+    try {
+      final List<dynamic> decoded = json.decode(jsonString);
+      return decoded.cast<String>();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> setBarangays(List<String> value) async {
+    await init();
+    if (value.isEmpty) {
+      await _prefs?.remove(_keyBarangays);
+    } else {
+      await _prefs?.setString(_keyBarangays, json.encode(value));
+    }
+  }
+
+  String? getAddressQuery() {
+    return _prefs?.getString(_keyAddressQuery);
+  }
+
+  Future<void> setAddressQuery(String? value) async {
+    await init();
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      await _prefs?.remove(_keyAddressQuery);
+    } else {
+      await _prefs?.setString(_keyAddressQuery, trimmed);
     }
   }
 
@@ -277,6 +316,8 @@ class FilterPreferencesService {
     await _prefs?.remove(_keyAssignedOnly);
     await _prefs?.remove(_keyProvince);
     await _prefs?.remove(_keyMunicipalities);
+    await _prefs?.remove(_keyBarangays);
+    await _prefs?.remove(_keyAddressQuery);
     // Client attribute filters
     await _prefs?.remove(_keyClientType);
     await _prefs?.remove(_keyMarketType);
@@ -293,6 +334,8 @@ class FilterPreferencesService {
     await _prefs?.remove(_keyAssignedOnly);
     await _prefs?.remove(_keyProvince);
     await _prefs?.remove(_keyMunicipalities);
+    await _prefs?.remove(_keyBarangays);
+    await _prefs?.remove(_keyAddressQuery);
   }
 
   /// Clear only client attribute filters

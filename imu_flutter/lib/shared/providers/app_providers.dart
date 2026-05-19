@@ -391,12 +391,18 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
 
     String? province;
     List<String>? municipalityIds;
+    List<String>? barangays;
+    String? addressSearch;
     if (locationFilter.hasFilter) {
       province = locationFilter.province;
       if (locationFilter.municipalities != null && locationFilter.municipalities!.isNotEmpty) {
         municipalityIds = locationFilter.municipalities!.toList();
       }
-      debugPrint('onlineClientsProvider: Location filter — province: $province, municipalities: $municipalityIds');
+      if (locationFilter.barangays != null && locationFilter.barangays!.isNotEmpty) {
+        barangays = locationFilter.barangays!.toList();
+      }
+      addressSearch = locationFilter.addressQuery;
+      debugPrint('onlineClientsProvider: Location filter — province: $province, municipalities: $municipalityIds, barangays: $barangays, addressSearch: $addressSearch');
     }
 
     // Convert attribute filter to API parameters
@@ -425,6 +431,8 @@ final onlineClientsProvider = FutureProvider<ClientsResponse>((ref) async {
       loanReleased: queryParams['loan_released'] == 'true' ? true : null,
       province: province,
       municipalityIds: municipalityIds,
+      barangays: barangays,
+      addressSearch: addressSearch,
       nextTouchpointNumbers: nextTouchpointNumbers,
       touchpointDateFrom: queryParams['touchpoint_date_from'],
       touchpointDateTo: queryParams['touchpoint_date_to'],
@@ -471,6 +479,27 @@ ClientsResponse _buildHiveFallback({
   if (locationFilter.province != null) {
     final p = locationFilter.province!.toUpperCase();
     clients = clients.where((c) => c.province?.toUpperCase() == p).toList();
+  }
+  if (locationFilter.barangays?.isNotEmpty == true) {
+    final barangays = locationFilter.barangays!.map((b) => b.toUpperCase()).toSet();
+    clients = clients
+        .where((c) => c.barangay != null && barangays.contains(c.barangay!.toUpperCase()))
+        .toList();
+  }
+  if ((locationFilter.addressQuery?.trim().isNotEmpty ?? false)) {
+    clients = clients.where((c) {
+      final primary = c.addresses.isNotEmpty ? c.addresses.first : null;
+      return locationFilter.matchesClientAddress(
+        fullAddress: c.tableFullAddress,
+        region: c.region,
+        province: c.province,
+        municipality: c.municipality,
+        barangay: c.barangay,
+        addressBarangay: primary?.barangay,
+        addressCity: primary?.municipality,
+        addressProvince: primary?.province,
+      );
+    }).toList();
   }
 
   // Text search — AND across words, LIKE on name/agency fields (mirrors SQL path).
@@ -592,6 +621,25 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
   if (locationFilter.province != null) {
     conditions.add('province = ?');
     params.add(locationFilter.province);
+  }
+
+  if (locationFilter.barangays?.isNotEmpty == true) {
+    final bPh = locationFilter.barangays!.map((_) => '?').join(', ');
+    conditions.add('UPPER(barangay) IN ($bPh)');
+    params.addAll(locationFilter.barangays!.map((b) => b.toUpperCase()));
+  }
+
+  final addressQuery = locationFilter.addressQuery?.trim();
+  if (addressQuery != null && addressQuery.isNotEmpty) {
+    for (final word in addressQuery
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length >= 2)) {
+      conditions.add(
+        "(LOWER(COALESCE(full_address, '')) LIKE ? OR LOWER(COALESCE(region, '')) LIKE ? OR LOWER(COALESCE(province, '')) LIKE ? OR LOWER(COALESCE(municipality, '')) LIKE ? OR LOWER(COALESCE(barangay, '')) LIKE ?)",
+      );
+      final pct = '%${word.toLowerCase()}%';
+      params.addAll([pct, pct, pct, pct, pct]);
+    }
   }
 
   // Attribute type filters — OR within a category, AND across categories.

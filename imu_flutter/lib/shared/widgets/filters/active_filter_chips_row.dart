@@ -17,12 +17,8 @@ class ActiveFilterChipsRow extends ConsumerWidget {
 
     final chips = <Widget>[];
 
-    if (location.province != null) {
-      final label = location.municipalities == null || location.municipalities!.isEmpty
-          ? location.province!
-          : location.municipalities!.length > 1
-              ? '${location.province} • ${location.municipalities!.length} cities'
-              : '${location.province} • ${location.municipalities!.first}';
+    if (location.hasFilter) {
+      final label = location.getDisplayLabel();
       chips.add(_ActiveChip(
         label: label,
         icon: Icons.location_on,

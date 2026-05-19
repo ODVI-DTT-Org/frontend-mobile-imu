@@ -140,6 +140,12 @@ final activeFilterCountProvider = Provider<int>((ref) {
       count += locationFilter.municipalities!.length;
     }
   }
+  if (locationFilter.barangays != null && locationFilter.barangays!.isNotEmpty) {
+    count += locationFilter.barangays!.length;
+  }
+  if (locationFilter.addressQuery != null && locationFilter.addressQuery!.trim().isNotEmpty) {
+    count += 1;
+  }
   count += attributeFilter.activeFilterCount;
   return count;
 });

@@ -349,6 +349,20 @@ class _ClientsPageState extends ConsumerState<ClientsPage> {
                 final muns = locationFilter.municipalities!.map((m) => m.toUpperCase()).toSet();
                 if (!muns.contains(c.municipality?.toUpperCase())) return false;
               }
+              if (locationFilter.barangays != null && locationFilter.barangays!.isNotEmpty) {
+                final barangays = locationFilter.barangays!.map((b) => b.toUpperCase()).toSet();
+                if (!barangays.contains(c.barangay?.toUpperCase())) return false;
+              }
+              if (!locationFilter.matchesClientAddress(
+                fullAddress: c.tableFullAddress,
+                region: c.region,
+                province: c.province,
+                municipality: c.municipality,
+                barangay: c.barangay,
+                addressBarangay: c.addresses.isNotEmpty ? c.addresses.first.barangay : null,
+                addressCity: c.addresses.isNotEmpty ? c.addresses.first.municipality : null,
+                addressProvince: c.addresses.isNotEmpty ? c.addresses.first.province : null,
+              )) return false;
               return true;
             }).toList();
           }

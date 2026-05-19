@@ -35,6 +35,8 @@ class ClientApiService {
     bool? loanReleased,
     String? province,
     List<String>? municipalityIds,
+    List<String>? barangays,
+    String? addressSearch,
     List<String>? nextTouchpointNumbers,
     String? touchpointDateFrom,
     String? touchpointDateTo,
@@ -91,6 +93,8 @@ class ClientApiService {
           if (loanReleased == true) 'loan_released': 'true',
           if (province != null && province.isNotEmpty) 'province': province,
           if (municipalityIds != null && municipalityIds.isNotEmpty) 'municipality': municipalityIds,
+          if (barangays != null && barangays.isNotEmpty) 'barangay': barangays,
+          if (addressSearch != null && addressSearch.trim().isNotEmpty) 'address_search': addressSearch.trim(),
           if (touchpointDateFrom != null && touchpointDateFrom.isNotEmpty) 'touchpoint_date_from': touchpointDateFrom,
           if (touchpointDateTo != null && touchpointDateTo.isNotEmpty) 'touchpoint_date_to': touchpointDateTo,
           if (nextTouchpointNumbers != null && nextTouchpointNumbers.isNotEmpty)
@@ -152,6 +156,8 @@ class ClientApiService {
     String? productType,
     String? province,
     String? municipality,
+    List<String>? barangays,
+    String? addressSearch,
   }) async {
     try {
       debugPrint('[CLIENT-API] Fetching ASSIGNED clients from REST API...');
@@ -182,6 +188,8 @@ class ClientApiService {
           if (productType != null && productType.isNotEmpty) 'product_type': productType,
           if (province != null && province.isNotEmpty) 'province': province,
           if (municipality != null && municipality.isNotEmpty) 'municipality': municipality,
+          if (barangays != null && barangays.isNotEmpty) 'barangay': barangays,
+          if (addressSearch != null && addressSearch.trim().isNotEmpty) 'address_search': addressSearch.trim(),
         },
       );
 

@@ -31,16 +31,48 @@ class ClientFilterService {
   }
 
   bool _matchesLocation(Client client, LocationFilter filter) {
-    if (filter.province == null) return true;
+    if (!filter.matchesClientAddress(
+      fullAddress: client.tableFullAddress,
+      region: client.region,
+      province: client.province,
+      municipality: client.municipality,
+      barangay: client.barangay,
+      addressBarangay: client.addresses.isNotEmpty ? client.addresses.first.barangay : null,
+      addressCity: client.addresses.isNotEmpty ? client.addresses.first.municipality : null,
+      addressProvince: client.addresses.isNotEmpty ? client.addresses.first.province : null,
+    )) {
+      return false;
+    }
+
+    if (filter.province == null) {
+      return filter.barangays == null || filter.barangays!.isEmpty
+          ? true
+          : _containsIgnoreCase(filter.barangays!, client.barangay);
+    }
 
     // Province must match
-    if (client.province != filter.province) return false;
+    if (!_equalsIgnoreCase(client.province, filter.province)) return false;
 
     // If municipalities specified, client must be in one of them
     if (filter.municipalities != null && filter.municipalities!.isNotEmpty) {
-      return filter.municipalities!.contains(client.municipality);
+      if (!_containsIgnoreCase(filter.municipalities!, client.municipality)) return false;
+    }
+
+    if (filter.barangays != null && filter.barangays!.isNotEmpty) {
+      return _containsIgnoreCase(filter.barangays!, client.barangay);
     }
 
     return true;
+  }
+
+  bool _equalsIgnoreCase(String? a, String? b) {
+    if (a == null || b == null) return false;
+    return a.toUpperCase() == b.toUpperCase();
+  }
+
+  bool _containsIgnoreCase(List<String> values, String? candidate) {
+    if (candidate == null) return false;
+    final upper = candidate.toUpperCase();
+    return values.any((value) => value.toUpperCase() == upper);
   }
 }

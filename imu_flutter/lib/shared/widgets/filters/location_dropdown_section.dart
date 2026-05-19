@@ -38,6 +38,15 @@ class LocationDropdownSection extends ConsumerWidget {
             ),
           ),
         ),
+        _AddressSearchField(
+          value: draftFilter.addressQuery,
+          onChanged: (value) => onChanged(
+            draftFilter.copyWith(
+              addressQuery: value.trim().isEmpty ? null : value,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         if (restrictToAssignedAreas)
           _AssignedAreasDropdowns(
             draftFilter: draftFilter,
@@ -132,6 +141,8 @@ class _AssignedAreasDropdowns extends ConsumerWidget {
                           province:
                               picked == null ? null : (labelToValue[picked] ?? picked),
                           municipalities: null,
+                          barangays: null,
+                          addressQuery: draftFilter.addressQuery,
                         ));
                       }
                     },
@@ -139,6 +150,11 @@ class _AssignedAreasDropdowns extends ConsumerWidget {
             const SizedBox(height: 8),
             _AssignedMunicipalityDropdown(
               areas: areas,
+              draftFilter: draftFilter,
+              onChanged: onChanged,
+            ),
+            const SizedBox(height: 8),
+            _BarangayDropdown(
               draftFilter: draftFilter,
               onChanged: onChanged,
             ),
@@ -229,6 +245,8 @@ class _AssignedMunicipalityDropdown extends ConsumerWidget {
                 onChanged(LocationFilter(
                   province: province,
                   municipalities: pickedRaw.isEmpty ? null : pickedRaw,
+                  barangays: null,
+                  addressQuery: draftFilter.addressQuery,
                 ));
               }
             },
@@ -274,6 +292,8 @@ class _PsgcDropdowns extends ConsumerWidget {
                 onChanged(LocationFilter(
                   province: newProvince,
                   municipalities: null,
+                  barangays: null,
+                  addressQuery: draftFilter.addressQuery,
                 ));
               }
             },
@@ -324,6 +344,8 @@ class _PsgcDropdowns extends ConsumerWidget {
                       onChanged(LocationFilter(
                         province: draftFilter.province,
                         municipalities: result.isEmpty ? null : result.toList(),
+                        barangays: null,
+                        addressQuery: draftFilter.addressQuery,
                       ));
                     }
                   } catch (e) {
@@ -338,7 +360,140 @@ class _PsgcDropdowns extends ConsumerWidget {
                   }
                 },
         ),
+        const SizedBox(height: 8),
+        _BarangayDropdown(
+          draftFilter: draftFilter,
+          onChanged: onChanged,
+        ),
       ],
+    );
+  }
+}
+
+class _AddressSearchField extends StatelessWidget {
+  final String? value;
+  final ValueChanged<String> onChanged;
+
+  const _AddressSearchField({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      initialValue: value ?? '',
+      decoration: InputDecoration(
+        labelText: 'Search address',
+        hintText: 'Barangay, city, province, or full address',
+        prefixIcon: const Icon(Icons.search, size: 18),
+        isDense: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      textInputAction: TextInputAction.search,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _BarangayDropdown extends ConsumerWidget {
+  final LocationFilter draftFilter;
+  final void Function(LocationFilter) onChanged;
+
+  const _BarangayDropdown({
+    required this.draftFilter,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final municipalities = draftFilter.municipalities ?? const <String>[];
+    final selectedMunicipality = municipalities.length == 1 ? municipalities.first : null;
+
+    return _BarangayDropdownButton(
+      selectedMunicipality: selectedMunicipality,
+      selectedBarangays: draftFilter.barangays?.toSet() ?? {},
+      onTap: selectedMunicipality == null
+          ? null
+          : () async {
+              try {
+                final barangays = await ref.read(
+                  barangaysByMunicipalityProvider(selectedMunicipality).future,
+                );
+                final items = barangays
+                    .map((b) => b.barangay)
+                    .whereType<String>()
+                    .where((b) => b.trim().isNotEmpty)
+                    .toList()
+                  ..sort();
+                if (items.isEmpty) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('No barangays found for this municipality'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                  return;
+                }
+                final result = await SearchablePickerSheet.show(
+                  context: context,
+                  title: 'Barangay',
+                  items: items,
+                  selectedItems: draftFilter.barangays?.toSet() ?? {},
+                  multiSelect: true,
+                  showAllOption: true,
+                );
+                if (result != null) {
+                  onChanged(draftFilter.copyWith(
+                    barangays: result.isEmpty ? null : result.toList(),
+                  ));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to load barangays: ${e.toString()}'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
+            },
+    );
+  }
+}
+
+class _BarangayDropdownButton extends StatelessWidget {
+  final String? selectedMunicipality;
+  final Set<String> selectedBarangays;
+  final VoidCallback? onTap;
+
+  const _BarangayDropdownButton({
+    required this.selectedMunicipality,
+    required this.selectedBarangays,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    String label;
+    if (selectedMunicipality == null) {
+      label = 'Select one municipality first';
+    } else if (selectedBarangays.isEmpty) {
+      label = 'All Barangays';
+    } else if (selectedBarangays.length == 1) {
+      label = selectedBarangays.first;
+    } else {
+      label = '${selectedBarangays.length} barangays';
+    }
+
+    return _DropdownButton(
+      label: label,
+      hint: selectedMunicipality == null || selectedBarangays.isEmpty,
+      enabled: selectedMunicipality != null,
+      onTap: onTap,
     );
   }
 }

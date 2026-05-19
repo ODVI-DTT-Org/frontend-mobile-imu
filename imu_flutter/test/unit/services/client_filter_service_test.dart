@@ -107,6 +107,51 @@ void main() {
       expect(result.first.province, 'Pangasinan');
     });
 
+    test('filterClients filters by barangay and typed address query', () {
+      final clientsWithAddress = [
+        Client(
+          id: '1',
+          firstName: 'Tessie',
+          lastName: 'Jordan',
+          tableFullAddress: 'LOT 10 BLK 10 CAPITOL HILLS',
+          province: 'Negros Occidental',
+          municipality: 'City of Bacolod',
+          barangay: 'Alangilan',
+          clientType: ClientType.potential,
+          productType: ProductType.pnpPension,
+          pensionType: PensionType.sss,
+          createdAt: DateTime.now(),
+        ),
+        Client(
+          id: '2',
+          firstName: 'Other',
+          lastName: 'Client',
+          tableFullAddress: 'Different Street',
+          province: 'Negros Occidental',
+          municipality: 'City of Bacolod',
+          barangay: 'Estefania',
+          clientType: ClientType.potential,
+          productType: ProductType.pnpPension,
+          pensionType: PensionType.sss,
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      final result = service.filterClients(
+        clients: clientsWithAddress,
+        searchQuery: '',
+        locationFilter: const LocationFilter(
+          province: 'Negros Occidental',
+          municipalities: ['City of Bacolod'],
+          barangays: ['Alangilan'],
+          addressQuery: 'capitol bacolod',
+        ),
+        attributeFilter: ClientAttributeFilter.none(),
+      );
+
+      expect(result.map((c) => c.id), ['1']);
+    });
+
     test('filterClients filters by client attribute (AND logic)', () {
       final attributeFilter = ClientAttributeFilter(
         clientType: ClientType.potential,

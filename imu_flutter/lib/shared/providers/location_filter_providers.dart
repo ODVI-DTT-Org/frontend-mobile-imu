@@ -23,11 +23,18 @@ class LocationFilterNotifier extends StateNotifier<LocationFilter> {
   Future<void> _loadFromPreferences() async {
     final province = _prefs.getProvince();
     final municipalities = _prefs.getMunicipalities();
+    final barangays = _prefs.getBarangays();
+    final addressQuery = _prefs.getAddressQuery();
 
-    if (province != null || municipalities.isNotEmpty) {
+    if (province != null ||
+        municipalities.isNotEmpty ||
+        barangays.isNotEmpty ||
+        (addressQuery != null && addressQuery.trim().isNotEmpty)) {
       state = LocationFilter(
         province: province,
         municipalities: municipalities.isNotEmpty ? municipalities : null,
+        barangays: barangays.isNotEmpty ? barangays : null,
+        addressQuery: addressQuery,
       );
     }
   }
@@ -40,15 +47,31 @@ class LocationFilterNotifier extends StateNotifier<LocationFilter> {
 
   /// Set province and persist — clears municipalities since they belong to the old province
   void setProvince(String? province) {
-    state = LocationFilter(province: province);
+    state = LocationFilter(province: province, addressQuery: state.addressQuery);
     _prefs.setProvince(province);
     _prefs.setMunicipalities([]);
+    _prefs.setBarangays([]);
   }
 
   /// Set municipalities and persist
   void setMunicipalities(List<String>? municipalities) {
-    state = state.copyWith(municipalities: municipalities);
+    state = state.copyWith(municipalities: municipalities, barangays: null);
     _prefs.setMunicipalities(municipalities ?? []);
+    _prefs.setBarangays([]);
+  }
+
+  void setBarangays(List<String>? barangays) {
+    state = state.copyWith(barangays: barangays);
+    _prefs.setBarangays(barangays ?? []);
+  }
+
+  void setAddressQuery(String? addressQuery) {
+    state = state.copyWith(
+      addressQuery: addressQuery == null || addressQuery.trim().isEmpty
+          ? null
+          : addressQuery.trim(),
+    );
+    _prefs.setAddressQuery(state.addressQuery);
   }
 
   /// Clear filter and persist
@@ -56,12 +79,16 @@ class LocationFilterNotifier extends StateNotifier<LocationFilter> {
     state = LocationFilter.none();
     _prefs.setProvince(null);
     _prefs.setMunicipalities([]);
+    _prefs.setBarangays([]);
+    _prefs.setAddressQuery(null);
   }
 
   /// Persist filter to SharedPreferences
   void _persistFilter(LocationFilter filter) {
     _prefs.setProvince(filter.province);
     _prefs.setMunicipalities(filter.municipalities ?? []);
+    _prefs.setBarangays(filter.barangays ?? []);
+    _prefs.setAddressQuery(filter.addressQuery);
   }
 }
 
