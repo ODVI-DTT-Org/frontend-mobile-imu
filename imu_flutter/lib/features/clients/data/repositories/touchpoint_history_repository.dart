@@ -98,8 +98,12 @@ class TouchpointHistoryRepository {
         '''
         SELECT a.id, a.type, a.status, a.reason, a.notes, a.udi_number,
                a.updated_udi, a.approved_at, a.rejected_at, a.rejection_reason,
-               a.created_at, a.updated_at
+               a.created_at, a.updated_at, a.visit_id,
+               v.time_in, v.time_out, v.odometer_arrival, v.odometer_departure,
+               v.address, v.latitude, v.longitude, v.photo_url, v.reason AS visit_reason,
+               v.status AS visit_status, v.notes AS visit_notes
         FROM approvals a
+        LEFT JOIN visits v ON a.visit_id = v.id
         WHERE a.client_id = ?
           AND a.type = 'udi'
         ORDER BY a.created_at DESC
@@ -121,6 +125,18 @@ class TouchpointHistoryRepository {
           rejectionReason: row['rejection_reason'] as String?,
           createdAt: DateTime.parse(row['created_at'] as String),
           updatedAt: DateTime.parse(row['updated_at'] as String),
+          visitId: row['visit_id'] as String?,
+          visitTimeIn: row['time_in'] != null ? DateTime.parse(row['time_in'] as String) : null,
+          visitTimeOut: row['time_out'] != null ? DateTime.parse(row['time_out'] as String) : null,
+          visitOdometerArrival: row['odometer_arrival'] as String?,
+          visitOdometerDeparture: row['odometer_departure'] as String?,
+          visitAddress: row['address'] as String?,
+          visitLatitude: (row['latitude'] as num?)?.toDouble(),
+          visitLongitude: (row['longitude'] as num?)?.toDouble(),
+          visitPhotoUrl: row['photo_url'] as String?,
+          visitReason: row['visit_reason'] as String?,
+          visitStatus: row['visit_status'] as String?,
+          visitNotes: row['visit_notes'] as String?,
         );
       }).toList();
     } catch (e) {

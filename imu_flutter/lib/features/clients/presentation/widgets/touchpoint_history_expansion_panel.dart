@@ -587,6 +587,17 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                         _tpDetailRow(LucideIcons.messageCircle, 'Reason', approval.reason!),
                       if (approval.notes != null && approval.notes!.isNotEmpty)
                         _tpDetailRow(LucideIcons.notepadText, 'Notes', approval.notes!),
+                      // Visit-related fields
+                      if (approval.visitTimeIn != null)
+                        _tpDetailRow(LucideIcons.logIn, 'Time In', DateFormat('MMM d, y h:mm a').format(approval.visitTimeIn!.toLocal())),
+                      if (approval.visitTimeOut != null)
+                        _tpDetailRow(LucideIcons.logOut, 'Time Out', DateFormat('MMM d, y h:mm a').format(approval.visitTimeOut!.toLocal())),
+                      if (approval.visitOdometerArrival != null && approval.visitOdometerArrival!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.gauge, 'Odometer (Arrival)', approval.visitOdometerArrival!),
+                      if (approval.visitOdometerDeparture != null && approval.visitOdometerDeparture!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.gauge, 'Odometer (Departure)', approval.visitOdometerDeparture!),
+                      if (approval.visitAddress != null && approval.visitAddress!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.mapPin, 'Location', approval.visitAddress!),
                       if (approval.approvedAt != null)
                         _tpDetailRow(LucideIcons.checkCircle, 'Approved At', DateFormat('MMM d, yyyy h:mm a').format(approval.approvedAt!.toLocal())),
                       if (approval.rejectedAt != null)

@@ -56,6 +56,19 @@ class Approval {
   final DateTime createdAt;
   final DateTime updatedAt;
   final ClientExpand? expand;
+  // Visit metadata (for loan releases with associated visits)
+  final String? visitId;
+  final DateTime? visitTimeIn;
+  final DateTime? visitTimeOut;
+  final String? visitOdometerArrival;
+  final String? visitOdometerDeparture;
+  final String? visitAddress;
+  final double? visitLatitude;
+  final double? visitLongitude;
+  final String? visitPhotoUrl;
+  final String? visitReason;
+  final String? visitStatus;
+  final String? visitNotes;
 
   Approval({
     required this.id,
@@ -78,6 +91,18 @@ class Approval {
     required this.createdAt,
     required this.updatedAt,
     this.expand,
+    this.visitId,
+    this.visitTimeIn,
+    this.visitTimeOut,
+    this.visitOdometerArrival,
+    this.visitOdometerDeparture,
+    this.visitAddress,
+    this.visitLatitude,
+    this.visitLongitude,
+    this.visitPhotoUrl,
+    this.visitReason,
+    this.visitStatus,
+    this.visitNotes,
   });
 
   factory Approval.fromJson(Map<String, dynamic> json) {
@@ -108,6 +133,22 @@ class Approval {
       expand: json['expand'] != null
           ? ClientExpand.fromJson(json['expand'] as Map<String, dynamic>)
           : null,
+      visitId: json['visit_id'] as String?,
+      visitTimeIn: json['time_in'] != null
+          ? DateTime.parse(json['time_in'] as String)
+          : null,
+      visitTimeOut: json['time_out'] != null
+          ? DateTime.parse(json['time_out'] as String)
+          : null,
+      visitOdometerArrival: json['odometer_arrival'] as String?,
+      visitOdometerDeparture: json['odometer_departure'] as String?,
+      visitAddress: json['address'] as String?,
+      visitLatitude: (json['latitude'] as num?)?.toDouble(),
+      visitLongitude: (json['longitude'] as num?)?.toDouble(),
+      visitPhotoUrl: json['photo_url'] as String?,
+      visitReason: json['visit_reason'] as String?,
+      visitStatus: json['visit_status'] as String?,
+      visitNotes: json['visit_notes'] as String?,
     );
   }
 
@@ -133,6 +174,18 @@ class Approval {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       if (expand != null) 'expand': expand?.toJson(),
+      'visit_id': visitId,
+      'time_in': visitTimeIn?.toIso8601String(),
+      'time_out': visitTimeOut?.toIso8601String(),
+      'odometer_arrival': visitOdometerArrival,
+      'odometer_departure': visitOdometerDeparture,
+      'address': visitAddress,
+      'latitude': visitLatitude,
+      'longitude': visitLongitude,
+      'photo_url': visitPhotoUrl,
+      'visit_reason': visitReason,
+      'visit_status': visitStatus,
+      'visit_notes': visitNotes,
     };
   }
 
