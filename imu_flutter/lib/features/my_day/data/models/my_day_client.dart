@@ -132,21 +132,17 @@ class MyDayClient {
       loanType: (json['client'] as Map<String, dynamic>?)?['loan_type'] as String?,
       address: () {
         final client = json['client'] as Map<String, dynamic>?;
-        Map<String, dynamic>? firstAddress;
-        final addresses = client?['addresses'];
-        if (addresses is List && addresses.isNotEmpty) {
-          firstAddress = addresses.first as Map<String, dynamic>;
-        }
+        final primaryAddress = selectPrimaryAddressMap(client?['addresses']);
         return resolveAddressDisplay(
           fullAddress: client?['full_address'],
           region: client?['region'] ?? client?['psgc_region'],
           province: client?['province'] ?? client?['psgc_province'],
           municipality: client?['municipality'] ?? client?['municipality_id'],
           barangay: client?['barangay'] ?? client?['psgc_barangay'],
-          addressStreet: firstAddress?['street'],
-          addressBarangay: firstAddress?['barangay'],
-          addressCity: firstAddress?['city'],
-          addressProvince: firstAddress?['province'],
+          addressStreet: primaryAddress?['street'],
+          addressBarangay: primaryAddress?['barangay'],
+          addressCity: primaryAddress?['city'],
+          addressProvince: primaryAddress?['province'],
           fallbackAddress: resolveAddressDisplay(
                 fullAddress: json['full_address'],
                 region: json['region'] ?? json['psgc_region'],

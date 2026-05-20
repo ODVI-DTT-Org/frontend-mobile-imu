@@ -163,7 +163,7 @@ class Client {
   }
 
   String get fullAddress {
-    final primary = primaryAddress;
+    final primary = addresses.isNotEmpty ? primaryAddress : null;
     return resolveAddressDisplay(
       fullAddress: tableFullAddress,
       region: region,
@@ -179,7 +179,7 @@ class Client {
   }
 
   String get displayAddress {
-    final primary = primaryAddress;
+    final primary = addresses.isNotEmpty ? primaryAddress : null;
     return resolveAddressDisplayOrFallback(
       fullAddress: tableFullAddress,
       region: region,

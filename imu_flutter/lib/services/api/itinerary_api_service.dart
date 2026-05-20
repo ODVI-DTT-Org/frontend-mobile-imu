@@ -103,20 +103,17 @@ class ItineraryItem {
     String? loanType;
     if (json['expand'] != null && json['expand']['client_id'] != null) {
       final client = json['expand']['client_id'] as Map<String, dynamic>;
-      Map<String, dynamic>? firstAddress;
-      if (client['addresses'] != null && client['addresses'] is List && (client['addresses'] as List).isNotEmpty) {
-        firstAddress = (client['addresses'] as List).first as Map<String, dynamic>;
-      }
+      final primaryAddress = selectPrimaryAddressMap(client['addresses']);
       address = resolveAddressDisplay(
         fullAddress: client['full_address'],
         region: client['region'] ?? client['psgc_region'],
         province: client['province'] ?? client['psgc_province'],
         municipality: client['municipality'] ?? client['municipality_id'],
         barangay: client['barangay'] ?? client['psgc_barangay'],
-        addressStreet: firstAddress?['street'],
-        addressBarangay: firstAddress?['barangay'],
-        addressCity: firstAddress?['city'],
-        addressProvince: firstAddress?['province'],
+        addressStreet: primaryAddress?['street'],
+        addressBarangay: primaryAddress?['barangay'],
+        addressCity: primaryAddress?['city'],
+        addressProvince: primaryAddress?['province'],
         fallbackAddress: client['address'],
       );
       productType = client['product_type'] as String?;

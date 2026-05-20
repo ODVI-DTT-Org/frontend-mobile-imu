@@ -36,9 +36,7 @@ class ContactInfoSection extends StatelessWidget {
           context,
           title: 'Address',
           icon: LucideIcons.mapPin,
-          child: primaryAddress != null
-              ? _buildPrimaryAddress(context, primaryAddress)
-              : _buildLegacyAddress(context),
+          child: _buildAddressDisplay(context, primaryAddress),
           actionLabel: client.addresses.length > 1 ? 'View All (${client.addresses.length})' : null,
           onActionPressed: onViewAddresses,
           onAddPressed: onAddAddress,
@@ -162,6 +160,28 @@ class ContactInfoSection extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildAddressDisplay(BuildContext context, Address? primaryAddress) {
+    if (client.displayAddress == 'No address available') {
+      return _buildEmptyState(
+        context,
+        message: 'No address information available',
+        icon: LucideIcons.mapPin,
+      );
+    }
+
+    if (primaryAddress != null && client.addresses.isNotEmpty) {
+      return _buildPrimaryAddress(context, primaryAddress);
+    }
+
+    final theme = Theme.of(context);
+    return Text(
+      client.displayAddress,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.colorScheme.onSurface,
+      ),
     );
   }
 

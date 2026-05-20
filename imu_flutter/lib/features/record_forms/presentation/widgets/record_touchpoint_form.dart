@@ -182,7 +182,7 @@ class _RecordTouchpointFormState extends ConsumerState<RecordTouchpointForm> {
           ),
           const SizedBox(height: 2),
           Text(
-            client.primaryAddress?.fullAddress ?? 'No address',
+            client.displayAddress,
             style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
           ),
           if (touchpointNumber != null) ...[

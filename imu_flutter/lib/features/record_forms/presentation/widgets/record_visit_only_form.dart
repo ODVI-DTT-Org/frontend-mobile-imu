@@ -153,7 +153,7 @@ class _RecordVisitOnlyFormState extends ConsumerState<RecordVisitOnlyForm> {
           Text(client.fullName, style: theme.textTheme.titleMedium?.copyWith(fontSize: 15)),
           const SizedBox(height: 2),
           Text(
-            client.primaryAddress?.fullAddress ?? 'No address',
+            client.displayAddress,
             style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
           ),
         ],

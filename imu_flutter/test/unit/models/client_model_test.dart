@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:imu_flutter/features/clients/data/models/address_model.dart' as addr;
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
 void main() {
@@ -121,6 +122,76 @@ void main() {
       );
 
       expect(client.completedTouchpoints, 0);
+    });
+  });
+
+  group('Client.displayAddress', () {
+    test('uses primary address before full address and PSGC fields', () {
+      final client = Client(
+        id: 'client-1',
+        firstName: 'John',
+        lastName: 'Doe',
+        tableFullAddress: 'Full Client Address',
+        region: 'Region X',
+        province: 'Province X',
+        municipality: 'Municipality X',
+        barangay: 'Barangay X',
+        street: 'Street X',
+        clientType: ClientType.existing,
+        productType: ProductType.bfpPension,
+        pensionType: PensionType.sss,
+        createdAt: DateTime.now(),
+        addresses: [
+          addr.Address(
+            id: 'address-1',
+            clientId: 'client-1',
+            psgcId: 0,
+            label: addr.AddressLabel.home,
+            streetAddress: 'Secondary Street',
+            isPrimary: false,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            province: 'Secondary Province',
+            municipality: 'Secondary City',
+            barangay: 'Secondary Barangay',
+          ),
+          addr.Address(
+            id: 'address-2',
+            clientId: 'client-1',
+            psgcId: 0,
+            label: addr.AddressLabel.home,
+            streetAddress: 'Primary Street',
+            isPrimary: true,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            province: 'Primary Province',
+            municipality: 'Primary City',
+            barangay: 'Primary Barangay',
+          ),
+        ],
+      );
+
+      expect(client.displayAddress, 'Primary Street, Primary Barangay, Primary City, Primary Province');
+    });
+
+    test('uses full address before PSGC fields when no address list exists', () {
+      final client = Client(
+        id: 'client-1',
+        firstName: 'John',
+        lastName: 'Doe',
+        tableFullAddress: 'Full Client Address',
+        region: 'Region X',
+        province: 'Province X',
+        municipality: 'Municipality X',
+        barangay: 'Barangay X',
+        street: 'Street X',
+        clientType: ClientType.existing,
+        productType: ProductType.bfpPension,
+        pensionType: PensionType.sss,
+        createdAt: DateTime.now(),
+      );
+
+      expect(client.displayAddress, 'Full Client Address');
     });
   });
 }

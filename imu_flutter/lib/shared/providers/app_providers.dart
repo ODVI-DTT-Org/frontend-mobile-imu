@@ -758,25 +758,22 @@ final refreshAssignedClientsProvider = Provider<Future<void> Function()>((ref) {
 });
 
 /// Provider for user's assigned municipality IDs
-/// Fetches and caches the user's assigned municipalities from the backend
+/// Reads directly from the PowerSync user_locations table instead of the backend API
 final assignedMunicipalitiesProvider = FutureProvider<List<String>>((ref) async {
-  // Import and use jwtAuthProvider from auth_service.dart
   final jwtAuth = ref.watch(jwtAuthProvider);
-  final token = jwtAuth.accessToken;
-
-  if (token == null) {
-    return [];
-  }
-
   final userId = jwtAuth.currentUser?.id ?? '';
+
   if (userId.isEmpty) {
     return [];
   }
 
-  final areaFilterService = ref.watch(areaFilterServiceProvider);
-  final locations = await areaFilterService.fetchUserLocations(token, userId);
+  final db = await PowerSyncService.database;
+  final rows = await db.getAll(
+    'SELECT DISTINCT municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+    [userId],
+  );
 
-  return locations.map((l) => l.municipality).toSet().toList();
+  return rows.map((row) => row['municipality'] as String).toList();
 });
 
 /// Selected client ID

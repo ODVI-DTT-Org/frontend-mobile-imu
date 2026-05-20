@@ -547,9 +547,7 @@ class _ClientListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fullName = client.fullName ?? 'Unknown Client';
-    final address = client.addresses?.isNotEmpty == true
-        ? client.addresses[0].fullAddress
-        : 'No address';
+    final address = client.displayAddress ?? 'No address available';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

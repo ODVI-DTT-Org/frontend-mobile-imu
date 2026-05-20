@@ -17,6 +17,26 @@ String? joinAddressParts(Iterable<Object?> values) {
   return parts.join(', ');
 }
 
+bool isPrimaryAddressValue(Object? value) {
+  if (value is bool) return value;
+  if (value is num) return value == 1;
+  final text = cleanAddressPart(value)?.toLowerCase();
+  return text == 'true' || text == '1';
+}
+
+Map<String, dynamic>? selectPrimaryAddressMap(Object? addresses) {
+  if (addresses is! List || addresses.isEmpty) return null;
+  final maps = addresses
+      .whereType<Map>()
+      .map((address) => Map<String, dynamic>.from(address))
+      .toList();
+  if (maps.isEmpty) return null;
+  return maps.firstWhere(
+    (address) => isPrimaryAddressValue(address['is_primary'] ?? address['isPrimary']),
+    orElse: () => maps.first,
+  );
+}
+
 String? resolveAddressDisplay({
   Object? fullAddress,
   Object? region,
@@ -30,19 +50,19 @@ String? resolveAddressDisplay({
   Object? addressProvince,
   Object? fallbackAddress,
 }) {
+  // Selected primary address from the client's address list.
+  final primaryAddress = joinAddressParts([
+    addressStreet,
+    addressBarangay,
+    addressCity,
+    addressProvince,
+  ]);
+  if (primaryAddress != null) return primaryAddress;
+
   final direct = cleanAddressPart(fullAddress);
   if (direct != null) return direct;
 
-  // Order: Province, Mun/City, Brgy, Street (broad → specific), skip empty parts
-  final addressLookup = joinAddressParts([
-    addressProvince,
-    addressCity,
-    addressBarangay,
-    addressStreet,
-  ]);
-  if (addressLookup != null) return addressLookup;
-
-  // Order: Region, Province, Mun/City, Brgy, Street (skip empty parts)
+  // Client PSGC fields, broad to specific, skip empty parts.
   final clientLocation = joinAddressParts([
     region,
     province,

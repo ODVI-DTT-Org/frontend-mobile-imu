@@ -1,4 +1,5 @@
 import 'client_model.dart';
+import '../../../../shared/utils/address_display.dart';
 
 enum AddressLabel {
   home('Home'),
@@ -115,22 +116,28 @@ class Address {
 
   // Factory from legacy client fields
   factory Address.fromLegacyFields(Client client) {
+    final displayAddress = resolveAddressDisplay(
+          fullAddress: client.tableFullAddress,
+          region: client.region,
+          province: client.province,
+          municipality: client.municipality,
+          barangay: client.barangay,
+          street: client.street,
+        ) ??
+        '';
+
     return Address(
       id: 'legacy_${client.id}',
       clientId: client.id ?? '',
       psgcId: client.psgcId ?? 0,
       label: AddressLabel.home,
-      streetAddress: '', // No address field in Client model
+      streetAddress: displayAddress,
       postalCode: null,
       latitude: null,
       longitude: null,
       isPrimary: true,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
-      region: client.region,
-      province: client.province,
-      municipality: client.municipality,
-      barangay: client.barangay,
     );
   }
 
