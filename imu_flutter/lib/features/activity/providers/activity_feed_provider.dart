@@ -65,23 +65,30 @@ class ActivityFeedState {
 
 class ActivityFeedNotifier extends StateNotifier<ActivityFeedState> {
   final ActivityRepository _repo;
+  bool _disposed = false;
 
   ActivityFeedNotifier(this._repo) : super(ActivityFeedState.initial()) {
     load();
   }
 
   Future<void> load() async {
-    debugPrint('[ACTIVITY] load() start — from=${state.dateRange.start} to=${state.dateRange.end} typeFilter=${state.typeFilter}');
-    state = state.copyWith(isLoading: true, clearError: true);
+    if (_disposed) return;
+
+    final currentState = state;
+    debugPrint('[ACTIVITY] load() start — from=${currentState.dateRange.start} to=${currentState.dateRange.end} typeFilter=${currentState.typeFilter}');
+    state = currentState.copyWith(isLoading: true, clearError: true);
+
     try {
       final items = await _repo.fetchAll(
-        from: state.dateRange.start,
-        to: state.dateRange.end,
-        typeFilter: state.typeFilter,
+        from: currentState.dateRange.start,
+        to: currentState.dateRange.end,
+        typeFilter: currentState.typeFilter,
       );
+      if (_disposed) return;
       debugPrint('[ACTIVITY] load() success — ${items.length} items');
       state = state.copyWith(items: items, isLoading: false);
     } catch (e, st) {
+      if (_disposed) return;
       debugPrint('[ACTIVITY] load() error: $e');
       debugPrint('[ACTIVITY] stacktrace: $st');
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -129,6 +136,12 @@ class ActivityFeedNotifier extends StateNotifier<ActivityFeedState> {
   }
 
   Future<void> refresh() => load();
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 }
 
 final activityFeedProvider =

@@ -821,12 +821,11 @@ final touchpointHistoryRepositoryProvider = Provider<TouchpointHistoryRepository
   return TouchpointHistoryRepository();
 });
 
-/// Local touchpoints whose PowerSync CRUD operations have already drained.
+/// Local touchpoints for a client, including rows still queued for PowerSync upload.
 ///
-/// Newly-recorded rows are intentionally excluded while they remain in
-/// `ps_crud`; once background sync succeeds, the queue row is removed and this
-/// stream emits immediately, bridging the delay before the denormalized client
-/// summary is downloaded.
+/// This bridges the delay before the denormalized client summary is downloaded.
+/// History merge logic dedupes by ID once the same touchpoint appears in the
+/// summary.
 final succeededLocalClientTouchpointsProvider =
     StreamProvider.family<List<Touchpoint>, String>((ref, clientId) {
   final repository = ref.watch(touchpointHistoryRepositoryProvider);

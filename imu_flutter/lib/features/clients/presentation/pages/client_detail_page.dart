@@ -1017,8 +1017,10 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
+      ref.invalidate(succeededLocalClientTouchpointsProvider(widget.clientId));
+
       // Immediately update Hive so the clients list reflects the new state
-      _updateHiveAfterTouchpoint(widget.clientId);
+      await _updateHiveAfterTouchpoint(widget.clientId);
 
       // Optimistic update for the detail page button
       setState(() {
@@ -1116,7 +1118,9 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
-      _updateHiveAfterTouchpoint(widget.clientId);
+      ref.invalidate(succeededLocalClientTouchpointsProvider(widget.clientId));
+
+      await _updateHiveAfterTouchpoint(widget.clientId);
       await _loadClient();
       ref.invalidate(clientTouchpointsProvider);
       ref.invalidate(assignedClientsProvider);
@@ -1140,6 +1144,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
     );
 
     if (result == true && mounted) {
+      ref.invalidate(succeededLocalClientTouchpointsProvider(widget.clientId));
+
       // Immediately update Hive cache so the UI shows loan released status
       await _updateHiveAfterLoanRelease(widget.clientId);
 
