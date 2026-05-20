@@ -10,6 +10,7 @@ import '../../services/auth/auth_service.dart' show jwtAuthProvider;
 import 'background_sync_indicator.dart';
 import 'offline_banner.dart';
 import '../../features/attendance/data/models/attendance_record.dart';
+import '../../features/notifications/providers/notification_provider.dart' show unreadNotificationCountProvider;
 import '../providers/app_providers.dart' show todayAttendanceProvider;
 
 class MainShell extends ConsumerWidget {
@@ -39,11 +40,18 @@ class MainShell extends ConsumerWidget {
               const BottomNavBar(),
             ],
           ),
-          // Sync status overlay (top-right)
+          // Notification bell + sync status overlay (top-right)
           const Positioned(
             top: 16,
             right: 16,
-            child: _SyncStatusOverlay(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _NotificationBell(),
+                SizedBox(width: 8),
+                _SyncStatusOverlay(),
+              ],
+            ),
           ),
         ],
       ),
@@ -137,6 +145,75 @@ class _SyncStatusOverlay extends ConsumerWidget {
       child: const BackgroundSyncIndicator(
         showLabel: false,
         showPendingCount: true,
+      ),
+    );
+  }
+}
+
+/// Notification bell with an unread-count badge, shown beside the sync overlay.
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+
+    return GestureDetector(
+      onTap: () {
+        HapticUtils.lightImpact();
+        context.push('/notifications');
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF0F172A).withOpacity(0.15),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: const Icon(
+              LucideIcons.bell,
+              size: 18,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              top: -5,
+              right: -5,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  unreadCount > 99 ? '99+' : '$unreadCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
