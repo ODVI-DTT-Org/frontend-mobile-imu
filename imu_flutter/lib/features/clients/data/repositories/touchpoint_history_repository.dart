@@ -55,6 +55,12 @@ class TouchpointHistoryRepository {
   Stream<List<Touchpoint>> watchSucceededLocalTouchpoints(String clientId) async* {
     try {
       final db = await PowerSyncService.database;
+      // Include locally-created touchpoints even while they are still queued for
+      // upload (in ps_crud). Otherwise a just-recorded touchpoint stays hidden
+      // until it round-trips through the server and lands in touchpoint_summary,
+      // which is why the history panel showed "No history recorded yet".
+      // mergeHistoryItems dedupes by id, so once the summary syncs down the same
+      // touchpoint is not displayed twice.
       await for (final rows in db.watch(
         '''
         SELECT t.id, t.client_id, t.user_id, t.touchpoint_number, t.type, t.date,
@@ -73,12 +79,6 @@ class TouchpointHistoryRepository {
         LEFT JOIN visits v ON t.visit_id = v.id
         LEFT JOIN calls c ON t.call_id = c.id
         WHERE t.client_id = ?
-          AND NOT EXISTS (
-            SELECT 1
-            FROM ps_crud cr
-            WHERE json_extract(cr.data, '\$.type') = 'touchpoints'
-              AND json_extract(cr.data, '\$.id') = t.id
-          )
         ORDER BY t.touchpoint_number DESC, COALESCE(t.created_at, t.date) DESC
         ''',
         parameters: [clientId],
