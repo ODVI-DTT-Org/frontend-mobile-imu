@@ -3,6 +3,18 @@ import 'package:dio/dio.dart';
 import '../auth/jwt_auth_service.dart';
 import '../../core/config/app_config.dart';
 
+class NotificationsApiPage {
+  final List<Map<String, dynamic>> notifications;
+  final int total;
+  final int unread;
+
+  const NotificationsApiPage({
+    required this.notifications,
+    required this.total,
+    required this.unread,
+  });
+}
+
 class NotificationsApiService {
   final Dio _dio;
   final JwtAuthService _authService;
@@ -27,6 +39,14 @@ class NotificationsApiService {
     int limit = 100,
     int offset = 0,
   }) async {
+    final page = await fetchNotificationsPage(limit: limit, offset: offset);
+    return page.notifications;
+  }
+
+  Future<NotificationsApiPage> fetchNotificationsPage({
+    int limit = 20,
+    int offset = 0,
+  }) async {
     final response = await _dio.get(
       '/notifications',
       queryParameters: {
@@ -38,10 +58,14 @@ class NotificationsApiService {
 
     final data = response.data as Map<String, dynamic>;
     final notifications = data['notifications'] as List? ?? const [];
-    return notifications
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
+    return NotificationsApiPage(
+      notifications: notifications
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(),
+      total: data['total'] as int? ?? notifications.length,
+      unread: data['unread'] as int? ?? 0,
+    );
   }
 
   Future<void> markRead(String notificationId) async {
@@ -56,6 +80,24 @@ class NotificationsApiService {
       '/notifications/read-all',
       options: Options(headers: _authHeaders),
     );
+  }
+
+  Future<int> clearAll() async {
+    final response = await _dio.delete(
+      '/notifications',
+      options: Options(headers: _authHeaders),
+    );
+    final data = response.data as Map<String, dynamic>;
+    return data['deleted'] as int? ?? 0;
+  }
+
+  Future<int> clearRead() async {
+    final response = await _dio.delete(
+      '/notifications/read',
+      options: Options(headers: _authHeaders),
+    );
+    final data = response.data as Map<String, dynamic>;
+    return data['deleted'] as int? ?? 0;
   }
 
   Future<void> registerDeviceToken({

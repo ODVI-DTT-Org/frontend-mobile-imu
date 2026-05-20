@@ -61,18 +61,130 @@ Future<List<NotificationItem>> fetchLocalNotifications() async {
   return rows.map(NotificationItem.fromRow).toList();
 }
 
-/// Notifications for the page. Pull-to-refresh invalidates this provider, which
-/// fetches the backend immediately instead of waiting for the next PowerSync
-/// download cycle. If the API is unavailable, fall back to local PowerSync rows.
-final notificationsPageProvider =
-    FutureProvider.autoDispose<List<NotificationItem>>((ref) async {
-  try {
-    final rows = await ref.watch(notificationsApiServiceProvider).fetchNotifications();
-    return rows.map(NotificationItem.fromRow).toList();
-  } catch (_) {
-    return fetchLocalNotifications();
+class NotificationsPageState {
+  final List<NotificationItem> notifications;
+  final int total;
+  final int unread;
+  final bool isLoadingMore;
+  final String? loadMoreError;
+
+  bool get hasMore => notifications.length < total;
+  bool get hasUnread => unread > 0 || notifications.any((n) => n.isUnread);
+  bool get hasRead => notifications.any((n) => !n.isUnread);
+
+  const NotificationsPageState({
+    required this.notifications,
+    required this.total,
+    required this.unread,
+    this.isLoadingMore = false,
+    this.loadMoreError,
+  });
+
+  NotificationsPageState copyWith({
+    List<NotificationItem>? notifications,
+    int? total,
+    int? unread,
+    bool? isLoadingMore,
+    String? loadMoreError,
+  }) {
+    return NotificationsPageState(
+      notifications: notifications ?? this.notifications,
+      total: total ?? this.total,
+      unread: unread ?? this.unread,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreError: loadMoreError,
+    );
   }
+}
+
+/// Notifications for the page. It fetches from the backend immediately so pull
+/// refresh and pagination are not blocked by the next PowerSync download cycle.
+/// If the first API page is unavailable, fall back to local PowerSync rows.
+final notificationsPageProvider = StateNotifierProvider.autoDispose<
+    NotificationsPageNotifier, AsyncValue<NotificationsPageState>>((ref) {
+  return NotificationsPageNotifier(ref.watch(notificationsApiServiceProvider));
 });
+
+class NotificationsPageNotifier extends StateNotifier<AsyncValue<NotificationsPageState>> {
+  static const int pageSize = 20;
+  final NotificationsApiService _api;
+
+  NotificationsPageNotifier(this._api) : super(const AsyncValue.loading()) {
+    refresh();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    try {
+      final page = await _api.fetchNotificationsPage(limit: pageSize, offset: 0);
+      state = AsyncValue.data(NotificationsPageState(
+        notifications: page.notifications.map(NotificationItem.fromRow).toList(),
+        total: page.total,
+        unread: page.unread,
+      ));
+    } catch (error, stackTrace) {
+      try {
+        final local = await fetchLocalNotifications();
+        state = AsyncValue.data(NotificationsPageState(
+          notifications: local.take(pageSize).toList(),
+          total: local.length,
+          unread: local.where((n) => n.isUnread).length,
+        ));
+      } catch (_) {
+        state = AsyncValue.error(error, stackTrace);
+      }
+    }
+  }
+
+  Future<void> loadMore() async {
+    final current = state.valueOrNull;
+    if (current == null || current.isLoadingMore || !current.hasMore) return;
+
+    state = AsyncValue.data(current.copyWith(
+      isLoadingMore: true,
+      loadMoreError: null,
+    ));
+
+    try {
+      final page = await _api.fetchNotificationsPage(
+        limit: pageSize,
+        offset: current.notifications.length,
+      );
+      final next = page.notifications.map(NotificationItem.fromRow).toList();
+      state = AsyncValue.data(current.copyWith(
+        notifications: [...current.notifications, ...next],
+        total: page.total,
+        unread: page.unread,
+        isLoadingMore: false,
+      ));
+    } catch (_) {
+      state = AsyncValue.data(current.copyWith(
+        isLoadingMore: false,
+        loadMoreError: 'Failed to load more notifications',
+      ));
+    }
+  }
+
+  Future<void> markRead(String notificationId) async {
+    await _api.markRead(notificationId);
+    await refresh();
+  }
+
+  Future<void> markAllRead() async {
+    await _api.markAllRead();
+    await refresh();
+  }
+
+  Future<void> clearAll() async {
+    await _api.clearAll();
+    await refresh();
+  }
+
+  Future<void> clearRead() async {
+    await _api.clearRead();
+    await refresh();
+  }
+}
 
 /// Reactive stream of all notifications for the current user, newest first.
 final notificationsStreamProvider = StreamProvider<List<NotificationItem>>((ref) async* {

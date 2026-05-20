@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../providers/notification_provider.dart';
-import '../../../../services/api/notifications_api_service.dart';
 import '../../../../core/utils/app_notification.dart';
 
 class NotificationsPage extends ConsumerWidget {
@@ -14,10 +13,9 @@ class NotificationsPage extends ConsumerWidget {
     final asyncNotifications = ref.watch(notificationsPageProvider);
 
     Future<void> handleRefresh() async {
-      ref.invalidate(notificationsPageProvider);
       await Future.wait([
         Future.delayed(const Duration(milliseconds: 1200)),
-        ref.read(notificationsPageProvider.future),
+        ref.read(notificationsPageProvider.notifier).refresh(),
       ]);
     }
 
@@ -37,15 +35,39 @@ class NotificationsPage extends ConsumerWidget {
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         actions: [
           asyncNotifications.when(
-            data: (list) {
-              final hasUnread = list.any((n) => n.isUnread);
-              if (!hasUnread) return const SizedBox.shrink();
-              return TextButton(
-                onPressed: () => _markAllRead(context, ref),
-                child: const Text(
-                  'Mark all read',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF2563EB)),
-                ),
+            data: (state) {
+              if (state.notifications.isEmpty) return const SizedBox.shrink();
+              return PopupMenuButton<String>(
+                icon: const Icon(LucideIcons.moreVertical, size: 20),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'mark_read':
+                      _markAllRead(context, ref);
+                      break;
+                    case 'clear_read':
+                      _clearRead(context, ref);
+                      break;
+                    case 'clear_all':
+                      _clearAll(context, ref);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'mark_read',
+                    enabled: state.hasUnread,
+                    child: const Text('Mark all read'),
+                  ),
+                  PopupMenuItem(
+                    value: 'clear_read',
+                    enabled: state.hasRead,
+                    child: const Text('Clear read'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'clear_all',
+                    child: Text('Clear all'),
+                  ),
+                ],
               );
             },
             loading: () => const SizedBox.shrink(),
@@ -54,8 +76,8 @@ class NotificationsPage extends ConsumerWidget {
         ],
       ),
       body: asyncNotifications.when(
-        data: (notifications) {
-          if (notifications.isEmpty) {
+        data: (state) {
+          if (state.notifications.isEmpty) {
             return RefreshIndicator(
               onRefresh: handleRefresh,
               child: SingleChildScrollView(
@@ -86,12 +108,28 @@ class NotificationsPage extends ConsumerWidget {
             onRefresh: handleRefresh,
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: notifications.length,
+              itemCount: state.notifications.length + 2,
               separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
               itemBuilder: (context, index) {
+                if (index == 0) {
+                  return _NotificationSummary(
+                    shown: state.notifications.length,
+                    total: state.total,
+                    unread: state.unread,
+                    onClearRead: state.hasRead ? () => _clearRead(context, ref) : null,
+                    onClearAll: () => _clearAll(context, ref),
+                  );
+                }
+                final notificationIndex = index - 1;
+                if (notificationIndex >= state.notifications.length) {
+                  return _LoadMoreFooter(
+                    state: state,
+                    onLoadMore: () => ref.read(notificationsPageProvider.notifier).loadMore(),
+                  );
+                }
                 return _NotificationTile(
-                  notification: notifications[index],
-                  onTap: () => _handleTap(context, ref, notifications[index]),
+                  notification: state.notifications[notificationIndex],
+                  onTap: () => _handleTap(context, ref, state.notifications[notificationIndex]),
                 );
               },
             ),
@@ -106,8 +144,7 @@ class NotificationsPage extends ConsumerWidget {
   Future<void> _handleTap(BuildContext context, WidgetRef ref, NotificationItem n) async {
     if (n.isUnread) {
       try {
-        await ref.read(notificationsApiServiceProvider).markRead(n.id);
-        ref.invalidate(notificationsPageProvider);
+        await ref.read(notificationsPageProvider.notifier).markRead(n.id);
       } catch (_) {}
     }
 
@@ -120,13 +157,157 @@ class NotificationsPage extends ConsumerWidget {
 
   Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(notificationsApiServiceProvider).markAllRead();
-      ref.invalidate(notificationsPageProvider);
+      await ref.read(notificationsPageProvider.notifier).markAllRead();
     } catch (e) {
       if (context.mounted) {
         AppNotification.showError(context, 'Failed to mark notifications as read');
       }
     }
+  }
+
+  Future<void> _clearRead(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(notificationsPageProvider.notifier).clearRead();
+      if (context.mounted) {
+        AppNotification.showSuccess(context, 'Read notifications cleared');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        AppNotification.showError(context, 'Failed to clear read notifications');
+      }
+    }
+  }
+
+  Future<void> _clearAll(BuildContext context, WidgetRef ref) async {
+    final confirmed = await _confirmClearAll(context);
+    if (!confirmed) return;
+
+    try {
+      await ref.read(notificationsPageProvider.notifier).clearAll();
+      if (context.mounted) {
+        AppNotification.showSuccess(context, 'Notifications cleared');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        AppNotification.showError(context, 'Failed to clear notifications');
+      }
+    }
+  }
+
+  Future<bool> _confirmClearAll(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear all notifications?'),
+        content: const Text('This removes all notifications from your notification center.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear all'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+}
+
+class _NotificationSummary extends StatelessWidget {
+  final int shown;
+  final int total;
+  final int unread;
+  final VoidCallback? onClearRead;
+  final VoidCallback onClearAll;
+
+  const _NotificationSummary({
+    required this.shown,
+    required this.total,
+    required this.unread,
+    required this.onClearRead,
+    required this.onClearAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$shown of $total shown${unread > 0 ? ' - $unread unread' : ''}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onClearRead,
+            child: const Text('Clear read', style: TextStyle(fontSize: 12)),
+          ),
+          TextButton(
+            onPressed: onClearAll,
+            child: const Text('Clear all', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadMoreFooter extends StatelessWidget {
+  final NotificationsPageState state;
+  final VoidCallback onLoadMore;
+
+  const _LoadMoreFooter({required this.state, required this.onLoadMore});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!state.hasMore && state.loadMoreError == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 18),
+        child: Center(
+          child: Text(
+            'All notifications loaded',
+            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Column(
+        children: [
+          if (state.loadMoreError != null) ...[
+            Text(
+              state.loadMoreError!,
+              style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626)),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: state.isLoadingMore ? null : onLoadMore,
+              child: state.isLoadingMore
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Load more'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
