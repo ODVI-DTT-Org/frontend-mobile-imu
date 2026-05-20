@@ -12,7 +12,7 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/ph
 import 'package:imu_flutter/features/record_forms/presentation/widgets/unified_action_bottom_sheet.dart';
 import 'package:imu_flutter/services/release/release_creation_service.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart'
-    show releaseCreationServiceProvider, assignedClientsProvider;
+    show releaseCreationServiceProvider, assignedClientsProvider, succeededLocalClientTouchpointsProvider;
 import 'package:imu_flutter/core/utils/app_notification.dart';
 
 class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
@@ -86,6 +86,8 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
               ? 'No connection — loan release saved and will sync when online'
               : 'Loan release recorded successfully';
           AppNotification.showSuccess(context, message);
+          // Invalidate touchpoint history provider to force refetch and display new loan release
+          ref.invalidate(succeededLocalClientTouchpointsProvider(client.id!));
           // Invalidate cache to refresh loan released status in clients list
           ref.invalidate(assignedClientsProvider);
           Navigator.of(context).pop(true);

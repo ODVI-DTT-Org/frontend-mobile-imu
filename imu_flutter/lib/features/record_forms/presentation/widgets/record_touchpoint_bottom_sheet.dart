@@ -12,7 +12,7 @@ import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/no
 import 'package:imu_flutter/features/record_forms/presentation/widgets/shared/photo_card.dart';
 import 'package:imu_flutter/features/record_forms/presentation/widgets/unified_action_bottom_sheet.dart';
 import 'package:imu_flutter/shared/providers/app_providers.dart'
-    show touchpointCreationServiceProvider, jwtAuthProvider, currentUserRoleProvider;
+    show touchpointCreationServiceProvider, jwtAuthProvider, currentUserRoleProvider, succeededLocalClientTouchpointsProvider, assignedClientsProvider;
 import 'package:imu_flutter/core/models/user_role.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/core/utils/app_notification.dart';
@@ -101,6 +101,10 @@ class RecordTouchpointBottomSheet extends HookConsumerWidget {
           longitude: gps.lng,
           address: gps.address,
         );
+
+        // Invalidate touchpoint history provider to force refetch and display new touchpoint
+        ref.invalidate(succeededLocalClientTouchpointsProvider(client.id!));
+        ref.invalidate(assignedClientsProvider);
 
         // Mark today's itinerary as completed so My Day / Itinerary updates immediately
         try {
