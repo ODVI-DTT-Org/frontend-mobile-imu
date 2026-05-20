@@ -2,26 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../clients/data/models/client_model.dart';
+import '../../../clients/data/models/history_item.dart';
+import '../../../approvals/data/models/approval_model.dart';
 
 /// Touchpoint History Expansion Panel
-/// Displays the touchpoint history with status indicators
+/// Displays the touchpoint and loan release history with status indicators
 class TouchpointHistoryExpansionPanel extends StatelessWidget {
   final Client client;
-  final List<Touchpoint> touchpoints;
+  final List<HistoryItem> items;
 
   const TouchpointHistoryExpansionPanel({
     super.key,
     required this.client,
-    required this.touchpoints,
+    required this.items,
   });
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...touchpoints]..sort((a, b) => b.touchpointNumber.compareTo(a.touchpointNumber));
+    final sorted = [...items]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return ExpansionTile(
       title: Text(
-        'TOUCHPOINT HISTORY',
+        'HISTORY',
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
@@ -30,8 +32,8 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
       ),
       subtitle: Text(
         sorted.isEmpty
-            ? 'No touchpoints yet'
-            : '${sorted.length} touchpoint${sorted.length == 1 ? '' : 's'}',
+            ? 'No history yet'
+            : '${sorted.length} item${sorted.length == 1 ? '' : 's'}',
         style: TextStyle(
           fontSize: 12,
           color: Colors.grey[600],
@@ -46,14 +48,21 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      'No touchpoints recorded yet',
+                      'No history recorded yet',
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
                   ),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: sorted.map((tp) => _buildTouchpointTile(context, tp)).toList(),
+                  children: sorted.map((item) {
+                    if (item is TouchpointHistoryItem) {
+                      return _buildTouchpointTile(context, item.touchpoint);
+                    } else if (item is LoanReleaseHistoryItem) {
+                      return _buildLoanReleaseTile(context, item.approval);
+                    }
+                    return const SizedBox.shrink();
+                  }).toList(),
                 ),
         ),
       ],
@@ -89,7 +98,7 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top row: number + type + status + date
+                // Top row: number + type + date
                 Row(
                   children: [
                     Text(
@@ -106,10 +115,10 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                       typeColor.withOpacity(0.15),
                       typeColor,
                     ),
-                    const SizedBox(width: 6),
-                    _chip(statusLabel, statusColor.withOpacity(0.15), statusColor),
-                    if (touchpoint.source != null && touchpoint.source!.isNotEmpty)
+                    if (touchpoint.source != null && touchpoint.source!.isNotEmpty) ...[
+                      const SizedBox(width: 6),
                       _chip(touchpoint.source!, Colors.grey[200]!, Colors.grey[600]!),
+                    ],
                     const Spacer(),
                     Text(
                       _formatDate(touchpoint.date),
@@ -148,6 +157,94 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
                     ],
                   ),
                 ],
+                // Status row (bottom right)
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _chip(statusLabel, statusColor.withOpacity(0.15), statusColor),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoanReleaseTile(BuildContext context, Approval approval) {
+    final statusLabel = _approvalStatusLabel(approval.status);
+    final statusColor = _approvalStatusColor(approval.status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(
+            color: Colors.amber,
+            width: 3,
+          ),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _showLoanReleaseDetailDialog(context, approval),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top row: type + udi + date
+                Row(
+                  children: [
+                    Text(
+                      'Loan Release',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _chip('UDI', Colors.amber.withOpacity(0.15), Colors.amber[700]!),
+                    const Spacer(),
+                    Text(
+                      _formatDate(approval.createdAt),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+                // UDI Number row
+                if (approval.udiNumber != null && approval.udiNumber!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(LucideIcons.fileText, size: 12, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          approval.udiNumber!,
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // Status row (bottom right)
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _chip(statusLabel, statusColor.withOpacity(0.15), statusColor),
+                  ],
+                ),
               ],
             ),
           ),
@@ -388,5 +485,131 @@ class TouchpointHistoryExpansionPanel extends StatelessWidget {
     if (timeIn != null) return 'In: ${fmt.format(timeIn.toLocal())}';
     if (timeOut != null) return 'Out: ${fmt.format(timeOut.toLocal())}';
     return '—';
+  }
+
+  String _approvalStatusLabel(ApprovalStatus status) {
+    switch (status) {
+      case ApprovalStatus.pending: return 'Pending';
+      case ApprovalStatus.approved: return 'Approved';
+      case ApprovalStatus.rejected: return 'Rejected';
+    }
+  }
+
+  Color _approvalStatusColor(ApprovalStatus status) {
+    switch (status) {
+      case ApprovalStatus.pending: return Colors.amber;
+      case ApprovalStatus.approved: return Colors.green;
+      case ApprovalStatus.rejected: return Colors.red;
+    }
+  }
+
+  void _showLoanReleaseDetailDialog(BuildContext context, Approval approval) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber[50],
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.amber[100]!),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.amber[100],
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        LucideIcons.fileText,
+                        size: 18,
+                        color: Colors.amber[700],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Loan Release',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey[800]),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              _chip(
+                                _approvalStatusLabel(approval.status),
+                                _approvalStatusColor(approval.status).withOpacity(0.15),
+                                _approvalStatusColor(approval.status),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(LucideIcons.x, size: 18, color: Colors.grey[600]),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Body
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _tpDetailRow(LucideIcons.calendar, 'Date', DateFormat('MMM d, yyyy').format(approval.createdAt)),
+                      if (approval.udiNumber != null && approval.udiNumber!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.fileText, 'UDI Number', approval.udiNumber!),
+                      if (approval.updatedUdi != null && approval.updatedUdi!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.fileText, 'Updated UDI', approval.updatedUdi!),
+                      if (approval.reason != null && approval.reason!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.messageCircle, 'Reason', approval.reason!),
+                      if (approval.notes != null && approval.notes!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.notepadText, 'Notes', approval.notes!),
+                      if (approval.approvedAt != null)
+                        _tpDetailRow(LucideIcons.checkCircle, 'Approved At', DateFormat('MMM d, yyyy h:mm a').format(approval.approvedAt!.toLocal())),
+                      if (approval.rejectedAt != null)
+                        _tpDetailRow(LucideIcons.xCircle, 'Rejected At', DateFormat('MMM d, yyyy h:mm a').format(approval.rejectedAt!.toLocal())),
+                      if (approval.rejectionReason != null && approval.rejectionReason!.isNotEmpty)
+                        _tpDetailRow(LucideIcons.alertCircle, 'Rejection Reason', approval.rejectionReason!),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Footer
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

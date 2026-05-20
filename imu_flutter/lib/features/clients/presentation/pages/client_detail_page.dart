@@ -31,7 +31,9 @@ import '../../../../shared/widgets/touchpoint_validation_dialog.dart';
 import '../../../../shared/widgets/map_widgets/client_map_view.dart';
 import '../../../../shared/utils/permission_helpers.dart';
 import '../../../clients/data/models/client_model.dart' hide Address, PhoneNumber;
+import '../../../clients/data/models/history_item.dart';
 import '../../../clients/data/repositories/touchpoint_history_repository.dart';
+import '../../../approvals/data/models/approval_model.dart';
 import '../../../clients/data/models/address_model.dart';
 import '../../../clients/data/models/phone_number_model.dart';
 import '../../../clients/data/repositories/address_repository.dart' show AddressRepository;
@@ -1667,179 +1669,190 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
         final succeededLocalTouchpoints = ref
             .watch(succeededLocalClientTouchpointsProvider(widget.clientId))
             .valueOrNull ?? const <Touchpoint>[];
-        final touchpointHistory = mergeTouchpointHistory(
-          summary: _client!.touchpointSummary,
-          succeededLocal: succeededLocalTouchpoints,
-        );
 
-        return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('Client Details'),
-        actions: [
-          Consumer(
-            builder: (context, ref, _) {
-              final favoriteState = ref.watch(clientFavoritesNotifierProvider);
-              final isStarred = favoriteState.ids.contains(widget.clientId);
-              final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
-              return IconButton(
-                icon: Icon(
-                  isStarred ? Icons.star : Icons.star_border,
-                  color: isStarred ? Colors.amber : null,
+        // Fetch loan releases synchronously
+        final repository = TouchpointHistoryRepository();
+        final loanReleases = repository.fetchClientLoanReleases(widget.clientId);
+
+        return FutureBuilder<List<Approval>>(
+          future: loanReleases,
+          builder: (context, snapshot) {
+            final loanReleasesList = snapshot.data ?? [];
+            final historyItems = mergeHistoryItems(
+              summary: _client!.touchpointSummary,
+              succeededLocal: succeededLocalTouchpoints,
+              loanReleases: loanReleasesList,
+            );
+
+            return Scaffold(
+              backgroundColor: Colors.white,
+              appBar: AppBar(
+                leading: IconButton(
+                  icon: const Icon(LucideIcons.arrowLeft),
+                  onPressed: () => context.pop(),
                 ),
-                tooltip: isStarred ? 'Remove from favorites' : 'Add to favorites',
-                onPressed: () async {
-                  try {
-                    logDebug('[ClientDetailPage] ${isStarred ? "Unstarring" : "Starring"} client: ${widget.clientId}');
+                title: const Text('Client Details'),
+                actions: [
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final favoriteState = ref.watch(clientFavoritesNotifierProvider);
+                      final isStarred = favoriteState.ids.contains(widget.clientId);
+                      final favoritesNotifier = ref.read(clientFavoritesNotifierProvider.notifier);
+                      return IconButton(
+                        icon: Icon(
+                          isStarred ? Icons.star : Icons.star_border,
+                          color: isStarred ? Colors.amber : null,
+                        ),
+                        tooltip: isStarred ? 'Remove from favorites' : 'Add to favorites',
+                        onPressed: () async {
+                          try {
+                            logDebug('[ClientDetailPage] ${isStarred ? "Unstarring" : "Starring"} client: ${widget.clientId}');
 
-                    if (isStarred) {
-                      await favoritesNotifier.remove(widget.clientId);
-                      if (context.mounted) {
-                        AppNotification.showSuccess(context, 'Removed from favorites');
-                      }
-                    } else {
-                      await favoritesNotifier.add(client);
-                      if (context.mounted) {
-                        AppNotification.showSuccess(context, 'Added to favorites');
-                      }
-                    }
+                            if (isStarred) {
+                              await favoritesNotifier.remove(widget.clientId);
+                              if (context.mounted) {
+                                AppNotification.showSuccess(context, 'Removed from favorites');
+                              }
+                            } else {
+                              await favoritesNotifier.add(client);
+                              if (context.mounted) {
+                                AppNotification.showSuccess(context, 'Added to favorites');
+                              }
+                            }
 
-                    logDebug('[ClientDetailPage] Successfully updated favorite status for client: ${widget.clientId}');
-                  } catch (e, stackTrace) {
-                    logError(
-                      '[ClientDetailPage] Failed to update favorites for client: ${widget.clientId}',
-                      e,
-                      stackTrace,
-                    );
-                    if (context.mounted) {
-                      AppNotification.showError(context, 'Failed to update favorites: ${e.toString()}');
-                    }
-                  }
-                },
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.pencil),
-            tooltip: 'Edit Client',
-            onPressed: () async {
-              HapticUtils.lightImpact();
-              if (mounted) {
-                await _editClient();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.trash),
-            tooltip: 'Delete Client',
-            onPressed: () async {
-              HapticUtils.lightImpact();
-              if (mounted) {
-                await _handleDelete();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.mapPin),
-            tooltip: 'Navigate',
-            onPressed: () async {
-              HapticUtils.lightImpact();
-              if (mounted) {
-                await _navigateToClient();
-              }
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Loan Released Sash
-          if (_client!.loanReleased)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4), // Light red/pink background
-                border: Border(
-                  bottom: BorderSide(color: Colors.red.shade200),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    LucideIcons.checkCircle,
-                    size: 20,
-                    color: const Color(0xFF16A34A), // Green checkmark
+                            logDebug('[ClientDetailPage] Successfully updated favorite status for client: ${widget.clientId}');
+                          } catch (e, stackTrace) {
+                            logError(
+                              '[ClientDetailPage] Failed to update favorites for client: ${widget.clientId}',
+                              e,
+                              stackTrace,
+                            );
+                            if (context.mounted) {
+                              AppNotification.showError(context, 'Failed to update favorites: ${e.toString()}');
+                            }
+                          }
+                        },
+                      );
+                    },
                   ),
-                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(LucideIcons.pencil),
+                    tooltip: 'Edit Client',
+                    onPressed: () async {
+                      HapticUtils.lightImpact();
+                      if (mounted) {
+                        await _editClient();
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.trash),
+                    tooltip: 'Delete Client',
+                    onPressed: () async {
+                      HapticUtils.lightImpact();
+                      if (mounted) {
+                        await _handleDelete();
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.mapPin),
+                    tooltip: 'Navigate',
+                    onPressed: () async {
+                      HapticUtils.lightImpact();
+                      if (mounted) {
+                        await _navigateToClient();
+                      }
+                    },
+                  ),
+                ],
+              ),
+              body: Column(
+                children: [
+                  // Loan Released Sash
+                  if (_client!.loanReleased)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4), // Light red/pink background
+                        border: Border(
+                          bottom: BorderSide(color: Colors.red.shade200),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.checkCircle,
+                            size: 20,
+                            color: const Color(0xFF16A34A), // Green checkmark
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Loan Released',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFBE123C), // Dark red
+                                  ),
+                                ),
+                                Text(
+                                  'This client has completed their loan. No further touchpoints or edits allowed.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Main content
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Loan Released',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFFBE123C), // Dark red
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Hero Card - Always visible basic info
+                          _buildHeroCard(),
+
+                          // Quick Actions - Visit, Touchpoint, Release Loan buttons
+                          _buildQuickActions(),
+
+                          // Expansion Panels
+                          // 1. Client Information (44 fields in 8 subsections)
+                          ClientInformationExpansionPanel(client: _client!),
+
+                          // 2. Contact Information (Phone, Email, Addresses, Social Media)
+                          ContactInformationExpansionPanel(
+                            client: _client!,
+                            onAddPhone: _addPhoneNumber,
+                            onAddAddress: _addAddress,
                           ),
-                        ),
-                        Text(
-                          'This client has completed their loan. No further touchpoints or edits allowed.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.red.shade700,
+
+                          // 3. Touchpoint History
+                          TouchpointHistoryExpansionPanel(
+                            client: _client!,
+                            items: historyItems,
                           ),
-                        ),
-                      ],
+
+                          const SizedBox(height: 100), // Bottom padding
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-          // Main content
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Hero Card - Always visible basic info
-                  _buildHeroCard(),
-
-                  // Quick Actions - Visit, Touchpoint, Release Loan buttons
-                  _buildQuickActions(),
-
-                  // Expansion Panels
-                  // 1. Client Information (44 fields in 8 subsections)
-                  ClientInformationExpansionPanel(client: _client!),
-
-                  // 2. Contact Information (Phone, Email, Addresses, Social Media)
-                  ContactInformationExpansionPanel(
-                    client: _client!,
-                    onAddPhone: _addPhoneNumber,
-                    onAddAddress: _addAddress,
-                  ),
-
-                  // 3. Touchpoint History
-                  TouchpointHistoryExpansionPanel(
-                    client: _client!,
-                    touchpoints: touchpointHistory,
-                  ),
-
-                  const SizedBox(height: 100), // Bottom padding
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-      },
-    );
+            );
+          },
+        );
+      }
   }
 
   String _formatDate(DateTime date) {
