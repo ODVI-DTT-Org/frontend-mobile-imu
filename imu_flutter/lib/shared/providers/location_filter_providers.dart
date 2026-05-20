@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:imu_flutter/shared/models/location_filter.dart';
-import 'package:imu_flutter/services/area/area_filter_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvider;
 import 'package:imu_flutter/services/filter_preferences_service.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 import 'package:imu_flutter/features/clients/data/models/client_model.dart';
 
 /// Active location filter state with persistence
@@ -93,41 +93,35 @@ class LocationFilterNotifier extends StateNotifier<LocationFilter> {
 }
 
 /// User's assigned areas (provinces and municipalities)
-/// Fetches from AreaFilterService, falls back to API if cache is empty
+/// Reads directly from the PowerSync user_locations table
 final assignedAreasProvider = FutureProvider<AssignedAreas>((ref) async {
-  final areaFilterService = ref.watch(areaFilterServiceProvider);
   final jwtAuth = ref.watch(jwtAuthProvider);
+  final userId = jwtAuth.currentUser?.id ?? '';
 
-  // Try cache first
-  var locations = await areaFilterService.getCachedLocations();
-
-  // If cache is empty, fetch from API
-  if (locations.isEmpty) {
-    final token = jwtAuth.accessToken;
-    final userId = jwtAuth.currentUser?.id ?? '';
-
-    if (token != null && userId.isNotEmpty) {
-      try {
-        locations = await areaFilterService.fetchUserLocations(token, userId);
-      } catch (e) {
-        // If API fetch fails, return empty areas
-        return AssignedAreas(provinces: {}, municipalitiesByProvince: {});
-      }
-    }
-  }
-
-  if (locations.isEmpty) {
+  if (userId.isEmpty) {
     return AssignedAreas(provinces: {}, municipalitiesByProvince: {});
   }
 
-  // Extract unique provinces
-  final provinces = locations.map((l) => l.province).toSet();
+  final db = await PowerSyncService.database;
+  final rows = await db.getAll(
+    'SELECT DISTINCT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+    [userId],
+  );
 
-  // Group municipalities by province
+  if (rows.isEmpty) {
+    return AssignedAreas(provinces: {}, municipalitiesByProvince: {});
+  }
+
+  final provinces = <String>{};
   final municipalitiesByProvince = <String, Set<String>>{};
-  for (final location in locations) {
-    municipalitiesByProvince.putIfAbsent(location.province, () => {});
-    municipalitiesByProvince[location.province]!.add(location.municipality);
+
+  for (final row in rows) {
+    final province = row['province'] as String?;
+    final municipality = row['municipality'] as String?;
+    if (province == null || municipality == null) continue;
+    provinces.add(province);
+    municipalitiesByProvince.putIfAbsent(province, () => {});
+    municipalitiesByProvince[province]!.add(municipality);
   }
 
   return AssignedAreas(
