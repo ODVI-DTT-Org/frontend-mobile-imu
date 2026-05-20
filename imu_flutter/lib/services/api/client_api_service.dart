@@ -17,7 +17,11 @@ class ClientApiService {
   final JwtAuthService _authService;
 
   ClientApiService({Dio? dio, JwtAuthService? authService})
-      : _dio = dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30))),
+      : _dio = dio ?? Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+        )),
         _authService = authService ?? JwtAuthService();
 
   /// Fetch clients from the REST API with pagination
@@ -545,7 +549,11 @@ class ClientApiService {
         if (client.facebookLink != null) 'facebook_link': client.facebookLink,
         if (client.remarks != null) 'remarks': client.remarks,
         if (client.agencyId != null) 'agency_id': client.agencyId,
+        if (client.region != null) 'region': client.region,
+        if (client.province != null) 'province': client.province,
         if (client.municipality != null) 'municipality': client.municipality,
+        if (client.barangay != null) 'barangay': client.barangay,
+        if (client.street != null) 'street': client.street,
         'is_starred': client.isStarred,
       };
 
@@ -647,7 +655,11 @@ class ClientApiService {
         if (client.facebookLink != null) 'facebook_link': client.facebookLink,
         if (client.remarks != null) 'remarks': client.remarks,
         if (client.agencyId != null) 'agency_id': client.agencyId,
+        if (client.region != null) 'region': client.region,
+        if (client.province != null) 'province': client.province,
         if (client.municipality != null) 'municipality': client.municipality,
+        if (client.barangay != null) 'barangay': client.barangay,
+        if (client.street != null) 'street': client.street,
         'is_starred': client.isStarred,
       };
 

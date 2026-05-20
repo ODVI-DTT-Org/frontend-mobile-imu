@@ -14,6 +14,8 @@ class ApprovalsApiService {
       : _dio = dio ?? Dio(BaseOptions(
           baseUrl: AppConfig.postgresApiUrl,
           connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
         )),
         _authService = authService ?? JwtAuthService.instance;
 
@@ -423,6 +425,11 @@ class ApprovalsApiService {
       'facebook_link': clientData['facebookLink'],
       'remarks': clientData['remarks'],
       'agency_id': clientData['agencyId'],
+      'region': clientData['region'],
+      'province': clientData['province'],
+      'municipality': clientData['municipality'],
+      'barangay': clientData['barangay'],
+      'street': clientData['street'],
       'is_starred': clientData['isStarred'],
     };
 
@@ -478,6 +485,7 @@ class ApprovalsApiService {
       'province': updatedData['province'],
       'municipality': updatedData['municipality'],
       'barangay': updatedData['barangay'],
+      'street': updatedData['street'],
       'is_starred': updatedData['isStarred'],
     };
 

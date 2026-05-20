@@ -40,6 +40,13 @@ void main() {
       );
     });
   });
+
+  group('clientTouchpointHistorySql', () {
+    test('only selects columns declared by the local touchpoints schema', () {
+      expect(clientTouchpointHistorySql, isNot(contains('rejected_at')));
+      expect(clientTouchpointHistorySql, contains('rejection_reason'));
+    });
+  });
 }
 
 Touchpoint _touchpoint({

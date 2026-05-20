@@ -4,6 +4,27 @@ import 'package:imu_flutter/features/clients/data/models/history_item.dart';
 import 'package:imu_flutter/features/approvals/data/models/approval_model.dart';
 import 'package:imu_flutter/services/sync/powersync_service.dart';
 
+const clientTouchpointHistorySql = '''
+        SELECT t.id, t.client_id, t.user_id, t.touchpoint_number, t.type, t.date,
+               t.status, t.next_visit_date, t.notes, t.is_legacy, t.latitude,
+               t.longitude, t.address, t.visit_id, t.call_id, t.created_at,
+               t.updated_at, t.rejection_reason,
+               COALESCE(v.reason, c.reason) AS reason,
+               v.reason AS visit_reason, v.status AS visit_status,
+               v.notes AS visit_notes, v.time_in, v.time_out,
+               v.odometer_arrival, v.odometer_departure, v.photo_url AS visit_photo_url,
+               v.address AS visit_address, v.latitude AS visit_latitude,
+               v.longitude AS visit_longitude,
+               c.reason AS call_reason, c.status AS call_status,
+               c.notes AS call_notes, c.phone_number, c.dial_time, c.duration,
+               c.photo_url AS call_photo_url
+        FROM touchpoints t
+        LEFT JOIN visits v ON t.visit_id = v.id
+        LEFT JOIN calls c ON t.call_id = c.id
+        WHERE t.client_id = ?
+        ORDER BY t.touchpoint_number DESC, COALESCE(t.created_at, t.date) DESC
+        ''';
+
 List<Touchpoint> mergeTouchpointHistory({
   required List<Touchpoint> summary,
   required List<Touchpoint> succeededLocal,
@@ -62,25 +83,7 @@ class TouchpointHistoryRepository {
       // mergeHistoryItems dedupes by id, so once the summary syncs down the same
       // touchpoint is not displayed twice.
       await for (final rows in db.watch(
-        '''
-        SELECT t.id, t.client_id, t.user_id, t.touchpoint_number, t.type, t.date,
-               t.status, t.next_visit_date, t.notes, t.is_legacy, t.latitude,
-               t.longitude, t.address, t.visit_id, t.call_id, t.created_at,
-               t.updated_at, t.rejected_at, t.rejection_reason,
-               v.reason AS visit_reason, v.status AS visit_status,
-               v.notes AS visit_notes, v.time_in, v.time_out,
-               v.odometer_arrival, v.odometer_departure, v.photo_url AS visit_photo_url,
-               v.address AS visit_address, v.latitude AS visit_latitude,
-               v.longitude AS visit_longitude,
-               c.reason AS call_reason, c.status AS call_status,
-               c.notes AS call_notes, c.phone_number, c.dial_time, c.duration,
-               c.photo_url AS call_photo_url
-        FROM touchpoints t
-        LEFT JOIN visits v ON t.visit_id = v.id
-        LEFT JOIN calls c ON t.call_id = c.id
-        WHERE t.client_id = ?
-        ORDER BY t.touchpoint_number DESC, COALESCE(t.created_at, t.date) DESC
-        ''',
+        clientTouchpointHistorySql,
         parameters: [clientId],
       )) {
         yield rows.map(Touchpoint.fromRow).toList();

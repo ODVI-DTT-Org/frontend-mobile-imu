@@ -156,9 +156,9 @@ class ClientRepository {
           agency_name, department, position, employment_status, payroll_date,
           tenure, client_type, product_type, market_type, pension_type, loan_type, pan,
           facebook_link, remarks, agency_id, psgc_id, province, municipality, region,
-          barangay, udi, loan_released, loan_released_at, is_starred,
+          barangay, street, udi, loan_released, loan_released_at, is_starred,
           full_address, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         [
           id,
           client.firstName,
@@ -187,6 +187,7 @@ class ClientRepository {
           client.municipality,
           client.region,
           client.barangay,
+          client.street,
           client.udi,
           client.loanReleased ? 1 : 0,
           client.loanReleasedAt?.toIso8601String(),
@@ -224,7 +225,7 @@ class ClientRepository {
           position = ?, employment_status = ?, payroll_date = ?, tenure = ?,
           client_type = ?, product_type = ?, market_type = ?, pension_type = ?,
           loan_type = ?, pan = ?, facebook_link = ?, remarks = ?, agency_id = ?,
-          psgc_id = ?, province = ?, municipality = ?, region = ?, barangay = ?,
+          psgc_id = ?, province = ?, municipality = ?, region = ?, barangay = ?, street = ?,
           udi = ?, loan_released = ?, loan_released_at = ?,
           is_starred = ?, full_address = COALESCE(?, full_address), updated_at = ?
         WHERE id = ?''',
@@ -255,6 +256,7 @@ class ClientRepository {
           client.municipality,
           client.region,
           client.barangay,
+          client.street,
           client.udi,
           client.loanReleased ? 1 : 0,
           client.loanReleasedAt?.toIso8601String(),
