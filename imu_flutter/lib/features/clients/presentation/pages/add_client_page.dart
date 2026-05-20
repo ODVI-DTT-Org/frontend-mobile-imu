@@ -38,6 +38,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
   final _tenureController = TextEditingController();
   final _panController = TextEditingController();
   final _remarksController = TextEditingController();
+  final _streetController = TextEditingController();
 
   // Location dropdown values
   PsgcRegion? _selectedRegion;
@@ -97,6 +98,7 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
     _tenureController.dispose();
     _panController.dispose();
     _remarksController.dispose();
+    _streetController.dispose();
     super.dispose();
   }
 
@@ -203,6 +205,9 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
         province: _selectedProvince?.name,
         municipality: _selectedMunicipality?.name,
         barangay: _selectedBarangay?.barangay,
+        street: _streetController.text.trim().isEmpty
+            ? null
+            : _streetController.text.trim(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         touchpoints: [],
@@ -860,6 +865,18 @@ class _AddClientPageState extends ConsumerState<AddClientPage> {
                       },
                 validator: (v) => v == null ? 'Required' : null,
               ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _streetController,
+              decoration: const InputDecoration(
+                labelText: 'Street Address',
+                hintText: 'House/Unit/Lot number, Street name',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(LucideIcons.mapPin),
+              ),
+              maxLines: 2,
+              textCapitalization: TextCapitalization.words,
             ),
           ],
         ),

@@ -44,9 +44,9 @@ class ClientMutationService {
           agency_name, department, position, employment_status, payroll_date,
           tenure, client_type, product_type, market_type, pension_type,
           loan_type, pan, facebook_link, remarks, agency_id, psgc_id,
-          province, municipality, region, barangay, is_starred,
-          loan_released, udi, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          province, municipality, region, barangay, street, is_starred,
+          loan_released, udi, full_address, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         client.firstName,
@@ -75,9 +75,11 @@ class ClientMutationService {
         client.municipality,
         client.region,
         client.barangay,
+        client.street,
         client.isStarred ? 1 : 0,
         client.loanReleased ? 1 : 0,
         client.udi,
+        client.tableFullAddress,
         now,
       ],
     );
@@ -113,8 +115,8 @@ class ClientMutationService {
          employment_status=?, payroll_date=?, tenure=?, client_type=?,
          product_type=?, market_type=?, pension_type=?, loan_type=?,
          pan=?, facebook_link=?, remarks=?, agency_id=?, psgc_id=?,
-         province=?, municipality=?, region=?, barangay=?, is_starred=?,
-         loan_released=?, udi=?, updated_at=?
+         province=?, municipality=?, region=?, barangay=?, street=?, is_starred=?,
+         loan_released=?, udi=?, full_address=COALESCE(?, full_address), updated_at=?
          WHERE id=?''',
       [
         client.firstName,
@@ -143,9 +145,11 @@ class ClientMutationService {
         client.municipality,
         client.region,
         client.barangay,
+        client.street,
         client.isStarred ? 1 : 0,
         client.loanReleased ? 1 : 0,
         client.udi,
+        client.tableFullAddress,
         DateTime.now().toIso8601String(),
         client.id,
       ],

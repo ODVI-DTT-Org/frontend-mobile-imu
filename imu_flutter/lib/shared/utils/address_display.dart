@@ -23,6 +23,7 @@ String? resolveAddressDisplay({
   Object? province,
   Object? municipality,
   Object? barangay,
+  Object? street,
   Object? addressStreet,
   Object? addressBarangay,
   Object? addressCity,
@@ -32,19 +33,22 @@ String? resolveAddressDisplay({
   final direct = cleanAddressPart(fullAddress);
   if (direct != null) return direct;
 
+  // Order: Province, Mun/City, Brgy, Street (broad → specific), skip empty parts
   final addressLookup = joinAddressParts([
-    addressStreet,
-    addressBarangay,
-    addressCity,
     addressProvince,
+    addressCity,
+    addressBarangay,
+    addressStreet,
   ]);
   if (addressLookup != null) return addressLookup;
 
+  // Order: Region, Province, Mun/City, Brgy, Street (skip empty parts)
   final clientLocation = joinAddressParts([
     region,
     province,
     municipality,
     barangay,
+    street,
   ]);
   if (clientLocation != null) return clientLocation;
 
@@ -57,6 +61,7 @@ String resolveAddressDisplayOrFallback({
   Object? province,
   Object? municipality,
   Object? barangay,
+  Object? street,
   Object? addressStreet,
   Object? addressBarangay,
   Object? addressCity,
@@ -69,6 +74,7 @@ String resolveAddressDisplayOrFallback({
         province: province,
         municipality: municipality,
         barangay: barangay,
+        street: street,
         addressStreet: addressStreet,
         addressBarangay: addressBarangay,
         addressCity: addressCity,
@@ -85,6 +91,7 @@ String? resolveAddressDisplayFromRow(Map<String, dynamic> row) {
     province: row['province'],
     municipality: row['municipality'],
     barangay: row['barangay'],
+    street: row['street'],
     addressStreet: row['address_street'],
     addressBarangay: row['address_barangay'],
     addressCity: row['address_city'],

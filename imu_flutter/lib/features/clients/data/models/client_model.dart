@@ -63,6 +63,7 @@ class Client {
   final String? province; // Province from PSGC (e.g., Metro Manila, Pangasinan)
   final String? municipality; // Municipality from PSGC
   final String? barangay; // Barangay from PSGC
+  final String? street; // Street address line on the client record
   final String? udi; // Unified ID
   final List<addr.Address> addresses; // Multiple addresses
   final List<ph.PhoneNumber> phoneNumbers; // Multiple phone numbers
@@ -133,6 +134,7 @@ class Client {
     this.province,
     this.municipality,
     this.barangay,
+    this.street,
     this.udi,
     this.addresses = const [],
     this.phoneNumbers = const [],
@@ -168,6 +170,7 @@ class Client {
       province: province,
       municipality: municipality,
       barangay: barangay,
+      street: street,
       addressStreet: primary?.streetAddress,
       addressBarangay: primary?.barangay,
       addressCity: primary?.municipality,
@@ -183,6 +186,7 @@ class Client {
       province: province,
       municipality: municipality,
       barangay: barangay,
+      street: street,
       addressStreet: primary?.streetAddress,
       addressBarangay: primary?.barangay,
       addressCity: primary?.municipality,
@@ -466,6 +470,7 @@ class Client {
     String? province,
     String? municipality,
     String? barangay,
+    String? street,
     String? udi,
     List<addr.Address>? addresses,
     List<ph.PhoneNumber>? phoneNumbers,
@@ -528,6 +533,7 @@ class Client {
       province: province ?? this.province,
       municipality: municipality ?? this.municipality,
       barangay: barangay ?? this.barangay,
+      street: street ?? this.street,
       udi: udi ?? this.udi,
       addresses: addresses ?? this.addresses,
       phoneNumbers: phoneNumbers ?? this.phoneNumbers,
@@ -551,7 +557,7 @@ class Client {
       'firstName': firstName,
       'middleName': middleName,
       'lastName': lastName,
-      'full_address': tableFullAddress,
+      if (tableFullAddress != null) 'full_address': tableFullAddress,
       'agencyName': agencyName,
       'department': department,
       'position': position,
@@ -575,6 +581,7 @@ class Client {
       'province': province,
       'municipality': municipality,
       'barangay': barangay,
+      'street': street,
       'udi': udi,
       'touchpoints': touchpoints.map((t) {
         try {
@@ -802,6 +809,7 @@ class Client {
       province: json['province'] ?? json['psgc_province'],
       municipality: json['municipality'] ?? json['municipality_id'],
       barangay: json['barangay'] ?? json['psgc_barangay'],
+      street: json['street'],
       udi: json['udi'],
       addresses: ((json['expand']?['addresses'] ?? json['addresses']) as List?)
           ?.map((a) => addr.Address.fromJson(a as Map<String, dynamic>)).toList() ?? [],
@@ -897,6 +905,7 @@ class Client {
       province: row['province'] as String?,
       municipality: row['municipality'] as String?,
       barangay: row['barangay'] as String?,
+      street: row['street'] as String?,
       udi: row['udi'] as String?,
       touchpointSummary: _parseTouchpointSummary(row['touchpoint_summary']),
       touchpointNumber: row['touchpoint_number'] as int? ?? 1,

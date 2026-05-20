@@ -38,6 +38,7 @@ const Schema _powerSyncSchema = Schema([
     Column.text('municipality'),
     Column.text('region'),
     Column.text('barangay'),
+    Column.text('street'),
     Column.integer('loan_released'),
     Column.text('loan_released_at'),
     Column.text('udi'),

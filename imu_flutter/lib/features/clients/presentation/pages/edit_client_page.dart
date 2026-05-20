@@ -39,6 +39,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
   final _tenureController = TextEditingController();
   final _panController = TextEditingController();
   final _remarksController = TextEditingController();
+  final _streetController = TextEditingController();
 
   PsgcRegion? _selectedRegion;
   PsgcProvince? _selectedProvince;
@@ -93,6 +94,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
     _tenureController.dispose();
     _panController.dispose();
     _remarksController.dispose();
+    _streetController.dispose();
     super.dispose();
   }
 
@@ -258,6 +260,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
 
     _panController.text = _client!.pan ?? '';
     _remarksController.text = _client!.remarks ?? '';
+    _streetController.text = _client!.street ?? '';
 
     // In edit mode all steps start completed — user can jump freely
     setState(() => _completedSteps.addAll({0, 1, 2, 3, 4}));
@@ -381,6 +384,7 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         firstName: _firstNameController.text.trim(),
         middleName: _middleNameController.text.trim().isEmpty ? null : _middleNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
+        tableFullAddress: _client?.tableFullAddress,
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         facebookLink: _facebookController.text.trim().isEmpty ? null : _facebookController.text.trim(),
@@ -402,6 +406,9 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
         province: _selectedProvince?.name,
         municipality: _selectedMunicipality?.name,
         barangay: _selectedBarangay?.barangay,
+        street: _streetController.text.trim().isEmpty
+            ? null
+            : _streetController.text.trim(),
         createdAt: _client?.createdAt,
         updatedAt: DateTime.now(),
         touchpoints: _client?.touchpoints ?? [],
@@ -1069,6 +1076,18 @@ class _EditClientPageState extends ConsumerState<EditClientPage> {
                       },
                 validator: (v) => v == null ? 'Required' : null,
               ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _streetController,
+              decoration: const InputDecoration(
+                labelText: 'Street Address',
+                hintText: 'House/Unit/Lot number, Street name',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(LucideIcons.mapPin),
+              ),
+              maxLines: 2,
+              textCapitalization: TextCapitalization.words,
             ),
           ],
         ),
