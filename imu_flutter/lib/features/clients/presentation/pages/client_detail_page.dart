@@ -1852,7 +1852,8 @@ class _ClientDetailPageState extends ConsumerState<ClientDetailPage> {
             );
           },
         );
-      }
+      },
+    );
   }
 
   String _formatDate(DateTime date) {

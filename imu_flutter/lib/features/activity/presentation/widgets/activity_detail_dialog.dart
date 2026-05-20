@@ -11,6 +11,7 @@ import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvide
 import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserRoleProvider;
 import 'package:imu_flutter/core/models/user_role.dart';
 import 'package:imu_flutter/services/release/pending_release_service.dart';
+import 'package:imu_flutter/services/sync/powersync_service.dart';
 
 class ActivityDetailDialog extends ConsumerStatefulWidget {
   final ActivityItem item;
