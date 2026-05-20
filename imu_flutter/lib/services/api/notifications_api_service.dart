@@ -12,6 +12,8 @@ class NotificationsApiService {
             Dio(BaseOptions(
               baseUrl: AppConfig.postgresApiUrl,
               connectTimeout: const Duration(seconds: 30),
+              receiveTimeout: const Duration(seconds: 30),
+              sendTimeout: const Duration(seconds: 30),
             )),
         _authService = authService ?? JwtAuthService.instance;
 
@@ -19,6 +21,27 @@ class NotificationsApiService {
     final token = _authService.accessToken;
     if (token == null) throw Exception('Not authenticated');
     return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNotifications({
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final response = await _dio.get(
+      '/notifications',
+      queryParameters: {
+        'limit': limit,
+        'offset': offset,
+      },
+      options: Options(headers: _authHeaders),
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    final notifications = data['notifications'] as List? ?? const [];
+    return notifications
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
   Future<void> markRead(String notificationId) async {

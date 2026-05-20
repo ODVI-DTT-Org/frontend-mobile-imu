@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../providers/notification_provider.dart';
 import '../../../../services/api/notifications_api_service.dart';
-import '../../../../services/sync/powersync_service.dart';
 import '../../../../core/utils/app_notification.dart';
 
 class NotificationsPage extends ConsumerWidget {
@@ -12,16 +11,13 @@ class NotificationsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncNotifications = ref.watch(notificationsStreamProvider);
+    final asyncNotifications = ref.watch(notificationsPageProvider);
 
     Future<void> handleRefresh() async {
-      // Always show the spinner for at least 1.2s so the user sees feedback.
-      // waitForInitialSync waits for any in-progress sync to finish; PowerSync
-      // is reactive so new server data arrives automatically via the stream.
+      ref.invalidate(notificationsPageProvider);
       await Future.wait([
         Future.delayed(const Duration(milliseconds: 1200)),
-        PowerSyncService.waitForInitialSync(timeout: const Duration(seconds: 8))
-            .catchError((_) {}),
+        ref.read(notificationsPageProvider.future),
       ]);
     }
 
@@ -111,6 +107,7 @@ class NotificationsPage extends ConsumerWidget {
     if (n.isUnread) {
       try {
         await ref.read(notificationsApiServiceProvider).markRead(n.id);
+        ref.invalidate(notificationsPageProvider);
       } catch (_) {}
     }
 
@@ -124,6 +121,7 @@ class NotificationsPage extends ConsumerWidget {
   Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
     try {
       await ref.read(notificationsApiServiceProvider).markAllRead();
+      ref.invalidate(notificationsPageProvider);
     } catch (e) {
       if (context.mounted) {
         AppNotification.showError(context, 'Failed to mark notifications as read');

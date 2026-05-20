@@ -11,7 +11,6 @@ import '../../../../shared/providers/app_providers.dart' hide assignedMunicipali
 import '../../../../shared/providers/filter_providers.dart';
 import '../../../../shared/widgets/permission_widgets.dart';
 import '../../../../shared/widgets/permission_dialog.dart';
-import '../../../notifications/providers/notification_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -69,12 +68,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         foregroundColor: const Color(0xFF0F172A),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _NotificationBell(),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -554,46 +547,6 @@ class _DeveloperOptionsSheetState extends ConsumerState<_DeveloperOptionsSheet> 
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NotificationBell extends ConsumerWidget {
-  const _NotificationBell();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(unreadNotificationCountProvider);
-    return IconButton(
-      onPressed: () => context.push('/notifications'),
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(LucideIcons.bell, size: 22, color: Color(0xFF0F172A)),
-          if (unread > 0)
-            Positioned(
-              right: -4,
-              top: -4,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDC2626),
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: Text(
-                  unread > 99 ? '99+' : '$unread',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../services/api/notifications_api_service.dart';
 import '../../../services/sync/powersync_service.dart';
 
 class NotificationItem {
@@ -48,6 +49,30 @@ class NotificationItem {
 
   String? get clientId => data['client_id'] as String?;
 }
+
+Future<List<NotificationItem>> fetchLocalNotifications() async {
+  final db = await PowerSyncService.database;
+  final rows = await db.getAll(
+    'SELECT id, type, title, body, data, read_at, created_at '
+    'FROM notifications '
+    'ORDER BY created_at DESC '
+    'LIMIT 100',
+  );
+  return rows.map(NotificationItem.fromRow).toList();
+}
+
+/// Notifications for the page. Pull-to-refresh invalidates this provider, which
+/// fetches the backend immediately instead of waiting for the next PowerSync
+/// download cycle. If the API is unavailable, fall back to local PowerSync rows.
+final notificationsPageProvider =
+    FutureProvider.autoDispose<List<NotificationItem>>((ref) async {
+  try {
+    final rows = await ref.watch(notificationsApiServiceProvider).fetchNotifications();
+    return rows.map(NotificationItem.fromRow).toList();
+  } catch (_) {
+    return fetchLocalNotifications();
+  }
+});
 
 /// Reactive stream of all notifications for the current user, newest first.
 final notificationsStreamProvider = StreamProvider<List<NotificationItem>>((ref) async* {
