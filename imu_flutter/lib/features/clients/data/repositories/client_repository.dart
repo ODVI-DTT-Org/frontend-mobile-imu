@@ -157,8 +157,8 @@ class ClientRepository {
           tenure, client_type, product_type, market_type, pension_type, loan_type, pan,
           facebook_link, remarks, agency_id, psgc_id, province, municipality, region,
           barangay, udi, loan_released, loan_released_at, is_starred,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          full_address, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         [
           id,
           client.firstName,
@@ -191,6 +191,7 @@ class ClientRepository {
           client.loanReleased ? 1 : 0,
           client.loanReleasedAt?.toIso8601String(),
           client.isStarred ? 1 : 0,
+          client.tableFullAddress,
           now,
           now,
         ],
@@ -225,7 +226,7 @@ class ClientRepository {
           loan_type = ?, pan = ?, facebook_link = ?, remarks = ?, agency_id = ?,
           psgc_id = ?, province = ?, municipality = ?, region = ?, barangay = ?,
           udi = ?, loan_released = ?, loan_released_at = ?,
-          is_starred = ?, updated_at = ?
+          is_starred = ?, full_address = COALESCE(?, full_address), updated_at = ?
         WHERE id = ?''',
         [
           client.firstName,
@@ -258,6 +259,7 @@ class ClientRepository {
           client.loanReleased ? 1 : 0,
           client.loanReleasedAt?.toIso8601String(),
           client.isStarred ? 1 : 0,
+          client.tableFullAddress,
           DateTime.now().toIso8601String(),
           client.id,
         ],
