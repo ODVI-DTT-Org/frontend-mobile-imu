@@ -55,6 +55,15 @@ const Schema _powerSyncSchema = Schema([
     Column.text('deleted_at'), // Soft delete timestamp
     Column.text('created_at'), // Creation timestamp
     Column.text('updated_at'), // Update timestamp
+  ], indexes: [
+    // Assigned Clients hot path filters by territory municipality and orders by
+    // name; this composite covers both the COUNT(*) and the paged
+    // SELECT ... ORDER BY first_name, last_name, avoiding a full scan + sort.
+    Index('clients_municipality_name', [
+      IndexedColumn.ascending('municipality'),
+      IndexedColumn.ascending('first_name'),
+      IndexedColumn.ascending('last_name'),
+    ]),
   ]),
   Table('addresses', [
     Column.text('client_id'),
