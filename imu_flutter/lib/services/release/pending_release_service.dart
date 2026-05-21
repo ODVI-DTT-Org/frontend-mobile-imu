@@ -94,6 +94,10 @@ class PendingReleaseService {
     String? remarks,
     String? productType,
     String? loanType,
+    String? timeIn,
+    String? timeOut,
+    String? odometerArrival,
+    String? odometerDeparture,
   }) async {
     final box = await _box();
     final raw = box.get(id);
@@ -106,6 +110,10 @@ class PendingReleaseService {
     if (remarks != null) data['remarks'] = remarks;
     if (productType != null) data['productType'] = productType;
     if (loanType != null) data['loanType'] = loanType;
+    if (timeIn != null) data['timeIn'] = timeIn;
+    if (timeOut != null) data['timeOut'] = timeOut;
+    if (odometerArrival != null) data['odometerArrival'] = odometerArrival;
+    if (odometerDeparture != null) data['odometerDeparture'] = odometerDeparture;
     data['updatedAt'] = DateTime.now().toIso8601String();
     await box.put(id, jsonEncode(data));
   }

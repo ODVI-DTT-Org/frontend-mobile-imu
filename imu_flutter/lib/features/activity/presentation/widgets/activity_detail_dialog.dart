@@ -36,6 +36,10 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
   bool _isSaving = false;
   late final TextEditingController _reasonCtrl;
   late final TextEditingController _remarksCtrl;
+  late final TextEditingController _timeInCtrl;
+  late final TextEditingController _timeOutCtrl;
+  late final TextEditingController _odometerArrivalCtrl;
+  late final TextEditingController _odometerDepartureCtrl;
   ProductType? _selectedProductType;
   LoanType? _selectedLoanType;
 
@@ -52,6 +56,18 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
           (widget.item.metadata['approvalNotes'] as String?) ??
           (widget.item.metadata['notes'] as String?) ??
           '',
+    );
+    _timeInCtrl = TextEditingController(
+      text: widget.item.metadata['timeIn'] as String? ?? '',
+    );
+    _timeOutCtrl = TextEditingController(
+      text: widget.item.metadata['timeOut'] as String? ?? '',
+    );
+    _odometerArrivalCtrl = TextEditingController(
+      text: widget.item.metadata['odometerArrival'] as String? ?? '',
+    );
+    _odometerDepartureCtrl = TextEditingController(
+      text: widget.item.metadata['odometerDeparture'] as String? ?? '',
     );
     // Initialize product/loan type from metadata for loan release edits
     final rawProductType = widget.item.metadata['productType'] as String?;
@@ -72,6 +88,10 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
   void dispose() {
     _reasonCtrl.dispose();
     _remarksCtrl.dispose();
+    _timeInCtrl.dispose();
+    _timeOutCtrl.dispose();
+    _odometerArrivalCtrl.dispose();
+    _odometerDepartureCtrl.dispose();
     super.dispose();
   }
 
@@ -118,21 +138,36 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
     setState(() => _isSaving = true);
     try {
       if (_isLoanRelease()) {
+        final udiNumber = _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null;
+        final remarks = _remarksCtrl.text.trim().isNotEmpty ? _remarksCtrl.text.trim() : null;
+        final timeIn = _timeInCtrl.text.trim().isNotEmpty ? _timeInCtrl.text.trim() : null;
+        final timeOut = _timeOutCtrl.text.trim().isNotEmpty ? _timeOutCtrl.text.trim() : null;
+        final odometerArrival = _odometerArrivalCtrl.text.trim().isNotEmpty ? _odometerArrivalCtrl.text.trim() : null;
+        final odometerDeparture = _odometerDepartureCtrl.text.trim().isNotEmpty ? _odometerDepartureCtrl.text.trim() : null;
+
         if (widget.item.source == ActivitySource.pendingReleaseQueue) {
           await ref.read(pendingReleaseServiceProvider).update(
             id: widget.item.id,
-            udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
-            remarks: _remarksCtrl.text.trim(),
+            udiNumber: udiNumber,
+            remarks: remarks,
             productType: _selectedProductType?.apiValue,
             loanType: _selectedLoanType?.apiValue,
+            timeIn: timeIn,
+            timeOut: timeOut,
+            odometerArrival: odometerArrival,
+            odometerDeparture: odometerDeparture,
           );
         } else {
           await ref.read(approvalsApiServiceProvider).ownerEditLoanRelease(
             approvalId: widget.item.id,
-            udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
-            remarks: _remarksCtrl.text.trim().isNotEmpty ? _remarksCtrl.text.trim() : null,
+            udiNumber: udiNumber,
+            remarks: remarks,
             productType: _selectedProductType?.apiValue,
             loanType: _selectedLoanType?.apiValue,
+            timeIn: timeIn,
+            timeOut: timeOut,
+            odometerArrival: odometerArrival,
+            odometerDeparture: odometerDeparture,
           );
         }
       } else {
@@ -329,6 +364,90 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
                       .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
                       .toList(),
                   onChanged: (v) => setState(() => _selectedLoanType = v),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Time In', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _timeInCtrl,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              hintText: 'e.g. 09:00 AM',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Time Out', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _timeOutCtrl,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              hintText: 'e.g. 11:00 AM',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Odometer In', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _odometerArrivalCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Odometer Out', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _odometerDepartureCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
               const SizedBox(height: 12),

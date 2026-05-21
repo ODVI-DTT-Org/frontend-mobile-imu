@@ -376,6 +376,10 @@ class ApprovalsApiService {
     String? remarks,
     String? productType,
     String? loanType,
+    String? timeIn,
+    String? timeOut,
+    String? odometerArrival,
+    String? odometerDeparture,
   }) async {
     final token = _authService.accessToken;
     if (token == null) throw Exception('Not authenticated');
@@ -385,6 +389,10 @@ class ApprovalsApiService {
     if (remarks != null) data['remarks'] = remarks;
     if (productType != null) data['product_type'] = productType;
     if (loanType != null) data['loan_type'] = loanType;
+    if (timeIn != null) data['time_in'] = timeIn;
+    if (timeOut != null) data['time_out'] = timeOut;
+    if (odometerArrival != null) data['odometer_arrival'] = odometerArrival;
+    if (odometerDeparture != null) data['odometer_departure'] = odometerDeparture;
 
     final response = await _dio.patch(
       '/approvals/$approvalId/owner-edit',
