@@ -86,11 +86,15 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
     }
 
     // Loan release: editable while pending and within 1 day
-    if (_isLoanRelease() && item.status == ActivityStatus.pending) {
+    if (_isLoanRelease()) {
       final hoursSinceCreation = DateTime.now().difference(item.createdAt).inHours;
-      return hoursSinceCreation <= 24;
+      final isPending = item.status == ActivityStatus.pending;
+      final withinWindow = hoursSinceCreation <= 24;
+      debugPrint('[ACTIVITY][canEdit] loanRelease: status=${item.status}($isPending) source=${item.source} createdAt=${item.createdAt} hours=$hoursSinceCreation withinWindow=$withinWindow');
+      return isPending && withinWindow;
     }
 
+    debugPrint('[ACTIVITY][canEdit] not editable: type=${item.type} subtype=${item.subtype} status=${item.status}');
     return false;
   }
 

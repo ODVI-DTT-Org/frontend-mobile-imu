@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -159,6 +161,7 @@ class NotificationsPage extends ConsumerWidget {
     try {
       await ref.read(notificationsPageProvider.notifier).markAllRead();
     } catch (e) {
+      _logNotificationError('markAllRead', e);
       if (context.mounted) {
         AppNotification.showError(context, 'Failed to mark notifications as read');
       }
@@ -171,7 +174,8 @@ class NotificationsPage extends ConsumerWidget {
       if (context.mounted) {
         AppNotification.showSuccess(context, 'Read notifications cleared');
       }
-    } catch (_) {
+    } catch (e) {
+      _logNotificationError('clearRead', e);
       if (context.mounted) {
         AppNotification.showError(context, 'Failed to clear read notifications');
       }
@@ -187,10 +191,19 @@ class NotificationsPage extends ConsumerWidget {
       if (context.mounted) {
         AppNotification.showSuccess(context, 'Notifications cleared');
       }
-    } catch (_) {
+    } catch (e) {
+      _logNotificationError('clearAll', e);
       if (context.mounted) {
         AppNotification.showError(context, 'Failed to clear notifications');
       }
+    }
+  }
+
+  void _logNotificationError(String action, Object e) {
+    if (e is DioException) {
+      debugPrint('[NOTIF][$action] DioException: status=${e.response?.statusCode} uri=${e.requestOptions.uri} data=${e.response?.data}');
+    } else {
+      debugPrint('[NOTIF][$action] ${e.runtimeType}: $e');
     }
   }
 
