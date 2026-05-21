@@ -758,22 +758,22 @@ final refreshAssignedClientsProvider = Provider<Future<void> Function()>((ref) {
 });
 
 /// Provider for user's assigned municipality IDs
-/// Reads directly from the PowerSync user_locations table instead of the backend API
-final assignedMunicipalitiesProvider = FutureProvider<List<String>>((ref) async {
+/// Streams directly from the PowerSync user_locations table so it updates
+/// automatically when user_locations syncs from the backend.
+final assignedMunicipalitiesProvider = StreamProvider<List<String>>((ref) {
   final jwtAuth = ref.watch(jwtAuthProvider);
   final userId = jwtAuth.currentUser?.id ?? '';
 
   if (userId.isEmpty) {
-    return [];
+    return Stream.value(<String>[]);
   }
 
-  final db = await PowerSyncService.database;
-  final rows = await db.getAll(
-    'SELECT DISTINCT municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
-    [userId],
-  );
-
-  return rows.map((row) => row['municipality'] as String).toList();
+  return PowerSyncService.database.asStream().asyncExpand((db) {
+    return db.watch(
+      'SELECT DISTINCT municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+      parameters: [userId],
+    ).map((rows) => rows.map((row) => row['municipality'] as String).toList());
+  });
 });
 
 /// Selected client ID

@@ -93,41 +93,37 @@ class LocationFilterNotifier extends StateNotifier<LocationFilter> {
 }
 
 /// User's assigned areas (provinces and municipalities)
-/// Reads directly from the PowerSync user_locations table
-final assignedAreasProvider = FutureProvider<AssignedAreas>((ref) async {
+/// Streams directly from the PowerSync user_locations table so it updates
+/// automatically when user_locations syncs from the backend.
+final assignedAreasProvider = StreamProvider<AssignedAreas>((ref) {
   final jwtAuth = ref.watch(jwtAuthProvider);
   final userId = jwtAuth.currentUser?.id ?? '';
 
   if (userId.isEmpty) {
-    return AssignedAreas(provinces: {}, municipalitiesByProvince: {});
+    return Stream.value(AssignedAreas(provinces: {}, municipalitiesByProvince: {}));
   }
 
-  final db = await PowerSyncService.database;
-  final rows = await db.getAll(
-    'SELECT DISTINCT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
-    [userId],
-  );
-
-  if (rows.isEmpty) {
-    return AssignedAreas(provinces: {}, municipalitiesByProvince: {});
-  }
-
-  final provinces = <String>{};
-  final municipalitiesByProvince = <String, Set<String>>{};
-
-  for (final row in rows) {
-    final province = row['province'] as String?;
-    final municipality = row['municipality'] as String?;
-    if (province == null || municipality == null) continue;
-    provinces.add(province);
-    municipalitiesByProvince.putIfAbsent(province, () => {});
-    municipalitiesByProvince[province]!.add(municipality);
-  }
-
-  return AssignedAreas(
-    provinces: provinces,
-    municipalitiesByProvince: municipalitiesByProvince,
-  );
+  return PowerSyncService.database.asStream().asyncExpand((db) {
+    return db.watch(
+      'SELECT DISTINCT province, municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
+      parameters: [userId],
+    ).map((rows) {
+      final provinces = <String>{};
+      final municipalitiesByProvince = <String, Set<String>>{};
+      for (final row in rows) {
+        final province = row['province'] as String?;
+        final municipality = row['municipality'] as String?;
+        if (province == null || municipality == null) continue;
+        provinces.add(province);
+        municipalitiesByProvince.putIfAbsent(province, () => {});
+        municipalitiesByProvince[province]!.add(municipality);
+      }
+      return AssignedAreas(
+        provinces: provinces,
+        municipalitiesByProvince: municipalitiesByProvince,
+      );
+    });
+  });
 });
 
 class AssignedAreas {

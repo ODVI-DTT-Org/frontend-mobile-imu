@@ -557,7 +557,7 @@ class _DropdownButton extends StatelessWidget {
             color: enabled ? theme.colorScheme.outline : Colors.grey[300]!,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: enabled ? null : Colors.grey[100],
+          color: enabled ? Colors.transparent : Colors.grey[100],
         ),
         child: Row(
           children: [
