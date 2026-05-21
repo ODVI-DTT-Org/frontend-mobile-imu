@@ -92,6 +92,8 @@ class PendingReleaseService {
     required String id,
     String? udiNumber,
     String? remarks,
+    String? productType,
+    String? loanType,
   }) async {
     final box = await _box();
     final raw = box.get(id);
@@ -102,6 +104,8 @@ class PendingReleaseService {
     final data = jsonDecode(raw) as Map<String, dynamic>;
     if (udiNumber != null) data['udiNumber'] = udiNumber;
     if (remarks != null) data['remarks'] = remarks;
+    if (productType != null) data['productType'] = productType;
+    if (loanType != null) data['loanType'] = loanType;
     data['updatedAt'] = DateTime.now().toIso8601String();
     await box.put(id, jsonEncode(data));
   }

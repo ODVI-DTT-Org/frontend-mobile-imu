@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:imu_flutter/core/config/app_config.dart';
 import 'package:imu_flutter/features/activity/data/models/activity_item.dart';
 import 'package:imu_flutter/features/activity/providers/activity_feed_provider.dart';
+import 'package:imu_flutter/features/record_forms/data/models/touchpoint_form_data.dart' show ProductType, LoanType;
 import 'package:imu_flutter/services/api/approvals_api_service.dart';
 import 'package:imu_flutter/services/auth/auth_service.dart' show jwtAuthProvider;
 import 'package:imu_flutter/shared/providers/app_providers.dart' show currentUserRoleProvider;
@@ -35,6 +36,8 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
   bool _isSaving = false;
   late final TextEditingController _reasonCtrl;
   late final TextEditingController _remarksCtrl;
+  ProductType? _selectedProductType;
+  LoanType? _selectedLoanType;
 
   @override
   void initState() {
@@ -50,6 +53,19 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
           (widget.item.metadata['notes'] as String?) ??
           '',
     );
+    // Initialize product/loan type from metadata for loan release edits
+    final rawProductType = widget.item.metadata['productType'] as String?;
+    final rawLoanType = widget.item.metadata['loanType'] as String?;
+    if (rawProductType != null && rawProductType.isNotEmpty) {
+      _selectedProductType = ProductType.values.where(
+        (t) => t.apiValue == rawProductType,
+      ).firstOrNull;
+    }
+    if (rawLoanType != null && rawLoanType.isNotEmpty) {
+      _selectedLoanType = LoanType.values.where(
+        (t) => t.apiValue == rawLoanType,
+      ).firstOrNull;
+    }
   }
 
   @override
@@ -107,12 +123,16 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
             id: widget.item.id,
             udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
             remarks: _remarksCtrl.text.trim(),
+            productType: _selectedProductType?.apiValue,
+            loanType: _selectedLoanType?.apiValue,
           );
         } else {
           await ref.read(approvalsApiServiceProvider).ownerEditLoanRelease(
             approvalId: widget.item.id,
             udiNumber: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : null,
             remarks: _remarksCtrl.text.trim().isNotEmpty ? _remarksCtrl.text.trim() : null,
+            productType: _selectedProductType?.apiValue,
+            loanType: _selectedLoanType?.apiValue,
           );
         }
       } else {
@@ -277,6 +297,40 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
+              if (_isLoanRelease()) ...[
+                const SizedBox(height: 12),
+                const Text('Product Type', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<ProductType>(
+                  value: _selectedProductType,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  hint: const Text('Select product type'),
+                  items: ProductType.values
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedProductType = v),
+                ),
+                const SizedBox(height: 12),
+                const Text('Loan Type', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<LoanType>(
+                  value: _selectedLoanType,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  hint: const Text('Select loan type'),
+                  items: LoanType.values
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t.displayName)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedLoanType = v),
+                ),
+              ],
               const SizedBox(height: 12),
               const Text('Remarks', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
               const SizedBox(height: 4),

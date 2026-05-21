@@ -374,6 +374,8 @@ class ApprovalsApiService {
     required String approvalId,
     String? udiNumber,
     String? remarks,
+    String? productType,
+    String? loanType,
   }) async {
     final token = _authService.accessToken;
     if (token == null) throw Exception('Not authenticated');
@@ -381,6 +383,8 @@ class ApprovalsApiService {
     final data = <String, dynamic>{};
     if (udiNumber != null) data['udi_number'] = udiNumber;
     if (remarks != null) data['remarks'] = remarks;
+    if (productType != null) data['product_type'] = productType;
+    if (loanType != null) data['loan_type'] = loanType;
 
     final response = await _dio.patch(
       '/approvals/$approvalId/owner-edit',

@@ -84,7 +84,7 @@ class RecordLoanReleaseBottomSheet extends HookConsumerWidget {
         if (context.mounted) {
           final message = outcome == ReleaseSubmitOutcome.queued
               ? 'No connection — loan release saved and will sync when online'
-              : 'Loan release recorded successfully';
+              : 'Loan release sent for approval';
           AppNotification.showSuccess(context, message);
           // Invalidate touchpoint history provider to force refetch and display new loan release
           ref.invalidate(succeededLocalClientTouchpointsProvider(client.id!));

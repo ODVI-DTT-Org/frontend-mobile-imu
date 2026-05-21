@@ -671,52 +671,91 @@ final assignedClientsProvider = FutureProvider<ClientsResponse>((ref) async {
     }
   }
 
-  final where = conditions.join(' AND ');
-
-  // ── Detect complex filters needing Dart post-processing ──────────────────
-  // touchpointStatuses / date range / recentlyVisited use the touchpoint_summary
-  // JSON column which SQLite can't easily query.
-  // touchpointFilter uses next_touchpoint_number which is absent from the schema.
-  final hasComplexFilter = touchpointFilter.hasFilter ||
-      attributeFilter.touchpointStatuses?.isNotEmpty == true ||
-      attributeFilter.touchpointDateFrom != null ||
-      attributeFilter.touchpointDateTo != null ||
-      attributeFilter.recentlyVisitedDays != null;
-
-  if (hasComplexFilter) {
-    // Fetch all SQL-filtered rows (type/location/search already applied),
-    // then apply the complex Dart predicates on the smaller result set.
-    final rows = await db.getAll(
-      'SELECT * FROM clients WHERE $where ORDER BY first_name, last_name',
-      params,
-    );
-    var clients = rows.map((r) => Client.fromRow(r)).toList();
-
-    if (attributeFilter.touchpointStatuses?.isNotEmpty == true ||
-        attributeFilter.touchpointDateFrom != null ||
-        attributeFilter.touchpointDateTo != null ||
-        attributeFilter.recentlyVisitedDays != null) {
-      clients = clients.where((c) => attributeFilter.matches(c)).toList();
+  // ── Touchpoint statuses — json_each on touchpoint_summary ────────────────
+  // 'loan_released' is a special sentinel that maps to the boolean column.
+  if (attributeFilter.touchpointStatuses?.isNotEmpty == true) {
+    final loanReleasedSelected =
+        attributeFilter.touchpointStatuses!.contains('loan_released');
+    final interestStatuses = attributeFilter.touchpointStatuses!
+        .where((s) => s != 'loan_released')
+        .map((s) => s.toUpperCase())
+        .toList();
+    if (loanReleasedSelected && interestStatuses.isNotEmpty) {
+      final ph = interestStatuses.map((_) => '?').join(', ');
+      conditions.add(
+        "(loan_released = 1 OR EXISTS (SELECT 1 FROM json_each(touchpoint_summary) WHERE UPPER(json_extract(value, '\$.status')) IN ($ph)))",
+      );
+      params.addAll(interestStatuses);
+    } else if (loanReleasedSelected) {
+      conditions.add('loan_released = 1');
+    } else {
+      final ph = interestStatuses.map((_) => '?').join(', ');
+      conditions.add(
+        "EXISTS (SELECT 1 FROM json_each(touchpoint_summary) WHERE UPPER(json_extract(value, '\$.status')) IN ($ph))",
+      );
+      params.addAll(interestStatuses);
     }
-    if (touchpointFilter.hasFilter) {
-      clients = clients.where((c) => touchpointFilter.matches(c)).toList();
+  }
+
+  // ── Date range — any touchpoint within the range ──────────────────────────
+  if (attributeFilter.touchpointDateFrom != null ||
+      attributeFilter.touchpointDateTo != null) {
+    final dateConds = <String>[];
+    if (attributeFilter.touchpointDateFrom != null) {
+      dateConds.add("date(json_extract(value, '\$.date')) >= date(?)");
+      params.add(
+        attributeFilter.touchpointDateFrom!.toIso8601String().substring(0, 10),
+      );
     }
-
-    final totalItems = clients.length;
-    final totalPages = (totalItems / itemsPerPage).ceil().clamp(1, 9999);
-    final offset = ((page - 1) * itemsPerPage).clamp(0, totalItems);
-    final end = (offset + itemsPerPage).clamp(0, totalItems);
-
-    return ClientsResponse(
-      items: clients.sublist(offset, end),
-      page: page,
-      perPage: itemsPerPage,
-      totalItems: totalItems,
-      totalPages: totalPages,
+    if (attributeFilter.touchpointDateTo != null) {
+      dateConds.add("date(json_extract(value, '\$.date')) <= date(?)");
+      params.add(
+        attributeFilter.touchpointDateTo!.toIso8601String().substring(0, 10),
+      );
+    }
+    conditions.add(
+      "EXISTS (SELECT 1 FROM json_each(touchpoint_summary) WHERE ${dateConds.join(' AND ')})",
     );
   }
 
-  // ── Fast path: SQL pagination only ───────────────────────────────────────
+  // ── Recently visited — any touchpoint in the last N days ──────────────────
+  if (attributeFilter.recentlyVisitedDays != null) {
+    final cutoff = DateTime.now()
+        .subtract(Duration(days: attributeFilter.recentlyVisitedDays!))
+        .toIso8601String()
+        .substring(0, 10);
+    conditions.add(
+      "EXISTS (SELECT 1 FROM json_each(touchpoint_summary) WHERE date(json_extract(value, '\$.date')) >= date(?))",
+    );
+    params.add(cutoff);
+  }
+
+  // ── Touchpoint-number filter ───────────────────────────────────────────────
+  // 8 is the "archive" sentinel (no next touchpoint or already loan-released).
+  // nextTouchpointNumber is not in the PowerSync schema, so fall back to
+  // touchpoint_number + 1 (the upcoming visit step the client is about to do).
+  if (touchpointFilter.hasFilter) {
+    final archiveSelected = touchpointFilter.selectedNumbers.contains(8);
+    final numberedSelected =
+        touchpointFilter.selectedNumbers.where((n) => n != 8).toList();
+    if (archiveSelected && numberedSelected.isNotEmpty) {
+      final ph = numberedSelected.map((_) => '?').join(', ');
+      conditions.add(
+        "((next_touchpoint IS NULL OR loan_released = 1) OR (touchpoint_number + 1) IN ($ph))",
+      );
+      params.addAll(numberedSelected);
+    } else if (archiveSelected) {
+      conditions.add('(next_touchpoint IS NULL OR loan_released = 1)');
+    } else {
+      final ph = numberedSelected.map((_) => '?').join(', ');
+      conditions.add('(touchpoint_number + 1) IN ($ph)');
+      params.addAll(numberedSelected);
+    }
+  }
+
+  final where = conditions.join(' AND ');
+
+  // ── SQL pagination for all filter combinations ────────────────────────────
   final offset = (page - 1) * itemsPerPage;
 
   final countRows = await db.getAll(
@@ -768,11 +807,26 @@ final assignedMunicipalitiesProvider = StreamProvider<List<String>>((ref) {
     return Stream.value(<String>[]);
   }
 
+  List<String>? previousSorted;
   return PowerSyncService.database.asStream().asyncExpand((db) {
     return db.watch(
       'SELECT DISTINCT municipality FROM user_locations WHERE user_id = ? AND deleted_at IS NULL',
       parameters: [userId],
-    ).map((rows) => rows.map((row) => row['municipality'] as String).toList());
+    ).map((rows) {
+      return rows
+          .map((row) => row['municipality'] as String? ?? '')
+          .where((m) => m.isNotEmpty)
+          .toList()
+        ..sort();
+    }).where((current) {
+      if (previousSorted != null &&
+          previousSorted!.length == current.length &&
+          previousSorted!.every(current.contains)) {
+        return false;
+      }
+      previousSorted = current;
+      return true;
+    });
   });
 });
 
