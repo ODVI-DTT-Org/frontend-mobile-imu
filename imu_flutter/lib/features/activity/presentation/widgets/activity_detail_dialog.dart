@@ -89,7 +89,7 @@ class _ActivityDetailDialogState extends ConsumerState<ActivityDetailDialog> {
     if (_isLoanRelease()) {
       final hoursSinceCreation = DateTime.now().difference(item.createdAt).inHours;
       final isPending = item.status == ActivityStatus.pending;
-      final withinWindow = hoursSinceCreation <= 24;
+      final withinWindow = hoursSinceCreation <= 48;
       debugPrint('[ACTIVITY][canEdit] loanRelease: status=${item.status}($isPending) source=${item.source} createdAt=${item.createdAt} hours=$hoursSinceCreation withinWindow=$withinWindow');
       return isPending && withinWindow;
     }

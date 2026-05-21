@@ -98,6 +98,12 @@ class _AssignedAreasDropdowns extends ConsumerWidget {
 
     return areasAsync.when(
       data: (areas) {
+        // If user_locations hasn't synced yet (empty), fall back to the full
+        // PSGC province list so the filter is still usable.
+        if (areas.provinces.isEmpty) {
+          return _PsgcDropdowns(draftFilter: draftFilter, onChanged: onChanged);
+        }
+
         final provinces = areas.provinces.toList()..sort();
         // Reuse PSGC display labels even if PSGC is still loading — fall
         // through to the raw value in that case (handled by the helper).
