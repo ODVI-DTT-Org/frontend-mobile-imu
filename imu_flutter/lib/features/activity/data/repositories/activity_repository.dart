@@ -151,6 +151,20 @@ class ActivityRepository {
     );
   }
 
+  /// Parse a timestamp that may have been written by the device (Dart
+  /// ISO8601) OR replicated from Postgres by PowerSync. PowerSync can emit a
+  /// timestamptz with a bare `+00` offset, which SQLite's `datetime()` fails
+  /// to parse (returns NULL) — Dart's parser handles both shapes.
+  static DateTime? parseTimestamp(Object? raw) {
+    if (raw == null) return null;
+    return DateTime.tryParse(raw.toString());
+  }
+
+  static bool isWithinWindow(DateTime? createdAt, DateTime from, DateTime to) {
+    if (createdAt == null) return false;
+    return !createdAt.isBefore(from) && !createdAt.isAfter(to);
+  }
+
   // ── PowerSync pending upload IDs ─────────────────────────────────────────
 
   Future<Set<String>> _pendingIds(String table) async {
@@ -218,6 +232,10 @@ class ActivityRepository {
 
   Future<List<ActivityItem>> fetchApprovals(DateTime from, DateTime to) async {
     debugPrint('[ACTIVITY][repo] fetchApprovals userId=$userId from=$from to=$to');
+    // Date window is filtered in Dart, not SQLite. `approvals.created_at` is
+    // server-set and replicated by PowerSync; its timestamp text can be a form
+    // SQLite's `datetime()` returns NULL for, which silently dropped pending
+    // approvals (incl. loan releases) from the feed. See [isWithinWindow].
     final rows = await PowerSyncService.query(
       """
       SELECT a.id, a.type, a.status, a.reason, a.notes, a.udi_number,
@@ -227,14 +245,16 @@ class ActivityRepository {
       FROM approvals a
       LEFT JOIN clients c ON c.id = a.client_id
       WHERE a.user_id = ?
-        AND datetime(a.created_at) BETWEEN datetime(?) AND datetime(?)
       ORDER BY a.created_at DESC
       """,
-      [userId, from.toIso8601String(), to.toIso8601String()],
+      [userId],
     );
 
     debugPrint('[ACTIVITY][repo] fetchApprovals — ${rows.length} rows');
-    return rows.map((r) {
+    final items = <ActivityItem>[];
+    for (final r in rows) {
+      final createdAt = parseTimestamp(r['created_at']);
+      if (!isWithinWindow(createdAt, from, to)) continue;
       final type = r['type'] as String? ?? 'client';
       final reason = r['reason'] as String?;
       final statusStr = r['status'] as String? ?? 'pending';
@@ -243,17 +263,18 @@ class ActivityRepository {
       final detail = subtype == ActivitySubtype.loanRelease && udiNumber != null
           ? udiNumber
           : reason;
-      return ActivityItem(
+      items.add(ActivityItem(
         id: r['id'] as String,
         type: ActivityType.approval,
         subtype: subtype,
         clientName: r['client_name'] as String?,
         detail: detail,
         status: statusFromApproval(statusStr),
-        createdAt: DateTime.parse(r['created_at'] as String),
+        createdAt: createdAt,
         metadata: approvalMetadataFromRow(r),
-      );
-    }).toList();
+      ));
+    }
+    return items;
   }
 
   Future<Map<String, dynamic>> _visitMetadata(String? visitId) async {
