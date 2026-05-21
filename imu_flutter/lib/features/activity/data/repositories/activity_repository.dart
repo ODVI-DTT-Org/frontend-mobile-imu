@@ -254,7 +254,7 @@ class ActivityRepository {
     final items = <ActivityItem>[];
     for (final r in rows) {
       final createdAt = parseTimestamp(r['created_at']);
-      if (!isWithinWindow(createdAt, from, to)) continue;
+      if (createdAt == null || !isWithinWindow(createdAt, from, to)) continue;
       final type = r['type'] as String? ?? 'client';
       final reason = r['reason'] as String?;
       final statusStr = r['status'] as String? ?? 'pending';
