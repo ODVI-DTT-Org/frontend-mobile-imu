@@ -64,8 +64,11 @@ class PsgcAssetService {
   }
 
   List<PsgcBarangay> barangaysForMunicipality(String municipality) {
+    // Case-insensitive so backend-assigned areas (stored uppercase) match the
+    // title-case names in psgc.json (e.g. "CALOOCAN CITY" → "Caloocan City").
+    final munNorm = municipality.toLowerCase().trim();
     return _cache!
-        .where((b) => b.municipality == municipality)
+        .where((b) => (b.municipality ?? '').toLowerCase().trim() == munNorm)
         .toList()
       ..sort((a, b) => (a.barangay ?? '').compareTo(b.barangay ?? ''));
   }

@@ -42,6 +42,10 @@ class PendingReleaseService {
     double? latitude,
     double? longitude,
     String? address,
+    // When true this item is already on the backend — skip upload during flush
+    // but keep it in the queue so it appears in the activity feed immediately
+    // while PowerSync syncs the server's approvals table back to the device.
+    bool submittedOnline = false,
   }) async {
     final box = await _box();
     final id = _uuid.v4();
@@ -62,10 +66,17 @@ class PendingReleaseService {
       'longitude': longitude,
       'address': address,
       'queuedAt': DateTime.now().toIso8601String(),
+      'submittedOnline': submittedOnline,
     });
     await box.put(id, payload);
-    debugPrint('PendingReleaseService: Queued release $id (${box.length} pending)');
+    debugPrint('PendingReleaseService: Queued release $id submittedOnline=$submittedOnline (${box.length} pending)');
     return id;
+  }
+
+  /// Remove a single entry by id (used when PowerSync has delivered the approval).
+  Future<void> remove(String id) async {
+    final box = await _box();
+    await box.delete(id);
   }
 
   Future<int> get count async => (await _box()).length;
@@ -115,6 +126,11 @@ class PendingReleaseService {
       final raw = box.get(id);
       if (raw == null) continue;
       final data = jsonDecode(raw) as Map<String, dynamic>;
+
+      // Items submitted while online are already on the backend — skip upload.
+      // They remain in the queue for display until PowerSync delivers the row.
+      if (data['submittedOnline'] == true) continue;
+
       final role = UserRole.fromApi(data['role'] as String);
 
       // Skip the entry if its photo file disappeared between sessions —

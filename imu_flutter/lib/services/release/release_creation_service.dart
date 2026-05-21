@@ -130,6 +130,30 @@ class ReleaseCreationService {
         photoUrl: photoUrl,
         remarks: remarks,
       );
+
+      // Enqueue a display-only copy so the approval appears immediately in
+      // the activity feed while PowerSync syncs the server's approvals row
+      // back to the device. The flush() path skips submittedOnline entries.
+      if (_pendingQueue != null) {
+        await _pendingQueue.enqueue(
+          role: _role,
+          clientId: clientId,
+          timeIn: timeIn,
+          timeOut: timeOut,
+          odometerArrival: odometerArrival,
+          odometerDeparture: odometerDeparture,
+          productType: productType,
+          loanType: loanType,
+          udiNumber: udiNumber,
+          remarks: remarks,
+          photoPath: photoPath,
+          latitude: latitude,
+          longitude: longitude,
+          address: address,
+          submittedOnline: true,
+        );
+        debugPrint('ReleaseCreationService: Enqueued display-only copy for activity feed visibility');
+      }
     }
     return ReleaseSubmitOutcome.submitted;
   }

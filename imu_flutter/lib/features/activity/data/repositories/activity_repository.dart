@@ -87,6 +87,7 @@ class ActivityRepository {
 
   static Map<String, dynamic> approvalMetadataFromRow(Map<String, dynamic> r) {
     return {
+      'clientId': _stringValue(r, 'client_id'),
       'approvalType': _stringValue(r, 'type'),
       'reason': _stringValue(r, 'reason'),
       'notes': _stringValue(r, 'notes'),
@@ -239,6 +240,7 @@ class ActivityRepository {
     final rows = await PowerSyncService.query(
       """
       SELECT a.id, a.type, a.status, a.reason, a.notes, a.udi_number,
+             a.client_id,
              a.updated_udi, a.approved_at, a.rejected_at, a.rejection_reason,
              a.created_at,
              c.first_name || ' ' || c.last_name AS client_name
@@ -383,19 +385,46 @@ class ActivityRepository {
     required DateTime to,
     ActivityType? typeFilter,
   }) async {
-    final futures = <Future<List<ActivityItem>>>[];
+    final touchpoints = (typeFilter == null || typeFilter == ActivityType.touchpoint)
+        ? await fetchTouchpoints(from, to)
+        : <ActivityItem>[];
 
-    if (typeFilter == null || typeFilter == ActivityType.touchpoint) {
-      futures.add(fetchTouchpoints(from, to));
-    }
+    List<ActivityItem> approvals = [];
+    List<ActivityItem> pendingLocal = [];
+    List<ActivityItem> completedReleases = [];
+
     if (typeFilter == null || typeFilter == ActivityType.approval) {
-      futures.add(fetchApprovals(from, to));
-      futures.add(fetchPendingLoanReleases(from, to));
-      futures.add(fetchCompletedLoanReleases(from, to));
+      approvals = await fetchApprovals(from, to);
+      pendingLocal = await fetchPendingLoanReleases(from, to);
+      completedReleases = await fetchCompletedLoanReleases(from, to);
+
+      // clientIds already covered by a synced PowerSync approval
+      final approvalClientIds = approvals
+          .where((a) => a.subtype == ActivitySubtype.loanRelease)
+          .map((a) => a.metadata['clientId'] as String?)
+          .whereType<String>()
+          .toSet();
+
+      // Separate superseded display-only entries from those still needed
+      final superseded = pendingLocal.where((item) {
+        final clientId = item.metadata['clientId'] as String?;
+        return clientId != null && approvalClientIds.contains(clientId);
+      }).toList();
+
+      // Remove superseded entries from the Hive queue so it doesn't grow indefinitely
+      final service = pendingReleaseService;
+      if (service != null && superseded.isNotEmpty) {
+        for (final item in superseded) {
+          await service.remove(item.id);
+        }
+      }
+
+      pendingLocal = pendingLocal
+          .where((item) => !superseded.contains(item))
+          .toList();
     }
 
-    final results = await Future.wait(futures);
-    final merged = results.expand((list) => list).toList()
+    final merged = [...touchpoints, ...approvals, ...pendingLocal, ...completedReleases]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return merged;
   }

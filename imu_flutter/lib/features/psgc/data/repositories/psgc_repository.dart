@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/psgc_models.dart';
 import '../services/psgc_asset_service.dart';
-import '../../../../services/sync/powersync_service.dart';
 
 class PsgcRepository {
   final PsgcAssetService _assetService;
@@ -162,19 +161,8 @@ final municipalitiesByProvinceProvider = FutureProvider.family<List<PsgcMunicipa
   return ref.watch(psgcRepositoryProvider).getMunicipalitiesByProvince(province);
 });
 
+// Reads from the bundled psgc.json asset (same source as provinces/municipalities)
+// so barangays are always available offline without depending on PowerSync psgc table sync.
 final barangaysByMunicipalityProvider = FutureProvider.family<List<PsgcBarangay>, String>((ref, municipality) async {
-  final db = await PowerSyncService.database;
-  final rows = await db.getAll(
-    'SELECT id, region, province, mun_city_kind, mun_city, barangay, zip_code FROM psgc WHERE mun_city = ? AND barangay IS NOT NULL AND barangay != \'\' ORDER BY barangay',
-    [municipality],
-  );
-  return rows.map((row) => PsgcBarangay(
-    id: row['id'] as String? ?? '',
-    region: row['region'] as String?,
-    province: row['province'] as String?,
-    municipality: row['mun_city'] as String?,
-    barangay: row['barangay'] as String?,
-    municipalityKind: row['mun_city_kind'] as String?,
-    zipCode: row['zip_code'] as String?,
-  )).toList();
+  return ref.read(psgcRepositoryProvider).getBarangaysByMunicipality(municipality);
 });
